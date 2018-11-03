@@ -43,7 +43,7 @@ class ApiController extends Controller
      */
     public function show(Request $req)
     {
-        $data              = $this->getOneApi($req);
+        $data              = $this->getOneApi($req, 'show');
         $data['namespace'] = $req->input('file', null);
 
         return $this->view('api.show', $data);
@@ -57,7 +57,7 @@ class ApiController extends Controller
     public function request(Request $req)
     {
         $list                = $this->getApiList();
-        $data                = $this->getOneApi($req);
+        $data                = $this->getOneApi($req, 'request');
         $data['request_url'] = str_replace($req->path(), 'api', $req->url());
         $data['api_index']   = 1;
 
@@ -108,7 +108,7 @@ class ApiController extends Controller
      *
      * @return mixed
      */
-    private function getOneApi($req)
+    private function getOneApi($req, $from_action)
     {
         $folder_name      = $req->input('f', 'Index');
         $folder_path      = $folder_name == 'Index' ? '' : '' . $folder_name;
@@ -126,6 +126,7 @@ class ApiController extends Controller
             throw new InvalidArgumentException('Invalid Action Argument (Not Found).');
         }
         $action_data                       = $data['actions'][$action_name];
+        $action_data['request']            = $this->formatRequest($action_data['request']);
         $action_data['current_action']     = $action_name;
         $action_data['current_folder']     = $folder_path;
         $action_data['current_controller'] = $controller_class;
@@ -135,11 +136,14 @@ class ApiController extends Controller
 
         // 字段数据，从中获取字段格式，以便 faker 伪造数据
         $fields = $this->utility->getFields();
-    
+        
         // 添加 cookie 到 body params
-        if ( ! empty($req->cookie('token')) && $action_name != 'authenticate')
+        if (! empty($req->cookie('api_token')) && $action_name != 'authenticate')
         {
-            $action_data['body_params']['token'] = ['Api Token', $req->cookie('api_token')];
+            $action_data['body_params']['token'] = [
+                'Api Token',
+                ($from_action == 'request' ? $req->cookie('api_token') : '')
+            ];
         }
 
         $url_params = $body_params = [];
@@ -158,6 +162,23 @@ class ApiController extends Controller
         //dump($action_data);
 
         return $action_data;
+    }
+    
+    /**
+     * 格式化请求参数
+     *
+     * @param $request
+     *
+     * @return array
+     */
+    private function formatRequest($request)
+    {
+        $method = $request[0];
+        $url    = $request[1];
+    
+        $url    = preg_replace('/\{[a-z_]+\}/i', rand(1, 5), $url);
+        
+        return [$method, $url];
     }
 
     /**
