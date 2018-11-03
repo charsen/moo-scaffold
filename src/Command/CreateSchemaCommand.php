@@ -1,39 +1,39 @@
 <?php
 namespace Charsen\Scaffold\Command;
 
-use Charsen\Scaffold\Generator\CreateDatabaseSchemaGenerator;
+use Charsen\Scaffold\Generator\CreateSchemaGenerator;
 use InvalidArgumentException;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
- * Create a new database schema
+ * Create a new module schema
  *
  * @author   Charsen <780537@gmail.com>
  */
-class CreateDatabaseSchemaCommand extends Command
+class CreateSchemaCommand extends Command
 {
     /**
      * The console command title.
      *
      * @var string
      */
-    protected $title = 'Laravel Scaffold New Databse Schema';
+    protected $title = 'Create a new module schema';
 
     /**
      * The console command name.
      *
      * @var string
      */
-    protected $name = 'scaffold:db:schema';
+    protected $name = 'scaffold:schema';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Create a new database schema';
+    protected $description = 'Create a new module schema';
 
     /**
      * Get the console command options.
@@ -49,7 +49,7 @@ class CreateDatabaseSchemaCommand extends Command
                 InputOption::VALUE_OPTIONAL,
                 'Overwrite the schema file.',
                 false,
-            ]
+            ],
         ];
     }
 
@@ -61,7 +61,7 @@ class CreateDatabaseSchemaCommand extends Command
     protected function getArguments()
     {
         return [
-            ['file_name', InputArgument::REQUIRED, 'The name of the schema. (Ex: Personnel)'],
+            ['schema_name', InputArgument::REQUIRED, 'The name of the schema. (Ex: Personnels)'],
         ];
     }
 
@@ -72,13 +72,15 @@ class CreateDatabaseSchemaCommand extends Command
      */
     public function handle()
     {
+        //$this->checkScaffoldFolder();
+        
         $this->alert($this->title);
 
-        $file_name = $this->argument('file_name');
-        $format    = $this->option('force') === NULL;
+        $schema_name = $this->argument('schema_name');
+        $force       = $this->option('force') === null;
 
-        $result = (new CreateDatabaseSchemaGenerator($this, $this->filesystem, $this->utility))
-                   ->start($file_name, $format);
+        $result = (new CreateSchemaGenerator($this, $this->filesystem, $this->utility))
+            ->start($schema_name, $force);
 
         $this->info('done!');
     }

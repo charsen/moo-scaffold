@@ -1,39 +1,51 @@
 <?php
 namespace Charsen\Scaffold\Command;
 
-use Charsen\Scaffold\Generator\FreshDatabaseStorageGenerator;
+use Charsen\Scaffold\Generator\CreateModelGenerator;
 use InvalidArgumentException;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
- * Fresh Database Storage Command
+ * Create Model Command
  *
  * @author   Charsen <780537@gmail.com>
  */
-class FreshDatabaseStorageCommand extends Command
+class CreateModelCommand extends Command
 {
     /**
      * The console command title.
      *
      * @var string
      */
-    protected $title = 'Laravel Scaffold Fresh Database Storage Command';
+    protected $title = 'Create Model Command';
 
     /**
      * The console command name.
      *
      * @var string
      */
-    protected $name = 'scaffold:db:fresh';
+    protected $name = 'scaffold:model';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Fresh Database Storage Command';
+    protected $description = 'Create Model Command';
+
+    /**
+     * Get the console command arguments.
+     *
+     * @return array
+     */
+    protected function getArguments()
+    {
+        return [
+            ['schema_name', InputArgument::REQUIRED, 'The name of the schema. (Ex: Personnels)'],
+        ];
+    }
 
     /**
      * Get the console command options.
@@ -47,7 +59,7 @@ class FreshDatabaseStorageCommand extends Command
                 'force',
                 '-f',
                 InputOption::VALUE_OPTIONAL,
-                'Overwrite All Storage Files.',
+                'Overwrite Model File.',
                 false,
             ],
         ];
@@ -61,10 +73,11 @@ class FreshDatabaseStorageCommand extends Command
     public function handle()
     {
         $this->alert($this->title);
+        $schema_name = $this->argument('schema_name');
+        $force       = $this->option('force') === null;
 
-        $format = $this->option('force') === null;
-        $result = (new FreshDatabaseStorageGenerator($this, $this->filesystem, $this->utility))
-            ->start($format);
+        $result = (new CreateModelGenerator($this, $this->filesystem, $this->utility))
+            ->start($schema_name, $force);
 
         $this->info('done!');
     }

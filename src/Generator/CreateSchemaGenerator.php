@@ -2,17 +2,21 @@
 namespace Charsen\Scaffold\Generator;
 
 /**
- * Create Database Schema Generator
+ * Create Schema Generator
  *
- * @author   Charsen <780537@gmail.com>
+ * @author Charsen <780537@gmail.com>
  */
-class CreateDatabaseSchemaGenerator extends Generator
+class CreateSchemaGenerator extends Generator
 {
 
-    public function start($file_name, $froce = false)
+    /**
+     * @param $schema_name
+     * @param $froce
+     */
+    public function start($schema_name, $froce = false)
     {
         $schema_folder = $this->utility->getConfig('database.schema');
-        $schema_path   = base_path() . $schema_folder . "/{$file_name}.yaml";
+        $schema_path   = base_path() . $schema_folder . "/{$schema_name}.yaml";
 
         if (!$this->filesystem->exists($schema_path))
         {
@@ -31,13 +35,11 @@ class CreateDatabaseSchemaGenerator extends Generator
         return $this->command->warn("x $schema_path" . ' (Skipped)');
     }
 
+    /**
+     * @return mixed
+     */
     protected function compileStub()
     {
-        $file = $this->getStubPath() . '/schema-database.stub';
-        $stub = $this->filesystem->get($file);
-
-        //$this->buildStub($this->getMeta(), $stub);
-
-        return $stub;
+        return $this->getStub('module-schema');
     }
 }

@@ -13,6 +13,10 @@ use InvalidArgumentException;
  */
 class DatabaseController extends Controller
 {
+    /**
+     * @var array
+     */
+    private $table_style = ['red', 'orange', 'yellow', 'blue', 'olive', 'teal'];
 
     /**
      * tables list
@@ -20,12 +24,9 @@ class DatabaseController extends Controller
      */
     public function index()
     {
-        $data = [];
-        $file = $this->utility->getDatabasePath('storage') . 'tables.php';
-
-        $data['menus']              = require_once $file;
-        $data['table_class']        = ['red', 'orange', 'yellow', 'blue', 'olive', 'teal'];
-        $data['table_index']        = 1;
+        $data                       = [];
+        $data['menus']              = $this->utility->getTables();
+        $data['table_style']        = $this->table_style[array_rand($this->table_style)];
         $data['first_menu_active']  = false;
         $data['first_table_active'] = false;
 
@@ -38,30 +39,23 @@ class DatabaseController extends Controller
      */
     public function dictionaries()
     {
-        $data         = [];
-        $file         = $this->utility->getDatabasePath('storage') . 'dictionaries.php';
-        $data['data'] = require_once $file;
+        $data = ['data' => $this->utility->getDictionaries(false)];
 
         return $this->view('db.dictionaries', $data);
     }
-
+    
     /**
      * table view
      *
+     * @param \Illuminate\Http\Request $req
+     *
+     * @return \Illuminate\View\View
      */
-    public function table(Request $req)
+    public function show(Request $req)
     {
-        $data      = [];
         $file_name = $req->input('name', null);
-        $file      = $this->utility->getDatabasePath('storage') . $file_name . '.php';
+        $data      = ['data' => $this->utility->getOneTable($file_name)];
 
-        if (!is_file($file))
-        {
-            throw new InvalidArgumentException('Invalid Argument (Not Found).');
-        }
-
-        $data['data'] = require_once $file;
-
-        return $this->view('db.table', $data);
+        return $this->view('db.show', $data);
     }
 }

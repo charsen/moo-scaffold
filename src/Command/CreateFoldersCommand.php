@@ -18,7 +18,7 @@ class CreateFoldersCommand extends Command
      *
      * @var string
      */
-    protected $title = 'Laravel Scaffold Create Folders';
+    protected $title = 'Create Scaffold Folders';
 
     /**
      * The console command name.
@@ -32,7 +32,7 @@ class CreateFoldersCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Create Laravel Scaffold\'s Folders';
+    protected $description = 'Create Scaffold Folders';
 
     /**
      * Execute the console command.

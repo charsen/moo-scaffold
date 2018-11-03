@@ -3,6 +3,7 @@
 namespace Charsen\Scaffold\Http\Controllers;
 
 use Charsen\Scaffold\Utility;
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Routing\Controller as BaseController;
 
 /**
@@ -14,21 +15,28 @@ use Illuminate\Routing\Controller as BaseController;
 class Controller extends BaseController
 {
     protected $utility;
-
-    public function __construct(Utility $utility)
+    protected $filesystem;
+    
+    /**
+     * Controller constructor.
+     *
+     * @param \Charsen\Scaffold\Utility         $utility
+     * @param \Illuminate\Filesystem\Filesystem $filesystem
+     */
+    public function __construct(Utility $utility, Filesystem $filesystem)
     {
-        $this->utility = $utility;
+        $this->filesystem = $filesystem;
+        $this->utility    = $utility;
     }
 
     /**
      * Helper to get the config values.
      *
      * @param  string  $key
-     * @param  string  $default
      *
      * @return mixed
      */
-    protected function config($key, $default = null)
+    protected function config($key)
     {
         return $this->utility->getConfig($key);
     }
