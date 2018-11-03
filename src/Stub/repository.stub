@@ -1,0 +1,44 @@
+<?php
+
+namespace App\{{namespace}};
+
+{{use_model}}
+use App\Libs\Repository\AbstractRepository;
+use Illuminate\Validation\Rule;
+use Prettus\Repository\Criteria\RequestCriteria;
+
+/**
+ * Class {{class}}Repository.
+ *
+ * @package namespace App\{{namespace}};
+ */
+class {{class}}Repository extends AbstractRepository implements {{class}}RepositoryInterface
+{
+    /**
+     * Validation Rules
+     *
+     * @var array
+     */
+    protected $rules = [
+        {{rules}}
+    ];
+
+    /**
+     * Specify Model class name
+     *
+     * @return string
+     */
+    public function model()
+    {
+        return {{class}}::class;
+    }
+
+    /**
+     * Boot up the repository, pushing criteria
+     */
+    public function boot()
+    {
+        $this->pushCriteria(app(RequestCriteria::class));
+    }
+
+}

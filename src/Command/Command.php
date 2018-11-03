@@ -15,13 +15,12 @@ class Command extends BaseCommand
     protected $filesystem;
 
     protected $utility;
-
+    
     /**
      * Create a new command instance.
      *
-     * @param Filesystem $files
-     * @param Composer $composer
-     * @return void
+     * @param \Illuminate\Filesystem\Filesystem $filesystem
+     * @param \Charsen\Scaffold\Utility         $utility
      */
     public function __construct(Filesystem $filesystem, Utility $utility)
     {
@@ -36,12 +35,12 @@ class Command extends BaseCommand
      *
      * @return mixed
      */
-    private function checkScaffoldFolder()
+    public function checkScaffoldFolder()
     {
         $check_scaffold_folder = base_path() . '/scaffold';
         if ( ! $this->filesystem->isDirectory($check_scaffold_folder))
         {
-            return $this->call('scaffold:folders');
+            return $this->call('artisan scaffold:folders');
         }
 
         return true;

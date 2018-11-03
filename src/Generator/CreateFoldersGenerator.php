@@ -4,7 +4,7 @@ namespace Charsen\Scaffold\Generator;
 /**
  * Create Folders
  *
- * @author   Charsen <780537@gmail.com>
+ * @author Charsen <780537@gmail.com>
  */
 class CreateFoldersGenerator extends Generator
 {
@@ -37,19 +37,28 @@ class CreateFoldersGenerator extends Generator
             }
         }
 
-        $gitignore_file = base_path() . '/scaffold/.gitignore';
-        if (!$this->filesystem->isFile($gitignore_file))
+        $this->buildGitIgnoreFile();
+    }
+    
+    /**
+     * 生成 脚手架的 .gitignore 文件
+     */
+    private function buildGitIgnoreFile()
+    {
+        $git_ignore_file = base_path() . '/scaffold/.gitignore';
+        if (!$this->filesystem->isFile($git_ignore_file))
         {
             $gitignore_content = '.DS_Store' . PHP_EOL
-                . '/storage/database/*' . PHP_EOL
-                . '/storage/api/*' . PHP_EOL;
-
+                                 //. '/storage/database/*' . PHP_EOL
+                                 //. '/storage/api/*' . PHP_EOL
+                                 . '';
+        
             $put = $this->filesystem->put(base_path() . '/scaffold/.gitignore', $gitignore_content);
             if ($put)
             {
                 return $this->command->info('+ /scaffold/.gitignore');
             }
-
+        
             return $this->command->error('add /scaffold/.gitignore file failed!');
         }
         else

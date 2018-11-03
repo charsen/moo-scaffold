@@ -12,15 +12,16 @@ use Illuminate\Http\Request;
  */
 class ScaffoldController extends Controller
 {
-
+    
     /**
      * Show the dashboard.
+     *
+     * @param \Illuminate\Http\Request $req
      *
      * @return \Illuminate\View\View
      */
     public function index(Request $req)
     {
-
-        return $this->view('dashboard', ['route_prefix' => $this->config('route.prefix')]);
+        return $this->view('dashboard');
     }
 }

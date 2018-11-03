@@ -1,0 +1,15 @@
+<?php
+
+namespace App\{{namespace}};
+
+use Prettus\Repository\Contracts\RepositoryInterface;
+
+/**
+ * Interface {{class}}Repository.
+ *
+ * @package namespace App\{{namespace}};
+ */
+interface {{class}}RepositoryInterface extends RepositoryInterface
+{
+    //
+}

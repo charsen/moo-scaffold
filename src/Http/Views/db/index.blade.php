@@ -1,6 +1,6 @@
 @extends('scaffold::layouts.app')
 
-@section('title', 'Laravel-Scaffold')
+@section('title', 'DBS')
 
 @section('content')
 <div class="ui text container" style="max-width: none !important; width: 1200px" id="menu_top">
@@ -13,15 +13,18 @@
                             <i class="dropdown icon"></i>DB
                         </h4>
                         <div class="content active" style="margin: 0 -16px -13px -16px;">
-                            <?php foreach ($menus as $file_name => $folder): ?>
-                                <a class="item <?=!$first_menu_active ? 'active' : '';?>" data-tab="<?=$file_name;?>"><?=$folder['folder_name'];?> (<?=$folder['tables_count'];?>)</a>
-                            <?php $first_menu_active = true;endforeach;?>
+                            @foreach ($menus as $file_name => $folder)
+                                <a class="item {{ !$first_menu_active ? 'active' : '' }}" data-tab="{{ $file_name }}">
+                                    {{ $folder['folder_name'] }} <font color="orange">({{ $folder['tables_count'] }})</font>
+                                </a>
+                                <?php $first_menu_active = true;?>
+                            @endforeach
                         </div>
                     </div>
 
                     <div class="item">
                         <div class="content">
-                            <a href="./dictionaries" target="dictionaries">数据字典</a>
+                            <a href="{{ route('dictionaries') }}" target="dictionaries">数据字典</a>
                         </div>
                     </div>
                     <div class="item">
@@ -33,9 +36,9 @@
             </div>
 
             <div class="twelve wide stretched column">
-                <?php foreach ($menus as $file_name => $folder): ?>
-                <div class="ui tab <?=!$first_table_active ? 'active' : '';?>" data-tab="<?=$file_name;?>">
-                    <table class="ui red celled striped table <?=$table_class[array_rand($table_class)];?> celled striped table">
+                @foreach ($menus as $file_name => $folder)
+                <div class="ui tab {{ (!$first_table_active ? 'active' : '') }}" data-tab="{{ $file_name }}">
+                    <table class="ui red celled striped table {{ $table_style }} celled striped table">
                         <thead>
                             <tr>
                                 <th>#</th>
@@ -45,18 +48,24 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($folder['tables'] as $table_name => $table): ?>
+                            <?php $index = 1; ?>
+                            @foreach ($folder['tables'] as $table_name => $table)
                             <tr>
-                                <td><?=$table_index++;?></td>
-                                <td><a href="./table?name=<?=$table_name;?>" target="<?=$table_name;?>"><?=$table_name;?></a></td>
-                                <td><?=$table['name'];?></td>
-                                <td><?=$table['desc'];?></td>
+                                <td>{{ $index++ }}</td>
+                                <td>
+                                    <a href="{{ route('table.show', ['name' => $table_name]) }}" target="{{ $table_name  }}">
+                                        {{ $table_name  }}
+                                    </a>
+                                </td>
+                                <td>{{ $table['name'] }}</td>
+                                <td>{{ $table['desc'] }}</td>
                             </tr>
-                            <?php endforeach;?>
+                            @endforeach
                         </tbody>
                     </table>
                 </div>
-                <?php $first_table_active = true;endforeach;?>
+                    <?php $first_table_active = true; ?>
+                @endforeach
             </div>
         </div>
 
