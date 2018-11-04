@@ -38,7 +38,6 @@ class CreateApiGenerator extends Generator
 
         // 获取对应的 repository_class, table_name, model_class
         $controllers = $this->utility->getControllers();
-        //dump($controllers);
 
         foreach ($routes as $controller_name => $actions)
         {

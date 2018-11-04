@@ -35,7 +35,7 @@ class CreateModelGenerator extends Generator
         $this->model_relative_path = $this->utility->getModelPath(true);
         $this->model_folder        = $this->utility->getConfig('model.path');
 
-        // 从 storage 里获取 表名列表，在修改了 schema 后忘了执行 scaffold:fresh 的话会不准确！！
+        // 从 storage 里获取模型数据，在修改了 schema 后忘了执行 scaffold:fresh 的话会不准确！！
         $all = $this->utility->getModels();
 
         if (!isset($all[$schema_name]))

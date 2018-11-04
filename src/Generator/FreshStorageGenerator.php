@@ -68,7 +68,7 @@ class FreshStorageGenerator extends Generator
                 // 缓存 控制器 与 模型和资源仓库的关系
                 if (isset($config['controller']))
                 {
-                    $controllers[$config['controller']['class']] = [
+                    $controllers[$file_name][$config['controller']['class']] = [
                         'table_name'       => $table_name,
                         'model_class'      => $config['model']['class'] ?? '',
                         'repository_class' => $config['repository']['class'] ?? '',

@@ -3,7 +3,6 @@ namespace Charsen\Scaffold\Generator;
 
 use Charsen\Scaffold\Utility;
 use Illuminate\Console\Command;
-use Illuminate\Container\Container;
 use Illuminate\Filesystem\Filesystem;
 
 /**
@@ -85,7 +84,8 @@ class Generator
      *
      * @param array $metas
      * @param string $template
-     * @return void
+     *
+     * @return string
      */
     protected function buildStub(array $metas, $template)
     {
@@ -119,14 +119,5 @@ class Generator
     {
         return $this->filesystem->get($this->getStubPath() . "{$file_name}.stub");
     }
-
-    /**
-     * Get the application namespace.
-     *
-     * @return string
-     */
-    protected function getAppNamespace()
-    {
-        return Container::getInstance()->getNamespace();
-    }
+    
 }

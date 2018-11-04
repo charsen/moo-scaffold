@@ -1,5 +1,5 @@
 ###
-# fileds的默认规划
+# fields 的默认规划
 # - 字段名为 id 时，索引默认设为 AI
 #
 # - require 默认 = true

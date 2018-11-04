@@ -5,7 +5,6 @@ use Charsen\Scaffold\Generator\CreateSchemaGenerator;
 use InvalidArgumentException;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
-use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * Create a new module schema
