@@ -1,6 +1,6 @@
 @extends('scaffold::layouts.app')
 
-@section('title', '接口列表')
+@section('title', '接口文档')
 
 @section('content')
 <div class="ui text container" style="max-width: none !important; width: 1200px" id="menu_top">

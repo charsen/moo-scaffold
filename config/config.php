@@ -5,36 +5,36 @@ return [
         /**
          * schema path, 在 base_path() 下
          */
-        'schema'  => '/scaffold/database',
+        'schema'  => 'scaffold/database/',
         /*
          * storage path, 在 base_path() 下
          */
-        'storage' => '/scaffold/storage/database',
+        'storage' => 'scaffold/storage/database/',
     ],
 
     'api'        => [
         /**
          * schema path, 在 base_path() 下
          */
-        'schema'  => '/scaffold/api',
+        'schema'  => 'scaffold/api/',
         /**
          * storage path, 在 base_path() 下
          */
-        'storage' => '/scaffold/storage/api',
+        'storage' => 'scaffold/storage/api/',
     ],
 
     'model'      => [
         /**
          *  在 app 目录下的路径 app_path()
          */
-        'path' => '/Entities',
+        'path' => 'Entities/',
     ],
 
     'repository' => [
         /**
          *  在 app 下的路径 app_path()
          */
-        'path' => '/Repositories',
+        'path' => 'Repositories/',
     ],
 
     /* -----------------------------------------------------------------

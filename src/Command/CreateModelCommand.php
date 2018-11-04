@@ -1,11 +1,13 @@
 <?php
+
 namespace Charsen\Scaffold\Command;
 
+use Charsen\Scaffold\Generator\CreateControllerGenerator;
 use Charsen\Scaffold\Generator\CreateModelGenerator;
+use Charsen\Scaffold\Generator\CreateRepositoryGenerator;
 use InvalidArgumentException;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
-use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * Create Model Command
@@ -20,21 +22,21 @@ class CreateModelCommand extends Command
      * @var string
      */
     protected $title = 'Create Model Command';
-
+    
     /**
      * The console command name.
      *
      * @var string
      */
     protected $name = 'scaffold:model';
-
+    
     /**
      * The console command description.
      *
      * @var string
      */
     protected $description = 'Create Model Command';
-
+    
     /**
      * Get the console command arguments.
      *
@@ -46,7 +48,7 @@ class CreateModelCommand extends Command
             ['schema_name', InputArgument::REQUIRED, 'The name of the schema. (Ex: Personnels)'],
         ];
     }
-
+    
     /**
      * Get the console command options.
      *
@@ -62,9 +64,23 @@ class CreateModelCommand extends Command
                 'Overwrite Model File.',
                 false,
             ],
+            [
+                'controller',
+                '-c',
+                InputOption::VALUE_OPTIONAL,
+                'Create Controller File.',
+                false,
+            ],
+            [
+                'repository',
+                '-r',
+                InputOption::VALUE_OPTIONAL,
+                'Create Repository File.',
+                false,
+            ],
         ];
     }
-
+    
     /**
      * Execute the console command.
      *
@@ -75,10 +91,21 @@ class CreateModelCommand extends Command
         $this->alert($this->title);
         $schema_name = $this->argument('schema_name');
         $force       = $this->option('force') === null;
-
+        $controller  = $this->option('controller') === null;
+        $repository  = $this->option('repository') === null;
+        
         $result = (new CreateModelGenerator($this, $this->filesystem, $this->utility))
             ->start($schema_name, $force);
-
+        
+        if ($controller) {
+            $result = (new CreateControllerGenerator($this, $this->filesystem, $this->utility))
+                ->start($schema_name, $force);
+        }
+        if ($repository) {
+            $result = (new CreateRepositoryGenerator($this, $this->filesystem, $this->utility))
+                ->start($schema_name, $force);
+        }
+        
         $this->info('done!');
     }
 }

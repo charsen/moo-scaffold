@@ -11,28 +11,21 @@ class CreateSchemaGenerator extends Generator
 
     /**
      * @param $schema_name
-     * @param $froce
+     * @param $force
      */
-    public function start($schema_name, $froce = false)
+    public function start($schema_name, $force = false)
     {
-        $schema_folder = $this->utility->getConfig('database.schema');
-        $schema_path   = base_path() . $schema_folder . "/{$schema_name}.yaml";
-
-        if (!$this->filesystem->exists($schema_path))
+        $schema_relative_file = $this->utility->getSchema("{$schema_name}.yaml", true);
+        $schema_file          = $this->utility->getSchema("{$schema_name}.yaml");
+        
+        if (!$this->filesystem->exists($schema_file) || $force)
         {
-            $this->filesystem->put($schema_path, $this->compileStub());
+            $this->filesystem->put($schema_file, $this->compileStub());
 
-            return $this->command->info("+ $schema_path");
+            return $this->command->info("+ $schema_relative_file" . ($force ? ' (Overwrited)' : ''));
         }
 
-        if ($froce)
-        {
-            $this->filesystem->put($schema_path, $this->compileStub());
-
-            return $this->command->info("+ $schema_path" . ' (Overwrited)');
-        }
-
-        return $this->command->warn("x $schema_path" . ' (Skipped)');
+        return $this->command->warn("x $schema_relative_file" . ' (Skipped)');
     }
 
     /**

@@ -23,6 +23,20 @@ class Utility
     }
     
     /**
+     * 获取 schema 文件路径
+     *
+     * @param null $file_name
+     *
+     * @return string
+     */
+    public function getSchema($file_name = null, $relative = false)
+    {
+        $path = $this->getDatabasePath('schema', $relative);
+
+        return $file_name == null ? $path : ($path . $file_name);
+    }
+    
+    /**
      * 检查 api 下的文件是否存在
      *
      * @param        $folder_path
@@ -96,12 +110,29 @@ class Utility
     /**
      * 获取控制器数据
      *
-     * @return mixed
+     * @param bool $merge_all
+     *
+     * @return array
      * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
-    public function getControllers()
+    public function getControllers($merge_all = true)
     {
-        return $this->filesystem->getRequire($this->getDatabasePath('storage') . 'controllers.php');
+        $data = $this->filesystem->getRequire($this->getDatabasePath('storage') . 'controllers.php');
+        if (! $merge_all)
+        {
+            return $data;
+        }
+        
+        $result = [];
+        foreach ($data as $schema_file => $controllers)
+        {
+            foreach ($controllers as $class => $attr)
+            {
+                $result[$class] = $attr;
+            }
+        }
+        
+        return $result;
     }
 
     /**
@@ -150,6 +181,24 @@ class Utility
     }
     
     /**
+     * Get Controller Path
+     *
+     * @param bool $relative
+     *
+     * @return mixed|string
+     */
+    public function getControllerPath($relative = false)
+    {
+        $path = app_path('Http/Controllers/');
+        if ($relative)
+        {
+            $path = str_replace(base_path(), '.', $path);
+        }
+        
+        return $path;
+    }
+    
+    /**
      * Get Repository Path
      *
      * @param bool $relative
@@ -158,13 +207,9 @@ class Utility
      */
     public function getRepositoryPath($relative = false)
     {
-        $folder = trim($this->getConfig('repository.path'), '/') . '/';
-        if ($relative)
-        {
-            return './' . $folder;
-        }
-
-        return app_path() . '/' . $folder;
+        $path = base_path($this->getConfig('repository.path'));
+    
+        return $relative ? str_replace(base_path(), '.', $path) : $path;
     }
     
     /**
@@ -176,13 +221,9 @@ class Utility
      */
     public function getModelPath($relative = false)
     {
-        $folder = trim($this->getConfig('model.path'), '/') . '/';
-        if ($relative)
-        {
-            return './' . $folder;
-        }
-
-        return app_path() . '/' . $folder;
+        $path = base_path($this->getConfig('model.path'));
+    
+        return $relative ? str_replace(base_path(), '.', $path) : $path;
     }
     
     /**
@@ -194,12 +235,7 @@ class Utility
      */
     public function getMigrationPath($relative = false)
     {
-        if ($relative)
-        {
-            return './database/migrations/';
-        }
-
-        return base_path() . '/database/migrations/';
+        return $relative ? './database/migrations/' : base_path('database/migration/');
     }
     
     /**
@@ -212,12 +248,9 @@ class Utility
      */
     public function getDatabasePath($folder = 'schema', $relative = false)
     {
-        if ($relative)
-        {
-            return './' . trim($this->getConfig('database.' . $folder), '/') . '/';
-        }
-
-        return base_path() . '/' . trim($this->getConfig('database.' . $folder), '/') . '/';
+        $path = base_path($this->getConfig('database.' . $folder));
+        
+        return $relative ? str_replace(base_path(), '.', $path) : $path;
     }
     
     /**
@@ -230,12 +263,9 @@ class Utility
      */
     public function getApiPath($folder = 'schema', $relative = false)
     {
-        if ($relative)
-        {
-            return './' . trim($this->getConfig('api.' . $folder), '/') . '/';
-        }
-
-        return base_path() . '/' . trim($this->getConfig('api.' . $folder), '/') . '/';
+        $path = base_path($this->getConfig('api.' . $folder));
+    
+        return $relative ? str_replace(base_path(), '.', $path) : $path;
     }
 
     /**
