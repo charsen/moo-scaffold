@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
  * {{migrant_name}}
  *
  * @description {{migrant_desc}}
+ *
+ * @author {{author}}
+ * @date   {{date}}
  */
 class {{migrant_class}} extends Migration
 {

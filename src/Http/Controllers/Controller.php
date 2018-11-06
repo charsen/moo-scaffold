@@ -10,7 +10,7 @@ use Illuminate\Routing\Controller as BaseController;
  * Class     Controller
  *
  * @package  Charsen\Scaffold\Http\Controllers
- * @author   Charsen <780537@gmail.com>
+ * @author Charsen https://github.com/charsen
  */
 class Controller extends BaseController
 {

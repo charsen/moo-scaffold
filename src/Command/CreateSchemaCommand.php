@@ -9,7 +9,7 @@ use Symfony\Component\Console\Input\InputOption;
 /**
  * Create a new module schema
  *
- * @author   Charsen <780537@gmail.com>
+ * @author Charsen https://github.com/charsen
  */
 class CreateSchemaCommand extends Command
 {
@@ -71,8 +71,6 @@ class CreateSchemaCommand extends Command
      */
     public function handle()
     {
-        //$this->checkScaffoldFolder();
-        
         $this->alert($this->title);
 
         $schema_name = $this->argument('schema_name');
@@ -80,7 +78,7 @@ class CreateSchemaCommand extends Command
 
         $result = (new CreateSchemaGenerator($this, $this->filesystem, $this->utility))
             ->start($schema_name, $force);
-
-        $this->info('done!');
+    
+        $this->tipDone();
     }
 }

@@ -8,7 +8,7 @@ use Illuminate\Filesystem\Filesystem;
 /**
  * Generator
  *
- * @author   Charsen <780537@gmail.com>
+ * @author Charsen https://github.com/charsen
  */
 class Generator
 {

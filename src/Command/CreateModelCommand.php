@@ -3,6 +3,7 @@
 namespace Charsen\Scaffold\Command;
 
 use Charsen\Scaffold\Generator\CreateControllerGenerator;
+use Charsen\Scaffold\Generator\CreateMigrationGenerator;
 use Charsen\Scaffold\Generator\CreateModelGenerator;
 use Charsen\Scaffold\Generator\CreateRepositoryGenerator;
 use InvalidArgumentException;
@@ -12,7 +13,7 @@ use Symfony\Component\Console\Input\InputOption;
 /**
  * Create Model Command
  *
- * @author   Charsen <780537@gmail.com>
+ * @author Charsen https://github.com/charsen
  */
 class CreateModelCommand extends Command
 {
@@ -45,7 +46,7 @@ class CreateModelCommand extends Command
     protected function getArguments()
     {
         return [
-            ['schema_name', InputArgument::REQUIRED, 'The name of the schema. (Ex: Personnels)'],
+            ['schema_name', InputArgument::OPTIONAL, 'The name of the schema. (Ex: Personnels)'],
         ];
     }
     
@@ -78,6 +79,13 @@ class CreateModelCommand extends Command
                 'Create Repository File.',
                 false,
             ],
+            [
+                'migration',
+                '-m',
+                InputOption::VALUE_OPTIONAL,
+                'Create migration File.',
+                false,
+            ],
         ];
     }
     
@@ -85,27 +93,50 @@ class CreateModelCommand extends Command
      * Execute the console command.
      *
      * @return void
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
     public function handle()
     {
         $this->alert($this->title);
+    
         $schema_name = $this->argument('schema_name');
+        if (empty($schema_name))
+        {
+            $file_names  = $this->utility->getSchemaNames();
+            $schema_name = $this->choice('What is schema name?', $file_names);
+        }
+        
         $force       = $this->option('force') === null;
         $controller  = $this->option('controller') === null;
         $repository  = $this->option('repository') === null;
-        
+        $migration   = $this->option('migration') === null;
+    
+        $this->tipCallCommand('scaffold:model');
         $result = (new CreateModelGenerator($this, $this->filesystem, $this->utility))
             ->start($schema_name, $force);
         
         if ($controller) {
+            $this->tipCallCommand('scaffold:controller');
             $result = (new CreateControllerGenerator($this, $this->filesystem, $this->utility))
                 ->start($schema_name, $force);
         }
         if ($repository) {
+            $this->tipCallCommand('scaffold:repository');
             $result = (new CreateRepositoryGenerator($this, $this->filesystem, $this->utility))
                 ->start($schema_name, $force);
         }
-        
-        $this->info('done!');
+        if ($migration) {
+            $this->tipCallCommand('scaffold:migration');
+            $result = (new CreateMigrationGenerator($this, $this->filesystem, $this->utility))
+                ->start($schema_name, $force);
+            
+            if ($this->confirm("Do you want to Execute 'artisan migrate' ?", 'yes'))
+            {
+                $this->tipCallCommand('migrate');
+                $this->call('migrate');
+            }
+        }
+    
+        $this->tipDone();
     }
 }

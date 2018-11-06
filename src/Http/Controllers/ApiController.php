@@ -11,7 +11,7 @@ use Symfony\Component\Yaml\Yaml;
  * Class     ApiController
  *
  * @package  Charsen\Scaffold\Http\Controllers
- * @author   Charsen <780537@gmail.com>
+ * @author Charsen https://github.com/charsen
  */
 class ApiController extends Controller
 {
@@ -33,7 +33,7 @@ class ApiController extends Controller
 
         return $this->view('api.index', $data);
     }
-    
+
     /**
      * api view
      *
@@ -48,7 +48,7 @@ class ApiController extends Controller
 
         return $this->view('api.show', $data);
     }
-    
+
     /**
      * @param Request $req
      *
@@ -72,7 +72,6 @@ class ApiController extends Controller
     private function getApiList()
     {
         $yaml_files = $this->filesystem->allFiles($this->utility->getApiPath('schema'));
-        //dump($yaml_files);
 
         $yaml  = new Yaml;
         $menus = [];
@@ -102,7 +101,7 @@ class ApiController extends Controller
 
         return ['menus' => $menus, 'apis' => $apis];
     }
-    
+
     /**
      * @param $req
      *
@@ -222,6 +221,20 @@ class ApiController extends Controller
             {
                 $attr[2] = $faker->userName;
             }
+            elseif ($field_name == 'id_card_number')
+            {
+                $attr[2] = '';
+            }
+            elseif ($field_name == 'logo' || strstr($field_name, '_logo'))
+            {
+                $attr[2] = $faker->image(base_path('../uploads/temp/'), 320, 320);
+                $attr[2] = str_replace(base_path('../'), '/', $attr[2]);
+            }
+            elseif ($field_name == 'banner' || strstr($field_name, '_banner'))
+            {
+                $attr[2] = $faker->image(base_path('../uploads/temp/'), 750, 360);
+                $attr[2] = str_replace(base_path('../'), '/', $attr[2]);
+            }
             elseif ($field_name == 'real_name')
             {
                 $attr[2] = $attr[2] = $faker->name(array_random(['male', 'female']));
@@ -289,7 +302,7 @@ class ApiController extends Controller
                 $data[$key][3] .= ' ' . json_encode(array_pluck($dictionaries[$key], 2, 0), JSON_UNESCAPED_UNICODE);
             }
 
-            $data[$key][4] = isset($fields[$key]) ? $fields[$key]['type'] : null;
+            $data[$key][4] = isset($fields[$key]['type']) ? $fields[$key]['type'] : null;
         }
 
         return $data;

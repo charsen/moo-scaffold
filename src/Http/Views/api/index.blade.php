@@ -15,7 +15,8 @@
                         </h4>
                         <div class="content active" style="margin: 0 -16px -13px -16px;">
                         @foreach ($controllers as $controller_class => $attr)
-                            <a class="item {{ (!$first_menu_active ? 'active' : '') }}" data-tab="{{ $folder_name }}-{{ $controller_class }}">
+                            <a class="item {{ (!$first_menu_active ? 'active' : '') }}"
+                               data-tab="{{ (str_replace('/', '-', $folder_name)) }}-{{ $controller_class }}">
                                 {{ $attr['name'] }} <font color="orange">({{ $attr['api_count'] }})</font>
                             </a>
                         <?php $first_menu_active = true;?>
@@ -35,7 +36,8 @@
             <div class="twelve wide stretched column">
                 @foreach ($apis as $folder_name => $data)
                     @foreach ($data as $controller_class => $actions)
-                    <div class="ui tab {{ (!$first_table_active ? 'active' : '') }}" data-tab="{{ $folder_name}}-{{ $controller_class }}">
+                    <div class="ui tab {{ (!$first_table_active ? 'active' : '') }}"
+                         data-tab="{{ (str_replace('/', '-', $folder_name)) }}-{{ $controller_class }}">
                         <table class="ui red celled striped table {{ $table_style }} celled striped table">
                             <thead>
                                 <tr>

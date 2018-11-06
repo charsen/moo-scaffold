@@ -7,7 +7,7 @@ use Symfony\Component\Yaml\Yaml;
 /**
  * Create Repository
  *
- * @author Charsen <780537@gmail.com>
+ * @author Charsen https://github.com/charsen
  */
 class CreateRepositoryGenerator extends Generator
 {
@@ -26,18 +26,20 @@ class CreateRepositoryGenerator extends Generator
     protected $repository_folder;
     protected $model_path;
     protected $model_folder;
-
+    
     /**
-     * @param $schema_name
-     * @param $force
+     * @param      $schema_name
+     * @param bool $force
+     *
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
     public function start($schema_name, $force = false)
     {
         $this->repository_path          = $this->utility->getRepositoryPath();
         $this->repository_relative_path = $this->utility->getRepositoryPath(true);
-        $this->repository_folder        = $this->utility->getConfig('repository.path');
+        $this->repository_folder        = $this->utility->getRepositoryFolder();
         $this->model_path               = $this->utility->getModelPath();
-        $this->model_folder             = $this->utility->getConfig('model.path');
+        $this->model_folder             = $this->utility->getModelFolder();
 
         // 从 storage 里获取 表名列表，在修改了 schema 后忘了执行 scaffold:fresh 的话会不准确！！
         $all = $this->utility->getRepositories();
@@ -56,7 +58,7 @@ class CreateRepositoryGenerator extends Generator
             $repository_relative_file = $this->repository_relative_path . "{$repository_class}Repository.php";
             if ($this->filesystem->isFile($repository_file) && !$force)
             {
-                $this->command->error('x Model is existed (' . $repository_relative_file . ')');
+                $this->command->error('x Repository is existed (' . $repository_relative_file . ')');
                 continue;
             }
 
@@ -71,8 +73,10 @@ class CreateRepositoryGenerator extends Generator
             $model_namespace      = $this->dealNameSpaceAndPath($this->model_path, $this->model_folder, $attr['model_class']);
 
             $meta = [
-                'namespace' => $repository_namespace,
-                'use_model' => 'use App\\' . $model_namespace . '\\'. $attr['model_class'] . ';',
+                'author'    => $this->utility->getConfig('author'),
+                'date'      => date('Y-m-d H:i:s'),
+                'namespace' => ucfirst($repository_namespace),
+                'use_model' => 'use ' . ucfirst($model_namespace) . '\\'. $attr['model_class'] . ';',
                 'class'     => $repository_class,
                 'rules'     => $this->buildRules($fields, $dictionaries_ids),
             ];
@@ -87,12 +91,13 @@ class CreateRepositoryGenerator extends Generator
             $this->command->info('+ ' . $repository_relative_interface_file);
         }
     }
-
+    
     /**
      * 生成 检验规
      *
-     * @param  array  $fields
-     * @param  array  $dictionaries [description]
+     * @param  array $fields
+     * @param array  $dictionaries_ids
+     *
      * @return string
      */
     private function buildRules(array $fields, array $dictionaries_ids)
@@ -114,15 +119,18 @@ class CreateRepositoryGenerator extends Generator
 
         return implode("\n", array_merge($create_code, $update_code));
     }
-
+    
     /**
      * 重建 字段的规则
      *
-     * @param  array  $fields
+     * @param  array $fields
+     * @param array  $dictionaries_ids
+     *
      * @return array
      */
     private function rebuildFieldsRules(array $fields, array $dictionaries_ids)
     {
+        //todo, 根据 索引 unique 附加 unique 规则
         $rules = [];
         foreach ($fields as $field_name => $attr)
         {
@@ -139,15 +147,19 @@ class CreateRepositoryGenerator extends Generator
             {
                 $filed_rules[] = 'nullable';
             }
+            if (in_array($attr['type'], ['int', 'tinyint', 'bigint']))
+            {
+                $filed_rules[] = 'integer';
+            }
             if ($attr['type'] == 'date' || $attr['type'] == 'datetime')
             {
                 $filed_rules[] = 'date';
             }
-            if (isset($attr['min_size']))
+            if (isset($attr['min_size']) && in_array($attr['type'], ['char', 'varchar']))
             {
                 $filed_rules[] = 'min:' . $attr['min_size'];
             }
-            if (isset($attr['size']))
+            if (isset($attr['size']) && in_array($attr['type'], ['char', 'varchar']))
             {
                 $filed_rules[] = 'max:' . $attr['size'];
             }
@@ -162,11 +174,13 @@ class CreateRepositoryGenerator extends Generator
 
         return $rules;
     }
-
+    
     /**
      * 重建 数据字典
-     * @param  array  $dictionaries [description]
-     * @return [type]               [description]
+     *
+     * @param  array $dictionaries [description]
+     *
+     * @return array [type]               [description]
      */
     private function rebuildDictionaries(array $dictionaries)
     {
@@ -181,23 +195,29 @@ class CreateRepositoryGenerator extends Generator
 
         return $data;
     }
-
+    
     /**
      * 编译模板
      *
+     * @param array $meta
+     *
      * @return string
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
-    private function compileStub($meta)
+    private function compileStub(array $meta)
     {
         return $this->buildStub($meta, $this->getStub('repository'));
     }
-
+    
     /**
      * 编译模板
      *
+     * @param array $meta
+     *
      * @return string
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
-    private function compileInterfaceStub($meta)
+    private function compileInterfaceStub(array $meta)
     {
         return $this->buildStub($meta, $this->getStub('repository-interface'));
     }

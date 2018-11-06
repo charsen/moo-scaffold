@@ -1,15 +1,23 @@
 <?php
 namespace Charsen\Scaffold;
 
-use Charsen\Scaffold\Command\CreateApiCommand;
-use Charsen\Scaffold\Command\CreateFoldersCommand;
+use Charsen\Scaffold\Command\FreeCommand;
+use Charsen\Scaffold\Command\InitCommand;
+use Charsen\Scaffold\Command\UpdateMultilingualCommand;
 use Charsen\Scaffold\Command\CreateMigrationCommand;
 use Charsen\Scaffold\Command\CreateModelCommand;
 use Charsen\Scaffold\Command\CreateRepositoryCommand;
 use Charsen\Scaffold\Command\CreateSchemaCommand;
+use Charsen\Scaffold\Command\CreateControllerCommand;
 use Charsen\Scaffold\Command\FreshStorageCommand;
+use Charsen\Scaffold\Command\CreateApiCommand;
 use Illuminate\Support\ServiceProvider;
 
+/**
+ * Laravel Scaffold Service Provider
+ *
+ * @author Charsen https://github.com/charsen
+ */
 class ScaffoldProvider extends ServiceProvider
 {
 
@@ -36,14 +44,16 @@ class ScaffoldProvider extends ServiceProvider
 
         if ($this->app->runningInConsole())
         {
-            //$this->app->bind('command.scaffold:database', DatabaseSchemaCommand::class);
             $this->commands([
-                CreateFoldersCommand::class,
+                InitCommand::class,
+                FreeCommand::class,
                 CreateSchemaCommand::class,
                 CreateModelCommand::class,
                 CreateRepositoryCommand::class,
                 FreshStorageCommand::class,
                 CreateMigrationCommand::class,
+                CreateControllerCommand::class,
+                UpdateMultilingualCommand::class,
                 CreateApiCommand::class,
             ]);
         }

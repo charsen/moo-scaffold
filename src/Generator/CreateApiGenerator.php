@@ -8,63 +8,72 @@ use Symfony\Component\Yaml\Yaml;
 /**
  * Create Api
  *
- * @author Charsen <780537@gmail.com>
+ * @author Charsen https://github.com/charsen
  */
 class CreateApiGenerator extends Generator
 {
     protected $api_path;
     protected $api_relative_path;
     protected $unknow_fields;
+    protected $repository_folder;
+    protected $files_path;
     
     /**
-     * @param $namespace
-     * @param $force
+     * @param      $namespace
+     * @param bool $force
+     *
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
     public function start($namespace, $force = false)
     {
         $this->api_path                 = $this->utility->getApiPath('schema');
         $this->api_relative_path        = $this->utility->getApiPath('schema', true);
+        $this->repository_folder        = $this->utility->getRepositoryFolder();
         $this->unknow_fields            = [];
+        $this->files_path               = $this->api_path . $namespace . '/';
 
         // 获取路由列表，但 create 和 edit 两个动作，不一定有，
+        //dump($namespace);
         $routes = $this->getRoutes($namespace);
         if (empty($routes))
         {
             throw new InvalidArgumentException('Controllers are not found.');
         }
+        
+        // 创建目录
+        if (!$this->filesystem->isDirectory($this->files_path))
+        {
+            $this->filesystem->makeDirectory($this->files_path, 0777, true, true);
+        }
 
         // 获取所有字段
         $fields = $this->utility->getFields();
-
+        
         // 获取对应的 repository_class, table_name, model_class
         $controllers = $this->utility->getControllers();
 
         foreach ($routes as $controller_name => $actions)
         {
             // 过滤掉当前控制器 - 路由里多余的 action
-            $controller    = 'App\Http\Controllers\\' . "{$namespace}\\{$controller_name}" . 'Controller';
+            $temp          = str_replace('/', '\\', $namespace);    // 多级目录需要转换
+            $controller    = 'App\Http\Controllers\\' . "{$temp}\\{$controller_name}" . 'Controller';
             $methods       = get_class_methods($controller);
+            if (empty($methods))
+            {
+                throw new InvalidArgumentException('Controller\'s action  are not found.');
+            }
+            
             $real_actions  = array_intersect(array_keys($actions), $methods);
             $unset_actions = array_diff(array_keys($actions), $real_actions);
             foreach ($unset_actions as $key)
             {
                 unset($actions[$key]);
             }
+    
+            $rules             = $this->getRules($controllers, $namespace, $controller_name);
+            $table_name        = $this->getTableName($controllers, $namespace, $controller_name);
 
-            $rules      = [];
-            $table_name = '';
-            if (isset($controllers["{$namespace}/{$controller_name}"]))
-            {
-                $repository = 'App\Repositories\\' . $controllers["{$namespace}/{$controller_name}"]['repository_class'] . 'Repository';
-                $rules      = (new $repository(app()))->getRules();
-                //dump($rules);
-
-                $table      = $this->utility->getOneTable($controllers["{$namespace}/{$controller_name}"]['table_name']);
-                $table_name = $table['name'];
-                // dump($table_name);
-            }
-
-            $api_yaml          = $this->api_path . $namespace . '/' . $controller_name . '.yaml';
+            $api_yaml          = $this->files_path . $controller_name . '.yaml';
             $api_relative_yaml = $this->api_relative_path . $namespace . '/' . $controller_name . '.yaml';
             if ($this->filesystem->isFile($api_yaml) && !$force)
             {
@@ -80,6 +89,54 @@ class CreateApiGenerator extends Generator
         {
             $this->command->error('* unknow_fields: ' . implode(', ', $this->unknow_fields));
         }
+    }
+    
+    /**
+     * 获取控制器对应 repository 的验证规则
+     *
+     * @param $controllers
+     * @param $namespace
+     * @param $controller_name
+     *
+     * @return mixed
+     */
+    private function getRules($controllers, $namespace, $controller_name)
+    {
+        if ( ! isset($controllers["{$namespace}/{$controller_name}"]))
+        {
+            return [];
+        }
+        
+        // 通过 repository 获取检验规则，明确每个 action 需要的字段
+        $repository = ucfirst($this->repository_folder)
+                      . $controllers["{$namespace}/{$controller_name}"]['repository_class']
+                      . 'Repository';
+        $repository = str_replace('/', '\\', $repository);
+        $rules      = (new $repository(app()))->getRules();
+        $rules['index']['page'] = 'sometime|integer|min:1';    // 在列表页附加 分页码参数
+        
+        return $rules;
+    }
+    
+    /**
+     * 获取数据表 中文名
+     *
+     * @param $controllers
+     * @param $namespace
+     * @param $controller_name
+     *
+     * @return mixed
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     */
+    private function getTableName($controllers, $namespace, $controller_name)
+    {
+        if ( ! isset($controllers["{$namespace}/{$controller_name}"]))
+        {
+            return '';
+        }
+        
+        $table = $this->utility->getOneTable($controllers["{$namespace}/{$controller_name}"]['table_name']);
+        return $table['name'];
     }
     
     /**
@@ -150,6 +207,9 @@ class CreateApiGenerator extends Generator
     {
         $code   = ['###'];
         $code[] = '# 一个 controller 一个 api.schema 文件';
+        $code[] = '#';
+        $code[] = '# @author ' . $this->utility->getConfig('author');
+        $code[] = '# @data ' . date('Y-m-d H:i:s');
         $code[] = '##';
         $code[] = 'controller:';
         $code[] = $this->getTabs(1) . 'code:';
@@ -296,24 +356,26 @@ class CreateApiGenerator extends Generator
         foreach ($routes as $route)
         {
             // 过滤掉不是 api 的
-            if (!preg_match('/^api\/(.*)/', $route->uri()))
+            if ( ! preg_match('/^api\/(.*)/', $route->uri()))
             {
                 continue;
             }
-            
+    
+            $namespace   = str_replace('/', '\\\\', $namespace);    // 多级目录时，需要转换一下
             $pre_pattern = 'App\\\\Http\\\\Controllers\\\\' . $namespace . '\\\\';
             // 过滤掉不是指定 namespace 的
             $action_name = ltrim($route->getActionName(), '\\');
-            if (!preg_match('/^' . $pre_pattern .'(.*)/', $action_name))
+            if ( ! preg_match('/^' . $pre_pattern .'([a-zA-Z]+)Controller@([a-zA-Z]+)/', $action_name))
             {
                 continue;
             }
 
             // 正则匹配出 controller 和 action 名称
-            preg_match('/^' . $pre_pattern . '([a-z]+)Controller@([a-z]+)/i', $action_name, $result);
+            preg_match('/^' . $pre_pattern . '([a-zA-Z]+)Controller@([a-zA-Z]+)/', $action_name, $result);
             $method                       = implode('|', $route->methods());
             $method                       = ($method == 'GET|HEAD') ? 'GET' : $method;
             $method                       = ($method == 'PUT|PATCH') ? 'PUT' : $method;
+            
             $data[$result[1]][$result[2]] = [
                 'name'   => $route->getName(),
                 'uri'    => str_replace('api/', '', $route->uri()),

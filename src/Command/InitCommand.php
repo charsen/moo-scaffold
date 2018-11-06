@@ -1,54 +1,48 @@
 <?php
 namespace Charsen\Scaffold\Command;
 
-use Charsen\Scaffold\Generator\FreshStorageGenerator;
+use Charsen\Scaffold\Generator\InitGenerator;
 use InvalidArgumentException;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
 /**
- * Fresh Database Storage Command
+ * Init Laravel Scaffold
  *
  * @author Charsen https://github.com/charsen
  */
-class FreshStorageCommand extends Command
+class InitCommand extends Command
 {
     /**
      * The console command title.
      *
      * @var string
      */
-    protected $title = 'Fresh Database Storage Command';
+    protected $title = 'Init Laravel Scaffold';
 
     /**
      * The console command name.
      *
      * @var string
      */
-    protected $name = 'scaffold:fresh';
+    protected $name = 'scaffold:init';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Fresh Database Storage Command';
-
+    protected $description = 'Init Laravel Scaffold';
+    
     /**
-     * Get the console command options.
+     * Get the console command arguments.
      *
      * @return array
      */
-    protected function getOptions()
+    protected function getArguments()
     {
         return [
-            [
-                'clean',
-                '-c',
-                InputOption::VALUE_OPTIONAL,
-                'Overwrite All Storage Files.',
-                false,
-            ],
+            ['author', InputArgument::REQUIRED, 'Your Name. (Ex: Charsen)'],
         ];
     }
 
@@ -60,10 +54,10 @@ class FreshStorageCommand extends Command
     public function handle()
     {
         $this->alert($this->title);
-
-        $clean  = $this->option('clean') === null;
-        $result = (new FreshStorageGenerator($this, $this->filesystem, $this->utility))
-            ->start($clean);
+    
+        $author = $this->argument('author');
+        
+        $result = (new InitGenerator($this, $this->filesystem, $this->utility))->start($author);
     
         $this->tipDone();
     }

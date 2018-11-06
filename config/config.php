@@ -1,49 +1,54 @@
 <?php
 
+/**
+ * Laravel Scaffold Config
+ *
+ * - 配置中所有的路由，都是相对于 base_path() （必须在base_path()路径下）
+ */
 return [
+    /**
+     *  当前编码作者信息
+     */
+    'author'     => env('LARAVEL_SCAFFOLD_AUTHOR', ''),
+
+    /**
+     * 数据库相关文件的路径
+     */
     'database'   => [
-        /**
-         * schema path, 在 base_path() 下
-         */
         'schema'  => 'scaffold/database/',
-        /*
-         * storage path, 在 base_path() 下
-         */
         'storage' => 'scaffold/storage/database/',
     ],
 
+    /**
+     * api 相关文件的路径
+     */
     'api'        => [
-        /**
-         * schema path, 在 base_path() 下
-         */
         'schema'  => 'scaffold/api/',
-        /**
-         * storage path, 在 base_path() 下
-         */
         'storage' => 'scaffold/storage/api/',
     ],
 
+    /**
+     * Eloquent ORM 的路径
+     */
     'model'      => [
-        /**
-         *  在 app 目录下的路径 app_path()
-         */
-        'path' => 'Entities/',
+        'path' => 'app/Entities/',
     ],
 
+    /**
+     * Repository 的路径
+     */
     'repository' => [
-        /**
-         *  在 app 下的路径 app_path()
-         */
-        'path' => 'Repositories/',
+        'path' => 'app/Repositories/',
     ],
 
-    /* -----------------------------------------------------------------
-    |  Route settings
-    | -----------------------------------------------------------------
+    /**
+     * 路由设置
      */
     'route'      => [
         'enabled'    => true,
         'prefix'     => 'scaffold',
-        'middleware' => env('LARAVEL_SCAFFOLD_MIDDLEWARE') ? explode(',', env('LARAVEL_SCAFFOLD_MIDDLEWARE')) : null,
+        'middleware' => env('LARAVEL_SCAFFOLD_MIDDLEWARE')
+            ? explode(',', env('LARAVEL_SCAFFOLD_MIDDLEWARE'))
+            : null,
     ],
 ];

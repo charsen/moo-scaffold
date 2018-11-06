@@ -1,0 +1,109 @@
+<?php
+
+namespace {{namespace}};
+
+{{use_repository}}
+use App\Http\Controllers\Controller;
+use App\Http\Resources\BaseResource;
+use Illuminate\Http\Request;
+
+/**
+ * {{controller_class}} Controller
+ *
+ * @package {{namespace}};
+ * @author  {{author}}
+ * @date    {{date}}
+ */
+class {{controller_class}}Controller extends Controller
+{
+
+    protected $repository;
+
+    /**
+     *
+     * @param {{repository_class}} $repository
+     */
+    public function __construct({{repository_class}} $repository)
+    {
+        $this->repository = $repository;
+    }
+
+    /**
+     * 列表
+     *
+     * @param Request $req
+     *
+     * @return \App\Http\Resources\BaseResource
+     * @throws \Exception
+     */
+    public function index(Request $req)
+    {
+        $this->repository->validator()->with($req->all())->passesOrFail('index');
+
+        $result = $this->repository->paginate();
+
+        return new BaseResource($result);
+    }
+
+    /**
+     * 创建
+     *
+     * @param Request $req
+     *
+     * @return \App\Http\Resources\BaseResource
+     * @throws \Prettus\Repository\Exceptions\RepositoryException
+     * @throws \Prettus\Validator\Exceptions\ValidatorException
+     */
+    public function store(Request $req)
+    {
+        $result = $this->repository->create($req->all());
+
+        return new BaseResource($result);
+    }
+
+    /**
+     * 更新
+     *
+     * @param Request $req
+     * @param         $id
+     *
+     * @return \App\Http\Resources\BaseResource
+     * @throws \Prettus\Repository\Exceptions\RepositoryException
+     * @throws \Prettus\Validator\Exceptions\ValidatorException
+     */
+    public function update(Request $req, $id)
+    {
+        $result = $this->repository->update($req->all(), $id);
+
+        return new BaseResource($result);
+    }
+
+    /**
+     * 查看
+     *
+     * @param int $id
+     *
+     * @return \App\Http\Resources\BaseResource
+     */
+    public function show($id)
+    {
+        $result = $this->repository->find($id);
+
+        return new BaseResource($result);
+    }
+
+    /**
+     * 删除
+     *
+     * @param int $id
+     *
+     * @return \App\Http\Resources\BaseResource
+     * @throws \Prettus\Repository\Exceptions\RepositoryException
+     */
+    public function destroy($id)
+    {
+        $result = $this->repository->delete($id);
+
+        return new BaseResource($result);
+    }
+}

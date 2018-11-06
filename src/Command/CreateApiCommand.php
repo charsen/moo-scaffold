@@ -9,7 +9,7 @@ use Symfony\Component\Console\Input\InputOption;
 /**
  * Create Api Command
  *
- * @author   Charsen <780537@gmail.com>
+ * @author Charsen https://github.com/charsen
  */
 class CreateApiCommand extends Command
 {
@@ -42,7 +42,7 @@ class CreateApiCommand extends Command
     protected function getArguments()
     {
         return [
-            ['namespace', InputArgument::REQUIRED, 'The name of the namespace. (Ex: Enterprise)'],
+            ['namespace', InputArgument::OPTIONAL, 'The name of the namespace. (Ex: Enterprise)'],
         ];
     }
 
@@ -72,13 +72,23 @@ class CreateApiCommand extends Command
     public function handle()
     {
         $this->alert($this->title);
-
-        $namespace = ucfirst($this->argument('namespace'));
+    
+        $namespace = $this->argument('namespace');
+        if (empty($namespace))
+        {
+            $namespaces = $this->utility->getControllerNamespaces();
+            $namespace  = $this->choice('What is namespace?', $namespaces);
+        }
+        else
+        {
+            $namespace = ucfirst($namespace);
+        }
+        
         $force     = $this->option('force') === null;
 
         $result = (new CreateApiGenerator($this, $this->filesystem, $this->utility))
             ->start($namespace, $force);
-
-        $this->info('done!');
+    
+        $this->tipDone();
     }
 }

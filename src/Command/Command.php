@@ -8,7 +8,7 @@ use Illuminate\Filesystem\Filesystem;
 /**
  * Command
  *
- * @author   Charsen <780537@gmail.com>
+ * @author Charsen https://github.com/charsen
  */
 class Command extends BaseCommand
 {
@@ -35,7 +35,7 @@ class Command extends BaseCommand
      *
      * @return mixed
      */
-    public function checkScaffoldFolder()
+    protected function checkScaffoldFolder()
     {
         $check_scaffold_folder = base_path() . '/scaffold';
         if ( ! $this->filesystem->isDirectory($check_scaffold_folder))
@@ -44,5 +44,23 @@ class Command extends BaseCommand
         }
 
         return true;
+    }
+    
+    /**
+     * 提示执行的命令
+     *
+     * @param $command
+     */
+    protected function tipCallCommand($command)
+    {
+        $this->warn("\n************************* {$command} *************************");
+    }
+    
+    /**
+     * 提示执行完成
+     */
+    protected function tipDone()
+    {
+        $this->info("\n √ done!");
     }
 }

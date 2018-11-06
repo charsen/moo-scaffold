@@ -2,26 +2,24 @@
 namespace Charsen\Scaffold\Generator;
 
 use InvalidArgumentException;
-use Symfony\Component\Yaml\Yaml;
 
 /**
  * Create Database Migration
  *
- * @author Charsen <780537@gmail.com>
+ * @author Charsen https://github.com/charsen
  */
 class CreateMigrationGenerator extends Generator
 {
     
-    /**
-     * @var mixed
-     */
     protected $migration_path;
     
     protected $migration_relative_path;
-
+    
     /**
-     * @param $schema_name
-     * @param $force
+     * @param      $schema_name
+     * @param bool $force
+     *
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
     public function start($schema_name, $force = false)
     {
@@ -49,8 +47,10 @@ class CreateMigrationGenerator extends Generator
 
             $migration_name = date('Y_m_d_His') . "_create_{$table_name}_table.php";
             $migration_file = $this->migration_path . $migration_name;
-
+            
             $meta = [
+                'author'        => $this->utility->getConfig('author'),
+                'date'          => date('Y-m-d H:i:s'),
                 'migrant_name'  => $table['name'],
                 'migrant_class' => 'Create' . str_replace(' ', '', ucwords(str_replace('_', ' ', $table_name))) . 'Table',
                 'migrant_desc'  => $table['desc'],
@@ -61,43 +61,41 @@ class CreateMigrationGenerator extends Generator
             $this->filesystem->put($migration_file, $this->compileStub($meta));
             $this->command->info('+ ' . $this->migration_relative_path . $migration_name);
         }
-        //date('Y_m_d_His')
     }
     
     /**
      * @param $table_name
      *
      * @return string
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
     private function getUpCode($table_name)
     {
-        $code = ["Schema::create('{$table_name}', function (Blueprint \$table) {"];
-        // $table->engine = 'InnoDB';
-        // $table->charset = 'utf8';
-        // $table->collation = 'utf8_unicode_ci';
+        $code   = ["Schema::create('{$table_name}', function (Blueprint \$table) {"];
 
         $code   = $this->buildCreateCode($table_name, $code);
         $code[] = $this->getTabs(2) . '});';
 
         return implode("\n", $code);
     }
-
+    
     /**
      * 生成字段相关代码
      *
      * @param  string $table_name
      * @param  array  $code
+     *
      * @return array
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
     private function buildCreateCode($table_name, array $code)
     {
-        $table  = $this->utility->getOneTable($table_name);
-        $index = $table['index'];
-        $fields = $table['fields'];
+        $table          = $this->utility->getOneTable($table_name);
+        $index          = $table['index'];
+        $fields         = $table['fields'];
 
-        $fields_code = $this->buildFieldsCode($fields, $index);
-
-        $index_code = $this->buildIndexCode($index);
+        $fields_code    = $this->buildFieldsCode($fields, $index);
+        $index_code     = $this->buildIndexCode($index);
 
         return array_merge($code, $fields_code, $index_code);
     }
@@ -205,6 +203,7 @@ class CreateMigrationGenerator extends Generator
      */
     private function buildIndexCode(array $index)
     {
+        unset($index['id']);
         if (empty($index))
         {
             return [];
@@ -213,6 +212,12 @@ class CreateMigrationGenerator extends Generator
         $code = ['']; //空一行
         foreach ($index as $name => $attr)
         {
+            $functions = [
+                'primary' => '$table->primary(',
+                'index'  => '$table->index(',
+                'unique'  => '$table->unique(',
+            ];
+            
             if (strstr($attr['fields'], ','))
             {
                 $fields_string = [];
@@ -220,11 +225,11 @@ class CreateMigrationGenerator extends Generator
                 {
                     $fields_string[] = "'{$value}'";
                 }
-                $code[] = $this->getTabs(3) . '$table->index([' . implode(',', $fields_string) . ']);';
+                $code[] = $this->getTabs(3) . $functions[$attr['type']] . '[' . implode(',', $fields_string) . ']);';
             }
             else
             {
-                $code[] = $this->getTabs(3) . "\$table->index('{$attr['fields']}');";
+                $code[] = $this->getTabs(3) . $functions[$attr['type']] . "'{$attr['fields']}');";
             }
         }
 
@@ -246,21 +251,23 @@ class CreateMigrationGenerator extends Generator
 
         return implode("\n", $code);
     }
-
+    
     /**
      * 编译模板
      *
+     * @param array $meta
+     *
      * @return string
      */
-    private function compileStub($meta)
+    private function compileStub(array $meta)
     {
         return $this->buildStub($meta, $this->getStub('migration'));
     }
     
     /**
-     * @param $name
+     * 检查 表的迁移 是否存在
      *
-     * return mixed
+     * @param $name
      *
      * @return bool|string
      */

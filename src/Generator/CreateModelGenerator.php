@@ -7,7 +7,7 @@ use Symfony\Component\Yaml\Yaml;
 /**
  * Create Model
  *
- * @author Charsen <780537@gmail.com>
+ * @author Charsen https://github.com/charsen
  */
 class CreateModelGenerator extends Generator
 {
@@ -24,16 +24,18 @@ class CreateModelGenerator extends Generator
      * @var mixed
      */
     protected $model_folder;
-
+    
     /**
-     * @param $schema_name
-     * @param $force
+     * @param      $schema_name
+     * @param bool $force
+     *
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
     public function start($schema_name, $force = false)
     {
         $this->model_path          = $this->utility->getModelPath();
         $this->model_relative_path = $this->utility->getModelPath(true);
-        $this->model_folder        = $this->utility->getConfig('model.path');
+        $this->model_folder        = $this->utility->getModelFolder();
 
         // 从 storage 里获取模型数据，在修改了 schema 后忘了执行 scaffold:fresh 的话会不准确！！
         $all = $this->utility->getModels();
@@ -75,7 +77,9 @@ class CreateModelGenerator extends Generator
             $namespace = $this->dealNameSpaceAndPath($this->model_path, $this->model_folder, $class);
 
             $meta = [
-                'namespace'         => $namespace,
+                'author'            => $this->utility->getConfig('author'),
+                'date'              => date('Y-m-d H:i:s'),
+                'namespace'         => ucfirst($namespace),
                 'user_soft_deletes' => $user_soft_deletes,
                 'use_trait'         => !empty($use_trait) ? 'use ' . implode(', ', $use_trait) . ';' : '',
                 'class'             => $class,
@@ -156,7 +160,7 @@ class CreateModelGenerator extends Generator
             $data_code[] = $this->getTabs(1) . " * 设置 {$fields[$filed_name]['name']} 具体值";
             $data_code[] = $this->getTabs(1) . ' * @var array';
             $data_code[] = $this->getTabs(1) . ' */';
-            $data_code[] = $this->getTabs(1) . "public \$init_{$filed_name} = [";
+            $data_code[] = $this->getTabs(1) . "protected \$init_{$filed_name} = [";
             foreach ($attr as $alias => $one)
             {
                 $data_code[] = $this->getTabs(2) . "'{$one[0]}' => '{$alias}',";
@@ -171,13 +175,13 @@ class CreateModelGenerator extends Generator
             $function_name   = str_replace(' ', '', ucwords(str_replace('_', ' ', $filed_name)));
             $function_code[] = $this->getTabs(1) . '/**';
             $function_code[] = $this->getTabs(1) . " * 获取 {$fields[$filed_name]['name']} TXT";
-            $function_code[] = $this->getTabs(1) . ' * @var string';
+            $function_code[] = $this->getTabs(1) . ' * @return array|null|string';
             $function_code[] = $this->getTabs(1) . ' */';
             $function_code[] = $this->getTabs(1) . "public function get{$function_name}TxtAttribute()";
             $function_code[] = $this->getTabs(1) . '{';
             $function_code[] = $this->getTabs(2) . "if (\$this->{$filed_name} !== NULL)";
             $function_code[] = $this->getTabs(2) . '{';
-            $function_code[] = $this->getTabs(3) . "return __('model.' . \$this->init_{$filed_name}}[\$this->{$filed_name}]);";
+            $function_code[] = $this->getTabs(3) . "return __('model.' . \$this->init_{$filed_name}[\$this->{$filed_name}]);";
             $function_code[] = $this->getTabs(2) . '}';
             $function_code[] = '';
             $function_code[] = $this->getTabs(2) . "return '';";
