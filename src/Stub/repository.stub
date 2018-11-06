@@ -4,8 +4,7 @@ namespace {{namespace}};
 
 {{use_model}}
 use App\Libs\Repository\AbstractRepository;
-use Illuminate\Validation\Rule;
-use Prettus\Repository\Criteria\RequestCriteria;
+use App\Libs\Repository\RequestCriteria;
 
 /**
  * {{class}} Repository

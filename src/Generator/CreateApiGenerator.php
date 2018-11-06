@@ -1,7 +1,6 @@
 <?php
 namespace Charsen\Scaffold\Generator;
 
-use InvalidArgumentException;
 use Route;
 use Symfony\Component\Yaml\Yaml;
 
@@ -37,7 +36,7 @@ class CreateApiGenerator extends Generator
         $routes = $this->getRoutes($namespace);
         if (empty($routes))
         {
-            throw new InvalidArgumentException('Controllers are not found.');
+            return $this->command->error(' x Routes are not found.');
         }
         
         // 创建目录
@@ -60,7 +59,7 @@ class CreateApiGenerator extends Generator
             $methods       = get_class_methods($controller);
             if (empty($methods))
             {
-                throw new InvalidArgumentException('Controller\'s action  are not found.');
+                return $this->command->error(' x Controller\'s action  are not found.');
             }
             
             $real_actions  = array_intersect(array_keys($actions), $methods);
@@ -214,7 +213,7 @@ class CreateApiGenerator extends Generator
         $code[] = 'controller:';
         $code[] = $this->getTabs(1) . 'code:';
         $code[] = $this->getTabs(1) . 'class: ' . $controller_name;
-        $code[] = $this->getTabs(1) . 'name: ' . $controller_name;
+        $code[] = $this->getTabs(1) . 'name: ' . $table_name . '管理';
         $code[] = $this->getTabs(1) . 'desc: []';
         $code[] = 'actions:';
 

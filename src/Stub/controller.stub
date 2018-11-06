@@ -31,14 +31,14 @@ class {{controller_class}}Controller extends Controller
     /**
      * 列表
      *
-     * @param Request $req
+     * @param \Illuminate\Http\Request $req
      *
-     * @return \App\Http\Resources\BaseResource
+     * @return \Illuminate\Http\Resources\Json\BaseResource
      * @throws \Exception
      */
     public function index(Request $req)
     {
-        $this->repository->validator()->with($req->all())->passesOrFail('index');
+        $this->repository->validator()->with($req)->passesOrFail('index');
 
         $result = $this->repository->paginate();
 
@@ -48,15 +48,13 @@ class {{controller_class}}Controller extends Controller
     /**
      * 创建
      *
-     * @param Request $req
+     * @param \Illuminate\Http\Request $req
      *
      * @return \App\Http\Resources\BaseResource
-     * @throws \Prettus\Repository\Exceptions\RepositoryException
-     * @throws \Prettus\Validator\Exceptions\ValidatorException
      */
     public function store(Request $req)
     {
-        $result = $this->repository->create($req->all());
+        $result = $this->repository->create($req);
 
         return new BaseResource($result);
     }
@@ -64,16 +62,14 @@ class {{controller_class}}Controller extends Controller
     /**
      * 更新
      *
-     * @param Request $req
-     * @param         $id
+     * @param \Illuminate\Http\Request $req
+     * @param                          $id
      *
      * @return \App\Http\Resources\BaseResource
-     * @throws \Prettus\Repository\Exceptions\RepositoryException
-     * @throws \Prettus\Validator\Exceptions\ValidatorException
      */
     public function update(Request $req, $id)
     {
-        $result = $this->repository->update($req->all(), $id);
+        $result = $this->repository->update($req, $id);
 
         return new BaseResource($result);
     }
@@ -97,12 +93,13 @@ class {{controller_class}}Controller extends Controller
      *
      * @param int $id
      *
-     * @return \App\Http\Resources\BaseResource
-     * @throws \Prettus\Repository\Exceptions\RepositoryException
+     * @return \Illuminate\Http\Resources\Json\BaseResource
      */
     public function destroy($id)
     {
         $result = $this->repository->delete($id);
+
+        $result = $this->repository->paginate();
 
         return new BaseResource($result);
     }
