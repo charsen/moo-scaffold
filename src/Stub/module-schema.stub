@@ -1,12 +1,8 @@
 ###
-# fields 的默认规划
-# - 字段名为 id 时，索引默认设为 AI
 #
-# - require 默认 = true
-# - type = int 时，默认 size = 10, unsigned = true, default = 0
-# - type = bigint 时，默认 size = 10, unsigned = true, default = 0
-# - type = tinyint 时，默认 size = 2, unsigned = true, default = 0
-# - varchar = char|varchar 时, 默认 size = 32, default = ''
+#
+# @author {{author}}
+# @date   {{date}}
 ##
 module_name: ModuleName
 tables:

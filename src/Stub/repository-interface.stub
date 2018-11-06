@@ -1,13 +1,15 @@
 <?php
 
-namespace App\{{namespace}};
+namespace {{namespace}};
 
 /**
- * Interface {{class}}Repository.
+ * {{class}} RepositoryInterface
  *
- * @package namespace App\{{namespace}};
+ * @package {{namespace}};
+ * @author  {{author}}
+ * @date    {{date}}
  */
 interface {{class}}RepositoryInterface
 {
-    //
+
 }

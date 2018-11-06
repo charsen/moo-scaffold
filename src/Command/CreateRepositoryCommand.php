@@ -9,7 +9,7 @@ use Symfony\Component\Console\Input\InputOption;
 /**
  * Create Repository Command
  *
- * @author   Charsen <780537@gmail.com>
+ * @author Charsen https://github.com/charsen
  */
 class CreateRepositoryCommand extends Command
 {
@@ -42,7 +42,7 @@ class CreateRepositoryCommand extends Command
     protected function getArguments()
     {
         return [
-            ['schema_name', InputArgument::REQUIRED, 'The name of the schema. (Ex: Personnels)'],
+            ['schema_name', InputArgument::OPTIONAL, 'The name of the schema. (Ex: Personnels)'],
         ];
     }
 
@@ -72,12 +72,19 @@ class CreateRepositoryCommand extends Command
     public function handle()
     {
         $this->alert($this->title);
+    
         $schema_name = $this->argument('schema_name');
+        if (empty($schema_name))
+        {
+            $file_names  = $this->utility->getSchemaNames();
+            $schema_name = $this->choice('What is schema name?', $file_names);
+        }
+        
         $force       = $this->option('force') === null;
 
         $result = (new CreateRepositoryGenerator($this, $this->filesystem, $this->utility))
             ->start($schema_name, $force);
-
-        $this->info('done!');
+    
+        $this->tipDone();
     }
 }

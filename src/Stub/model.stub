@@ -1,15 +1,16 @@
 <?php
 
-namespace App\{{namespace}};
+namespace {{namespace}};
 
 use Illuminate\Database\Eloquent\Model;
-use App\Exceptions\DepartmentDeleteException;
 {{user_soft_deletes}}
 
 /**
- * {{class}} Class
+ * {{class}} Model
  *
- * @package namespace App\{{namespace}};
+ * @package {{namespace}};
+ * @author  {{author}}
+ * @date    {{date}}
  */
 class {{class}} extends Model
 {

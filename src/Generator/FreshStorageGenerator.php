@@ -6,7 +6,7 @@ use Symfony\Component\Yaml\Yaml;
 /**
  * Fresh Database Storage
  *
- * @author Charsen <780537@gmail.com>
+ * @author Charsen https://github.com/charsen
  */
 class FreshStorageGenerator extends Generator
 {
@@ -34,7 +34,6 @@ class FreshStorageGenerator extends Generator
         if ($clean)
         {
             $this->cleanAll();
-            $this->filesystem->delete($this->db_schema_path . '_fields.yaml');
         }
 
         $yaml         = new Yaml;
@@ -123,6 +122,7 @@ class FreshStorageGenerator extends Generator
         $this->buildDictionaries($dictionaries);
         $this->buildTables($tables);
         $this->buildFields($all_fields);
+        $this->buildFieldsCache($all_fields);        //生成缓存的所有字段数据
     }
 
     /**
@@ -257,7 +257,7 @@ class FreshStorageGenerator extends Generator
                 'type'    => $attr['type'],
                 'cn'      => $attr['name'],
                 'en'      => trim(ucwords(str_replace('_', ' ', $field_name))),
-                'talbe'   => $table_name,
+                'table'   => $table_name,
                 'default' => !empty($attr['default']) ? $attr['default'] : '',
             ];
 
@@ -281,6 +281,7 @@ class FreshStorageGenerator extends Generator
      */
     private function buildFields(array $all_fields)
     {
+        // 组织 yaml 数据
         $yaml_file          = $this->db_schema_path . '_fields.yaml';
         $yaml_relative_file = $this->db_relative_schema_path . '_fields.yaml';
         if ($this->filesystem->isFile($yaml_file))
@@ -293,8 +294,6 @@ class FreshStorageGenerator extends Generator
 
             $reduce_field_keys   = array_diff($old_field_keys, $new_field_keys);
             $increase_field_keys = array_diff($new_field_keys, $old_field_keys);
-            // dump($reduce_field_keys);
-            // dump($increase_field_keys);
 
             foreach ($reduce_field_keys as $field_name)
             {
@@ -318,7 +317,7 @@ class FreshStorageGenerator extends Generator
             '# duplicate_fields: 数据库里重复出现的，有可能是重名了',
             '##',
         ];
-
+        
         foreach ($all_fields as $type => $fields)
         {
             $code[] = "{$type}:";
@@ -330,28 +329,68 @@ class FreshStorageGenerator extends Generator
             {
                 $yaml   = ["en: '{$attr['en']}'"];
                 $yaml[] = "cn: '{$attr['cn']}'";
-                $yaml[] = "type: {$attr['type']}";
-
-                if (!empty($attr['default']))
-                {
-                    $yaml[] = "default: {$attr['default']}";
-                }
-
-                if (!empty($attr['talbe']))
-                {
-                    $yaml[] = "talbe: {$attr['talbe']}";
-                }
+                
                 $code[] = $this->getTabs(1) . "{$field_name}: {" . implode(', ', $yaml) . '}';
             }
         }
         $code[] = '';
+    
+        // 生成可手动修改，用于多语言的，不能被清空覆盖的
         $put    = $this->filesystem->put($yaml_file, implode("\n", $code));
         if ($put)
         {
             return $this->command->info('+ ' . $yaml_relative_file . ' (Updated)');
         }
-
+    
         return $this->command->error('x ' . $yaml_relative_file . '(Failed)');
+    }
+    
+    /**
+     *  生成缓存的所有字段数据
+     *
+     * @param $data
+     */
+    private function buildFieldsCache($data)
+    {
+        // 附加分页码，在生成接口时用
+        $data['append_fields']['page'] = [
+            'en'      => 'page',
+            'cn'      => '分页码',
+            'int'     => 'int',
+            'default' => 1,
+        ];
+        
+        $php_data = [];
+        foreach ($data as $type => $fields)
+        {
+            if (empty($fields))
+            {
+                continue;
+            }
+            foreach ($fields as $field_name => $attr)
+            {
+                $php_data[$field_name] = [
+                    'en'      => $attr['en'],
+                    'cn'      => $attr['cn'],
+                    'type'    => $attr['type'] ?? null,
+                    'default' => ! empty($attr['default']) ? $attr['default'] : '',
+                    'table'   => ! empty($attr['table']) ? $attr['table'] : '',
+                ];
+            
+            }
+        }
+        // 生成缓存的，可被覆盖的，因为有时修改字段 type 和 default
+        $php_code = '<?php' . PHP_EOL
+                    . 'return ' . var_export($php_data, true) . ';'
+                    . PHP_EOL;
+    
+        $put = $this->filesystem->put($this->db_storage_path . 'fields.php', $php_code);
+        if ($put)
+        {
+            return $this->command->info('+ ' . $this->db_relative_storage_path . 'fields.php (Updated)');
+        }
+    
+        return $this->command->error('x ' . $this->db_relative_storage_path . 'fields.php (Failed)');
     }
     
     /**
@@ -502,7 +541,7 @@ class FreshStorageGenerator extends Generator
      */
     private function cleanAll()
     {
-        $this->command->warn('+ cleaning db...');
+        $this->command->warn('+ cleaning db caches...');
         $clean = $this->filesystem->cleanDirectory($this->db_storage_path);
         if ($clean)
         {
@@ -512,18 +551,6 @@ class FreshStorageGenerator extends Generator
         else
         {
             $this->command->error('x clean ' . $this->db_relative_storage_path . ' failed!');
-        }
-
-        $this->command->warn('+ cleaning api...');
-        $clean = $this->filesystem->cleanDirectory($this->api_storage_path);
-        if ($clean)
-        {
-            $this->command->info('+ clean ' . $this->api_relative_storage_path . ' successed!');
-            $this->command->warn('+ cleaned');
-        }
-        else
-        {
-            $this->command->error('x clean ' . $this->api_relative_storage_path . ' failed!');
         }
 
         return true;

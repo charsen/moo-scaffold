@@ -4,35 +4,44 @@ namespace Charsen\Scaffold\Generator;
 /**
  * Create Schema Generator
  *
- * @author Charsen <780537@gmail.com>
+ * @author Charsen https://github.com/charsen
  */
 class CreateSchemaGenerator extends Generator
 {
-
+    
     /**
-     * @param $schema_name
-     * @param $force
+     * @param      $schema_name
+     * @param bool $force
+     *
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
     public function start($schema_name, $force = false)
     {
-        $schema_relative_file = $this->utility->getSchema("{$schema_name}.yaml", true);
-        $schema_file          = $this->utility->getSchema("{$schema_name}.yaml");
+        $schema_relative_file = $this->utility->getSchemaPatch("{$schema_name}.yaml", true);
+        $schema_file          = $this->utility->getSchemaPatch("{$schema_name}.yaml");
         
         if (!$this->filesystem->exists($schema_file) || $force)
         {
-            $this->filesystem->put($schema_file, $this->compileStub());
+            $meta = [
+                'author'   => $this->utility->getConfig('author'),
+                'date'     => date('Y-m-d H:i:s')
+            ];
+            $this->filesystem->put($schema_file, $this->compileStub($meta));
 
             return $this->command->info("+ $schema_relative_file" . ($force ? ' (Overwrited)' : ''));
         }
 
         return $this->command->warn("x $schema_relative_file" . ' (Skipped)');
     }
-
+    
     /**
-     * @return mixed
+     * @param array $meta
+     *
+     * @return string
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
-    protected function compileStub()
+    protected function compileStub(array $meta)
     {
-        return $this->getStub('module-schema');
+        return $this->buildStub($meta, $this->getStub('module-schema'));
     }
 }

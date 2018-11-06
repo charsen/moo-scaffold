@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
  * Class     ScaffoldController
  *
  * @package  Charsen\Scaffold\Http\Controllers
- * @author   Charsen <780537@gmail.com>
+ * @author Charsen https://github.com/charsen
  */
 class ScaffoldController extends Controller
 {

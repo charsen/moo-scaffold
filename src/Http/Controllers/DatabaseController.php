@@ -9,7 +9,7 @@ use InvalidArgumentException;
  * Class     DatabaseController
  *
  * @package  Charsen\Scaffold\Http\Controllers
- * @author   Charsen <780537@gmail.com>
+ * @author Charsen https://github.com/charsen
  */
 class DatabaseController extends Controller
 {

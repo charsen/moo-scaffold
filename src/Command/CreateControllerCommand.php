@@ -1,38 +1,38 @@
 <?php
 namespace Charsen\Scaffold\Command;
 
-use Charsen\Scaffold\Generator\CreateMigrationGenerator;
+use Charsen\Scaffold\Generator\CreateControllerGenerator;
 use InvalidArgumentException;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
 /**
- * Create Database Migration Command
+ * Create Controller Command
  *
  * @author Charsen https://github.com/charsen
  */
-class CreateMigrationCommand extends Command
+class CreateControllerCommand extends Command
 {
     /**
      * The console command title.
      *
      * @var string
      */
-    protected $title = 'Create Database Migration Command';
+    protected $title = 'Create Controller Command';
 
     /**
      * The console command name.
      *
      * @var string
      */
-    protected $name = 'scaffold:migration';
+    protected $name = 'scaffold:controller';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Create Database Migration Command';
+    protected $description = 'Create Controller Command';
 
     /**
      * Get the console command arguments.
@@ -42,7 +42,7 @@ class CreateMigrationCommand extends Command
     protected function getArguments()
     {
         return [
-            ['schema_name', InputArgument::OPTIONAL, 'The name of the schema. (Ex: Personnels)'],
+            ['schema_name', InputArgument::OPTIONAL, 'The name of the schema. (Ex: personnels)'],
         ];
     }
 
@@ -58,7 +58,7 @@ class CreateMigrationCommand extends Command
                 'force',
                 '-f',
                 InputOption::VALUE_OPTIONAL,
-                'Overwrite Migration File.',
+                'Overwrite Controller File.',
                 false,
             ],
         ];
@@ -82,7 +82,7 @@ class CreateMigrationCommand extends Command
         
         $force       = $this->option('force') === null;
 
-        $result = (new CreateMigrationGenerator($this, $this->filesystem, $this->utility))
+        $result = (new CreateControllerGenerator($this, $this->filesystem, $this->utility))
             ->start($schema_name, $force);
     
         $this->tipDone();

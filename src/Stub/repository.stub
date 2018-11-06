@@ -1,6 +1,6 @@
 <?php
 
-namespace App\{{namespace}};
+namespace {{namespace}};
 
 {{use_model}}
 use App\Libs\Repository\AbstractRepository;
@@ -8,9 +8,11 @@ use Illuminate\Validation\Rule;
 use Prettus\Repository\Criteria\RequestCriteria;
 
 /**
- * Class {{class}}Repository.
+ * {{class}} Repository
  *
- * @package namespace App\{{namespace}};
+ * @package {{namespace}};
+ * @author  {{author}}
+ * @date    {{date}}
  */
 class {{class}}Repository extends AbstractRepository implements {{class}}RepositoryInterface
 {
@@ -35,6 +37,8 @@ class {{class}}Repository extends AbstractRepository implements {{class}}Reposit
 
     /**
      * Boot up the repository, pushing criteria
+     *
+     * @throws \Prettus\Repository\Exceptions\RepositoryException
      */
     public function boot()
     {
