@@ -94,11 +94,11 @@ http://{{url}}}/scaffold/api
 php artisan scaffold:i18n
 ```
 
-### 12. Free : "释放双手"
-- 先执行 'artisan scaffold:fresh' 更新缓存数据
+### 12. Free : “释放双手”
+- 先执行 `artisan scaffold:fresh` 更新缓存数据
 - 同时生成 controller, mode, repository, migration
-- 执行 'artisan scaffold:i18' 更新多语言文件
-- 执行 `artisan migrate` (不确认!!!)
+- 执行 `artisan scaffold:i18` 更新多语言文件
+- 执行 `artisan migrate` 
 ```sh
 php artisan scaffold:free
 ```
@@ -119,3 +119,5 @@ If you discover any security related issues, please email 780537@gmail.com inste
 
 ## License
 The MIT License (MIT). Please see [License File](*LICENSE.md*) for more information.
+ 
+ 
