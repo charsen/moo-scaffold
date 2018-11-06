@@ -3,7 +3,7 @@
     "description": "Scaffold for Laravel",
     "keywords": [
         "charsen",
-        "scaffold-server"
+        "laravel-scaffold"
     ],
     "homepage": "https://github.com/charsen/laravel-scaffold",
     "license": "MIT",
