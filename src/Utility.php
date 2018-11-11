@@ -102,6 +102,7 @@ class Utility
      *
      * @param string $file_name
      * @param string $language
+     * @param bool   $relative
      *
      * @return string
      */

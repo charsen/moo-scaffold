@@ -1,0 +1,18 @@
+@mixin delta($type, $length, $height, $color) {
+    border-style: solid;
+    width: 0;
+    height: 0;
+    @if ($type == 'up') {
+        border-width: 0 $length/2 $height $length/2;
+        border-color: transparent transparent $color transparent;
+    } @else if ($type == 'down') {
+        border-width: $height $length/2 0 $length/2;
+        border-color: $color transparent transparent transparent;
+    } @else if ($type == 'left') {
+        border-width: $length/2 0 $length/2 $height;
+        border-color: transparent transparent transparent $color;
+    } @else if ($type == 'right') {
+        border-width: $length/2 $height $length/2 0;
+        border-color: transparent $color transparent transparent;
+    }
+}

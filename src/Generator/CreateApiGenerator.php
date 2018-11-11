@@ -112,7 +112,6 @@ class CreateApiGenerator extends Generator
                       . 'Repository';
         $repository = str_replace('/', '\\', $repository);
         $rules      = (new $repository(app()))->getRules();
-        $rules['index']['page'] = 'sometime|integer|min:1';    // 在列表页附加 分页码参数
         
         return $rules;
     }
@@ -318,7 +317,7 @@ class CreateApiGenerator extends Generator
         {
             $rule_txt = [];
             // 是否必填
-            if (!strstr($rule, 'required') && !strstr($rule, 'sometimes'))
+            if (!strstr($rule, 'required') && !strstr($rule, 'required_if') && !strstr($rule, 'sometimes'))
             {
                 $rule_txt[] .= 'false';
             }

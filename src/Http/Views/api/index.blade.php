@@ -2,94 +2,112 @@
 
 @section('title', '接口文档')
 
-@section('content')
-<div class="ui text container" style="max-width: none !important; width: 1200px" id="menu_top">
-    <div class="ui floating message">
-        <div class="ui grid container" style="max-width: none !important;">
-            <div class="four wide column">
-                <div class="ui vertical accordion menu">
-                    @foreach ($menus as $folder_name => $controllers)
-                    <div class="item">
-                        <h4 class="title active" style="font-size:16px; margin:0px;">
-                            <i class="dropdown icon"></i>{{ $folder_name }}
-                        </h4>
-                        <div class="content active" style="margin: 0 -16px -13px -16px;">
-                        @foreach ($controllers as $controller_class => $attr)
-                            <a class="item {{ (!$first_menu_active ? 'active' : '') }}"
-                               data-tab="{{ (str_replace('/', '-', $folder_name)) }}-{{ $controller_class }}">
-                                {{ $attr['name'] }} <font color="orange">({{ $attr['api_count'] }})</font>
-                            </a>
-                        <?php $first_menu_active = true;?>
-                        @endforeach
-                        </div>
-                    </div>
+@section('sidebar')
+@foreach ($menus as $folder_name => $controllers)
+<li class="{{ (! $first_menu_active ||  $folder_name == $current_folder) ? 'open' : '' }}">
+    <a href="javascript:;">{{ (isset($menus_transform[$folder_name])) ? $menus_transform[$folder_name] : $folder_name }}</a>
+    <ul class="sub tag-list">
+        @foreach ($controllers as $controller_class => $attr)
+        <li class="{{ (! $first_menu_active || $current_controller == $controller_class) ? 'active' : '' }}">
+            <a href="javascript:;"
+               data-tag="{{ (str_replace('/', '-', $folder_name)) }}-{{ $controller_class }}"
+               data-url="{{ route('api.list', ['f' => $folder_name, 'c' => $controller_class]) }}"
+            >
+                <em>{{ $attr['api_count'] }}</em>{{ $attr['name'] }}
+            </a>
+        </li>
+        <?php $first_menu_active = true;?>
+        @endforeach
+    </ul>
+</li>
+@endforeach
+@endsection
+
+@section('middle')
+<div class="panel">
+    <div class="bd" id="table_list">
+        @foreach ($apis as $folder_name => $data)
+            @foreach ($data as $controller_class => $actions)
+            <div class="table {{ (str_replace('/', '-', $folder_name)) }}-{{ $controller_class }} {{ (!$first_table_active || $current_controller == $controller_class ? 'show' : 'hide') }}">
+                <table>
+                    <tr>
+                        <th>#</th>
+                        <th>接口名称</th>
+                        <th>方式</th>
+                        <th>URL</th>
+                    </tr>
+                    <?php $api_index = 1;?>
+                    @foreach ($actions as $action => $attr)
+                        <tr class="{{($current_controller == $controller_class && $action == $current_action) ? 'active' : ''}}">
+                            <td>{{ $api_index ++ }}</td>
+                            <td>
+                                <a class="link" href="javascript:;"
+                                   data-f="{{ $folder_name }}"
+                                   data-c="{{ $controller_class }}"
+                                   data-a="{{ $action }}"
+                                   data-url="{{ route('api.list', ['f' => $folder_name, 'c' => $controller_class, 'a' => $action]) }}">
+                                    {{ $attr['name'] }}
+                                </a>
+                            </td>
+                            <td>{{ strtoupper($attr['method']) }}</td>
+                            <td>{{ $attr['url'] }}</td>
+                        </tr>
                     @endforeach
-
-                    <div class="item">
-                        <div class="content">
-                            <a href="#menu_top">返回顶部↑↑↑</a>
-                        </div>
-                    </div>
-                </div>
+                </table>
             </div>
-
-            <div class="twelve wide stretched column">
-                @foreach ($apis as $folder_name => $data)
-                    @foreach ($data as $controller_class => $actions)
-                    <div class="ui tab {{ (!$first_table_active ? 'active' : '') }}"
-                         data-tab="{{ (str_replace('/', '-', $folder_name)) }}-{{ $controller_class }}">
-                        <table class="ui red celled striped table {{ $table_style }} celled striped table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>接口名称</th>
-                                    <th>方式</th>
-                                    <th>URL</th>
-                                    <th>更多说明</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php $api_index = 1;?>
-                                @foreach ($actions as $action => $attr)
-                                <tr>
-                                    <td>{{ $api_index ++ }}</td>
-                                    <td>
-                                        <a href="{{ route('api.show', ['f' => $folder_name, 'c' => $controller_class, 'a' => $action]) }}"
-                                            target="{{ $action }}">{{ $attr['name'] }}</a>
-                                     </td>
-                                    <td>{{ strtoupper($attr['method']) }}</td>
-                                    <td>{{ $attr['url'] }}</td>
-                                    <td>{{ implode("\n", $attr['desc']) }}</td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                    <?php $first_table_active = true;?>
-                    @endforeach
-                @endforeach
-            </div>
-        </div>
-
-        @include('scaffold::layouts._footer')
+            <?php $first_table_active = true; ?>
+            @endforeach
+        @endforeach
     </div>
 </div>
 @endsection
 
-@section('scripts')
-<script type="text/javascript">
-    $('.accordion.menu a.item').tab({ 'deactivate': 'all' });
-    $('.ui.sticky').sticky();
+@section('right')
+<div class="none">
+    <img src="/scaffold/images/none.png">
+    <h2>请选择接口</h2>
+</div>
+@endsection
 
-    //当点击跳转链接后，回到页面顶部位置
-    $(".accordion.menu a.item").click(function() {
-        $('body,html').animate({
-                scrollTop: 0
-            },
-            500);
-        return false;
+@section('scripts')
+<script>
+    $('.tag-list a').click(function () {
+        $('#table_list .show').removeClass('show').addClass('hide');
+        $('#table_list').find('.' + $(this).data('tag')).removeClass('hide').addClass('show');
+        $('.tag-list li.active').removeClass('active');
+        $(this).parent().addClass('active');
+
+        window.history.pushState({}, 0, $(this).data('url'));
     });
 
-    $('.ui.accordion').accordion({ 'exclusive': false });
+    $('#table_list .link').click(function () {
+        var _tr = $(this).parent().parent();
+        var _table = _tr.parent();
+        _table.find('tr').removeClass('active');
+        _tr.addClass('active');
+
+        window.history.pushState({}, 0, $(this).data('url'));
+
+        $('#right_container').html('<p class="loading">loading...</p>');
+
+        getParams($(this).data('f'), $(this).data('c'), $(this).data('a'));
+    });
+
+    var getParams = function(folder, controller, action)
+    {
+        $.ajax({
+            type: "GET",
+            url: '{{ route('api.show') }}',
+            data: {'f': folder, 'c': controller, 'a': action},
+            dataType: 'html',
+            success: function (result) {
+                $('#right_container').removeClass('transparent').html(result);
+            }
+        });
+    }
+
+    @if (!empty($current_controller) && ! empty($current_action))
+    getParams('{{ $current_folder }}', '{{ $current_controller }}', '{{ $current_action }}');
+    @endif
 </script>
 @endsection

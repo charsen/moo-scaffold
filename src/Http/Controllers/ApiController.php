@@ -15,31 +15,32 @@ use Symfony\Component\Yaml\Yaml;
  */
 class ApiController extends Controller
 {
-    /**
-     * @var array
-     */
-    private $table_style = ['red', 'orange', 'yellow', 'blue', 'olive', 'teal'];
 
     /**
      * list view
      *
      */
-    public function index()
+    public function index(Request $req)
     {
         $data                       = $this->getApiList();
-        $data['table_style']        = $this->table_style[array_rand($this->table_style)];
-        $data['first_menu_active']  = false;
-        $data['first_table_active'] = false;
+        $data['menus_transform']    = $this->getMenusTransform();
+        $data['uri']                = $req->getPathInfo();
+        $data['current_folder']     = $req->input('f', 'Index');
+        $data['current_controller'] = $req->input('c', null);
+        $data['current_action']     = $req->input('a', null);
+        $data['first_menu_active']  = $data['current_controller'] != null;
+        $data['first_table_active'] = $data['current_controller'] != null;
 
         return $this->view('api.index', $data);
     }
-
+    
     /**
      * api view
      *
      * @param \Illuminate\Http\Request $req
      *
      * @return \Illuminate\View\View
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
     public function show(Request $req)
     {
@@ -56,12 +57,47 @@ class ApiController extends Controller
      */
     public function request(Request $req)
     {
-        $list                = $this->getApiList();
+        $data                       = $this->getApiList();
+        $data['menus_transform']    = $this->getMenusTransform();
+        $data['uri']                = $req->getPathInfo();
+        $data['request_url']        = str_replace($req->path(), 'api', $req->url());
+        $data['api_index']          = 1;
+        $data['current_folder']     = $req->input('f', 'Index');
+        $data['current_controller'] = $req->input('c', null);
+        $data['current_action']     = $req->input('a', null);
+        $data['first_menu_active']  = false;
+
+        return $this->view('api.request', $data);
+    }
+    
+    /**
+     * @param Request $req
+     *
+     * @return \Illuminate\View\View
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     */
+    public function param(Request $req)
+    {
         $data                = $this->getOneApi($req, 'request');
         $data['request_url'] = str_replace($req->path(), 'api', $req->url());
-        $data['api_index']   = 1;
 
-        return $this->view('api.request', array_merge($data, $list));
+        return $this->view('api.param', array_merge($data));
+    }
+    
+    /**
+     * 获取菜单转换名称数据
+     *
+     * @return array|mixed
+     */
+    private function getMenusTransform()
+    {
+        $yaml_file = $this->utility->getApiPath('schema') . '_menus_transform.yaml';
+        if ( ! $this->filesystem->isFile($yaml_file))
+        {
+            return [];
+        }
+    
+        return  (new Yaml)::parseFile($yaml_file);
     }
 
     /**
@@ -78,6 +114,11 @@ class ApiController extends Controller
         $apis  = [];
         foreach ($yaml_files as $file)
         {
+            if ($file->getBasename()== '_menus_transform.yaml')
+            {
+                continue;
+            }
+            
             $file_name = $file->getPathname();
             $path      = empty($file->getRelativePath()) ? 'Index' : $file->getRelativePath();
             $data      = $yaml::parseFile($file_name);
@@ -101,11 +142,14 @@ class ApiController extends Controller
 
         return ['menus' => $menus, 'apis' => $apis];
     }
-
+    
     /**
      * @param $req
      *
+     * @param $from_action
+     *
      * @return mixed
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
     private function getOneApi($req, $from_action)
     {
@@ -129,7 +173,7 @@ class ApiController extends Controller
         $action_data['current_action']     = $action_name;
         $action_data['current_folder']     = $folder_path;
         $action_data['current_controller'] = $controller_class;
-
+    
         // 字典数据
         $dictionaries = $this->utility->getDictionaries();
 
@@ -139,10 +183,21 @@ class ApiController extends Controller
         // 添加 cookie 到 body params
         if (! empty($req->cookie('api_token')) && $action_name != 'authenticate')
         {
-            $action_data['body_params']['token'] = [
-                'Api Token',
-                ($from_action == 'request' ? $req->cookie('api_token') : '')
-            ];
+            if ($action_data['request'][0] == 'GET')
+            {
+                $action_data['url_params']['token'] = [
+                    'Token',
+                    ($from_action == 'request' ? $req->cookie('api_token') : '')
+                ];
+            }
+            else
+            {
+                $action_data['body_params']['token'] = [
+                    'Token',
+                    ($from_action == 'request' ? $req->cookie('api_token') : '')
+                ];
+            }
+            
         }
 
         $url_params = $body_params = [];
@@ -177,7 +232,7 @@ class ApiController extends Controller
     
         $url    = preg_replace('/\{[a-z_]+\}/i', rand(1, 5), $url);
         
-        return [$method, $url];
+        return [strtoupper($method), $url];
     }
 
     /**
@@ -201,7 +256,11 @@ class ApiController extends Controller
                 continue;
             }
             // https://github.com/fzaninotto/Faker
-            if ($field_name == 'password' || strstr($field_name, '_password'))
+            if (strstr($field_name, '_ids'))
+            {
+                $attr[2] = $faker->numberBetween(1, 3) . ',' . $faker->numberBetween(4, 7);
+            }
+            elseif ($field_name == 'password' || strstr($field_name, '_password'))
             {
                 $attr[2] = $faker->password;
             }

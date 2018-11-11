@@ -1,8 +1,6 @@
 <?php
 namespace Charsen\Scaffold\Generator;
 
-use InvalidArgumentException;
-
 /**
  * Create Database Migration
  *
@@ -31,7 +29,7 @@ class CreateMigrationGenerator extends Generator
 
         if (!isset($all[$schema_name]))
         {
-            throw new InvalidArgumentException(sprintf('Schema File "%s" could not be found.', $schema_name));
+            return $this->command->error("Schema File \"{$schema_name}\" could not be found.");
         }
 
         // 模块下的所有表格

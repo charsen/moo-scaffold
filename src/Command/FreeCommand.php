@@ -8,7 +8,6 @@ use Charsen\Scaffold\Generator\CreateModelGenerator;
 use Charsen\Scaffold\Generator\CreateRepositoryGenerator;
 use Charsen\Scaffold\Generator\FreshStorageGenerator;
 use Charsen\Scaffold\Generator\UpdateMultilingualGenerator;
-use InvalidArgumentException;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 

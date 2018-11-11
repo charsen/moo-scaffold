@@ -51,4 +51,6 @@ return [
             ? explode(',', env('LARAVEL_SCAFFOLD_MIDDLEWARE'))
             : null,
     ],
+    
+    'version' => '0.1.1'
 ];

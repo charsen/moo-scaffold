@@ -52,6 +52,8 @@ class Controller extends BaseController
      */
     protected function view($view, $data = [], $mergeData = [])
     {
+        $mergeData['version'] = $this->config('version');
+        
         return view()->make("scaffold::{$view}", $data, $mergeData);
     }
 }
