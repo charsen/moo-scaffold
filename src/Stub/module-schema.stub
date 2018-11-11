@@ -7,12 +7,12 @@
 module_name: ModuleName
 tables:
     table_name1:
-        model:       # 不生成时，可删除此项
-            class: ModelClassName       # Eloquent 名称，可带目录，如：Topic/Comment
-        repository:  # 不生成时，可删除此项
-            class: RepositoryClassName  # 系统会自动加上 Repository
-        controller:  # 不生成时，可删除此项
-            class: ControllerClassName  # 系统会自动加上 Controller
+        model:
+            class: ModelClassName
+        repository:
+            class: RepositoryClassName
+        controller:
+            class: ControllerClassName
         attrs:
             name: 表名称
             desc: 表描述
@@ -21,14 +21,14 @@ tables:
             id: { type: primary, fields: id }
             name: { type: unique, fields: name }
         fields:
-            id: { } # 为空时，使用默认配置，递增的 ID (主键)，相当于「UNSIGNED INTEGER」
+            id: { }
             name: { name: 名称, type: varchar, default: 'scaffold' }
             ...
             status: { name: 状态, type: tinyint, default: 1 }
-            deleted_at: { } # 为空时，使用默认配置
-            created_at: { } # 为空时，使用默认配置
-            updated_at: { } # 为空时，使用默认配置
-        dictionaries:  # 生成 model 时，会在 appends 中添加 status_txt, 同时生成 getStatusTxtAttribute()，支持多语言
+            deleted_at: { }
+            created_at: { }
+            updated_at: { }
+        dictionaries:
             status:
                 online: [1, online, 上架 ]
                 offline: [2, offline, 下架 ]
