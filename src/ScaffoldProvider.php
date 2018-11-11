@@ -31,7 +31,10 @@ class ScaffoldProvider extends ServiceProvider
             $this->publishes([
                 __DIR__ . '/../config/config.php' => config_path('scaffold.php'),
             ], 'config');
-
+    
+            $this->publishes([
+                __DIR__ . '/../public' => public_path('scaffold'),
+            ], 'public');
         }
     }
 

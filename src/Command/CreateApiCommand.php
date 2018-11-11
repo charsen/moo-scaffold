@@ -2,7 +2,6 @@
 namespace Charsen\Scaffold\Command;
 
 use Charsen\Scaffold\Generator\CreateApiGenerator;
-use InvalidArgumentException;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 

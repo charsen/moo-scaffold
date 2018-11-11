@@ -7,11 +7,17 @@ composer require --dev charsen/laravel-scaffold
 ```
 The package will register itself automatically. 
 
-Optionally you can publish the package configuration using:
+(可选)发布配置文件到，若需要调整配置的话：
 ```bash
-php artisan vendor:publish --provider=Charsen\\Scaffold\\ScaffoldProvider
+php artisan vendor:publish --provider=Charsen\\Scaffold\\ScaffoldProvider --tag=config
 ```
-This will publish a file called `scaffold.php` in your `config` folder.
+将会发布 `scaffold.php` 到 `config` 目录下.
+
+发布前端公共资源包到 public 目录下：
+```bash
+php artisan vendor:publish --provider=Charsen\\Scaffold\\ScaffoldProvider --tag=public --force
+```
+
 
 ## 使用方法
 ### 1. 初始化（记录编码作者及创建目录）

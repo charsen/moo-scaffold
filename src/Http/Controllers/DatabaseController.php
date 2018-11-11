@@ -3,7 +3,6 @@
 namespace Charsen\Scaffold\Http\Controllers;
 
 use Illuminate\Http\Request;
-use InvalidArgumentException;
 
 /**
  * Class     DatabaseController
@@ -14,22 +13,19 @@ use InvalidArgumentException;
 class DatabaseController extends Controller
 {
     /**
-     * @var array
-     */
-    private $table_style = ['red', 'orange', 'yellow', 'blue', 'olive', 'teal'];
-
-    /**
      * tables list
      *
      */
-    public function index()
+    public function index(Request $req)
     {
-        $data                       = [];
+        $data                       = ['uri' => $req->getPathInfo()];
         $data['menus']              = $this->utility->getTables();
-        $data['table_style']        = $this->table_style[array_rand($this->table_style)];
-        $data['first_menu_active']  = false;
-        $data['first_table_active'] = false;
-
+        $data['current_file']       = $req->input('name', null);
+        $data['current_table']      = $req->input('table', null);
+        $data['first_menu_active']  = $data['current_file'] != null;
+        $data['first_table_active'] = $data['current_file'] != null;
+    
+    
         return $this->view('db.index', $data);
     }
 
@@ -37,10 +33,14 @@ class DatabaseController extends Controller
      * dictionaries
      *
      */
-    public function dictionaries()
+    public function dictionaries(Request $req)
     {
-        $data = ['data' => $this->utility->getDictionaries(false)];
-
+        $data = [
+            'menus' => $this->utility->getTables(),
+            'uri'   => $req->getPathInfo(),
+            'data'  => $this->utility->getDictionaries(false),
+        ];
+        
         return $this->view('db.dictionaries', $data);
     }
     

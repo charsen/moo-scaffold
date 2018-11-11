@@ -1,8 +1,6 @@
 <?php
 namespace Charsen\Scaffold\Generator;
 
-use InvalidArgumentException;
-
 /**
  * Create Model
  *
@@ -32,7 +30,7 @@ class CreateControllerGenerator extends Generator
         
         if (!isset($all[$schema_name]))
         {
-            throw new InvalidArgumentException(sprintf('Schema File "%s" could not be found.', $schema_name));
+            return $this->command->error("Schema File \"{$schema_name}\" could not be found.");
         }
         
         //dump($all[$schema_name]);

@@ -1,0 +1,164 @@
+.aside{
+	position: absolute;
+	left: 0;
+	top: 64px;
+	bottom: 0;
+	width: 210px;
+	padding-top: 20px;
+	overflow-y: scroll;
+	-webkit-overflow-scrolling: touch;
+	ul{
+		a{
+			@include text-overflow;
+			display: block;
+			padding-left: 40px;
+			padding-right: 35px;
+			line-height: 40px;
+			color: $dark-gray;
+			&:hover{
+				color: $theme-color;
+			}
+		}
+	}
+	> ul {
+		> li{
+			> .sub {
+				a{
+					padding-left: 60px;
+					&:before{
+						left: 45px;
+					}
+				}
+			}
+		}
+	}
+	li{
+		position: relative;
+		font-size: 16px;
+		&:before{
+			@include arrow(7px, 45deg, $gray);
+			position: absolute;
+			left: 20px;
+			top: 16px;
+			content: '';
+		}
+		&.open{
+			.second,
+			> .sub{
+				display: block;
+			}
+			
+			&:before{
+			    @include arrow(7px, 135deg, $gray);
+			    top: 14px;
+			}
+		}
+	}
+	.second{
+		display: none;
+		li{
+			font-size: 14px;
+			&.open{
+				.sub{
+					display: block;
+				}
+			}
+			&:before{
+				left: 40px;
+			}
+		}
+		a{
+			padding-left: 60px;
+		}
+	}
+	.sub{
+		display: none;
+		padding-top: 0;
+		li{
+			font-size: 14px;
+			&:before{
+				content: none;
+			}
+			&.active{
+				a{
+					position: relative;
+					color: $theme-color;
+					&:before{
+						background-color: $theme-color;
+					}
+					&:after{
+						position: absolute;
+						left: 0;
+						top: 5px;
+						bottom: 5px;
+						width: 4px;
+						content: '';
+						background-color: $theme-color;	
+					}
+				}
+			}
+			a{	
+				position: relative;
+				padding-left: 75px;
+				color: $gray;
+				&:before{
+					position: absolute;
+					top: 17px;
+					left: 60px;
+					width: 5px;
+					height: 5px;
+					border-radius: 50%;
+					content: '';
+					background-color: $border-color;
+				}
+				&:hover{
+					color: $theme-color;
+					&:before{
+						background-color: $theme-color;
+					}
+					&:after{
+						position: absolute;
+						left: 0;
+						top: 5px;
+						bottom: 5px;
+						width: 4px;
+						content: '';
+						background-color: $theme-color;	
+					}
+				}
+			}
+		}
+	}
+	em{
+		float: right;
+		margin-right: -35px;
+		margin-top: 12px;
+		padding: 0 6px;
+		border-radius: 10px;
+		line-height: 16px;
+		font-size: 12px;
+		color: #fff;
+		background-color: $theme-color;
+	}
+	.none-open{
+		&:before{
+			content: none;
+		}
+		&:hover,
+		&.active{
+			a{
+				position: relative;
+				color: $theme-color;
+				&:after{
+					position: absolute;
+					left: 0;
+					top: 5px;
+					bottom: 5px;
+					width: 4px;
+					content: '';
+					background-color: $theme-color;	
+				}
+			}
+		}
+	}
+}

@@ -6,7 +6,6 @@ use Charsen\Scaffold\Generator\CreateControllerGenerator;
 use Charsen\Scaffold\Generator\CreateMigrationGenerator;
 use Charsen\Scaffold\Generator\CreateModelGenerator;
 use Charsen\Scaffold\Generator\CreateRepositoryGenerator;
-use InvalidArgumentException;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 

@@ -12,6 +12,7 @@ Route::prefix($prefix)->group(function ()
     Route::get('/api', ApiController::class . '@index')->name('api.list');
     Route::get('/api/show', ApiController::class . '@show')->name('api.show');
     Route::get('/api/request', ApiController::class . '@request')->name('api.request');
+    Route::get('/api/param', ApiController::class . '@param')->name('api.param');
 
     Route::get('/db', DatabaseController::class . '@index')->name('table.list');
     Route::get('/dictionaries', DatabaseController::class . '@dictionaries')->name('dictionaries');
