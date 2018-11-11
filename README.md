@@ -1,19 +1,18 @@
 # Laravel Scaffold
 
-## Installation
-You can install the package via composer:
+## 安装
+通过 [composer](https://laravel-china.org/composer) 安装
 ```bash
 composer require --dev charsen/laravel-scaffold
 ```
-The package will register itself automatically. 
 
-(可选)发布配置文件到，若需要调整配置的话：
+- (可选)发布配置文件到，若需要调整配置的话：
 ```bash
 php artisan vendor:publish --provider=Charsen\\Scaffold\\ScaffoldProvider --tag=config
 ```
 将会发布 `scaffold.php` 到 `config` 目录下.
 
-发布前端公共资源包到 public 目录下：
+- 发布前端公共资源包到 public 目录下：
 ```bash
 php artisan vendor:publish --provider=Charsen\\Scaffold\\ScaffoldProvider --tag=public --force
 ```
@@ -109,10 +108,9 @@ php artisan scaffold:i18n
 php artisan scaffold:free
 ```
 
-
-## todo
-- ScaffoldProvider 里 view 指定的 namespace 未从指定地方获取
-- Http/Views/* extends, include 里 view 指定的 namesapce 未从指定地方获取
+## 文档
+- schema demo [document/schema_demo.yaml](https://github.com/charsen/laravel-scaffold/blob/master/document/schema_demo.yaml)
+- api demo [document/api_demo.yaml](https://github.com/charsen/laravel-scaffold/blob/master/document/api_demo.yaml)
 
 ## Changelog
 Please see [CHANGELOG](*CHANGELOG.md*) for more information what has changed recently.
@@ -121,7 +119,7 @@ Please see [CHANGELOG](*CHANGELOG.md*) for more information what has changed rec
 If you discover any security related issues, please email 780537@gmail.com instead of using the issue tracker.
 
 ## Thanks
-- [Lamtim](*https://github.com/Lamtin*)
+- [Lamtim](https://github.com/Lamtin)
 
 ## License
 The MIT License (MIT). Please see [License File](*LICENSE.md*) for more information.

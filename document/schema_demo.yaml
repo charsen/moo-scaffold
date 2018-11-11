@@ -1,0 +1,123 @@
+#######
+# 数据库表字段配置的默认规则 （目的减少代码输入量）
+#
+# *** 字段 *********************************************************
+# - 为 id 时，索引默认设为 AI，UNSIGNED INTEGER
+#
+# *** 字段-属性 *****************************************************
+# - require 默认 = true
+# - type: int 时，默认 size = 10, unsigned = true, default = 0
+# - type: bigint 时，默认 size = 20, unsigned = true, default = 0
+# - type: tinyint 时，默认 size = 2, unsigned = true, default = 0
+# - varchar: {char|varchar} 时, 默认 size = 32, default = ''
+# - size: 3|128 时，分割两个数字时，第一个表示最小长度（会生成验证），第二个表示最大长度
+###
+
+####
+# 人事模块 设计文件
+#
+# @author Charsen
+# @date   2018-11-11 11:50
+##
+module_name: 人事模块
+tables:
+    departments:
+        model:   # 不生成时，可删除此项
+            class: Department                # Eloquent 名称，可带目录，如：Personnels/Department
+        repository:  # 不生成时，可删除此项
+            class: Personnels/Department     # 系统会自动加上 Repository
+        controller:  # 不生成时，可删除此项
+            class: Personnels/Department     # 系统会自动加上 Controller
+        attrs:
+            name: 部门
+            desc: 树状结构存储企业的组织构架（行政实体）
+            remark: ['标明类型是为了便于在后续的使用中筛选出准确的数据，如：添加小区时 选择公司，选择管理处。',
+                     '1. 在企业注册时，用其公司名称，默认创建一个 department_type = 1 的总公司部分；',
+                     '2. 在后续的操作时， department_type 隐藏 =1 的选项']
+        index:
+            id: { type: primary, fields: id }
+            department_name: { type: index, fields: department_name }
+        fields:
+            id: { }                                                             # 为空时，使用默认配置，递增的 ID (主键)，相当于「UNSIGNED INTEGER」
+            parent_id: { name: 父级ID, type: int, default: NULL }
+            _lft: { name: 左边距, type: int, default: 0 }
+            _rgt: { name: 右边距, type: int, default: 0 }
+            department_code: { require: false, name: 部门编号, type: varchar }
+            department_type: { name: 部门类型, type: tinyint, default: 3 }
+            department_name: { name: 部门名称, type: varchar, size: 2|128 }      # size: 用 | 分割两个数字时，第一个表示最小长度（会生成验证），第二个表示最大长度
+            department_status: { name: 部门状态, type: tinyint, default: 7 }
+            deleted_at: { }                                                     # 为空时，使用默认配置
+            created_at: { }                                                     # 为空时，使用默认配置
+            updated_at: { }                                                     # 为空时，使用默认配置
+        dictionaries:             # 生成 model 时，会在 appends 中添加 status_txt, 同时生成 getStatusTxtAttribute()，支持多语言
+            department_type:
+                head_office: [1, head office, 总公司 ]
+                branch_office: [2, branch office, 分公司 ]
+                department_office: [3, department office, 部门 ]
+            department_status:
+                canceled: [2, canceled, 撤销 ]
+                normal: [7, normal, 正常 ]
+
+
+    personnels:
+        model:
+            class: Personnels/Personnel
+        repository:
+            class: Personnels/Personnel
+        controller:
+            class: Personnels/Personnel
+        attrs:
+            name: 人员
+            desc: 存储企业的员工信息、员工帐号信息;
+            remark: ['目前在人事系统没做起来前，这个员工信息只能最基础的；']
+        index:
+            id: { type: primary, fields: id }
+            real_name: { type: index, fields: real_name }
+        fields:
+            id: { }
+            real_name: { name: 姓名, type: varchar, size: 32, }
+            id_card_number: { require: false, name: 身份证号码, type: varchar, size: 3|32 }
+            birthday: { require: false, name: 生日, type: date }
+            gender: { name: 姓别, type: tinyint, default: 1 }
+            mobile: { name: 手机, type: varchar, size: 16 }
+            email: { require: false, name: 邮箱, type: varchar, size: 128 }
+            wechat_id: { require: false, name: 微信号, type: varchar, size: 128 }
+            staff_code: { require: false, name: 员工编号, type: varchar, size: 32 }
+            staff_status: { name: 状态, type: tinyint, default: 7 }
+            entry_at: { require: false, name: 入职时间, type: date }
+            leave_at: { require: false, name: 离职时间, type: date }
+            password: { require: false, name: 登陆密码, type: varchar, size: 128 }
+            last_logined_at: { require: false, name: 上次登陆时间, type: timestamp }
+            last_logined_ip: { require: false, name: 上次登陆IP, type: varchar, size: 128 }
+            last_logined_endpoint: { name: 上次登陆端点, type: tinyint, default: 1 }
+            login_times: { name: 登陆次数, type: int, default: 0 }
+            created_account_at: { require: false, name: 帐号创建于, type: timestamp }
+            account_status: { require: false, name: 帐号状态, type: tinyint, default: 3, desc: 当设置了离职时间，帐号状态要更新为：锁定}
+            is_root: { require: false, name: 是否为超级管理员, type: tinyint, default: 0 }
+            deleted_at: { }
+            created_at: { }
+            updated_at: { }
+        dictionaries:
+            is_root:
+                is_root: [1, root, 超级管理员 ]
+                is_not_root: [2, is't root, 非超级管理员 ]
+            gender:
+                male: [1, male, 男士 ]
+                female: [2, female, 女士 ]
+            staff_status:
+                leave_office: [3, leave office, 离职]
+                retired: [5, retired, 退修]
+                stored: [6, retired, 后备]
+                on_job: [7, retired, 在职]
+            last_logined_endpoint:
+                never_login: [1, never login, 未登陆 ]
+                app: [2, app, App ]
+                wechat: [3, wechat, 微信 ]
+                alipay: [4, alipay, 支付宝 ]
+                web: [5, web, 网站 ]
+            account_status:
+                forbidden: [2, forbidden, 禁用 ]
+                initial: [3, initial, 初始化 ]
+                locked: [4, locked, 锁定 ]
+                normal: [7, normal, 正常 ]
+

@@ -1,0 +1,45 @@
+###
+# 一个 controller 一个 api.schema 文件
+##
+controller:
+    code: 001
+    class: Department
+    name: 部门管理
+    desc: [部门管理的 api ]
+actions:
+    index:
+        name: 部门列表
+        desc: []
+        request: [GET, departments]
+        url_params: []
+    store:
+        name: 添加部门
+        desc: []
+        request: [POST, departments]
+        body_params:
+            parent_id: [父级ID, '']
+            department_code: [false, 部门编号, '']
+            department_type: [部门类型, 3]
+            department_name: [部门名称, '']
+    show:
+        name: 查看部门
+        desc: []
+        request: [GET, departments/{department}]
+        url_params: []
+    update:
+        name: 更新部门
+        desc: []
+        request: [POST, departments/{department}]
+        body_params:
+            _method: [PUT]
+            parent_id: [父级ID, '']
+            department_code: [false, 部门编号, '']
+            department_type: [部门类型, 3]
+            department_name: [部门类型, '']
+            department_status: [部门状态, 7]
+    destroy:
+        name: 删除部门
+        desc: []
+        request: [POST, departments/{department}]
+        body_params:
+            _method: [DELETE]
