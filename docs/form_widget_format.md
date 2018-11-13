@@ -22,24 +22,24 @@
 - editor    : 富文本编辑器
 
 ### 1.2 其它附加属性 的一些示例
-```php
+```json
 .
 .
 .
-    'append_attr'  :  {
+    'append_attr' : {
         'max_choice'     :  2,       // select, checkbox 时, = -1 时不限, =0 是不能选， =1 单选
     },
 .
 .
 .
-    'append_attr'  :  {
+    'append_attr' : {
         'min_length'     :  3,       // 字符串时，验证最小长度
         'max_length'     :  96,      // 字符串时，验证最大长度
     },
 .
 .
 .
-    'append_attr'    :  {
+    'append_attr' : {
         'resize'         :  true,        // 前端是否按最大尺寸缩放图片
         'preview_size'   :  '160*160',   // 上传后预览尺寸
         'crop'           :  true,        // 是否裁剪
@@ -50,7 +50,7 @@
 .
 .
 .
-    'append_attr'    :  {
+    'append_attr' : {
         'time_start'     :  '1980-1-1 0:0:0',
     }
 .
@@ -63,14 +63,14 @@
 {
     "data": {
         'id' : {
-            'require' : true,
-            'label'   : 'ID',
-            'placeholder' : '',
-            'widget_type'  : 'text',
-            'widget_status' : 'readonly',
-            'help'    : '',
+            'require'        : true,
+            'label'          : 'ID',
+            'placeholder'    : '',
+            'widget_type'    : 'text',
+            'widget_status'  : 'readonly',
+            'help'           : '',
         }
-        'password'  :  {
+        'password' : {
             'require'        :  true,
             'label'          :  '密码',
             'widget_type'    :  'password',
