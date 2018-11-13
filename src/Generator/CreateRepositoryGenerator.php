@@ -47,6 +47,8 @@ class CreateRepositoryGenerator extends Generator
             return $this->command->error("Schema File \"{$schema_name}\" could not be found.");
         }
         //var_dump($all[$schema_name]);
+        
+        // todo: 更新 app/Providers/RepositoryServiceProvider.php
 
         foreach ($all[$schema_name] as $repository_class => $attr)
         {
@@ -105,7 +107,7 @@ class CreateRepositoryGenerator extends Generator
     
         // 在列表页附加 分页码参数
         $index_code    = ["'index' => ["];
-        $index_code[]  = $this->getTabs(3) . "'page' => 'sometime|required|integer|min:1',";
+        $index_code[]  = $this->getTabs(3) . "'page' => 'sometimes|required|integer|min:1',";
         $index_code[]  = $this->getTabs(2) . '],';
         
         // create & update action

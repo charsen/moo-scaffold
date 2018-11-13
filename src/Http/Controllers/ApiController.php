@@ -286,13 +286,19 @@ class ApiController extends Controller
             }
             elseif ($field_name == 'logo' || strstr($field_name, '_logo'))
             {
-                $attr[2] = $faker->image(public_path('uploads/temp'), 320, 320);
-                $attr[2] = str_replace(public_path(), '', $attr[2]);
+                if ($attr[0])
+                {
+                    $attr[2] = $faker->image(public_path('uploads/temp'), 320, 320);
+                    $attr[2] = str_replace(public_path(), '', $attr[2]);
+                }
             }
             elseif ($field_name == 'banner' || strstr($field_name, '_banner'))
             {
-                $attr[2] = $faker->image(public_path('uploads/temp'), 750, 360);
-                $attr[2] = str_replace(public_path(), '', $attr[2]);
+                if ($attr[0])
+                {
+                    $attr[2] = $faker->image(public_path('uploads/temp'), 750, 360);
+                    $attr[2] = str_replace(public_path(), '', $attr[2]);
+                }
             }
             elseif ($field_name == 'real_name')
             {

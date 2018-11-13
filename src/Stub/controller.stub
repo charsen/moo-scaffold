@@ -33,7 +33,7 @@ class {{controller_class}}Controller extends Controller
      *
      * @param \Illuminate\Http\Request $req
      *
-     * @return \Illuminate\Http\Resources\Json\BaseResource
+     * @return \App\Http\Resources\BaseResource
      * @throws \Exception
      */
     public function index(Request $req)
@@ -93,7 +93,7 @@ class {{controller_class}}Controller extends Controller
      *
      * @param int $id
      *
-     * @return \Illuminate\Http\Resources\Json\BaseResource
+     * @return \App\Http\Resources\BaseResource
      */
     public function destroy($id)
     {

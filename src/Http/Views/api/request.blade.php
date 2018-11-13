@@ -96,9 +96,14 @@
             dataType: 'html',
             success: function (result) {
                 $('#left_container').removeClass('transparent').html(result);
+                if (action != 'store' && action != 'update' && action != 'delete')
+                {
+                    $('#send').trigger('click');
+                }
             }
         });
-    }
+    };
+
     @if (!empty($current_controller) && ! empty($current_action))
     getParams('{{ $current_folder }}', '{{ $current_controller }}', '{{ $current_action }}');
     @endif
