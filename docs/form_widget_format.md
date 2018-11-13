@@ -26,61 +26,93 @@
 .
 .
 .
-    'append_attr' : {
-        'max_choice'     :  2,       // select, checkbox 时, = -1 时不限, =0 是不能选， =1 单选
+    "append_attr": {
+        "max_choice"     :  2,       // select, checkbox 时, = -1 时不限, =0 是不能选， =1 单选
     },
 .
 .
 .
-    'append_attr' : {
-        'min_length'     :  3,       // 字符串时，验证最小长度
-        'max_length'     :  96,      // 字符串时，验证最大长度
+    "append_attr": {
+        "min_length"     :  3,       // 字符串时，验证最小长度
+        "max_length"     :  96,      // 字符串时，验证最大长度
     },
 .
 .
 .
-    'append_attr' : {
-        'resize'         :  true,        // 前端是否按最大尺寸缩放图片
-        'preview_size'   :  '160*160',   // 上传后预览尺寸
-        'crop'           :  true,        // 是否裁剪
-        'crop_size'      :  '320*320',   // 裁剪为
-        'min_size'       :  '320*320',   // 上传文件的最小尺寸
-        'max_file_size'  :  '4048',      // 上传文件的最大体积，单位kb
+    "append_attr": {
+        "resize"         :  true,        // 前端是否按最大尺寸缩放图片
+        "preview_size"   :  "160*160",   // 上传后预览尺寸
+        "crop"           :  true,        // 是否裁剪
+        "crop_size"      :  "320*320",   // 裁剪为
+        "min_size"       :  "320*320",   // 上传文件的最小尺寸
+        "max_file_size"  :  "4048",      // 上传文件的最大体积，单位kb
     }
 .
 .
 .
-    'append_attr' : {
-        'time_start'     :  '1980-1-1 0:0:0',
+    "append_attr": {
+        "time_start"     :  "1980-1-1 0:0:0",
     }
 .
 .
 .
 ```
 
-## 2. create form json 结果示例
+## 2.1 create form json 结果示例
 ```json
 {
     "data": {
-        'id' : {
-            'require'        : true,
-            'label'          : 'ID',
-            'placeholder'    : '',
-            'widget_type'    : 'text',
-            'widget_status'  : 'readonly',
-            'help'           : '',
+        "id": {
+            "require"        : true,
+            "label"          : "ID",
+            "placeholder"    : "",
+            "widget_type"    : "text",
+            "widget_status"  : "readonly",
+            "help"           : "",
         }
-        'password' : {
-            'require'        :  true,
-            'label'          :  '密码',
-            'widget_type'    :  'password',
-            'widget_status'  :  'normal',
-            'placeholder'    :  '',
-            'help'           :  '',
+        "password": {
+            "require"        :  true,
+            "label"          :  "密码",
+            "widget_type"    :  "password",
+            "widget_status"  :  "normal",
+            "placeholder"    :  "",
+            "help"           :  "",
         }
     }
 }
 ```
 
-
+## 2.2 edit form json 结果示例
+- data: 为 model/entity 数据
+- meta.form_widgets 是表单控件数据
+```json
+{
+    "data": {
+        "id"        : 5,
+        "parent_id" : 1,
+    },
+    "meta": {
+        "form_widgets": {
+            "parent_id": {
+                "field_name"        : "parent_id",
+                "widget_status"     : "hidden",
+                "widget_type"       : "hidden",
+                "require"           : true,
+                "label"             : "上一级",
+                "placeholder"       : "",
+                "help": ""
+            },
+            "department_code": {
+                "field_name"        : "department_code",
+                "require"           : false,
+                "label"             : "部门编号",
+                "placeholder"       : "",
+                "widget_type"       : "",
+                "widget_status"     : "",
+                "help"              : ""
+            },
+        }
+    }
+}
+```
 
