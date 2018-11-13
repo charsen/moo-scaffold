@@ -59,16 +59,16 @@ class CreateModelGenerator extends Generator
             $fields            = $table_attr['fields'];
             $dictionaries      = $table_attr['dictionaries'];
             $use_trait         = [];
-            $user_soft_deletes = '';
-            //var_dump($table_attr['fields']);
-
+            $use_class         = [];
+            
+            // 数据字典代码
             $dictionaries_code = $this->buildDictionaries($dictionaries, $fields);
 
             // 软删除
             if (isset($fields['deleted_at']))
             {
-                $use_trait[]       = 'SoftDeletes';
-                $user_soft_deletes = 'use Illuminate\Database\Eloquent\SoftDeletes;';
+                $use_trait[]   = 'SoftDeletes';
+                $use_class[]   = 'use Illuminate\Database\Eloquent\SoftDeletes;';
             }
 
             // 目录及 namespace 处理
@@ -78,7 +78,7 @@ class CreateModelGenerator extends Generator
                 'author'            => $this->utility->getConfig('author'),
                 'date'              => date('Y-m-d H:i:s'),
                 'namespace'         => ucfirst($namespace),
-                'user_soft_deletes' => $user_soft_deletes,
+                'use_class'         => implode("\n", $use_class),
                 'use_trait'         => !empty($use_trait) ? 'use ' . implode(', ', $use_trait) . ';' : '',
                 'class'             => $class,
                 'class_name'        => $table_attr['name'] . '模型',
@@ -158,7 +158,7 @@ class CreateModelGenerator extends Generator
             $data_code[] = $this->getTabs(1) . " * 设置 {$fields[$filed_name]['name']} 具体值";
             $data_code[] = $this->getTabs(1) . ' * @var array';
             $data_code[] = $this->getTabs(1) . ' */';
-            $data_code[] = $this->getTabs(1) . "protected \$init_{$filed_name} = [";
+            $data_code[] = $this->getTabs(1) . "public \$init_{$filed_name} = [";
             foreach ($attr as $alias => $one)
             {
                 $data_code[] = $this->getTabs(2) . "'{$one[0]}' => '{$alias}',";

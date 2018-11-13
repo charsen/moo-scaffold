@@ -177,7 +177,7 @@ class FreshStorageGenerator extends Generator
     private function getSize(&$attr)
     {
         $attr['size'] = $attr['size'] ?? '';
-        if (in_array($attr['type'], ['int', 'bigint', 'tinyint']))
+        if (in_array($attr['type'], ['int', 'bigint', 'tinyint', 'decimal', 'float']))
         {
             // 添加 unsigned 属性
             $attr['unsigned'] = $attr['unsigned'] ?? true;
@@ -186,13 +186,13 @@ class FreshStorageGenerator extends Generator
             {
                 $attr['size'] = $attr['size'] == '' ? 20 : $attr['size'];
             }
-            else if ($attr['type'] == 'int')
+            else if ($attr['type'] == 'tinyint')
             {
-                $attr['size'] = $attr['size'] == '' ? 10 : $attr['size'];
+                $attr['size'] = $attr['size'] == '' ? 1 : $attr['size'];
             }
             else
             {
-                $attr['size'] = $attr['size'] == '' ? 1 : $attr['size'];
+                $attr['size'] = $attr['size'] == '' ? 10 : $attr['size'];
             }
         }
         elseif (in_array($attr['type'], ['char', 'varchar']))

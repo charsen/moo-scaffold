@@ -3,7 +3,7 @@
 namespace {{namespace}};
 
 use Illuminate\Database\Eloquent\Model;
-{{user_soft_deletes}}
+{{use_class}}
 
 /**
  * {{class}} Model
