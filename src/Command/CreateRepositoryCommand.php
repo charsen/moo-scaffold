@@ -2,6 +2,7 @@
 namespace Charsen\Scaffold\Command;
 
 use Charsen\Scaffold\Generator\CreateRepositoryGenerator;
+use Charsen\Scaffold\Generator\FreshStorageGenerator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
@@ -60,6 +61,13 @@ class CreateRepositoryCommand extends Command
                 'Overwrite Model File.',
                 false,
             ],
+            [
+                'fresh',
+                '--fresh',
+                InputOption::VALUE_OPTIONAL,
+                'Fresh all cache files.',
+                false,
+            ],
         ];
     }
 
@@ -80,7 +88,15 @@ class CreateRepositoryCommand extends Command
         }
         
         $force       = $this->option('force') === null;
-
+        $fresh       = $this->option('fresh') === null;
+        if ($fresh)
+        {
+            $this->tipCallCommand('scaffold:fresh');
+            $result = (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
+    
+            $this->tipCallCommand('scaffold:repository');
+        }
+        
         $result = (new CreateRepositoryGenerator($this, $this->filesystem, $this->utility))
             ->start($schema_name, $force);
     

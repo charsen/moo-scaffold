@@ -2,6 +2,7 @@
 namespace Charsen\Scaffold\Command;
 
 use Charsen\Scaffold\Generator\CreateApiGenerator;
+use Charsen\Scaffold\Generator\FreshStorageGenerator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
@@ -60,6 +61,13 @@ class CreateApiCommand extends Command
                 'Overwrite Api Files.',
                 false,
             ],
+            [
+                'fresh',
+                '--fresh',
+                InputOption::VALUE_OPTIONAL,
+                'Fresh all cache files.',
+                false,
+            ],
         ];
     }
 
@@ -84,6 +92,14 @@ class CreateApiCommand extends Command
         }
         
         $force     = $this->option('force') === null;
+        $fresh     = $this->option('fresh') === null;
+        if ($fresh)
+        {
+            $this->tipCallCommand('scaffold:fresh');
+            $result = (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
+    
+            $this->tipCallCommand('scaffold:api');
+        }
 
         $result = (new CreateApiGenerator($this, $this->filesystem, $this->utility))
             ->start($namespace, $force);

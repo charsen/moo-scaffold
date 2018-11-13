@@ -2,6 +2,7 @@
 namespace Charsen\Scaffold\Command;
 
 use Charsen\Scaffold\Generator\CreateControllerGenerator;
+use Charsen\Scaffold\Generator\FreshStorageGenerator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
@@ -60,6 +61,13 @@ class CreateControllerCommand extends Command
                 'Overwrite Controller File.',
                 false,
             ],
+            [
+                'fresh',
+                '--fresh',
+                InputOption::VALUE_OPTIONAL,
+                'Fresh all cache files.',
+                false,
+            ],
         ];
     }
     
@@ -80,7 +88,15 @@ class CreateControllerCommand extends Command
         }
         
         $force       = $this->option('force') === null;
-
+        $fresh       = $this->option('fresh') === null;
+        if ($fresh)
+        {
+            $this->tipCallCommand('scaffold:fresh');
+            $result = (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
+    
+            $this->tipCallCommand('scaffold:controller');
+        }
+        
         $result = (new CreateControllerGenerator($this, $this->filesystem, $this->utility))
             ->start($schema_name, $force);
     

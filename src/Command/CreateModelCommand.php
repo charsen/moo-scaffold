@@ -6,6 +6,7 @@ use Charsen\Scaffold\Generator\CreateControllerGenerator;
 use Charsen\Scaffold\Generator\CreateMigrationGenerator;
 use Charsen\Scaffold\Generator\CreateModelGenerator;
 use Charsen\Scaffold\Generator\CreateRepositoryGenerator;
+use Charsen\Scaffold\Generator\FreshStorageGenerator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
@@ -65,6 +66,13 @@ class CreateModelCommand extends Command
                 false,
             ],
             [
+                'fresh',
+                '--fresh',
+                InputOption::VALUE_OPTIONAL,
+                'Fresh all cache files.',
+                false,
+            ],
+            [
                 'controller',
                 '-c',
                 InputOption::VALUE_OPTIONAL,
@@ -106,9 +114,18 @@ class CreateModelCommand extends Command
         }
         
         $force       = $this->option('force') === null;
+        $fresh       = $this->option('fresh') === null;
         $controller  = $this->option('controller') === null;
         $repository  = $this->option('repository') === null;
         $migration   = $this->option('migration') === null;
+    
+        if ($fresh)
+        {
+            $this->tipCallCommand('scaffold:fresh');
+            $result = (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
+    
+            $this->tipCallCommand('scaffold:model');
+        }
     
         $this->tipCallCommand('scaffold:model');
         $result = (new CreateModelGenerator($this, $this->filesystem, $this->utility))
