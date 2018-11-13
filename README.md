@@ -53,6 +53,7 @@ php artisan scaffold:migration `schema_file_name`
 ```
 - `schema_file_name` 非必写，若不写会有提示做选择
 - 添加 `-f` 覆盖已存在文件
+- 添加 `--fresh` 刷新缓存数据，等于先执行 `artisan scaffold:fresh`
 
 
 ### 6. 创建模型文件
@@ -61,6 +62,7 @@ php artisan scaffold:migration `schema_file_name`
 php artisan scaffold:model `schema_file_name`
 ```
 - 添加 `-f` 覆盖已存在文件
+- 添加 `--fresh` 刷新缓存数据，等于先执行 `artisan scaffold:fresh`
 - 添加 `-c` 同时生成 controller
 - 添加 `-r` 同时生成 repository
 - 添加 `-m` 同时生成 migration (程序会确认，是否执行 `artisan migrate`)
@@ -72,6 +74,7 @@ php artisan scaffold:repository `schema_file_name`
 ```
 - `schema_file_name` 非必写，若不写会有提示做选择
 - 添加 `-f` 覆盖已存在文件
+- 添加 `--fresh` 刷新缓存数据，等于先执行 `artisan scaffold:fresh`
 _PS: 类里的验证规则是生成 api 时的参数来源;_
 
 
@@ -80,6 +83,8 @@ _PS: 类里的验证规则是生成 api 时的参数来源;_
 php artisan scaffold:controller `schema_file_name`
 ```
 - `schema_file_name` 非必写，若不写会有提示做选择
+- 添加 `-f` 覆盖已存在文件
+- 添加 `--fresh` 刷新缓存数据，等于先执行 `artisan scaffold:fresh`
 - 类里的 action 是生成 api 的依据，一个 action 一个 api 
 
 
@@ -89,6 +94,7 @@ php artisan scaffold:api `namesapce`
 ```
 - `namesapce` 非必写，若不写会有提示做选择（app/controllers 下的某个目录，或多级目录）
 - 添加 `-f` 覆盖已存在文件
+- 添加 `--fresh` 刷新缓存数据，等于先执行 `artisan scaffold:fresh`
 - 自动获取 `namesapce` 的选择提示内容，只支持 Http/Controllers/ 再往下两级，更深的层级不支持!!!
 
 **PS:**
@@ -107,6 +113,7 @@ http://{{url}}}/scaffold/api
 ```sh
 php artisan scaffold:i18n
 ```
+- 添加 `--fresh` 刷新缓存数据，等于先执行 `artisan scaffold:fresh`
 - 所有的数据表字段，除了 id, created_at, updated_at, deleted_at 以外
 - 所有 model 里定义的数据字典
 

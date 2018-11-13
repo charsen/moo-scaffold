@@ -69,7 +69,7 @@
             "widget_type"    : "text",
             "widget_status"  : "readonly",
             "help"           : "",
-        }
+        },
         "password": {
             "require"        :  true,
             "label"          :  "密码",
