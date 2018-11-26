@@ -33,6 +33,13 @@ class CreateControllerGenerator extends Generator
             return $this->command->error("Schema File \"{$schema_name}\" could not be found.");
         }
         
+        // 所有字段信息
+        $fields             = $this->utility->getFields();
+        // 字典数据
+        $dictionaries       = $this->utility->getDictionaries();
+        // 生成的 controllers
+        $build_controllers  = [];
+        
         //dump($all[$schema_name]);
         foreach ($all[$schema_name] as $class => $attr)
         {
@@ -45,22 +52,148 @@ class CreateControllerGenerator extends Generator
             }
             
             // 目录及 namespace 处理
-            $namespace      = $this->dealNameSpaceAndPath($this->controller_path, 'app/Http/Controllers', $class);
+            $namespace          = $this->dealNameSpaceAndPath($this->controller_path, 'app/Http/Controllers', $class);
             
-            $use_repository = 'use ' . ucfirst($this->repository_folder) . $attr['repository_class'] . 'Repository;';
-            $temp           = explode('/', $attr['repository_class']);
-            $meta           = [
+            $repository_class   = ucfirst($this->repository_folder) . $attr['repository_class'] . 'Repository';
+            $repository_class   = str_replace('/', '\\', $repository_class);
+            $temp               = explode('/', $attr['repository_class']);
+            
+            $meta               = [
                 'author'            => $this->utility->getConfig('author'),
                 'date'              => date('Y-m-d H:i:s'),
                 'controller_class'  => $class,
                 'namespace'         => ucfirst($namespace),
-                'use_repository'    => str_replace('/', '\\', $use_repository),
+                'use_repository'    => 'use ' . $repository_class . ';',
                 'repository_class'  => end($temp) . 'Repository',
+                'form_widgets'      => $this->getFormWidgets($repository_class, $fields, $dictionaries)
+            ];
+            
+            $build_controllers[] = [
+                'namespace'         => ucfirst($namespace),
+                'class'             => $class . 'Controller',
             ];
     
             $this->filesystem->put($controller_file, $this->compileStub($meta));
             $this->command->info('+ ' . $controller_relative_file);
         }
+        
+        //$this->updateRoutes($build_controllers);
+    }
+    
+    /**
+     * 更新路由
+     *
+     * @param $build_controllers
+     *
+     * @return bool
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     */
+    private function updateRoutes($build_controllers)
+    {
+        $file = $this->utility->getRouteFile('api');
+    
+        $code = [];
+        foreach ($build_controllers as $controller)
+        {
+            if (strstr($file, '\\' . $controller['class']))
+            {
+                continue;
+            }
+        
+            //$code[] = "Route::get('buildings/trashed', 'Enterprise\\Resources\\BuildingController@trashed');";
+            //$code[] = "Route::delete('buildings/destroy/batch', 'Enterprise\\Resources\\BuildingController@destroyBatch');";
+            //$code[] = "Route::resources(['buildings' => 'Enterprise\\Resources\\BuildingController']);";
+            $code[] = '';
+        }
+    
+        if (empty($code))
+        {
+            return true;
+        }
+    
+        $code[] = $this->getTabs(2) . '//:end:do_not_delete';
+        $code   = implode("\n", $code);
+    
+        $file = str_replace("//:end:do_not_delete", $code, $file);
+        $this->filesystem->put(base_path('routes/api.php'), $file);
+        $this->command->warn('+ ./app/routes/api.php (Updated)');
+    
+        return true;
+    }
+    
+    /**
+     * 获取 创建/编辑 表单的控件代码
+     *
+     * @param       $repository_class
+     * @param array $fields
+     * @param array $dictionaries
+     *
+     * @return string
+     */
+    private function getFormWidgets($repository_class, array $fields, array $dictionaries)
+    {
+        $rules = $this->getRules($repository_class);
+        if ( ! isset($rules['create']))
+        {
+            return "[];";
+        }
+        
+        $code = ["["];
+        
+        foreach ($rules['create'] as $field_name => $rule_string)
+        {
+            $code[] = $this->getTabs(3) . "[";
+            $code[] = $this->getTabs(4) . "'field_name'    => '{$field_name}',";
+            
+            if (strstr($rule_string, 'sometimes') || strstr($rule_string, 'nullable'))
+            {
+                $code[] = $this->getTabs(4) . "'require'       => FALSE,";
+            }
+            
+            // 字段以 _id 结尾的，一般是下拉选择
+            if (preg_match('/[a-z]_id$/i', $field_name))
+            {
+                $code[] = $this->getTabs(4) . "'widget_type'   => 'select',";
+            }
+            
+            // 通过字段类型指定 控件类型
+            if (isset($fields[$field_name]))
+            {
+                if ($fields[$field_name]['type'] == 'date')
+                {
+                    $code[] = $this->getTabs(4) . "'widget_type'   => 'date',";
+                }
+    
+                if ($fields[$field_name]['type'] == 'timestamp')
+                {
+                    $code[] = $this->getTabs(4) . "'widget_type'   => 'datetime',";
+                }
+            }
+            
+            if (isset($dictionaries[$field_name]))
+            {
+                $code[] = $this->getTabs(4) . "'widget_type'   => 'radio',";
+                $code[] = $this->getTabs(4) . "'options'       => \$this->repository->getModel()->init_{$field_name},";
+            }
+            
+            $code[] = $this->getTabs(3) . "],";
+        }
+        
+        $code[] = $this->getTabs(2) . "];";
+        
+        return implode("\n", $code);
+    }
+    
+    /**
+     * @param $repository_class
+     *
+     * @return mixed
+     */
+    private function getRules($repository_class)
+    {
+        $rules      = (new $repository_class(app()))->getRules();
+    
+        return $rules;
     }
     
     /**

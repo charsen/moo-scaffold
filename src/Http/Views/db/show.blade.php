@@ -1,6 +1,5 @@
 <h2 class="title">{{ $data['name'] }} ：{{ $data['table_name'] }}</h2>
 <div class="alert">
-    <h3>详情描述</h3>
     <p>{{ $data['desc'] }}</p>
 </div>
 

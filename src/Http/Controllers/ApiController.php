@@ -175,10 +175,13 @@ class ApiController extends Controller
         $action_data['current_controller'] = $controller_class;
     
         // 字典数据
-        $dictionaries = $this->utility->getDictionaries();
+        $dictionaries   = $this->utility->getDictionaries();
 
         // 字段数据，从中获取字段格式，以便 faker 伪造数据
-        $fields = $this->utility->getFields();
+        $fields         = $this->utility->getFields();
+        
+        // i18n 润色
+        $lang_fields    = $this->utility->getLangFields();
         
         // 添加 cookie 到 body params
         if (! empty($req->cookie('api_token')) && $action_name != 'authenticate')
@@ -205,12 +208,12 @@ class ApiController extends Controller
         $faker = Faker::create('zh_CN');
         if (isset($action_data['url_params']))
         {
-            $url_params                = $this->formatParams($action_data['url_params'], $dictionaries, $fields);
+            $url_params                = $this->formatParams($action_data['url_params'], $dictionaries, $fields, $lang_fields);
             $action_data['url_params'] = $this->formatToFaker($faker, $url_params);
         }
         if (isset($action_data['body_params']))
         {
-            $body_params                = $this->formatParams($action_data['body_params'], $dictionaries, $fields);
+            $body_params                = $this->formatParams($action_data['body_params'], $dictionaries, $fields, $lang_fields);
             $action_data['body_params'] = $this->formatToFaker($faker, $body_params);
         }
         //dump($action_data);
@@ -251,82 +254,89 @@ class ApiController extends Controller
         }
         foreach ($params as $field_name => &$attr)
         {
-            if ($attr[2] != '' || $field_name == '_method')
+            if ($attr['value'] != '' || $field_name == '_method')
             {
                 continue;
             }
             // https://github.com/fzaninotto/Faker
             if (strstr($field_name, '_ids'))
             {
-                $attr[2] = $faker->numberBetween(1, 3) . ',' . $faker->numberBetween(4, 7);
+                $attr['value'] = $faker->numberBetween(1, 3) . ',' . $faker->numberBetween(4, 7);
             }
             elseif ($field_name == 'password' || strstr($field_name, '_password'))
             {
-                $attr[2] = $faker->password;
+                $attr['value'] = $faker->password;
             }
             elseif ($field_name == 'address' || strstr($field_name, '_address'))
             {
-                $attr[2] = $faker->address;
+                $attr['value'] = $faker->address;
             }
             elseif ($field_name == 'mobile' || strstr($field_name, '_mobile'))
             {
-                $attr[2] = $faker->phoneNumber;
+                $attr['value'] = $faker->phoneNumber;
             }
             elseif ($field_name == 'email' || strstr($field_name, '_email'))
             {
-                $attr[2] = $faker->unique()->safeEmail;
+                $attr['value'] = $faker->unique()->safeEmail;
             }
             elseif ($field_name == 'user_name' || $field_name == 'nick_name')
             {
-                $attr[2] = $faker->userName;
+                $attr['value'] = $faker->userName;
             }
             elseif ($field_name == 'id_card_number')
             {
-                $attr[2] = '';
+                $attr['value'] = '';
             }
             elseif ($field_name == 'logo' || strstr($field_name, '_logo'))
             {
-                if ($attr[0])
-                {
-                    $attr[2] = $faker->image(public_path('uploads/temp'), 320, 320);
-                    $attr[2] = str_replace(public_path(), '', $attr[2]);
-                }
+                // 需要远程下载，影响加载速度
+                //if ($attr[0])
+                //{
+                //    $attr['value'] = $faker->image(public_path('uploads/temp'), 320, 320);
+                //    $attr['value'] = str_replace(public_path(), '', $attr['value']);
+                //}
             }
             elseif ($field_name == 'banner' || strstr($field_name, '_banner'))
             {
-                if ($attr[0])
-                {
-                    $attr[2] = $faker->image(public_path('uploads/temp'), 750, 360);
-                    $attr[2] = str_replace(public_path(), '', $attr[2]);
-                }
+                // 需要远程下载，影响加载速度
+                //if ($attr[0])
+                //{
+                //    $attr['value'] = $faker->image(public_path('uploads/temp'), 750, 360);
+                //    $attr['value'] = str_replace(public_path(), '', $attr['value']);
+                //}
             }
             elseif ($field_name == 'real_name')
             {
-                $attr[2] = $attr[2] = $faker->name(array_random(['male', 'female']));
+                $attr['value'] = $faker->name(array_random(['male', 'female']));
             }
             elseif (strstr($field_name, '_code'))
             {
-                $attr[2] = $faker->numerify('C####');
+                $attr['value'] = $faker->numerify('C####');
             }
-            elseif (in_array($attr[4], ['int', 'tinyint', 'bigint']))
+            elseif (in_array($attr['type'], ['int', 'tinyint', 'bigint']))
             {
-                $attr[2] = $faker->numberBetween(1, 7);
+                $attr['value'] = $faker->numberBetween(1, 7);
             }
-            elseif ($attr[4] == 'varchar' || $attr[4] == 'char')
+            elseif ($attr['type'] == 'varchar' || $attr['type'] == 'char')
             {
-                $attr[2] = implode(' ', $faker->words(2));
+                $attr['value'] = implode(' ', $faker->words(2));
             }
-            elseif ($attr[4] == 'text')
+            elseif ($attr['type'] == 'text')
             {
-                $attr[2] = $faker->text(100);
+                $attr['value'] = $faker->text(100);
             }
-            elseif ($attr[4] == 'date')
+            elseif ($attr['type'] == 'date')
             {
-                $attr[2] = $faker->date('Y-m-d');
+                $attr['value'] = $faker->date('Y-m-d');
             }
-            elseif ($attr[4] == 'datetime')
+            elseif ($attr['type'] == 'datetime')
             {
-                $attr[2] = $faker->datetime();
+                $attr['value'] = $faker->datetime();
+            }
+            elseif ($attr['type'] == 'boolean')
+            {
+                $attr['value'] = rand(0, 1);
+                $attr['desc']  = '{1: true, 0: false}';
             }
         }
 
@@ -339,35 +349,41 @@ class ApiController extends Controller
      * @param  array $params
      * @param  array $dictionaries
      * @param  array $fields
+     * @param  array $lang_fields
      *
      * @return array
      */
-    private function formatParams(array $params, array $dictionaries, array $fields)
+    private function formatParams(array $params, array $dictionaries, array $fields, array $lang_fields)
     {
         $data = [];
         foreach ($params as $key => $attr)
         {
             if ($key == '_method')
             {
-                $data[$key] = [true, '', strtoupper($attr[0]), '兼容处理'];
+                $data[$key] = ['require' => true, 'name' => '', 'value' => strtoupper($attr[0]), 'desc' => '兼容处理'];
                 continue;
             }
 
             if ($attr[0] === false)
             {
-                $data[$key] = [false, $attr[1], ($attr[2] ?? ''), ($attr[3] ?? '')];
+                $data[$key] = ['require' => false, 'name' => $attr[1], 'value' => ($attr[2] ?? ''), 'desc' => ($attr[3] ?? '')];
             }
             else
             {
-                $data[$key] = [true, $attr[0], $attr[1], ($attr[2] ?? '')];
+                $data[$key] = ['require' => true, 'name' => $attr[0], 'value' => $attr[1], 'desc' => ($attr[2] ?? '')];
             }
 
             if (isset($dictionaries[$key]))
             {
-                $data[$key][3] .= ' ' . json_encode(array_pluck($dictionaries[$key], 2, 0), JSON_UNESCAPED_UNICODE);
+                $data[$key]['desc'] .= ' ' . json_encode(array_pluck($dictionaries[$key], 2, 0), JSON_UNESCAPED_UNICODE);
+            }
+            
+            if (isset($lang_fields[$key]))
+            {
+                $data[$key]['name'] = $lang_fields[$key]['cn'];
             }
 
-            $data[$key][4] = isset($fields[$key]['type']) ? $fields[$key]['type'] : null;
+            $data[$key]['type'] = isset($fields[$key]['type']) ? $fields[$key]['type'] : null;
         }
 
         return $data;

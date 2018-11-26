@@ -73,24 +73,10 @@ class CreateModelCommand extends Command
                 false,
             ],
             [
-                'controller',
-                '-c',
-                InputOption::VALUE_OPTIONAL,
-                'Create Controller File.',
-                false,
-            ],
-            [
                 'repository',
                 '-r',
                 InputOption::VALUE_OPTIONAL,
                 'Create Repository File.',
-                false,
-            ],
-            [
-                'migration',
-                '-m',
-                InputOption::VALUE_OPTIONAL,
-                'Create migration File.',
                 false,
             ],
         ];
@@ -115,9 +101,7 @@ class CreateModelCommand extends Command
         
         $force       = $this->option('force') === null;
         $fresh       = $this->option('fresh') === null;
-        $controller  = $this->option('controller') === null;
         $repository  = $this->option('repository') === null;
-        $migration   = $this->option('migration') === null;
     
         if ($fresh)
         {
@@ -131,26 +115,10 @@ class CreateModelCommand extends Command
         $result = (new CreateModelGenerator($this, $this->filesystem, $this->utility))
             ->start($schema_name, $force);
         
-        if ($controller) {
-            $this->tipCallCommand('scaffold:controller');
-            $result = (new CreateControllerGenerator($this, $this->filesystem, $this->utility))
-                ->start($schema_name, $force);
-        }
         if ($repository) {
             $this->tipCallCommand('scaffold:repository');
             $result = (new CreateRepositoryGenerator($this, $this->filesystem, $this->utility))
                 ->start($schema_name, $force);
-        }
-        if ($migration) {
-            $this->tipCallCommand('scaffold:migration');
-            $result = (new CreateMigrationGenerator($this, $this->filesystem, $this->utility))
-                ->start($schema_name, $force);
-            
-            if ($this->confirm("Do you want to Execute 'artisan migrate' ?", 'yes'))
-            {
-                $this->tipCallCommand('migrate');
-                $this->call('migrate');
-            }
         }
     
         $this->tipDone();

@@ -42,7 +42,6 @@ class CreateModelGenerator extends Generator
         {
             return $this->command->error("Schema File \"{$schema_name}\" could not be found.");
         }
-        //var_dump($all[$schema_name]);
 
         foreach ($all[$schema_name] as $class => $attr)
         {
@@ -62,8 +61,11 @@ class CreateModelGenerator extends Generator
             $use_class         = [];
             
             // 数据字典代码
-            $dictionaries_code = $this->buildDictionaries($dictionaries, $fields);
-
+            $dictionaries_code      = $this->buildDictionaries($dictionaries, $fields);
+    
+            $casts_code             = $this->buildCasts($fields);
+            $get_intval_attribute   = $this->buildIntvalAttribute($fields);
+            
             // 软删除
             if (isset($fields['deleted_at']))
             {
@@ -75,25 +77,169 @@ class CreateModelGenerator extends Generator
             $namespace = $this->dealNameSpaceAndPath($this->model_path, $this->model_folder, $class);
 
             $meta = [
-                'author'            => $this->utility->getConfig('author'),
-                'date'              => date('Y-m-d H:i:s'),
-                'namespace'         => ucfirst($namespace),
-                'use_class'         => implode("\n", $use_class),
-                'use_trait'         => !empty($use_trait) ? 'use ' . implode(', ', $use_trait) . ';' : '',
-                'class'             => $class,
-                'class_name'        => $table_attr['name'] . '模型',
-                'table_name'        => $attr['table_name'],
-                'dictionaries'      => $dictionaries_code['dictionaries'],
-                'hidden'            => '',
-                'appends'           => $dictionaries_code['appends'],
-                'fillable'          => $this->buildFillable($fields),
-                'dates'             => $this->buildDates($fields),
-                'get_txt_attribute' => $dictionaries_code['get_txt_attribute'],
+                'author'                => $this->utility->getConfig('author'),
+                'date'                  => date('Y-m-d H:i:s'),
+                'namespace'             => ucfirst($namespace),
+                'use_class'             => implode("\n", $use_class),
+                'use_trait'             => ! empty($use_trait) ? 'use ' . implode(', ', $use_trait) . ';' : '',
+                'class'                 => $class,
+                'class_name'            => $table_attr['name'] . '模型',
+                'table_name'            => $attr['table_name'],
+                'dictionaries'          => $dictionaries_code['dictionaries'],
+                'casts'                 => $casts_code,
+                'appends'               => $this->buildAppends($dictionaries_code['appends']),
+                'fillable'              => $this->buildFillable($fields),
+                'dates'                 => $this->buildDates($fields),
+                //'set_temporary_visible' => $this->buildTemporaryVisible($table_attr),
+                'get_txt_attribute'     => $dictionaries_code['get_txt_attribute'],
+                'get_intval_attribute'  => $get_intval_attribute,
             ];
 
             $this->filesystem->put($model_file, $this->compileStub($meta));
             $this->command->info('+ ' . $model_relative_file);
         }
+    }
+    
+    /**
+     * 生成 设置临时可见的属性
+     *
+     * @param $table_attr
+     *
+     * @return string
+     */
+    private function buildTemporaryVisible($table_attr)
+    {
+        if ( ! isset($table_attr['repository_class']) || $table_attr['repository_class'] == null)
+        {
+            return '';
+        }
+        
+        $code = [
+            '', //先空一行
+            $this->getTabs(1) . '/**',
+            $this->getTabs(1) . ' * 设置临时可见的属性',
+            $this->getTabs(1) . ' *',
+            $this->getTabs(1) . ' * @var array',
+            $this->getTabs(1) . ' */',
+            $this->getTabs(1) . "public static \$temporary_visible = [];",
+            '', //空一行
+            $this->getTabs(1) . '/**',
+            $this->getTabs(1) . ' * Create a new Eloquent model instance.',
+            $this->getTabs(1) . ' *',
+            $this->getTabs(1) . ' * @param  array  $attributes',
+            $this->getTabs(1) . ' * @return void',
+            $this->getTabs(1) . ' */',
+            $this->getTabs(1) . 'public function __construct(array $attributes = [])',
+            $this->getTabs(1) . '{',
+            $this->getTabs(2) . 'parent::__construct($attributes);',
+            '',
+            $this->getTabs(2) . 'if ( ! empty(static::$temporary_visible))',
+            $this->getTabs(2) . '{',
+            $this->getTabs(3) . '$this->setVisible(static::$temporary_visible);',
+            $this->getTabs(2) . '}',
+            $this->getTabs(1) . '}',
+            '' // 空一行
+        ];
+    
+        return implode("\n", $code);
+    }
+    
+    /**
+     * 生成附加属性
+     *
+     * @param $appends
+     *
+     * @return string
+     */
+    private function buildAppends($appends)
+    {
+        if (empty($appends))
+        {
+            return '';
+        }
+        
+        $code = [
+            $this->getTabs(1) . '/**',
+            $this->getTabs(1) . ' * 追加到模型数组表单的访问器',
+            $this->getTabs(1) . ' * @var array',
+            $this->getTabs(1) . ' */',
+            $this->getTabs(1) . "protected \$appends = [" . implode(',', $appends) . "];",
+            '', //空一行
+        ];
+    
+        return implode("\n", $code);
+    }
+    
+    /**
+     * 生成 原生类型的属性
+     *
+     * @param array $fields
+     *
+     * @return string
+     */
+    private function buildCasts(array $fields)
+    {
+        $code = [];
+        
+        foreach ($fields as $field_name => $attr)
+        {
+            if ($attr['type'] == 'boolean')
+            {
+                $code[] = $this->getTabs(2) . "'{$field_name}' => 'boolean',";
+            }
+        }
+        if (empty($code))
+        {
+            return '';
+        }
+        $code[] = $this->getTabs(1) . '];';
+        $code[] = '';
+        
+        $temp = [
+            $this->getTabs(1) . '/**',
+            $this->getTabs(1) . ' * 应该被转换成原生类型的属性',
+            $this->getTabs(1) . ' * @var array',
+            $this->getTabs(1) . ' */',
+            $this->getTabs(1) . 'protected $casts = [',
+        ];
+        
+        return implode("\n", array_merge($temp, $code));
+    }
+    
+    /**
+     * 生成 整形转浮点数处理函数
+     *
+     * @param array $fields
+     *
+     * @return string
+     */
+    private function buildIntvalAttribute(array $fields)
+    {
+        $code = [];
+    
+        foreach ($fields as $field_name => $attr)
+        {
+            if (isset($attr['format']) && strstr($attr['format'], 'intval:'))
+            {
+                list($intval, $divisor) = explode(':', trim($attr['format']));
+                $function_name = str_replace(' ', '', ucwords(str_replace('_', ' ', $field_name)));
+    
+                $code[] = $this->getTabs(1) . '/**';
+                $code[] = $this->getTabs(1) . " * {$fields[$field_name]['name']} 浮点数转整数 互转";
+                $code[] = $this->getTabs(1) . ' */';
+                $code[] = $this->getTabs(1) . "public function set{$function_name}Attribute(\$value)";
+                $code[] = $this->getTabs(1) . "{";
+                $code[] = $this->getTabs(2) . "\$this->attributes['{$field_name}'] = intval(\$value * {$divisor});";
+                $code[] = $this->getTabs(1) . "}";
+                $code[] = $this->getTabs(1) . "public function get{$function_name}Attribute()";
+                $code[] = $this->getTabs(1) . "{";
+                $code[] = $this->getTabs(2) . "return \$this->attributes['{$field_name}'] / {$divisor};";
+                $code[] = $this->getTabs(1) . "}";
+                $code[] = '';
+            }
+        }
+    
+        return implode("\n", $code);
     }
 
     /**
@@ -147,18 +293,18 @@ class CreateModelGenerator extends Generator
      */
     private function buildDictionaries(array $dictionaries, array $fields)
     {
-        $data_code     = [];
+        $data_code     = ['']; // 先空一行
         $appends_code  = [];
         $function_code = [];
 
-        foreach ($dictionaries as $filed_name => $attr)
+        foreach ($dictionaries as $field_name => $attr)
         {
             // 字典数据
             $data_code[] = $this->getTabs(1) . '/**';
-            $data_code[] = $this->getTabs(1) . " * 设置 {$fields[$filed_name]['name']} 具体值";
+            $data_code[] = $this->getTabs(1) . " * 设置 {$fields[$field_name]['name']} 具体值";
             $data_code[] = $this->getTabs(1) . ' * @var array';
             $data_code[] = $this->getTabs(1) . ' */';
-            $data_code[] = $this->getTabs(1) . "public \$init_{$filed_name} = [";
+            $data_code[] = $this->getTabs(1) . "public \$init_{$field_name} = [";
             foreach ($attr as $alias => $one)
             {
                 $data_code[] = $this->getTabs(2) . "'{$one[0]}' => '{$alias}',";
@@ -167,19 +313,19 @@ class CreateModelGenerator extends Generator
             $data_code[] = ''; //空一行
 
             // 附加字段
-            $appends_code[] = "'{$filed_name}_txt'";
+            $appends_code[] = "'{$field_name}_txt'";
 
             // 附加字段值获取函数
-            $function_name   = str_replace(' ', '', ucwords(str_replace('_', ' ', $filed_name)));
+            $function_name   = str_replace(' ', '', ucwords(str_replace('_', ' ', $field_name)));
             $function_code[] = $this->getTabs(1) . '/**';
-            $function_code[] = $this->getTabs(1) . " * 获取 {$fields[$filed_name]['name']} TXT";
+            $function_code[] = $this->getTabs(1) . " * 获取 {$fields[$field_name]['name']} TXT";
             $function_code[] = $this->getTabs(1) . ' * @return array|null|string';
             $function_code[] = $this->getTabs(1) . ' */';
             $function_code[] = $this->getTabs(1) . "public function get{$function_name}TxtAttribute()";
             $function_code[] = $this->getTabs(1) . '{';
-            $function_code[] = $this->getTabs(2) . "if (\$this->{$filed_name} !== NULL)";
+            $function_code[] = $this->getTabs(2) . "if (\$this->{$field_name} !== NULL)";
             $function_code[] = $this->getTabs(2) . '{';
-            $function_code[] = $this->getTabs(3) . "return __('model.' . \$this->init_{$filed_name}[\$this->{$filed_name}]);";
+            $function_code[] = $this->getTabs(3) . "return __('model.' . \$this->init_{$field_name}[\$this->{$field_name}]);";
             $function_code[] = $this->getTabs(2) . '}';
             $function_code[] = '';
             $function_code[] = $this->getTabs(2) . "return '';";
@@ -189,7 +335,7 @@ class CreateModelGenerator extends Generator
 
         return [
             'dictionaries'      => implode("\n", $data_code),
-            'appends'           => implode(', ', $appends_code),
+            'appends'           => $appends_code,
             'get_txt_attribute' => implode("\n", $function_code),
         ];
     }
@@ -200,6 +346,7 @@ class CreateModelGenerator extends Generator
      * @param $meta
      *
      * @return string
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
     private function compileStub($meta)
     {

@@ -74,6 +74,16 @@ html, body {
             }
         }
     }
+    @media screen and (min-width: 1800px) {
+        display: block;
+        padding-left: 680px;
+        .left{
+            flex: none;
+            float: left;
+            margin-left: -680px;
+            width: 680px;
+        }
+    }
 }
 
 .panel{
@@ -309,6 +319,39 @@ html, body {
         font-size: 14px;
         color: #fff;
         background-color: $theme-color;
+    }
+    .group{
+        float: right;
+        a{
+            float: left;
+            display: inline-block;
+            margin-left: 10px;
+            border: $border-color solid 1px;
+            border-radius: 4px;
+            width: 28px;
+            height: 28px;
+            text-align: center;
+            &:hover{
+                border-color: $theme-color;
+                background-color: $theme-color;
+                .icon-prot{
+                    background-image: url("../images/icon-prot-o.png");
+                }
+                .icon-file{
+                    background-image: url("../images/icon-file-o.png");
+                }
+                .icon-debug{
+                    background-image: url("../images/icon-debug-o.png");
+                }
+            }
+            &:active{
+                background-color: darken($theme-color, 5%);
+            }
+        }
+        i{
+            margin-top: 4px;
+            margin-right: 0;
+        }
     }
 }
 

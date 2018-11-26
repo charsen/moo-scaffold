@@ -36,16 +36,17 @@ class FreshStorageGenerator extends Generator
             $this->cleanAll();
         }
 
-        $yaml         = new Yaml;
-        $menus        = [];
-        $tables       = [];
-        $dictionaries = [];
-        $models       = [];
-        $repositories = [];
-        $controllers  = [];
-        $all_fields   = [];
-
-        $yaml_files = $this->filesystem->allFiles($this->db_schema_path);
+        $yaml          = new Yaml;
+        $menus         = [];
+        $tables        = [];
+        $dictionaries  = [];
+        $models        = [];
+        $repositories  = [];
+        $controllers   = [];
+        $all_fields    = [];
+        
+        $lang_fields   = $this->utility->getLangFields();
+        $yaml_files    = $this->filesystem->allFiles($this->db_schema_path);
         foreach ($yaml_files as $file)
         {
             $file      = $file->getPathname();
@@ -99,17 +100,19 @@ class FreshStorageGenerator extends Generator
                 ];
 
                 $tables[$table_name] = [
-                    'table_name'   => $table_name,
-                    'name'         => $config['attrs']['name'],
-                    'desc'         => $config['attrs']['desc'],
-                    'remark'       => $config['attrs']['remark'] ?? [],
-                    'index'        => $this->formatIndex($config['index'] ?? []),
-                    'fields'       => $this->formatFields($config['fields']),
-                    'dictionaries' => $config['dictionaries'] ?? [],
+                    'table_name'       => $table_name,
+                    'model_class'      => $config['model']['class'] ?? NULL,
+                    'repository_class' => $config['repository']['class'] ?? NULL,
+                    'name'             => $config['attrs']['name'],
+                    'desc'             => $config['attrs']['desc'],
+                    'remark'           => $config['attrs']['remark'] ?? [],
+                    'index'            => $this->formatIndex($config['index'] ?? []),
+                    'fields'           => $this->formatFields($config['fields']),
+                    'dictionaries'     => $config['dictionaries'] ?? [],
                 ];
 
                 // 格式化字段，为 i18n 作准备
-                $this->formatI18NFields($all_fields, $table_name, $config['fields']);
+                $this->formatI18NFields($all_fields, $table_name, $tables[$table_name]['fields'], $lang_fields);
 
                 $dictionaries[$table_name] = $tables[$table_name]['dictionaries'];
             }
@@ -240,26 +243,41 @@ class FreshStorageGenerator extends Generator
     }
     
     /**
+     * 格式化多语言字段
+     *
+     * - 用 _fields.yaml 里润色的名称替换缓存里的，同时附加上 _fields.yaml 的附加字段
      *
      * @param  array $all_fields
      * @param        $table_name
-     * @param  array $data
+     * @param  array $fields
+     * @param array  $lang_fields
      *
      * @return array
      */
-    private function formatI18NFields(array &$all_fields, $table_name, array $data)
+    private function formatI18NFields(array &$all_fields, $table_name, array $fields, array $lang_fields)
     {
-        unset($data['id'], $data['created_at'], $data['updated_at'], $data['deleted_at']);
-
-        foreach ($data as $field_name => $attr)
+        //unset($data['id'], $data['created_at'], $data['updated_at'], $data['deleted_at']);
+        
+        foreach ($fields as $field_name => $attr)
         {
-            $temp = [
-                'type'    => $attr['type'],
-                'cn'      => $attr['name'],
-                'en'      => trim(ucwords(str_replace('_', ' ', $field_name))),
-                'table'   => $table_name,
-                'default' => !empty($attr['default']) ? $attr['default'] : '',
-            ];
+            if (isset($lang_fields[$field_name]))
+            {
+                $temp = [
+                    'cn'      => $lang_fields[$field_name]['cn'],
+                    'en'      => $lang_fields[$field_name]['en'],
+                ];
+            }
+            else
+            {
+                $temp = [
+                    'cn'      => $attr['name'],
+                    'en'      => trim(ucwords(str_replace('_', ' ', $field_name))),
+                ];
+            }
+            $temp['type']     = $attr['type'];
+            $temp['table']    = $table_name;
+            $temp['default']  = !empty($attr['default']) ? $attr['default'] : '';
+            $temp['format']   = !empty($attr['format']) ? $attr['format'] : '';
 
             if (isset($all_fields['table_fields'][$field_name]))
             {
@@ -330,7 +348,7 @@ class FreshStorageGenerator extends Generator
                 $yaml   = ["en: '{$attr['en']}'"];
                 $yaml[] = "cn: '{$attr['cn']}'";
                 
-                $code[] = $this->getTabs(1) . "{$field_name}: {" . implode(', ', $yaml) . '}';
+                $code[] = $this->getTabs(1) . "{$field_name}: { " . implode(', ', $yaml) . ' }';
             }
         }
         $code[] = '';
@@ -373,6 +391,7 @@ class FreshStorageGenerator extends Generator
                     'en'      => $attr['en'],
                     'cn'      => $attr['cn'],
                     'type'    => $attr['type'] ?? null,
+                    'format'  => $attr['format'] ?? null,
                     'default' => ! empty($attr['default']) ? $attr['default'] : '',
                     'table'   => ! empty($attr['table']) ? $attr['table'] : '',
                 ];

@@ -50,12 +50,23 @@ class DatabaseController extends Controller
      * @param \Illuminate\Http\Request $req
      *
      * @return \Illuminate\View\View
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
     public function show(Request $req)
     {
         $file_name = $req->input('name', null);
         $data      = ['data' => $this->utility->getOneTable($file_name)];
-
+        
+        // 从 i18n 里读取字段名称
+        $lang_fields = $this->utility->getLangFields();
+        foreach ($data['data']['fields'] as $key => &$attr)
+        {
+            if (isset($lang_fields[$key]))
+            {
+                $attr['name'] = $lang_fields[$key]['cn'];
+            }
+        }
+        
         return $this->view('db.show', $data);
     }
 }

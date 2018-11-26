@@ -9,6 +9,7 @@
     @foreach ($menus as $file_name => $folder)
         <li class="{{ (! $first_menu_active || $current_file == $file_name) ? 'active' : '' }}">
             <a href="javascript:;" {{$current_file}}
+                data-module="{{ $folder['folder_name'] }}"
                 data-tag="{{ $file_name }}"
                 data-url="{{ route('table.list', ['name' => $file_name]) }}"
             >
@@ -41,11 +42,13 @@
                 <tr class="{{ ($current_table == $table_name) ? 'active' : '' }}">
                     <td>{{ $index++ }}</td>
                     <td>
-                        <a class="link" href="javascript:;" data-table="{{ $table_name }}"
+                        <a class="link {{ $table_name }}"
+                           href="javascript:;"
+                           data-table="{{ $table_name }}"
                            data-url="{{ route('table.list', ['name' => $file_name, 'table' => $table_name]) }}"
                         >{{ $table_name  }}</a>
                     </td>
-                    <td>{{ $table['name'] }}</td>
+                    <td class="{{ $table_name }}">{{ $table['name'] }}</td>
                 </tr>
                 @endforeach
             </table>
@@ -89,6 +92,10 @@
     });
 
     var getTable =function (table_name) {
+        document.title = $('#aside_container li.active a').data('module')
+                       + '-'
+                       + $('td.' + table_name).html();
+
         $.ajax({
             type: "GET",
             url: '{{ route('table.show') }}',

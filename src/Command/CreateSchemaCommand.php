@@ -62,11 +62,12 @@ class CreateSchemaCommand extends Command
             ['schema_name', InputArgument::REQUIRED, 'The name of the schema. (Ex: Personnels)'],
         ];
     }
-
+    
     /**
      * Execute the console command.
      *
      * @return void
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
     public function handle()
     {
@@ -74,6 +75,11 @@ class CreateSchemaCommand extends Command
 
         $schema_name = $this->argument('schema_name');
         $force       = $this->option('force') === null;
+        
+        if (strstr($schema_name, '/'))
+        {
+            return $this->error('Multi-level directory is not supported at this time.');
+        }
 
         $result = (new CreateSchemaGenerator($this, $this->filesystem, $this->utility))
             ->start($schema_name, $force);

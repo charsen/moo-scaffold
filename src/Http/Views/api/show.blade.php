@@ -1,7 +1,13 @@
 <h2 class="title">
-    <a href="{{ route('api.request', ['f' => $current_folder, 'c' => $current_controller, 'a' => $current_action]) }}" target="_blank">
-        <em>{{ strtoupper($request[0]) }}</em>
-    </a>
+    <div class="group">
+        @if ( ! empty($prototype))
+            <a href="{{$prototype}}" target="_blank"><i class="icon-prot"></i></a>
+        @endif
+        <a href="{{ route('api.request', ['f' => $current_folder, 'c' => $current_controller, 'a' => $current_action]) }}" target="_blank">
+            <i class="icon-debug"></i></a>
+    </div>
+
+    <em>{{ strtoupper($request[0]) }}</em>
     {{ $name }} : {{ $request[1] }}
 </h2>
 
@@ -58,16 +64,16 @@
                     @foreach ($url_params as $key => $v)
                     <tr>
                         <td>
-                            @if ($v[0])
+                            @if ($v['require'])
                                 <em class="font-red">*</em>
                             @else
                                 &nbsp;
                             @endif
                             {{ $key }}
                         </td>
-                        <td>{{ $v[1] }}</td>
-                        <td>{{ $v[2] }}</td>
-                        <td>{{ $v[3] }}</td>
+                        <td>{{ $v['name'] }}</td>
+                        <td>{{ $v['value'] }}</td>
+                        <td>{{ $v['desc'] }}</td>
                     </tr>
                 @endforeach
                 </table>
@@ -94,16 +100,16 @@
                     @foreach ($body_params as $key => $v)
                         <tr>
                             <td>
-                                @if ($v[0])
+                                @if ($v['require'])
                                     <em class="font-red">*</em>
                                 @else
                                     &nbsp;
                                 @endif
                                 {{ $key }}
                             </td>
-                            <td>{{ $v[1] }}</td>
-                            <td>{{ $v[2] }}</td>
-                            <td>{{ $v[3] }}</td>
+                            <td>{{ $v['name'] }}</td>
+                            <td>{{ $v['value'] }}</td>
+                            <td>{{ $v['desc'] }}</td>
                         </tr>
                     @endforeach
                 </table>
