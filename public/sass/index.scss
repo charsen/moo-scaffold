@@ -77,6 +77,9 @@ html, body {
     @media screen and (min-width: 1800px) {
         display: block;
         padding-left: 680px;
+        &.pl0{
+            padding-left: 0;
+        }
         .left{
             flex: none;
             float: left;
@@ -156,6 +159,9 @@ html, body {
             width: 100%;
             line-height: 40px;
             background-color: transparent;
+        }
+        .value{
+            background-color: #FFFBE6;
         }
     }
     .link-table{

@@ -22,7 +22,7 @@
         </ul>
     </div>
 
-    <div class="container">
+    <div class="container pl0">
         <div class="right ml0">
             @yield('right')
         </div>

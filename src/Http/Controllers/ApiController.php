@@ -355,11 +355,11 @@ class ApiController extends Controller
             }
             elseif ($attr['type'] == 'date')
             {
-                $attr['value'] = $faker->date('Y-m-d');
+                $attr['value'] = $faker->date();
             }
-            elseif ($attr['type'] == 'datetime')
+            elseif ($attr['type'] == 'datetime' || $attr['type'] == 'timestamp')
             {
-                $attr['value'] = $faker->datetime();
+                $attr['value'] = $faker->date() . ' ' . $faker->time();
             }
             elseif ($attr['type'] == 'boolean')
             {
@@ -397,11 +397,14 @@ class ApiController extends Controller
             }
             elseif ($key == 'ids')
             {
+                $data[$key]['name']     = 'IDS';
                 $data[$key]['value']    = '2,3';
+                $data[$key]['desc']     = '用,分割为数组';
             }
             elseif ($key == 'force')
             {
                 $data[$key]['require']  = false;
+                $data[$key]['name']     = '强制';
                 $data[$key]['value']    = 1;
                 $data[$key]['desc']     = '{0: false, 1: true}';
             }

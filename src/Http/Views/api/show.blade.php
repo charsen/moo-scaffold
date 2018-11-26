@@ -28,10 +28,9 @@
         <div class="table" id="request_header">
             <table>
                 <tr>
-                <tr>
-                    <th>参数</th>
-                    <th>名称</th>
-                    <th>值</th>
+                    <th width="25%">参数</th>
+                    <th width="20%">名称</th>
+                    <th width="25%">值</th>
                     <th>说明</th>
                 </tr>
                 <tr>
@@ -55,10 +54,9 @@
             <div class="table" id="request_header">
                 <table>
                     <tr>
-                    <tr>
-                        <th>参数</th>
-                        <th>名称</th>
-                        <th>值</th>
+                        <th width="25%">参数</th>
+                        <th width="20%">名称</th>
+                        <th width="25%">值</th>
                         <th>说明</th>
                     </tr>
                     @foreach ($url_params as $key => $v)
@@ -91,10 +89,9 @@
             <div class="table" id="request_header">
                 <table>
                     <tr>
-                    <tr>
-                        <th>参数</th>
-                        <th>名称</th>
-                        <th>值</th>
+                        <th width="25%">参数</th>
+                        <th width="20%">名称</th>
+                        <th width="25%">值</th>
                         <th>说明</th>
                     </tr>
                     @foreach ($body_params as $key => $v)
