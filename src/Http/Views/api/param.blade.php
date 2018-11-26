@@ -40,9 +40,9 @@
             <div class="table input" id="request_header">
                 <table>
                     <tr>
-                        <th><input type="checkbox" class="checkbox-all"></th>
-                        <th>名称</th>
-                        <th>key</th>
+                        <th width="30"><input type="checkbox" class="checkbox-all"></th>
+                        <th width="100">名称</th>
+                        <th width="150">key</th>
                         <th>value</th>
                         <th>说明</th>
                     </tr>
@@ -73,9 +73,9 @@
             <div class="table input" id="request_params">
                 <table>
                     <tr>
-                        <th><input type="checkbox" class="checkbox-all"></th>
-                        <th>名称</th>
-                        <th>key</th>
+                       <th width="30"><input type="checkbox" class="checkbox-all"></th>
+                       <th width="100">名称</th>
+                       <th width="150">key</th>
                         <th>value</th>
                         <th>说明</th>
                     </tr>
@@ -109,9 +109,9 @@
             <div class="table input" id="request_params">
                 <table>
                     <tr>
-                        <th><input type="checkbox" class="checkbox-all"></th>
-                        <th>名称</th>
-                        <th>key</th>
+                        <th width="30"><input type="checkbox" class="checkbox-all"></th>
+                        <th width="100">名称</th>
+                        <th width="150">key</th>
                         <th>value</th>
                         <th>说明</th>
                     </tr>
