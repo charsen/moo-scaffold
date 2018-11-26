@@ -173,7 +173,7 @@ class ApiController extends Controller
         $action_data['current_action']     = $action_name;
         $action_data['current_folder']     = $folder_path;
         $action_data['current_controller'] = $controller_class;
-    
+        
         // 字典数据
         $dictionaries   = $this->utility->getDictionaries();
 
@@ -186,34 +186,61 @@ class ApiController extends Controller
         // 添加 cookie 到 body params
         if (! empty($req->cookie('api_token')) && $action_name != 'authenticate')
         {
+            $param = ['Token', ($from_action == 'request' ? $req->cookie('api_token') : '')];
             if ($action_data['request'][0] == 'GET')
             {
-                $action_data['url_params']['token'] = [
-                    'Token',
-                    ($from_action == 'request' ? $req->cookie('api_token') : '')
-                ];
+                $action_data['url_params']['token'] = $param;
             }
             else
             {
-                $action_data['body_params']['token'] = [
-                    'Token',
-                    ($from_action == 'request' ? $req->cookie('api_token') : '')
-                ];
+                $action_data['body_params']['token'] = $param;
             }
-            
         }
-
+    
+        // controllers, 从 repository 中获取验证规则的字段名，作为接口参数
+        $rule_params    = [];
+        $controllers    = $this->utility->getControllers();
+        if (! in_array($action_name, ['create', 'edit']) && isset($controllers[$folder_name . '/' . $controller_class]))
+        {
+            $action_name      = ($action_name == 'store') ? 'create' : $action_name;
+        
+            $repository_class = $controllers[$folder_name . '/' . $controller_class]['repository_class'] . 'Repository';
+            $repository_class = '\App\Repositories\\' . str_replace('/', '\\', $repository_class);
+            $rules            = (new $repository_class(app()))->getRules($action_name);
+        
+            // 从 验证规则 里获取 api 参数
+            if ( ! empty($rules))
+            {
+                $rule_params = $this->formatRules($rules, $dictionaries, $fields, $lang_fields);
+            }
+        }
+        
+        // method params
+        $method_params = [
+            'update'       => 'PUT',
+            'destroy'      => 'DELETE',
+            'destroyBatch' => 'DELETE',
+            'restoreBatch' => 'PUT',
+        ];
+        $method_param = isset($method_params[$action_name]) ? [
+            '_method' => ['require' => true, 'name' => '', 'value' => $method_params[$action_name], 'desc' => '']
+        ] : [];
+        
         $url_params = $body_params = [];
         // 格式化 faker 标识
         $faker = Faker::create('zh_CN');
-        if (isset($action_data['url_params']))
+        if ($action_data['request'][0] == 'GET')
         {
             $url_params                = $this->formatParams($action_data['url_params'], $dictionaries, $fields, $lang_fields);
+            $url_params                = array_merge($method_param, $rule_params, $url_params);
             $action_data['url_params'] = $this->formatToFaker($faker, $url_params);
         }
-        if (isset($action_data['body_params']))
+        
+        //if (isset($action_data['body_params']))
+        if ($action_data['request'][0] == 'POST')
         {
             $body_params                = $this->formatParams($action_data['body_params'], $dictionaries, $fields, $lang_fields);
+            $body_params                = array_merge($method_param, $rule_params, $body_params);
             $action_data['body_params'] = $this->formatToFaker($faker, $body_params);
         }
         //dump($action_data);
@@ -252,6 +279,7 @@ class ApiController extends Controller
         {
             return [];
         }
+        
         foreach ($params as $field_name => &$attr)
         {
             if ($attr['value'] != '' || $field_name == '_method')
@@ -290,7 +318,7 @@ class ApiController extends Controller
             elseif ($field_name == 'logo' || strstr($field_name, '_logo'))
             {
                 // 需要远程下载，影响加载速度
-                //if ($attr[0])
+                //if ($attr['require'])
                 //{
                 //    $attr['value'] = $faker->image(public_path('uploads/temp'), 320, 320);
                 //    $attr['value'] = str_replace(public_path(), '', $attr['value']);
@@ -299,7 +327,7 @@ class ApiController extends Controller
             elseif ($field_name == 'banner' || strstr($field_name, '_banner'))
             {
                 // 需要远程下载，影响加载速度
-                //if ($attr[0])
+                //if ($attr['require'])
                 //{
                 //    $attr['value'] = $faker->image(public_path('uploads/temp'), 750, 360);
                 //    $attr['value'] = str_replace(public_path(), '', $attr['value']);
@@ -341,6 +369,57 @@ class ApiController extends Controller
         }
 
         return $params;
+    }
+    
+    /**
+     * 格式 验证规则 成为api参数
+     *
+     * @param array $rules
+     * @param array $dictionaries
+     * @param array $fields
+     * @param array $lang_fields
+     *
+     * @return array
+     */
+    private function formatRules(array $rules, array $dictionaries, array $fields, array $lang_fields)
+    {
+        $data = [];
+        foreach ($rules as $key => $attr)
+        {
+            $data[$key]                 = strstr($attr, 'nullable') ? ['require' => false] : ['require' => true];
+            $data[$key]['name']         = $fields[$key]['cn'] ?? $key;
+            $data[$key]['value']        = '';
+            $data[$key]['desc']         = '';
+            
+            if ($key == 'page')
+            {
+                $data[$key]['value']    = 1;
+            }
+            elseif ($key == 'ids')
+            {
+                $data[$key]['value']    = '2,3';
+            }
+            elseif ($key == 'force')
+            {
+                $data[$key]['require']  = false;
+                $data[$key]['value']    = 1;
+                $data[$key]['desc']     = '{0: false, 1: true}';
+            }
+            
+            if (isset($dictionaries[$key]))
+            {
+                $data[$key]['desc'] .= ' ' . json_encode(array_pluck($dictionaries[$key], 2, 0), JSON_UNESCAPED_UNICODE);
+            }
+        
+            if (isset($lang_fields[$key]))
+            {
+                $data[$key]['name'] = $lang_fields[$key]['cn'];
+            }
+        
+            $data[$key]['type'] = isset($fields[$key]['type']) ? $fields[$key]['type'] : null;
+        }
+    
+        return $data;
     }
 
     /**

@@ -16,7 +16,7 @@ return [
      */
     'database'   => [
         'schema'  => 'scaffold/database/',
-        'storage' => 'scaffold/storage/database/',
+        'storage' => 'scaffold/storage/',
     ],
 
     /**
@@ -24,7 +24,6 @@ return [
      */
     'api'        => [
         'schema'  => 'scaffold/api/',
-        'storage' => 'scaffold/storage/api/',
     ],
 
     /**
@@ -43,6 +42,7 @@ return [
 
     /**
      * 路由设置
+     * todo: 待完成中间件
      */
     'route'      => [
         'enabled'    => true,

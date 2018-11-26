@@ -1,5 +1,10 @@
 ###
 # 一个 controller 一个 api.schema 文件
+#
+### 参数的几种写法举例：
+# 1. 名称、默认值：                    id: [ID, '']
+# 2. 非必填、名称、默认值：             id: [false, ID, 2]
+# 3. 非必填、名称、默认值、描述：        id: [false, ID, 2, '描述']
 ##
 controller:
     code: 001

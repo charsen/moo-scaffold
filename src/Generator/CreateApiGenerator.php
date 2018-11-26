@@ -50,7 +50,7 @@ class CreateApiGenerator extends Generator
         
         // 获取对应的 repository_class, table_name, model_class
         $controllers = $this->utility->getControllers();
-
+        
         foreach ($routes as $controller_name => $actions)
         {
             // 过滤掉当前控制器 - 路由里多余的 action
@@ -138,6 +138,16 @@ class CreateApiGenerator extends Generator
     }
     
     /**
+     * 获取默认的 action 用于排序输出
+     *
+     * @return array
+     */
+    private function getDefaultActions()
+    {
+        return ['create', 'edit', 'index', 'trashed', 'store', 'update', 'show', 'destroy', 'destroyBatch', 'restoreBatch'];
+    }
+    
+    /**
      * @param $api_yaml
      * @param $api_relative_yaml
      * @param $actions
@@ -155,7 +165,7 @@ class CreateApiGenerator extends Generator
         $actions_keys     = array_keys($actions);
         $reduce_data      = array_merge(array_diff($old_actions_keys, $actions_keys));
         $add_data         = array_merge(array_diff($actions_keys, $old_actions_keys));
-        //var_dump($add_data);
+ 
         if (empty($reduce_data) && empty($add_data))
         {
             return $this->command->warn('+ ' . $api_relative_yaml . ' (Nothing Changed)');
@@ -171,6 +181,27 @@ class CreateApiGenerator extends Generator
 
         $code          = [];
         $actions_count = 0;
+        $default_actions = $this->getDefaultActions();
+        
+        foreach ($default_actions as $action_name)
+        {
+            if (in_array($action_name, $add_data))
+            {
+                $this->buildOneRequest(
+                    $code,
+                    $rules,
+                    $fields,
+                    $table_name,
+                    $action_name,
+                    $actions[$action_name]['method'],
+                    $actions[$action_name]['uri']
+                );
+                
+                $actions_count++;
+                array_splice($add_data, array_search($action_name ,$add_data),1);
+            }
+        }
+        
         foreach ($add_data as $action_name)
         {
             $this->buildOneRequest($code, $rules, $fields, $table_name, $action_name,
@@ -215,10 +246,31 @@ class CreateApiGenerator extends Generator
         $code[] = $this->getTabs(1) . 'name: ' . $table_name . '管理';
         $code[] = $this->getTabs(1) . 'desc: []';
         $code[] = 'actions:';
-
-        foreach ($actions as $action_name => $attr)
+        
+        $default_actions = $this->getDefaultActions();
+        foreach ($default_actions as $action_name)
         {
-            $this->buildOneRequest($code, $rules, $fields, $table_name, $action_name, $attr['method'], $attr['uri']);
+            if (isset($actions[$action_name]))
+            {
+                $this->buildOneRequest(
+                    $code,
+                    $rules,
+                    $fields,
+                    $table_name,
+                    $action_name,
+                    $actions[$action_name]['method'],
+                    $actions[$action_name]['uri']
+                );
+                unset($actions[$action_name]);
+            }
+        }
+        
+        if ( ! empty($actions))
+        {
+            foreach ($actions as $action_name => $attr)
+            {
+                $this->buildOneRequest($code, $rules, $fields, $table_name, $action_name, $attr['method'], $attr['uri']);
+            }
         }
 
         $code[] = '';

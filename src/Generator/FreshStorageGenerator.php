@@ -15,7 +15,6 @@ class FreshStorageGenerator extends Generator
     protected $db_storage_path;
     protected $db_relative_schema_path;
     protected $db_relative_storage_path;
-    protected $api_storage_path;
     protected $api_relative_storage_path;
 
     /**
@@ -27,8 +26,6 @@ class FreshStorageGenerator extends Generator
         $this->db_relative_schema_path  = $this->utility->getDatabasePath('schema', true);
         $this->db_storage_path          = $this->utility->getDatabasePath('storage');
         $this->db_relative_storage_path = $this->utility->getDatabasePath('storage', true);
-
-        $this->api_storage_path          = $this->utility->getApiPath('storage');
         $this->api_relative_storage_path = $this->utility->getApiPath('storage', true);
 
         if ($clean)
