@@ -93,7 +93,7 @@
                     headers: validKey('#request_header'),
                     data: validKey('#request_params'),
                     success: function(json) {
-                        if (json.data.token)
+                        if (json.hasOwnProperty('data') && json.data.hasOwnProperty('token'))
                         {
                             $.cookie('api_token', json.data.token);
                         }

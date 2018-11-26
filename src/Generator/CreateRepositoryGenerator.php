@@ -38,6 +38,7 @@ class CreateRepositoryGenerator extends Generator
         $this->repository_folder        = $this->utility->getRepositoryFolder();
         $this->model_path               = $this->utility->getModelPath();
         $this->model_folder             = $this->utility->getModelFolder();
+        $build_class                    = [];
 
         // 从 storage 里获取 表名列表，在修改了 schema 后忘了执行 scaffold:fresh 的话会不准确！！
         $all = $this->utility->getRepositories();
@@ -47,8 +48,6 @@ class CreateRepositoryGenerator extends Generator
             return $this->command->error("Schema File \"{$schema_name}\" could not be found.");
         }
         //var_dump($all[$schema_name]);
-        
-        // todo: 更新 app/Providers/RepositoryServiceProvider.php
 
         foreach ($all[$schema_name] as $repository_class => $attr)
         {
@@ -89,7 +88,47 @@ class CreateRepositoryGenerator extends Generator
             $repository_relative_interface_file = $this->repository_relative_path . "{$original_class}RepositoryInterface.php";
             $this->filesystem->put($repository_interface_file, $this->compileInterfaceStub($meta));
             $this->command->info('+ ' . $repository_relative_interface_file);
+    
+            $build_class[] = '\\' . $meta['namespace'] . '\\' . $meta['class'] . 'Repository';
         }
+    
+        $this->updateServiceProvider($build_class);
+    }
+    
+    /**
+     * @param array $build_class
+     *
+     * @return bool
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     */
+    private function updateServiceProvider(array $build_class)
+    {
+        $file = $this->utility->getRepositoryServiceProviderFile();
+        $code = [];
+        foreach ($build_class as $class)
+        {
+            if (strstr($file, "{$class}::class"))
+            {
+                continue;
+            }
+            
+            $code[] = (isset($code[0]) ? $this->getTabs(2) : '')
+                      . "\$this->app->bind({$class}Interface::class, {$class}::class);";
+        }
+        
+        if (empty($code))
+        {
+            return true;
+        }
+        
+        $code[] = $this->getTabs(2) . '//:end-bindings:';
+        $code   = implode("\n", $code);
+        
+        $file = str_replace("//:end-bindings:", $code, $file);
+        $this->filesystem->put(app_path('Providers/RepositoryServiceProvider.php'), $file);
+        $this->command->warn('+ ./app/Providers/RepositoryServiceProvider.php (Updated)');
+    
+        return true;
     }
     
     /**
@@ -106,9 +145,21 @@ class CreateRepositoryGenerator extends Generator
         //var_dump($rules);
     
         // 在列表页附加 分页码参数
-        $index_code    = ["'index' => ["];
-        $index_code[]  = $this->getTabs(3) . "'page' => 'sometimes|required|integer|min:1',";
-        $index_code[]  = $this->getTabs(2) . '],';
+        $front_code    = ["'index' => ["];
+        $front_code[]  = $this->getTabs(3) . "'page' => 'sometimes|required|integer|min:1',";
+        $front_code[]  = $this->getTabs(2) . '],';
+        $front_code[]  = $this->getTabs(2) . "'trashed' => [";
+        $front_code[]  = $this->getTabs(3) . "'page' => 'sometimes|required|integer|min:1',";
+        $front_code[]  = $this->getTabs(2) . '],';
+        
+        // destroyBatch, restoreBatch
+        $end_code      = [$this->getTabs(2) . "'destroyBatch' => ["];
+        $end_code[]    = $this->getTabs(3) . "'ids' => 'required|array',";
+        $end_code[]    = $this->getTabs(3) . "'force' => 'sometimes|required|boolean',";
+        $end_code[]    = $this->getTabs(2) . '],';
+        $end_code[]    = $this->getTabs(2) . "'restoreBatch' => [";
+        $end_code[]    = $this->getTabs(3) . "'ids' => 'required|array',";
+        $end_code[]    = $this->getTabs(2) . '],';
         
         // create & update action
         $create_code = [$this->getTabs(2) . "'create' => ["];
@@ -123,7 +174,7 @@ class CreateRepositoryGenerator extends Generator
         $create_code[] = $this->getTabs(2) . '],';
         $update_code[] = $this->getTabs(2) . '],';
         
-        return implode("\n", array_merge($index_code, $create_code, $update_code));
+        return implode("\n", array_merge($front_code, $create_code, $update_code, $end_code));
     }
     
     /**
@@ -144,27 +195,51 @@ class CreateRepositoryGenerator extends Generator
             {
                 continue;
             }
-            $filed_rules = [];
+            
+            $filed_rules        = [];
             if ($attr['require'])
             {
-                $filed_rules[] = 'required';
+                $filed_rules[]  = 'required';
             }
+            
             if ($attr['allow_null'])
             {
-                $filed_rules[] = 'nullable';
+                $filed_rules[]  = 'nullable';
             }
+            
             if (in_array($attr['type'], ['int', 'tinyint', 'bigint']))
             {
-                $filed_rules[] = 'integer';
+                // 整数转浮点数时，需要调整为 numeric
+                if (isset($attr['format']) && strstr($attr['format'], 'intval:'))
+                {
+                    $filed_rules[] = 'numeric';
+                }
+                else
+                {
+                    $filed_rules[] = 'integer';
+                }
+                
+                if (isset($attr['unsigned']) && ! isset($dictionaries_ids[$field_name]))
+                {
+                    $filed_rules[] = 'min:0';
+                }
             }
+    
+            if ($attr['type'] == 'boolean')
+            {
+                $filed_rules[] = 'in:0,1';
+            }
+            
             if ($attr['type'] == 'date' || $attr['type'] == 'datetime')
             {
                 $filed_rules[] = 'date';
             }
+            
             if (isset($attr['min_size']) && in_array($attr['type'], ['char', 'varchar']))
             {
                 $filed_rules[] = 'min:' . $attr['min_size'];
             }
+            
             if (isset($attr['size']) && in_array($attr['type'], ['char', 'varchar']))
             {
                 $filed_rules[] = 'max:' . $attr['size'];

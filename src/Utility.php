@@ -28,6 +28,32 @@ class Utility
     }
     
     /**
+     * Get Route File Content
+     *
+     * @param string $name
+     *
+     * @return string
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     */
+    public function getRouteFile($name = 'api')
+    {
+        $file = base_path('routes/' . $name . '.php');
+        return $this->filesystem->get($file);
+    }
+    
+    /**
+     * Get RepositoryServiceProvider File Content
+     *
+     * @return string
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     */
+    public function getRepositoryServiceProviderFile()
+    {
+        $file = app_path('Providers/RepositoryServiceProvider.php');
+        return $this->filesystem->get($file);
+    }
+    
+    /**
      * 获取控制器的命令空间列表
      *
      * !!! 只支持 Http/Controllers/ 再往下两级，更深的层级不支持!!!
@@ -234,8 +260,14 @@ class Utility
      */
     public function getLangFields()
     {
+        $file = $this->getDatabasePath('schema') . '_fields.yaml';
+        if ( ! $this->filesystem->isFile($file))
+        {
+            return [];
+        }
+        
         $yaml      = new Yaml;
-        $yaml_data = $yaml::parseFile($this->getDatabasePath('schema') . '_fields.yaml');
+        $yaml_data = $yaml::parseFile($file);
         $fields    = isset($yaml_data['append_fields'])
                         ? array_merge($yaml_data['table_fields'], $yaml_data['append_fields'])
                         : $yaml_data['table_fields'];

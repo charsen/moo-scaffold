@@ -9,7 +9,7 @@
 @section('sidebar')
     @foreach ($menus as $folder_name => $controllers)
     <li class="{{ (($folder_name == $current_folder || !$first_menu_active) ? 'open' : '') }}">
-        <a href="javascript:;">{{ (isset($menus_transform[$folder_name])) ? $menus_transform[$folder_name] : $folder_name }}</a>
+        <a href="javascript:;" class="long">{{ (isset($menus_transform[$folder_name])) ? $menus_transform[$folder_name] : $folder_name }}</a>
         <ul class="second">
             @foreach ($controllers as $controller_class => $attr)
                 <li class="{{ ($controller_class == $current_controller ? 'open' : '') }}">
@@ -17,7 +17,8 @@
                     <ul class="sub">
                     @foreach ($apis[$folder_name][$controller_class] as $action => $api)
                         <li class="link_li {{ ($action == $current_action ? 'open active' : '') }}">
-                            <a class="link" href="javascript:;"
+                            <a class="link long" href="javascript:;"
+                               data-module="{{ $attr['name'] }}"
                                data-f="{{ $folder_name }}"
                                data-c="{{ $controller_class }}"
                                data-a="{{ $action }}"
@@ -89,6 +90,10 @@
 
     var getParams = function(folder, controller, action)
     {
+        document.title = $('#aside_container li.active a').data('module')
+                       + '-'
+                       + $('#aside_container li.active a').html();
+
         $.ajax({
             type: "GET",
             url: '{{ route('api.param') }}',
@@ -96,7 +101,7 @@
             dataType: 'html',
             success: function (result) {
                 $('#left_container').removeClass('transparent').html(result);
-                if (action != 'store' && action != 'update' && action != 'delete')
+                if (action != 'store' && action != 'update' && action != 'destroy' && action != 'destroyBatch' && action != 'restoreBatch')
                 {
                     $('#send').trigger('click');
                 }

@@ -17,28 +17,14 @@ class {{class}} extends Model
     {{use_trait}}
 
     /**
-     * 与模型关联的数据表。
+     * 与模型关联的数据表
      *
      * @var string
      */
     protected $table = '{{table_name}}';
-
 {{dictionaries}}
-
-    /**
-     * The attributes that should be hidden for arrays.
-     *
-     * @var array
-     */
-    protected $hidden = [{{hidden}}];
-
-    /**
-     * 追加到模型数组表单的访问器.
-     *
-     * @var array
-     */
-    protected $appends = [{{appends}}];
-
+{{casts}}
+{{appends}}
     /**
      * The attributes that are mass assignable.
      *
@@ -47,12 +33,12 @@ class {{class}} extends Model
     protected $fillable = [{{fillable}}];
 
     /**
-     * 应被转换为日期的属性。
+     * 应被转换为日期的属性
      *
      * @var array
      */
     protected $dates = [{{dates}}];
 
 {{get_txt_attribute}}
-
+{{get_intval_attribute}}
 }

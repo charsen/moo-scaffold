@@ -248,7 +248,9 @@ class CreateApiGenerator extends Generator
         $name_txt   = [
             'index'   => '{table_name}列表',
             'show'    => '查看{table_name}',
+            'create'  => '创建表单',
             'store'   => '添加{table_name}',
+            'edit'    => '编辑表单',
             'update'  => '更新{table_name}',
             'destroy' => '删除{table_name}',
         ];
@@ -256,6 +258,7 @@ class CreateApiGenerator extends Generator
         $code[] = $this->getTabs(1) . "{$action_name}:";
         $code[] = $this->getTabs(2) . "name: {$name}";
         $code[] = $this->getTabs(2) . 'desc: []';
+        $code[] = $this->getTabs(2) . "prototype: ''";
         $code[] = $this->getTabs(2) . "request: [{$method_txt[$method]}, {$uri}]";
 
         // controller store action 需要转换一下
@@ -264,14 +267,14 @@ class CreateApiGenerator extends Generator
         // GET 请求，参数放到 url_params
         if ($method == 'GET')
         {
-            if (!isset($rules[$rule_key]))
+            if (!isset($rules[$rule_key]) || in_array($action_name, ['create', 'edit']))
             {
                 $code[] = $this->getTabs(2) . 'url_params: []';
             }
             else
             {
                 $code[] = $this->getTabs(2) . 'url_params:';
-                $this->buildRequestParams($code, $rules[$action_name], $fields);
+                $this->buildRequestParams($code, $rules[$rule_key], $fields);
             }
             $code[] = $this->getTabs(2) . 'body_params: []';
         }
@@ -312,7 +315,6 @@ class CreateApiGenerator extends Generator
      */
     private function buildRequestParams(array &$code, array $rules, array $fields)
     {
-        //position_ids: [岗位ID, ':in:2,4', 数组，关联部门ID]
         foreach ($rules as $field_name => $rule)
         {
             $rule_txt = [];

@@ -1,12 +1,14 @@
-<div class="panel">
-    <div class="hd">
-        <h2>
-            <a href="{{ route('api.list', ['f' => $current_folder, 'c' => $current_controller, 'a' => $current_action]) }}" target="_blank">
-                <i class="icon-wordbook"></i>
-            </a>
-            {{ $name }}
-        </h2>
+<h2 class="title">
+    <div class="group">
+        @if ( ! empty($prototype))
+            <a href="{{$prototype}}" target="_blank"><i class="icon-prot"></i></a>
+        @endif
+        <a href="{{ route('api.list', ['f' => $current_folder, 'c' => $current_controller, 'a' => $current_action]) }}" target="_blank">
+            <i class="icon-file"></i></a>
     </div>
+    <i class="icon-wordbook"></i> {{ $name }}
+</h2>
+<div class="panel">
     <div class="bd">
         <div class="send-box">
             <a href="javascript:;" class="btn" id="send">发送</a>
@@ -19,6 +21,14 @@
         </div>
     </div>
 </div>
+
+@if ( ! empty($desc))
+    <div class="alert">
+        @foreach ($desc as $v)
+            <p> {{ $v }}</p>
+        @endforeach
+    </div>
+@endif
 
 <div class="panel">
     <div class="hd">
@@ -71,11 +81,11 @@
                     </tr>
                     @foreach ($url_params as $key => $v)
                     <tr>
-                        <td><input type="checkbox" class="checkbox" {{ (($v[0]) ? 'checked' : '') }}></td>
-                        <td><input type="text" value="{{ $v[1] }}" class="txt" readonly ></td>
+                        <td><input type="checkbox" class="checkbox" {{ (($v['require']) ? 'checked' : '') }}></td>
+                        <td><input type="text" value="{{ $v['name'] }}" class="txt" readonly ></td>
                         <td><input type="text" value="{{ $key }}" class="txt key" readonly ></td>
-                        <td><input type="text" value="{{ $v[2] }}" class="txt value"></td>
-                        <td><input type="text" value="{{ $v[3] }}" class="txt" readonly ></td>
+                        <td><input type="text" value="{{ $v['value'] }}" class="txt value"></td>
+                        <td><input type="text" value="{{ $v['desc'] }}" class="txt" readonly ></td>
                     </tr>
                     @endforeach
                 </table>
@@ -107,11 +117,11 @@
                     </tr>
                     @foreach ($body_params as $key => $v)
                     <tr>
-                        <td><input type="checkbox" class="checkbox" {{ (($v[0]) ? 'checked' : '') }}></td>
-                        <td><input type="text" value="{{ $v[1] }}" class="txt" readonly ></td>
+                        <td><input type="checkbox" class="checkbox" {{ (($v['require']) ? 'checked' : '') }}></td>
+                        <td><input type="text" value="{{ $v['name'] }}" class="txt" readonly ></td>
                         <td><input type="text" value="{{ $key }}" class="txt key" readonly ></td>
-                        <td><input type="text" value="{{ $v[2] }}" class="txt value"></td>
-                        <td><input type="text" value="{{ $v[3] }}" class="txt" readonly ></td>
+                        <td><input type="text" value="{{ $v['value'] }}" class="txt value"></td>
+                        <td><input type="text" value="{{ $v['desc'] }}" class="txt" readonly ></td>
                     </tr>
                     @endforeach
                 </table>

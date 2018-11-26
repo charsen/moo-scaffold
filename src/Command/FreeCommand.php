@@ -101,8 +101,8 @@ class FreeCommand extends Command
         $this->tipCallCommand('scaffold:model');
         (new CreateModelGenerator($this, $this->filesystem, $this->utility))->start($schema_name, $force);
         
-        $this->tipCallCommand('scaffold:controller');
-        (new CreateControllerGenerator($this, $this->filesystem, $this->utility))->start($schema_name, $force);
+        //$this->tipCallCommand('scaffold:controller');
+        //(new CreateControllerGenerator($this, $this->filesystem, $this->utility))->start($schema_name, $force);
         
         $this->tipCallCommand('scaffold:repository');
         (new CreateRepositoryGenerator($this, $this->filesystem, $this->utility))->start($schema_name, $force);
@@ -112,9 +112,12 @@ class FreeCommand extends Command
         
         $this->tipCallCommand('scaffold:migration');
         (new CreateMigrationGenerator($this, $this->filesystem, $this->utility))->start($schema_name, $force);
-        
-        $this->tipCallCommand('migrate');
-        $this->call('migrate');
+    
+        if ($this->confirm("Do you want to Execute 'artisan migrate' ?", 'yes'))
+        {
+            $this->tipCallCommand('migrate');
+            $this->call('migrate');
+        }
         
         $this->tipDone();
     }

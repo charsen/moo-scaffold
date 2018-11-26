@@ -15,11 +15,10 @@ class CreateMigrationGenerator extends Generator
     
     /**
      * @param      $schema_name
-     * @param bool $force
      *
      * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
-    public function start($schema_name, $force = false)
+    public function start($schema_name)
     {
         $this->migration_path          = $this->utility->getMigrationPath();
         $this->migration_relative_path = $this->utility->getMigrationPath(true);
@@ -223,11 +222,12 @@ class CreateMigrationGenerator extends Generator
                 {
                     $fields_string[] = "'{$value}'";
                 }
-                $code[] = $this->getTabs(3) . $functions[$attr['type']] . '[' . implode(',', $fields_string) . ']);';
+                $index_name = str_replace('_id', '', implode('_', $fields_string));
+                $code[] = $this->getTabs(3) . $functions[$attr['type']] . '[' . implode(',', $fields_string) . "], '{$index_name}');";
             }
             else
             {
-                $code[] = $this->getTabs(3) . $functions[$attr['type']] . "'{$attr['fields']}');";
+                $code[] = $this->getTabs(3) . $functions[$attr['type']] . "'{$attr['fields']}', '{$attr['fields']}');";
             }
         }
 

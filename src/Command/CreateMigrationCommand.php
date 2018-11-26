@@ -55,10 +55,10 @@ class CreateMigrationCommand extends Command
     {
         return [
             [
-                'force',
-                '-f',
+                'migrate',
+                '-m',
                 InputOption::VALUE_OPTIONAL,
-                'Overwrite Migration File.',
+                'Class the artisan:migrate command.',
                 false,
             ],
             [
@@ -87,7 +87,7 @@ class CreateMigrationCommand extends Command
             $schema_name = $this->choice('What is schema name?', $file_names);
         }
         
-        $force       = $this->option('force') === null;
+        $migrate     = $this->option('migrate') === null;
         $fresh       = $this->option('fresh') === null;
         if ($fresh)
         {
@@ -98,7 +98,21 @@ class CreateMigrationCommand extends Command
         }
         
         $result = (new CreateMigrationGenerator($this, $this->filesystem, $this->utility))
-            ->start($schema_name, $force);
+            ->start($schema_name);
+        
+        if ($migrate)
+        {
+            $this->tipCallCommand('migrate');
+            $this->call('migrate');
+        }
+        else
+        {
+            if ($this->confirm("Do you want to Execute 'artisan migrate' ?", 'yes'))
+            {
+                $this->tipCallCommand('migrate');
+                $this->call('migrate');
+            }
+        }
     
         $this->tipDone();
     }

@@ -3,24 +3,25 @@
 @section('title', '接口文档')
 
 @section('sidebar')
-@foreach ($menus as $folder_name => $controllers)
-<li class="{{ (! $first_menu_active ||  $folder_name == $current_folder) ? 'open' : '' }}">
-    <a href="javascript:;">{{ (isset($menus_transform[$folder_name])) ? $menus_transform[$folder_name] : $folder_name }}</a>
-    <ul class="sub tag-list">
-        @foreach ($controllers as $controller_class => $attr)
-        <li class="{{ (! $first_menu_active || $current_controller == $controller_class) ? 'active' : '' }}">
-            <a href="javascript:;"
-               data-tag="{{ (str_replace('/', '-', $folder_name)) }}-{{ $controller_class }}"
-               data-url="{{ route('api.list', ['f' => $folder_name, 'c' => $controller_class]) }}"
-            >
-                <em>{{ $attr['api_count'] }}</em>{{ $attr['name'] }}
-            </a>
-        </li>
-        <?php $first_menu_active = true;?>
-        @endforeach
-    </ul>
-</li>
-@endforeach
+    @foreach ($menus as $folder_name => $controllers)
+    <li class="{{ (! $first_menu_active ||  $folder_name == $current_folder) ? 'open' : '' }}">
+        <a href="javascript:;" class="long">{{ (isset($menus_transform[$folder_name])) ? $menus_transform[$folder_name] : $folder_name }}</a>
+        <ul class="sub tag-list">
+            @foreach ($controllers as $controller_class => $attr)
+            <li class="{{ (! $first_menu_active || $current_controller == $controller_class) ? 'active' : '' }}">
+                <a href="javascript:;"
+                   data-module="{{ $attr['name'] }}"
+                   data-tag="{{ (str_replace('/', '-', $folder_name)) }}-{{ $controller_class }}"
+                   data-url="{{ route('api.list', ['f' => $folder_name, 'c' => $controller_class]) }}"
+                >
+                    <em>{{ $attr['api_count'] }}</em>{{ $attr['name'] }}
+                </a>
+            </li>
+            <?php $first_menu_active = true;?>
+            @endforeach
+        </ul>
+    </li>
+    @endforeach
 @endsection
 
 @section('middle')
@@ -41,7 +42,7 @@
                         <tr class="{{($current_controller == $controller_class && $action == $current_action) ? 'active' : ''}}">
                             <td>{{ $api_index ++ }}</td>
                             <td>
-                                <a class="link" href="javascript:;"
+                                <a class="link {{$controller_class}}_{{$action}}" href="javascript:;"
                                    data-f="{{ $folder_name }}"
                                    data-c="{{ $controller_class }}"
                                    data-a="{{ $action }}"
@@ -77,6 +78,8 @@
         $('.tag-list li.active').removeClass('active');
         $(this).parent().addClass('active');
 
+        $('#right_container').html('<p class="loading">...</p>');
+
         window.history.pushState({}, 0, $(this).data('url'));
     });
 
@@ -95,6 +98,9 @@
 
     var getParams = function(folder, controller, action)
     {
+        document.title = $('.tag-list li.active a').data('module')
+                       + '-'
+                       + $('a.' + controller + '_' + action).html();
         $.ajax({
             type: "GET",
             url: '{{ route('api.show') }}',

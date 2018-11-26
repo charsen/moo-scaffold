@@ -5,6 +5,7 @@ namespace {{namespace}};
 {{use_repository}}
 use App\Http\Controllers\Controller;
 use App\Http\Resources\BaseResource;
+use App\Http\Resources\FormWidgetCollection;
 use Illuminate\Http\Request;
 
 /**
@@ -33,7 +34,7 @@ class {{controller_class}}Controller extends Controller
      *
      * @param \Illuminate\Http\Request $req
      *
-     * @return \App\Http\Resources\BaseResource
+     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
      * @throws \Exception
      */
     public function index(Request $req)
@@ -42,7 +43,24 @@ class {{controller_class}}Controller extends Controller
 
         $result = $this->repository->paginate();
 
-        return new BaseResource($result);
+        return BaseResource::collection($result);
+    }
+
+    /**
+     * 回收站列表
+     *
+     * @param \Illuminate\Http\Request $req
+     *
+     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
+     * @throws \Exception
+     */
+    public function trashed(Request $req)
+    {
+        $this->repository->validator()->with($req)->passesOrFail('trashed');
+
+        $result = $this->repository->getModel()->onlyTrashed()->paginate();
+
+        return BaseResource::collection($result);
     }
 
     /**
@@ -99,8 +117,91 @@ class {{controller_class}}Controller extends Controller
     {
         $result = $this->repository->delete($id);
 
-        $result = $this->repository->paginate();
+        return new BaseResource($result);
+    }
+
+    /**
+     * 批量删除
+     *
+     * @param \Illuminate\Http\Request $req
+     *
+     * @return \App\Http\Resources\BaseResource
+     */
+    public function destroyBatch(Request $req)
+    {
+        $this->repository->validator()->with($req)->passesOrFail('destroyBatch');
+
+        if ($req->input('force', FALSE) !== FALSE)
+        {
+            $data   = $this->repository->getModel()->onlyTrashed()->whereIn('id', $req->input('ids'))->get();
+            $result = $data->map(function($item) {
+                if ($item->forceDelete())
+                {
+                    return $item;
+                }
+            });
+        }
+        else
+        {
+            $result = collect($req->input('ids'))->map(function($id) {
+                return $this->repository->delete($id);
+            });
+        }
 
         return new BaseResource($result);
     }
+
+    /**
+     * 批量恢复软删除的数据
+     *
+     * @param \Illuminate\Http\Request $req
+     *
+     * @return \App\Http\Resources\BaseResource
+     * @throws \Exception
+     */
+    public function restoreBatch(Request $req)
+    {
+        $this->repository->validator()->with($req)->passesOrFail('restoreBatch');
+
+        $data   = $this->repository->getModel()->onlyTrashed()->whereIn('id', $req->input('ids'))->get();
+        $result = $data->map(function($item) {
+            if ($item->restore())
+            {
+                return $item;
+            }
+        });
+
+        return new BaseResource($result);
+    }
+
+    /**
+     * 返回创建控件信息
+     *
+     * @return \App\Http\Resources\FormWidgetCollection
+     */
+    public function create()
+    {
+        $result = {{form_widgets}};
+
+        return new FormWidgetCollection(collect($result));
+    }
+
+    /**
+     * 返回创建控件信息
+     *
+     * @param $id
+     *
+     * @return \App\Http\Resources\BaseResource
+     */
+    public function edit($id)
+    {
+        $result = $this->repository->find($id);
+
+        return (new BaseResource($result))->additional([
+            'meta' => [
+                'form_widgets' => $this->create()
+            ]
+        ]);
+    }
+
 }
