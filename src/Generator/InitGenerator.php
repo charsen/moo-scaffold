@@ -68,7 +68,6 @@ class InitGenerator extends Generator
     
         $api = [
             $this->utility->getApiPath('schema'),
-            $this->utility->getApiPath('storage'),
         ];
     
         $folders = array_merge($database, $api);

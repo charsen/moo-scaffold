@@ -138,7 +138,7 @@
 
                     e.trigger.focus();
                 },
-                clipboard =  new ClipboardJS('.table .txt', {
+                clipboard =  new ClipboardJS('.table .key', {
                     text: function(e){
                         return $(e).val()
                     }
