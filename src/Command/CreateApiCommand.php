@@ -62,6 +62,13 @@ class CreateApiCommand extends Command
                 false,
             ],
             [
+                'ignore',
+                '-i',
+                InputOption::VALUE_OPTIONAL,
+                'Ignore controller\'s actions.',
+                false,
+            ],
+            [
                 'fresh',
                 '--fresh',
                 InputOption::VALUE_OPTIONAL,
@@ -88,11 +95,12 @@ class CreateApiCommand extends Command
         }
         else
         {
-            $namespace = ucfirst($namespace);
+            $namespace  = ucfirst($namespace);
         }
         
-        $force     = $this->option('force') === null;
-        $fresh     = $this->option('fresh') === null;
+        $force          = $this->option('force') === null;
+        $ignore         = $this->option('ignore') === null;
+        $fresh          = $this->option('fresh') === null;
         if ($fresh)
         {
             $this->tipCallCommand('scaffold:fresh');
@@ -102,7 +110,7 @@ class CreateApiCommand extends Command
         }
 
         $result = (new CreateApiGenerator($this, $this->filesystem, $this->utility))
-            ->start($namespace, $force);
+            ->start($namespace, $ignore, $force);
     
         $this->tipDone();
     }

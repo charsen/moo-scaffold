@@ -211,7 +211,7 @@ class ApiController extends Controller
             // 从 验证规则 里获取 api 参数
             if ( ! empty($rules))
             {
-                $rule_params = $this->formatRules($rules, $dictionaries, $fields, $lang_fields);
+                $rule_params = $this->formatRules($action_name, $rules, $dictionaries, $fields, $lang_fields);
             }
         }
         
@@ -374,6 +374,7 @@ class ApiController extends Controller
     /**
      * 格式 验证规则 成为api参数
      *
+     * @param       $action_name
      * @param array $rules
      * @param array $dictionaries
      * @param array $fields
@@ -381,7 +382,7 @@ class ApiController extends Controller
      *
      * @return array
      */
-    private function formatRules(array $rules, array $dictionaries, array $fields, array $lang_fields)
+    private function formatRules($action_name, array $rules, array $dictionaries, array $fields, array $lang_fields)
     {
         $data = [];
         foreach ($rules as $key => $attr)
@@ -404,7 +405,7 @@ class ApiController extends Controller
             elseif ($key == 'force')
             {
                 $data[$key]['require']  = false;
-                $data[$key]['name']     = '强制';
+                $data[$key]['name']     = (in_array($action_name, ['destroy', 'destroyBatch'])) ? '强制删除' : '强制';
                 $data[$key]['value']    = 1;
                 $data[$key]['desc']     = '{0: false, 1: true}';
             }

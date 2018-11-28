@@ -19,11 +19,12 @@ class CreateApiGenerator extends Generator
     
     /**
      * @param      $namespace
+     * @param bool $ignore_controller
      * @param bool $force
      *
      * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
-    public function start($namespace, $force = false)
+    public function start($namespace, $ignore_controller = false, $force = false)
     {
         $this->api_path                 = $this->utility->getApiPath('schema');
         $this->api_relative_path        = $this->utility->getApiPath('schema', true);
@@ -54,19 +55,20 @@ class CreateApiGenerator extends Generator
         foreach ($routes as $controller_name => $actions)
         {
             // 过滤掉当前控制器 - 路由里多余的 action
-            $temp          = str_replace('/', '\\', $namespace);    // 多级目录需要转换
-            $controller    = 'App\Http\Controllers\\' . "{$temp}\\{$controller_name}" . 'Controller';
-            $methods       = get_class_methods($controller);
-            if (empty($methods))
+            if (! $ignore_controller)
             {
-                return $this->command->error(' x Controller\'s action  are not found.');
-            }
-            
-            $real_actions  = array_intersect(array_keys($actions), $methods);
-            $unset_actions = array_diff(array_keys($actions), $real_actions);
-            foreach ($unset_actions as $key)
-            {
-                unset($actions[$key]);
+                $temp       = str_replace('/', '\\', $namespace);    // 多级目录需要转换
+                $controller = 'App\Http\Controllers\\' . "{$temp}\\{$controller_name}" . 'Controller';
+                $methods    = get_class_methods($controller);
+                if (empty($methods)) {
+                    return $this->command->error(' x Controller\'s action  are not found.');
+                }
+    
+                $real_actions  = array_intersect(array_keys($actions), $methods);
+                $unset_actions = array_diff(array_keys($actions), $real_actions);
+                foreach ($unset_actions as $key) {
+                    unset($actions[$key]);
+                }
             }
     
             $rules             = $this->getRules($controllers, $namespace, $controller_name);
