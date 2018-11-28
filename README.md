@@ -113,6 +113,7 @@ php artisan scaffold:api `namesapce`
 ```
 - `namesapce` 非必写，若不写会有提示做选择（app/controllers 下的某个目录，或多级目录）
 - 添加 `-f` 覆盖已存在文件
+- 添加 `-i` 忽略用 controller 里的 actions 求交集（若 route.php 里用了 ::resource 方式可能会生成多余的请求）
 - 添加 `--fresh` 刷新缓存数据，等于先执行 `artisan scaffold:fresh`
 - 自动获取 `namesapce` 的选择提示内容，只支持 `Http/Controllers/` 往下**两级**，更深的层级**不支持**!!!
 
@@ -145,8 +146,9 @@ php artisan scaffold:i18n
 
 ### 12. Free : “释放双手”
 ```sh
-php artisan scaffold:free
+php artisan scaffold:free  `schema_file_name`
 ```
+- `schema_file_name` 非必写，若不写会有提示做选择
 - 先执行 `artisan scaffold:fresh` 更新缓存数据
 - 生成 `mode`, `repository`, `migration` 相关文件，更新 `RepositoryServiceProvider`
 - 执行 `artisan scaffold:i18` 更新多语言文件
