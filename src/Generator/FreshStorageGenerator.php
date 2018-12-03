@@ -369,10 +369,22 @@ class FreshStorageGenerator extends Generator
     {
         // 附加分页码，在生成接口时用
         $data['append_fields']['page'] = [
-            'en'      => 'page',
+            'en'      => 'Page',
             'cn'      => '分页码',
             'int'     => 'int',
             'default' => 1,
+        ];
+        $data['append_fields']['page_limit'] = [
+            'en'      => 'Page Limit',
+            'cn'      => '分页数量',
+            'int'     => 'int',
+            'default' => 10,
+        ];
+        $data['append_fields']['ids'] = [
+            'en'      => 'Ids',
+            'cn'      => '多个编号',
+            'int'     => 'varchar',
+            'default' => '2,3',
         ];
         
         $php_data = [];
