@@ -41,7 +41,7 @@ class {{controller_class}}Controller extends Controller
     {
         $this->repository->validator()->with($req)->passesOrFail('index');
 
-        $result = $this->repository->paginate();
+        $result = $this->repository->paginate($req->input('page_limit', NULL));
 
         return BaseResource::collection($result);
     }
@@ -58,7 +58,7 @@ class {{controller_class}}Controller extends Controller
     {
         $this->repository->validator()->with($req)->passesOrFail('trashed');
 
-        $result = $this->repository->getModel()->onlyTrashed()->paginate();
+        $result = $this->repository->getModel()->onlyTrashed()->paginate($req->input('page_limit', NULL));
 
         return BaseResource::collection($result);
     }

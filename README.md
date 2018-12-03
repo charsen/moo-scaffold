@@ -1,11 +1,38 @@
 # Laravel Scaffold
 
-## 功能（待写...）
+## 关于
+“约定大于配置” 、“以机械化代替手工化作业”
+
+## 功能
+
+### migration
+- 单个数据表的 migration 
+
+### controller 部分
+- create: 创建表单
+- edit: 编辑表单
+- index: 列表
+- trashed: 回收站
+- store: 创建
+- update: 编辑 
+- show: 查看详情
+- destroy: 删除
+- destroyBath: 批量删除
+- restoreBath: 批量恢复
+
 
 ### model 部分
 - boolean 自动转换
 - 整形 转 浮点数 (repository 的验证规则转换为 numeric)
 - 数据字典 添加 appends 及 getAttribute 函数
+
+### 资源仓库
+- 验证规则：{ index, trashed, create, update, destroyBatch, restoreBatch}
+
+### 多语言文件
+- 生成数据库表所有字段 及 模型字典字段多语言
+- resources/lang/{en, zh-CN}/model.php       
+- resources/lang/{en, zh-CN}/validation.php    
 
 ## 安装
 通过 [composer](https://laravel-china.org/composer) 安装
@@ -123,6 +150,12 @@ php artisan scaffold:api `namesapce`
 - api demo [docs/api_demo.yaml](https://github.com/charsen/laravel-scaffold/blob/master/docs/api_demo.yaml)
 
 **PS2:**
+```php
+Route::get('departments/trashed', 'Enterprise\\Personnels\\DepartmentController@trashed');
+Route::post('departments/destroy/batch', 'Enterprise\\Personnels\\DepartmentController@destroyBatch');
+Route::post('departments/restore/batch', 'Enterprise\\Personnels\\DepartmentController@restoreBatch');
+Route::resource('departments', 'Enterprise\\Personnels\\DepartmentController');
+```
 - 要先设置好路由规则，程序通过 `Route::getRoutes()` 获取接口地址（但由于用了 `Route::resources`，实际可能没那么多）
 - 用路由与控制器的 action 求交集，得出真实的接口
 - 生成时：默认是附加新的 action 到对应的配置文件，若有action被删减了会提醒，需要手工删除接口配置文件的代码

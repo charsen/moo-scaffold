@@ -147,6 +147,7 @@ class CreateRepositoryGenerator extends Generator
         // 在列表页附加 分页码参数
         $front_code    = ["'index' => ["];
         $front_code[]  = $this->getTabs(3) . "'page' => 'sometimes|required|integer|min:1',";
+        $front_code[]  = $this->getTabs(3) . "'page_limit' => 'sometimes|required|integer|min:1',";
         $front_code[]  = $this->getTabs(2) . '],';
         $front_code[]  = $this->getTabs(2) . "'trashed' => [";
         $front_code[]  = $this->getTabs(3) . "'page' => 'sometimes|required|integer|min:1',";

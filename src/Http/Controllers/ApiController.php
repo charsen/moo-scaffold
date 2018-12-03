@@ -396,9 +396,12 @@ class ApiController extends Controller
             {
                 $data[$key]['value']    = 1;
             }
+            elseif ($key == 'page_limit')
+            {
+                $data[$key]['value']    = 10;
+            }
             elseif ($key == 'ids')
             {
-                $data[$key]['name']     = 'IDS';
                 $data[$key]['value']    = '2,3';
                 $data[$key]['desc']     = '用,分割为数组';
             }
