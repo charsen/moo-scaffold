@@ -39,10 +39,10 @@
             <div class="table" id="request_header">
                 <table>
                     <tr>
-                        <th>值</th>
-                        <th>英文</th>
-                        <th>中文</th>
-                        <th>说明</th>
+                        <th width="15%">值</th>
+                        <th width="25%">英文</th>
+                        <th width="30%">中文</th>
+                        <th width="30%">说明</th>
                     </tr>
                     @foreach ($dictionaries as $key => $row)
                         <tr>

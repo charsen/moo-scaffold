@@ -272,7 +272,7 @@ class Utility
                         ? array_merge($yaml_data['table_fields'], $yaml_data['append_fields'])
                         : $yaml_data['table_fields'];
         
-        return $fields;
+        return empty($fields) ? [] : $fields;
     }
     
     /**

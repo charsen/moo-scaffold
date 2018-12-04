@@ -2,7 +2,7 @@
 namespace Charsen\Scaffold\Generator;
 
 /**
- * Create Folders
+ * Update Multilingual Generator
  *
  * @author Charsen https://github.com/charsen
  */

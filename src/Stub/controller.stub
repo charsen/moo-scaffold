@@ -26,6 +26,8 @@ class {{controller_class}}Controller extends Controller
      */
     public function __construct({{repository_class}} $repository)
     {
+        //$this->middleware('can:' . $this->getAclActionName());
+
         $this->repository = $repository;
     }
 
