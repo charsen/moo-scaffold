@@ -1,9 +1,9 @@
 # Laravel Scaffold
 
-## 关于
+## 关于（未完，待续）
 “约定大于配置” 、“以机械化代替手工化作业”
 
-## 功能
+## 功能（未完，待续）
 
 ### migration
 - 单个数据表的 migration 
@@ -177,7 +177,14 @@ php artisan scaffold:i18n
 - 可先润色 `scaffold/database/_fields.yaml` 里的内容，此文件会自动根据数据表的字段，添加或删掉项目
 
 
-### 12. Free : “释放双手”
+
+### 12. 更新 ACL 文件
+```sh
+php artisan scaffold:acl
+```
+
+
+### 13. Free : “释放双手”
 ```sh
 php artisan scaffold:free  `schema_file_name`
 ```

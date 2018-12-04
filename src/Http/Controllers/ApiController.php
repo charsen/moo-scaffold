@@ -174,6 +174,15 @@ class ApiController extends Controller
         $action_data['current_folder']     = $folder_path;
         $action_data['current_controller'] = $controller_class;
         
+        // 针对 创建 及 更新 两个动作的原型做特殊处理
+        if ($action_name == 'store' || $action_name == 'update')
+        {
+            $temp_name                = ($action_name == 'store') ? 'create' : 'edit';
+            $action_data['prototype'] = empty($action_data['prototype']) && ! empty($data['actions'][$temp_name]['prototype'])
+                                      ? $data['actions'][$temp_name]['prototype']
+                                      : $action_data['prototype'];
+        }
+        
         // 字典数据
         $dictionaries   = $this->utility->getDictionaries();
 
@@ -343,7 +352,7 @@ class ApiController extends Controller
             }
             elseif (in_array($attr['type'], ['int', 'tinyint', 'bigint']))
             {
-                $attr['value'] = $faker->numberBetween(1, 7);
+                $attr['value'] = 1;
             }
             elseif ($attr['type'] == 'varchar' || $attr['type'] == 'char')
             {
@@ -415,6 +424,7 @@ class ApiController extends Controller
             
             if (isset($dictionaries[$key]))
             {
+                $data[$key]['value'] = array_random(array_pluck($dictionaries[$key], 0));
                 $data[$key]['desc'] .= ' ' . json_encode(array_pluck($dictionaries[$key], 2, 0), JSON_UNESCAPED_UNICODE);
             }
         
@@ -461,6 +471,7 @@ class ApiController extends Controller
 
             if (isset($dictionaries[$key]))
             {
+                $data[$key]['value'] = array_random(array_pluck($dictionaries[$key], 0));
                 $data[$key]['desc'] .= ' ' . json_encode(array_pluck($dictionaries[$key], 2, 0), JSON_UNESCAPED_UNICODE);
             }
             

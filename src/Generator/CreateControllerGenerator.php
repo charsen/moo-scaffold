@@ -2,7 +2,7 @@
 namespace Charsen\Scaffold\Generator;
 
 /**
- * Create Model
+ * Create Controller
  *
  * @author Charsen https://github.com/charsen
  */

@@ -3,6 +3,7 @@ namespace Charsen\Scaffold;
 
 use Charsen\Scaffold\Command\FreeCommand;
 use Charsen\Scaffold\Command\InitCommand;
+use Charsen\Scaffold\Command\UpdateACLCommand;
 use Charsen\Scaffold\Command\UpdateMultilingualCommand;
 use Charsen\Scaffold\Command\CreateMigrationCommand;
 use Charsen\Scaffold\Command\CreateModelCommand;
@@ -58,6 +59,7 @@ class ScaffoldProvider extends ServiceProvider
                 CreateControllerCommand::class,
                 UpdateMultilingualCommand::class,
                 CreateApiCommand::class,
+                UpdateACLCommand::class,
             ]);
         }
 

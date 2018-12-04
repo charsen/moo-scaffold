@@ -18,7 +18,7 @@ class UpdateMultilingualCommand extends Command
      *
      * @var string
      */
-    protected $title = 'Create i18n Command';
+    protected $title = 'Update Multilingual Command';
 
     /**
      * The console command name.
@@ -32,7 +32,7 @@ class UpdateMultilingualCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Create i18n Command';
+    protected $description = 'Update Multilingual Command';
     
     /**
      * Get the console command options.

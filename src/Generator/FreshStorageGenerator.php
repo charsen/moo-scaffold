@@ -327,6 +327,8 @@ class FreshStorageGenerator extends Generator
 
         $code = [
             '###',
+            '# 润色，手动修改翻译（生成时不会被替换）',
+            '#',
             '# append_fields: 为手工添加字段，一直保存',
             '# table_fields: 数据库里的字段，会自动做增量、减量',
             '# duplicate_fields: 数据库里重复出现的，有可能是重名了',
