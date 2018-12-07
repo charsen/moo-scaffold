@@ -151,6 +151,7 @@ class CreateRepositoryGenerator extends Generator
         $front_code[]  = $this->getTabs(2) . '],';
         $front_code[]  = $this->getTabs(2) . "'trashed' => [";
         $front_code[]  = $this->getTabs(3) . "'page' => 'sometimes|required|integer|min:1',";
+        $front_code[]  = $this->getTabs(3) . "'page_limit' => 'sometimes|required|integer|min:1',";
         $front_code[]  = $this->getTabs(2) . '],';
         
         // destroyBatch, restoreBatch

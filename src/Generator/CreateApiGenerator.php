@@ -13,8 +13,6 @@ class CreateApiGenerator extends Generator
 {
     protected $api_path;
     protected $api_relative_path;
-    protected $unknow_fields;
-    protected $repository_folder;
     protected $files_path;
     
     /**
@@ -22,18 +20,15 @@ class CreateApiGenerator extends Generator
      * @param bool $ignore_controller
      * @param bool $force
      *
-     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     * @throws \ReflectionException
      */
     public function start($namespace, $ignore_controller = false, $force = false)
     {
         $this->api_path                 = $this->utility->getApiPath('schema');
         $this->api_relative_path        = $this->utility->getApiPath('schema', true);
-        $this->repository_folder        = $this->utility->getRepositoryFolder();
-        $this->unknow_fields            = [];
         $this->files_path               = $this->api_path . $namespace . '/';
 
         // 获取路由列表，但 create 和 edit 两个动作，不一定有，
-        //dump($namespace);
         $routes = $this->getRoutes($namespace);
         if (empty($routes))
         {
@@ -45,20 +40,15 @@ class CreateApiGenerator extends Generator
         {
             $this->filesystem->makeDirectory($this->files_path, 0777, true, true);
         }
-
-        // 获取所有字段
-        $fields = $this->utility->getFields();
-        
-        // 获取对应的 repository_class, table_name, model_class
-        $controllers = $this->utility->getControllers();
         
         foreach ($routes as $controller_name => $actions)
         {
+            $controller       = 'App\Http\Controllers\\' . str_replace('/', '\\', $namespace) . "\\{$controller_name}Controller";
+            $reflection_class = new \ReflectionClass($controller);
+    
             // 过滤掉当前控制器 - 路由里多余的 action
             if (! $ignore_controller)
             {
-                $temp       = str_replace('/', '\\', $namespace);    // 多级目录需要转换
-                $controller = 'App\Http\Controllers\\' . "{$temp}\\{$controller_name}" . 'Controller';
                 $methods    = get_class_methods($controller);
                 if (empty($methods)) {
                     return $this->command->error(' x Controller\'s action  are not found.');
@@ -70,73 +60,18 @@ class CreateApiGenerator extends Generator
                     unset($actions[$key]);
                 }
             }
-    
-            $rules             = $this->getRules($controllers, $namespace, $controller_name);
-            $table_name        = $this->getTableName($controllers, $namespace, $controller_name);
 
             $api_yaml          = $this->files_path . $controller_name . '.yaml';
             $api_relative_yaml = $this->api_relative_path . $namespace . '/' . $controller_name . '.yaml';
             if ($this->filesystem->isFile($api_yaml) && !$force)
             {
-                $this->append($api_yaml, $api_relative_yaml, $controller_name, $actions, $rules, $fields, $table_name);
+                $this->append($api_yaml, $api_relative_yaml, $actions, $reflection_class);
             }
             else
             {
-                $this->create($api_yaml, $api_relative_yaml, $controller_name, $actions, $rules, $fields, $table_name);
+                $this->create($api_yaml, $api_relative_yaml, $controller_name, $actions, $reflection_class);
             }
         }
-
-        if (!empty($this->unknow_fields))
-        {
-            $this->command->error('* unknow_fields: ' . implode(', ', $this->unknow_fields));
-        }
-    }
-    
-    /**
-     * 获取控制器对应 repository 的验证规则
-     *
-     * @param $controllers
-     * @param $namespace
-     * @param $controller_name
-     *
-     * @return mixed
-     */
-    private function getRules($controllers, $namespace, $controller_name)
-    {
-        if ( ! isset($controllers["{$namespace}/{$controller_name}"]))
-        {
-            return [];
-        }
-        
-        // 通过 repository 获取检验规则，明确每个 action 需要的字段
-        $repository = ucfirst($this->repository_folder)
-                      . $controllers["{$namespace}/{$controller_name}"]['repository_class']
-                      . 'Repository';
-        $repository = str_replace('/', '\\', $repository);
-        $rules      = (new $repository(app()))->getRules();
-        
-        return $rules;
-    }
-    
-    /**
-     * 获取数据表 中文名
-     *
-     * @param $controllers
-     * @param $namespace
-     * @param $controller_name
-     *
-     * @return mixed
-     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
-     */
-    private function getTableName($controllers, $namespace, $controller_name)
-    {
-        if ( ! isset($controllers["{$namespace}/{$controller_name}"]))
-        {
-            return '';
-        }
-        
-        $table = $this->utility->getOneTable($controllers["{$namespace}/{$controller_name}"]['table_name']);
-        return $table['name'];
     }
     
     /**
@@ -153,13 +88,11 @@ class CreateApiGenerator extends Generator
      * @param $api_yaml
      * @param $api_relative_yaml
      * @param $actions
-     * @param $rules
-     * @param $fields
-     * @param $table_name
+     * @param $reflection_class
      *
      * @return mixed
      */
-    private function append($api_yaml, $api_relative_yaml, $controller_name, $actions, $rules, $fields, $table_name)
+    private function append($api_yaml, $api_relative_yaml, $actions, $reflection_class)
     {
         $yaml             = new Yaml;
         $old_data         = $yaml::parseFile($api_yaml);
@@ -178,44 +111,23 @@ class CreateApiGenerator extends Generator
         }
         if (empty($add_data))
         {
-            return $this->command->warn('- ' . $api_relative_yaml . ', Did not increase.');
+            return $this->command->warn('- ' . $api_relative_yaml . ' (Not Increase)');
         }
 
-        $code          = [];
-        $actions_count = 0;
-        $default_actions = $this->getDefaultActions();
-        
-        foreach ($default_actions as $action_name)
-        {
-            if (in_array($action_name, $add_data))
-            {
-                $this->buildOneRequest(
-                    $code,
-                    $rules,
-                    $fields,
-                    $table_name,
-                    $action_name,
-                    $actions[$action_name]['method'],
-                    $actions[$action_name]['uri']
-                );
-                
-                $actions_count++;
-                array_splice($add_data, array_search($action_name ,$add_data),1);
-            }
-        }
-        
+        $code               = [];
+        $appends            = [];
         foreach ($add_data as $action_name)
         {
-            $this->buildOneRequest($code, $rules, $fields, $table_name, $action_name,
-                $actions[$action_name]['method'], $actions[$action_name]['uri']);
-            $actions_count++;
+            $this->buildOneRequest($code, $reflection_class, $action_name, $actions[$action_name]['method'], $actions[$action_name]['uri']);
+            $appends[]      = $action_name;
         }
 
-        $code[] = '';
-        $put    = $this->filesystem->append($api_yaml, implode("\n", $code));
+        $code[]     = '';
+        $put        = $this->filesystem->append($api_yaml, implode("\n", $code));
         if ($put)
         {
-            return $this->command->info('+ ' . $api_relative_yaml . ' (Append ' . $actions_count . ' Actions)');
+            $msg    = ' (Append ' . count($appends) . ' Actions: [' . implode(', ', $appends) . '])';
+            return $this->command->info('+ ' . $api_relative_yaml . $msg);
         }
 
         return $this->command->error('+ ' . $api_relative_yaml . '(Update Failed)');
@@ -228,16 +140,17 @@ class CreateApiGenerator extends Generator
      * @param $api_relative_yaml
      * @param $controller_name
      * @param $actions
-     * @param $rules
-     * @param $fields
-     * @param $table_name
+     * @param $reflection_class
      *
      * @return void [type]
      */
-    private function create($api_yaml, $api_relative_yaml, $controller_name, $actions, $rules, $fields, $table_name)
+    private function create($api_yaml, $api_relative_yaml, $controller_name, $actions, $reflection_class)
     {
+        $names = $this->utility->parsePMCNames($reflection_class);
+        $name  = empty($names['controller']['name']) ? '' : $names['controller']['name']['zh-CN'];
+        
         $code   = ['###'];
-        $code[] = '# 一个 controller 一个 api.schema 文件';
+        $code[] = '# 一个 controller 一个 api yaml 文件';
         $code[] = '#';
         $code[] = '# @author ' . $this->utility->getConfig('author');
         $code[] = '# @data ' . date('Y-m-d H:i:s');
@@ -245,10 +158,11 @@ class CreateApiGenerator extends Generator
         $code[] = 'controller:';
         $code[] = $this->getTabs(1) . 'code:';
         $code[] = $this->getTabs(1) . 'class: ' . $controller_name;
-        $code[] = $this->getTabs(1) . 'name: ' . $table_name . '管理';
+        $code[] = $this->getTabs(1) . 'name: ' . $name;
         $code[] = $this->getTabs(1) . 'desc: []';
         $code[] = 'actions:';
         
+        // todo: 用排序解决优先生成问题
         $default_actions = $this->getDefaultActions();
         foreach ($default_actions as $action_name)
         {
@@ -256,9 +170,7 @@ class CreateApiGenerator extends Generator
             {
                 $this->buildOneRequest(
                     $code,
-                    $rules,
-                    $fields,
-                    $table_name,
+                    $reflection_class,
                     $action_name,
                     $actions[$action_name]['method'],
                     $actions[$action_name]['uri']
@@ -271,7 +183,7 @@ class CreateApiGenerator extends Generator
         {
             foreach ($actions as $action_name => $attr)
             {
-                $this->buildOneRequest($code, $rules, $fields, $table_name, $action_name, $attr['method'], $attr['uri']);
+                $this->buildOneRequest($code, $reflection_class, $action_name, $attr['method'], $attr['uri']);
             }
         }
 
@@ -287,117 +199,58 @@ class CreateApiGenerator extends Generator
     
     /**
      * @param $code
-     * @param $rules
-     * @param $fields
-     * @param $table_name
+     * @param $reflection_class
      * @param $action_name
      * @param $method
      * @param $uri
      *
      * @return array
      */
-    private function buildOneRequest(&$code, $rules, $fields, $table_name, $action_name, $method, $uri)
+    private function buildOneRequest(&$code, $reflection_class, $action_name, $method, $uri)
     {
-        $method_txt = ['PUT' => 'POST', 'DELETE' => 'POST', 'GET' => 'GET', 'POST' => 'POST'];
-        $name_txt   = [
-            'index'        => '{table_name}列表',
-            'trashed'      => '回收站',
-            'show'         => '查看{table_name}',
-            'create'       => '创建表单',
-            'store'        => '添加{table_name}',
-            'edit'         => '编辑表单',
-            'update'       => '更新{table_name}',
-            'destroy'      => '删除{table_name}',
-            'destroyBatch' => '批量删除',
-            'restoreBatch' => '批量恢复',
-        ];
-        $name   = isset($name_txt[$action_name]) ? str_replace('{table_name}', $table_name, $name_txt[$action_name]) : $action_name;
+        $method_txt     = ['PUT' => 'POST', 'DELETE' => 'POST', 'GET' => 'GET', 'POST' => 'POST'];
+        
         $code[] = $this->getTabs(1) . "{$action_name}:";
-        $code[] = $this->getTabs(2) . "name: {$name}";
+        $code[] = $this->getTabs(2) . "name: " . $this->getActionName($reflection_class, $action_name);
         $code[] = $this->getTabs(2) . 'desc: []';
         $code[] = $this->getTabs(2) . "prototype: ''";
         $code[] = $this->getTabs(2) . "request: [{$method_txt[$method]}, {$uri}]";
         $code[] = $this->getTabs(2) . 'url_params: []';
         $code[] = $this->getTabs(2) . 'body_params: []';
 
-        // controller store action 需要转换一下
-        //$rule_key = $action_name == 'store' ? 'create' : $action_name;
-        //
-        //// GET 请求，参数放到 url_params
-        //if ($method == 'GET')
-        //{
-        //    if (!isset($rules[$rule_key]) || in_array($action_name, ['create', 'edit']))
-        //    {
-        //        $code[] = $this->getTabs(2) . 'url_params: []';
-        //    }
-        //    else
-        //    {
-        //        $code[] = $this->getTabs(2) . 'url_params:';
-        //        $this->buildRequestParams($code, $rules[$rule_key], $fields);
-        //    }
-        //    $code[] = $this->getTabs(2) . 'body_params: []';
-        //}
-        //else
-        //{
-        //    $code[]      = $this->getTabs(2) . 'url_params: []';
-        //    $body_params = [$this->getTabs(2) . 'body_params:'];
-        //
-        //    if (in_array($method, ['PUT', 'DELETE']))
-        //    {
-        //        $body_params[] = $this->getTabs(3) . "_method: [{$method}]";
-        //    }
-        //
-        //    if (isset($rules[$rule_key]))
-        //    {
-        //        $this->buildRequestParams($body_params, $rules[$rule_key], $fields);
-        //    }
-        //
-        //    if ( ! isset($body_params[1]))
-        //    {
-        //        $body_params[0] .= ' []';
-        //    }
-        //
-        //    $code = array_merge($code, $body_params);
-        //}
-
         return $code;
     }
     
     /**
-     * 生成 请求参数配置
+     * 获取 动作名
      *
-     * @param  array &$code
-     * @param  array $rules
-     * @param  array $fields
+     * @param $action_name
+     * @param $reflection_class
      *
-     * @return void
+     * @return mixed|string
      */
-    private function buildRequestParams(array &$code, array $rules, array $fields)
+    private function getActionName($reflection_class, $action_name)
     {
-        foreach ($rules as $field_name => $rule)
+        $default_names  = ['create' => '创建', 'edit' => '编辑'];
+    
+        if (isset($default_names[$action_name]))
         {
-            $rule_txt = [];
-            // 是否必填
-            if (!strstr($rule, 'required') && !strstr($rule, 'required_if') && !strstr($rule, 'sometimes'))
-            {
-                $rule_txt[] .= 'false';
-            }
-
-            // 参数名称
-            $rule_txt[] = isset($fields[$field_name]['cn']) ? $fields[$field_name]['cn'] : $field_name;
-
-            // 数值
-            $rule_txt[] = !empty($fields[$field_name]['default']) ? $fields[$field_name]['default'] : "''";
-
-            // 描述
-            if (!empty($fields[$field_name]['desc']))
-            {
-                $rule_txt[] = "'{$fields[$field_name]['desc']}'";
-            }
-
-            //dump($rule_txt);
-            $code[] = $this->getTabs(3) . "{$field_name}: [" . implode(', ', $rule_txt) . ']';
+            $name       = $default_names[$action_name];
         }
+        else
+        {
+            $name       = $this->utility->parseActionNames($action_name, $reflection_class);
+            if (! isset($name['name']))
+            {
+                $name   = $this->utility->parseActionName($action_name, $reflection_class);
+            }
+            else
+            {
+                $name       = $name['name']['zh-CN'];
+            }
+        }
+        
+        return empty($name) ? $action_name : $name;
     }
     
     /**

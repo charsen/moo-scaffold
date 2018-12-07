@@ -54,9 +54,23 @@ class CreateControllerGenerator extends Generator
             // 目录及 namespace 处理
             $namespace          = $this->dealNameSpaceAndPath($this->controller_path, 'app/Http/Controllers', $class);
             
+            // 资源仓库 类名处理
             $repository_class   = ucfirst($this->repository_folder) . $attr['repository_class'] . 'Repository';
             $repository_class   = str_replace('/', '\\', $repository_class);
             $temp               = explode('/', $attr['repository_class']);
+            
+            // 处理成英文的 package_en_name 和 module_en_name
+            $temp_names         = explode('\\', str_replace('app\\Http\\Controllers\\', '', $namespace));
+            if (count($temp_names) >1)
+            {
+                $package_en_name    = $temp_names[0];
+                $module_en_name     = $temp_names[1];
+            }
+            else
+            {
+                $package_en_name    = $temp_names[0];
+                $module_en_name     = '';
+            }
             
             $meta               = [
                 'author'            => $this->utility->getConfig('author'),
@@ -65,6 +79,11 @@ class CreateControllerGenerator extends Generator
                 'namespace'         => ucfirst($namespace),
                 'use_repository'    => 'use ' . $repository_class . ';',
                 'repository_class'  => end($temp) . 'Repository',
+                'package_name'      => $attr['package_name'],
+                'package_en_name'   => $package_en_name,
+                'module_name'       => $attr['module_name'],
+                'module_en_name'    => $module_en_name,
+                'entity_name'       => $attr['entity_name'],
                 'form_widgets'      => $this->getFormWidgets($repository_class, $fields, $dictionaries)
             ];
             

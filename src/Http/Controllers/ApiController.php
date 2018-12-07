@@ -228,8 +228,6 @@ class ApiController extends Controller
         $method_params = [
             'update'       => 'PUT',
             'destroy'      => 'DELETE',
-            'destroyBatch' => 'DELETE',
-            'restoreBatch' => 'PUT',
         ];
         $method_param = isset($method_params[$action_name]) ? [
             '_method' => ['require' => true, 'name' => '', 'value' => $method_params[$action_name], 'desc' => '']
@@ -397,7 +395,7 @@ class ApiController extends Controller
         foreach ($rules as $key => $attr)
         {
             $data[$key]                 = strstr($attr, 'nullable') ? ['require' => false] : ['require' => true];
-            $data[$key]['name']         = $fields[$key]['cn'] ?? $key;
+            $data[$key]['name']         = $fields[$key]['zh-CN'] ?? $key;
             $data[$key]['value']        = '';
             $data[$key]['desc']         = '';
             
@@ -430,7 +428,7 @@ class ApiController extends Controller
         
             if (isset($lang_fields[$key]))
             {
-                $data[$key]['name'] = $lang_fields[$key]['cn'];
+                $data[$key]['name'] = $lang_fields[$key]['zh-CN'];
             }
         
             $data[$key]['type'] = isset($fields[$key]['type']) ? $fields[$key]['type'] : null;
@@ -477,7 +475,7 @@ class ApiController extends Controller
             
             if (isset($lang_fields[$key]))
             {
-                $data[$key]['name'] = $lang_fields[$key]['cn'];
+                $data[$key]['name'] = $lang_fields[$key]['zh-CN'];
             }
 
             $data[$key]['type'] = isset($fields[$key]['type']) ? $fields[$key]['type'] : null;

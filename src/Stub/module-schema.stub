@@ -4,6 +4,7 @@
 # @author {{author}}
 # @date   {{date}}
 ##
+package_name: PackageName
 module_name: ModuleName
 tables:
     table_name1:
