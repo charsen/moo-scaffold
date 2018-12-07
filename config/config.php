@@ -12,6 +12,11 @@ return [
     'author'     => env('LARAVEL_SCAFFOLD_AUTHOR', ''),
 
     /**
+     *  多语言设定
+     */
+    'languages' => ['en', 'zh-CN'],
+
+    /**
      * 数据库相关文件的路径
      */
     'database'   => [

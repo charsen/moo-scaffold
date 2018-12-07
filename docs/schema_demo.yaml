@@ -20,6 +20,7 @@
 # @author Charsen
 # @date   2018-11-11 11:50
 ##
+package_name: 企业端
 module_name: 人事模块
 tables:
     departments:

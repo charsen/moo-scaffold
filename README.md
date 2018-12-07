@@ -3,6 +3,8 @@
 ## 关于（未完，待续）
 “约定大于配置” 、“以机械化代替手工化作业”
 
+支持多语言，默认 {en, zh-CN}
+
 ## 功能（未完，待续）
 
 ### migration
@@ -33,6 +35,12 @@
 - 生成数据库表所有字段 及 模型字典字段多语言
 - resources/lang/{en, zh-CN}/model.php       
 - resources/lang/{en, zh-CN}/validation.php    
+
+### 授权文件
+- app/ACL.php
+- config/actions.php (内含白名单)
+- resources/lang/{en, zh-CN}/actions.php   
+
 
 ## 安装
 通过 [composer](https://laravel-china.org/composer) 安装
@@ -66,8 +74,8 @@ php artisan scaffold:init `author`
 php artisan scaffold:schema `module_name`
 ```
 - 添加 `-f` 覆盖已存在文件
-- PS: 暂不支持多级目录！所有 `module_name = file_name`
-
+- PS1: 暂不支持多级目录！建议：`module_name = schema_file_name`
+- PS2：`controller` 的定义，只支持 `app/Http/Controllers/` 往下**两级**，更深的层级**不支持**!!!
 
 ### 3. 刷新/生成 schema 数据缓存
 ```sh
@@ -140,13 +148,13 @@ php artisan scaffold:api `namesapce`
 ```
 - `namesapce` 非必写，若不写会有提示做选择（app/controllers 下的某个目录，或多级目录）
 - 添加 `-f` 覆盖已存在文件
-- 添加 `-i` 忽略用 controller 里的 actions 求交集（若 route.php 里用了 ::resource 方式可能会生成多余的请求）
+- 添加 `-i` 忽略用 controller 里的 actions 求交集（若 route.php 里用了 ::resource 方式可能会生成多余的请求）（todo: 移除）
 - 添加 `--fresh` 刷新缓存数据，等于先执行 `artisan scaffold:fresh`
-- 自动获取 `namesapce` 的选择提示内容，只支持 `Http/Controllers/` 往下**两级**，更深的层级**不支持**!!!
 
 **PS1:**
 - api 里的参数 默认通过 repository 验证规则里读取
 - 可在 api 的 yaml 配置文件中重写 url_params 及 body_params 来覆盖 默认的参数设置
+- 默认的接口名称能过 "反射" 控制器中动作的注释来获取
 - api demo [docs/api_demo.yaml](https://github.com/charsen/laravel-scaffold/blob/master/docs/api_demo.yaml)
 
 **PS2:**
@@ -178,10 +186,14 @@ php artisan scaffold:i18n
 
 
 
-### 12. 更新 ACL 文件
+### 12. 更新 Authorization 文件
 ```sh
-php artisan scaffold:acl
+php artisan scaffold:auth
 ```
+- 更新 ./app/Gates.php
+- 更新 ./resources/lang/{en, zh-CN}/actions.php (维护一处注释，同步多个语言文件)
+- 更新 ./app/config/actions.php
+- 需要做授权的 action 必须在注释中写 @acl {zh-CN: 中文 | en: English} 否则会被加入白名单
 
 
 ### 13. Free : “释放双手”

@@ -66,6 +66,9 @@ class FreshStorageGenerator extends Generator
                 if (isset($config['controller']))
                 {
                     $controllers[$file_name][$config['controller']['class']] = [
+                        'package_name'     => $data['package_name'],
+                        'module_name'      => $data['module_name'],
+                        'entity_name'      => $config['attrs']['name'],
                         'table_name'       => $table_name,
                         'model_class'      => $config['model']['class'] ?? '',
                         'repository_class' => $config['repository']['class'] ?? '',
@@ -260,14 +263,14 @@ class FreshStorageGenerator extends Generator
             if (isset($lang_fields[$field_name]))
             {
                 $temp = [
-                    'cn'      => $lang_fields[$field_name]['cn'],
+                    'zh-CN'      => $lang_fields[$field_name]['zh-CN'],
                     'en'      => $lang_fields[$field_name]['en'],
                 ];
             }
             else
             {
                 $temp = [
-                    'cn'      => $attr['name'],
+                    'zh-CN'      => $attr['name'],
                     'en'      => trim(ucwords(str_replace('_', ' ', $field_name))),
                 ];
             }
@@ -345,7 +348,7 @@ class FreshStorageGenerator extends Generator
             foreach ($fields as $field_name => $attr)
             {
                 $yaml   = ["en: '{$attr['en']}'"];
-                $yaml[] = "cn: '{$attr['cn']}'";
+                $yaml[] = "'zh-CN': '{$attr['zh-CN']}'";
                 
                 $code[] = $this->getTabs(1) . "{$field_name}: { " . implode(', ', $yaml) . ' }';
             }
@@ -372,19 +375,19 @@ class FreshStorageGenerator extends Generator
         // 附加分页码，在生成接口时用
         $data['append_fields']['page'] = [
             'en'      => 'Page',
-            'cn'      => '分页码',
+            'zh-CN'   => '分页码',
             'int'     => 'int',
             'default' => 1,
         ];
         $data['append_fields']['page_limit'] = [
             'en'      => 'Page Limit',
-            'cn'      => '分页数量',
+            'zh-CN'   => '分页数量',
             'int'     => 'int',
             'default' => 10,
         ];
         $data['append_fields']['ids'] = [
             'en'      => 'Ids',
-            'cn'      => '多个编号',
+            'zh-CN'   => '多个编号',
             'int'     => 'varchar',
             'default' => '2,3',
         ];
@@ -400,7 +403,7 @@ class FreshStorageGenerator extends Generator
             {
                 $php_data[$field_name] = [
                     'en'      => $attr['en'],
-                    'cn'      => $attr['cn'],
+                    'zh-CN'   => $attr['zh-CN'],
                     'type'    => $attr['type'] ?? null,
                     'format'  => $attr['format'] ?? null,
                     'default' => ! empty($attr['default']) ? $attr['default'] : '',

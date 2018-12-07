@@ -15,7 +15,7 @@ class UpdateMultilingualGenerator extends Generator
      */
     public function start()
     {
-        $languages  = ['en', 'zh-CN'];
+        $languages  = $this->utility->getConfig('languages');
         $files      = ['model', 'validation'];
         
         $all_fields             = $this->utility->getLangFields();

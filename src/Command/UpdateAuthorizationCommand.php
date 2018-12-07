@@ -1,7 +1,7 @@
 <?php
 namespace Charsen\Scaffold\Command;
 
-use Charsen\Scaffold\Generator\UpdateACLGenerator;
+use Charsen\Scaffold\Generator\UpdateAuthorizationGenerator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
@@ -10,28 +10,28 @@ use Symfony\Component\Console\Input\InputOption;
  *
  * @author Charsen https://github.com/charsen
  */
-class UpdateACLCommand extends Command
+class UpdateAuthorizationCommand extends Command
 {
     /**
      * The console command title.
      *
      * @var string
      */
-    protected $title = 'Update ACL Command';
+    protected $title = 'Update Authorization Command';
 
     /**
      * The console command name.
      *
      * @var string
      */
-    protected $name = 'scaffold:acl';
+    protected $name = 'scaffold:auth';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Update ACL File';
+    protected $description = 'Update Authorization Files';
     
     /**
      * Execute the console command.
@@ -42,7 +42,7 @@ class UpdateACLCommand extends Command
     {
         $this->alert($this->title);
     
-        $result = (new UpdateACLGenerator($this, $this->filesystem, $this->utility))->start();
+        $result = (new UpdateAuthorizationGenerator($this, $this->filesystem, $this->utility))->start();
     
         $this->tipDone();
     }

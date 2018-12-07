@@ -28,6 +28,98 @@ class Utility
     }
     
     /**
+     * 根据语言解析
+     *
+     * @param $string
+     *
+     * @return array
+     */
+    public function parseByLanguages($string)
+    {
+        $languages  = $this->getConfig('languages');
+        $data       = [];
+        foreach ($languages as $lang)
+        {
+            preg_match('/'. $lang .':([^\|]*)[\|}]/i', $string, $temp);
+            $data[$lang] = empty($temp) ? '' : trim($temp[1]);
+        }
+        
+        return $data;
+    }
+    
+    /**
+     * 解析 包名、模块名、控制器名
+     *
+     * @param $reflection_class
+     *
+     * @return array
+     */
+    public function parsePMCNames($reflection_class)
+    {
+        $data               = [];
+        $doc_comment        = $reflection_class->getDocComment();
+        
+        preg_match('/@package\_name\s(.*)\n/', $doc_comment, $package_name);
+        preg_match('/@module\_name\s(.*)\n/', $doc_comment, $module_name);
+        preg_match('/@controller\_name\s(.*)\n/', $doc_comment, $controller_name);
+        
+        $package_name               = empty($package_name) ? '' : $package_name[1];
+        $module_name                = empty($module_name) ? '' : $module_name[1];
+        $controller_name            = empty($controller_name) ? '' : $controller_name[1];
+        
+        $data['package']['name']    = $this->parseByLanguages($package_name);
+        $data['module']['name']     = $this->parseByLanguages($module_name);
+        $data['controller']['name'] = $this->parseByLanguages($controller_name);
+        
+        return $data;
+    }
+    
+    /**
+     * 解析动作多语言名称
+     *
+     * @param $action
+     * @param $reflection_class
+     *
+     * @return array
+     */
+    public function parseActionNames($action, $reflection_class)
+    {
+        $data               = [];
+        $reflection_method  = $reflection_class->getMethod($action);
+        $doc_comment        = $reflection_method->getDocComment();
+        
+        preg_match('/@acl\s(.*)\n/', $doc_comment, $name);
+        if (empty($name))
+        {
+            $data['whitelist']  = true;
+        }
+        else
+        {
+            $data['name']       = $this->parseByLanguages($name[1]);
+        }
+        
+        return $data;
+    }
+    
+    /**
+     * 解析动作第一行作为名称
+     *
+     * @param $action
+     * @param $reflection_class
+     *
+     * @return string
+     */
+    public function parseActionName($action, $reflection_class)
+    {
+        $reflection_method  = $reflection_class->getMethod($action);
+        $doc_comment        = $reflection_method->getDocComment();
+    
+        preg_match_all('#^\s*\*(.*)#m', $doc_comment, $lines);
+
+        return isset($lines[1][0]) ? trim($lines[1][0]) : '';
+    }
+    
+    /**
      * Get Route File Content
      *
      * @param string $name

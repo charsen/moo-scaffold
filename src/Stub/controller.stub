@@ -9,7 +9,11 @@ use App\Http\Resources\FormWidgetCollection;
 use Illuminate\Http\Request;
 
 /**
- * {{controller_class}} Controller
+ * {{entity_name}}控制器
+ *
+ * @package_name {zh-CN: {{package_name}} | en: {{package_en_name}}}
+ * @module_name {zh-CN: {{module_name}} | en: {{module_en_name}}}
+ * @controller_name {zh-CN: {{entity_name}}管理 | en: Management {{controller_class}}}
  *
  * @package {{namespace}};
  * @author  {{author}}
@@ -34,8 +38,9 @@ class {{controller_class}}Controller extends Controller
     /**
      * 列表
      *
-     * @param \Illuminate\Http\Request $req
+     * @acl {zh-CN: {{entity_name}}列表 | en: {{controller_class}} List}
      *
+     * @param \Illuminate\Http\Request $req
      * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
      * @throws \Exception
      */
@@ -51,8 +56,9 @@ class {{controller_class}}Controller extends Controller
     /**
      * 回收站列表
      *
-     * @param \Illuminate\Http\Request $req
+     * @acl {zh-CN: {{entity_name}}回收站 | en: {{controller_class}} Trashed}
      *
+     * @param \Illuminate\Http\Request $req
      * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
      * @throws \Exception
      */
@@ -68,8 +74,9 @@ class {{controller_class}}Controller extends Controller
     /**
      * 创建
      *
-     * @param \Illuminate\Http\Request $req
+     * @acl {zh-CN: 创建{{entity_name}} | en: Create {{controller_class}}}
      *
+     * @param \Illuminate\Http\Request $req
      * @return \App\Http\Resources\BaseResource
      */
     public function store(Request $req)
@@ -81,6 +88,8 @@ class {{controller_class}}Controller extends Controller
 
     /**
      * 更新
+     *
+     * @acl {zh-CN: 更新{{entity_name}} | en: Update {{controller_class}}}
      *
      * @param \Illuminate\Http\Request $req
      * @param                          $id
@@ -97,8 +106,9 @@ class {{controller_class}}Controller extends Controller
     /**
      * 查看
      *
-     * @param int $id
+     * @acl {zh-CN: 查看{{entity_name}} | en: Show {{controller_class}}}
      *
+     * @param int $id
      * @return \App\Http\Resources\BaseResource
      */
     public function show($id)
@@ -111,8 +121,9 @@ class {{controller_class}}Controller extends Controller
     /**
      * 删除
      *
-     * @param int $id
+     * @acl {zh-CN: 删除{{entity_name}} | en: Destroy {{controller_class}}}
      *
+     * @param int $id
      * @return \App\Http\Resources\BaseResource
      */
     public function destroy($id)
@@ -125,8 +136,9 @@ class {{controller_class}}Controller extends Controller
     /**
      * 批量删除
      *
-     * @param \Illuminate\Http\Request $req
+     * @acl {zh-CN: 批量删除{{entity_name}} | en: Destroy Batch {{controller_class}}}
      *
+     * @param \Illuminate\Http\Request $req
      * @return \App\Http\Resources\BaseResource
      */
     public function destroyBatch(Request $req)
@@ -156,8 +168,9 @@ class {{controller_class}}Controller extends Controller
     /**
      * 批量恢复软删除的数据
      *
-     * @param \Illuminate\Http\Request $req
+     * @acl {zh-CN: 批量恢复{{entity_name}} | en: Restore Batch {{controller_class}}}
      *
+     * @param \Illuminate\Http\Request $req
      * @return \App\Http\Resources\BaseResource
      * @throws \Exception
      */
@@ -177,7 +190,7 @@ class {{controller_class}}Controller extends Controller
     }
 
     /**
-     * 返回创建控件信息
+     * 创建表单控件
      *
      * @return \App\Http\Resources\FormWidgetCollection
      */
@@ -189,10 +202,9 @@ class {{controller_class}}Controller extends Controller
     }
 
     /**
-     * 返回创建控件信息
+     * 编辑表单控件
      *
      * @param $id
-     *
      * @return \App\Http\Resources\BaseResource
      */
     public function edit($id)
