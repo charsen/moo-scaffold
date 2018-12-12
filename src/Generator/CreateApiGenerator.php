@@ -97,6 +97,8 @@ class CreateApiGenerator extends Generator
         $yaml             = new Yaml;
         $old_data         = $yaml::parseFile($api_yaml);
         $old_actions_keys = array_keys($old_data['actions']);
+        $old_actions_keys = $this->utility->removeActionNameMethod($old_actions_keys);
+        
         $actions_keys     = array_keys($actions);
         $reduce_data      = array_merge(array_diff($old_actions_keys, $actions_keys));
         $add_data         = array_merge(array_diff($actions_keys, $old_actions_keys));
@@ -118,7 +120,7 @@ class CreateApiGenerator extends Generator
         $appends            = [];
         foreach ($add_data as $action_name)
         {
-            $this->buildOneRequest($code, $reflection_class, $action_name, $actions[$action_name]['method'], $actions[$action_name]['uri']);
+            $this->buildOneRequest($code, $reflection_class, $action_name, $actions[$action_name]['methods'], $actions[$action_name]['uri']);
             $appends[]      = $action_name;
         }
 
@@ -172,7 +174,7 @@ class CreateApiGenerator extends Generator
                     $code,
                     $reflection_class,
                     $action_name,
-                    $actions[$action_name]['method'],
+                    $actions[$action_name]['methods'],
                     $actions[$action_name]['uri']
                 );
                 unset($actions[$action_name]);
@@ -183,7 +185,7 @@ class CreateApiGenerator extends Generator
         {
             foreach ($actions as $action_name => $attr)
             {
-                $this->buildOneRequest($code, $reflection_class, $action_name, $attr['method'], $attr['uri']);
+                $this->buildOneRequest($code, $reflection_class, $action_name, $attr['methods'], $attr['uri']);
             }
         }
 
@@ -201,22 +203,25 @@ class CreateApiGenerator extends Generator
      * @param $code
      * @param $reflection_class
      * @param $action_name
-     * @param $method
+     * @param $methods
      * @param $uri
      *
      * @return array
      */
-    private function buildOneRequest(&$code, $reflection_class, $action_name, $method, $uri)
+    private function buildOneRequest(&$code, $reflection_class, $action_name, $methods, $uri)
     {
         $method_txt     = ['PUT' => 'POST', 'DELETE' => 'POST', 'GET' => 'GET', 'POST' => 'POST'];
         
-        $code[] = $this->getTabs(1) . "{$action_name}:";
-        $code[] = $this->getTabs(2) . "name: " . $this->getActionName($reflection_class, $action_name);
-        $code[] = $this->getTabs(2) . 'desc: []';
-        $code[] = $this->getTabs(2) . "prototype: ''";
-        $code[] = $this->getTabs(2) . "request: [{$method_txt[$method]}, {$uri}]";
-        $code[] = $this->getTabs(2) . 'url_params: []';
-        $code[] = $this->getTabs(2) . 'body_params: []';
+        foreach ($methods as $method)
+        {
+            $code[] = $this->getTabs(1) . "{$action_name}_" . strtolower($method) . ":";
+            $code[] = $this->getTabs(2) . "name: " . $this->getActionName($reflection_class, $action_name);
+            $code[] = $this->getTabs(2) . 'desc: []';
+            $code[] = $this->getTabs(2) . "prototype: ''";
+            $code[] = $this->getTabs(2) . "request: [{$method_txt[$method]}, {$uri}]";
+            $code[] = $this->getTabs(2) . 'url_params: []';
+            $code[] = $this->getTabs(2) . 'body_params: []';
+        }
 
         return $code;
     }
@@ -284,14 +289,26 @@ class CreateApiGenerator extends Generator
 
             // 正则匹配出 controller 和 action 名称
             preg_match('/^' . $pre_pattern . '([a-zA-Z]+)Controller@([a-zA-Z]+)/', $action_name, $result);
-            $method                       = implode('|', $route->methods());
-            $method                       = ($method == 'GET|HEAD') ? 'GET' : $method;
-            $method                       = ($method == 'PUT|PATCH') ? 'PUT' : $method;
+            
+            //$method                       = implode('|', $route->methods());
+            //$method                       = ($method == 'GET|HEAD') ? 'GET' : $method;
+            //$method                       = ($method == 'PUT|PATCH') ? 'PUT' : $method;
+            $methods = $route->methods();
+            $delete_keys = ['HEAD', 'PATCH'];
+            foreach ($delete_keys as $val)
+            {
+                $key = array_search($val, $methods);
+                if ($key)
+                {
+                    unset($methods[$key]);
+                }
+            }
             
             $data[$result[1]][$result[2]] = [
                 'name'   => $route->getName(),
                 'uri'    => str_replace('api/', '', $route->uri()),
-                'method' => $method,
+                //'method' => $method,
+                'methods' => $methods,
             ];
         }
 

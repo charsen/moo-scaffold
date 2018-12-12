@@ -25,9 +25,11 @@ class ApiController extends Controller
         $data                       = $this->getApiList();
         $data['menus_transform']    = $this->getMenusTransform();
         $data['uri']                = $req->getPathInfo();
+        
         $data['current_folder']     = $req->input('f', 'Index');
         $data['current_controller'] = $req->input('c', null);
         $data['current_action']     = $req->input('a', null);
+        
         $data['first_menu_active']  = $data['current_controller'] != null;
         $data['first_table_active'] = $data['current_controller'] != null;
 
@@ -60,13 +62,21 @@ class ApiController extends Controller
         $data                       = $this->getApiList();
         $data['menus_transform']    = $this->getMenusTransform();
         $data['uri']                = $req->getPathInfo();
+        
         $data['request_url']        = str_replace($req->path(), 'api', $req->url());
         $data['api_index']          = 1;
         $data['current_folder']     = $req->input('f', 'Index');
         $data['current_controller'] = $req->input('c', null);
         $data['current_action']     = $req->input('a', null);
         $data['first_menu_active']  = false;
-
+    
+        if (isset($data['apis'][$data['current_folder']][$data['current_controller']][$data['current_action']]))
+        {
+            $current_method = $data['apis'][$data['current_folder']][$data['current_controller']][$data['current_action']]['method'];
+        }
+        
+        $data['current_method']     = $current_method ?? false;
+        
         return $this->view('api.request', $data);
     }
     
@@ -173,6 +183,9 @@ class ApiController extends Controller
         $action_data['current_action']     = $action_name;
         $action_data['current_folder']     = $folder_path;
         $action_data['current_controller'] = $controller_class;
+    
+        // 12-09, 因为出现了同一个 url 多个 method ，api.yaml 的键名重复了，附加了方法，在这里特殊处理一下
+        $action_name = $this->utility->removeActionNameMethod($action_name);
         
         // 针对 创建 及 更新 两个动作的原型做特殊处理
         if ($action_name == 'store' || $action_name == 'update')
@@ -215,7 +228,10 @@ class ApiController extends Controller
         
             $repository_class = $controllers[$folder_name . '/' . $controller_class]['repository_class'] . 'Repository';
             $repository_class = '\App\Repositories\\' . str_replace('/', '\\', $repository_class);
-            $rules            = (new $repository_class(app()))->getRules($action_name);
+            
+            // 12-09, 因为出现了同一个 url 多个 method，导致真实的动作未知，可通过 rule_action 指定
+            $rule_action      = isset($action_data['rule_action']) ? $action_data['rule_action'] : $action_name;
+            $rules            = (new $repository_class(app()))->getRules($rule_action);
         
             // 从 验证规则 里获取 api 参数
             if ( ! empty($rules))
@@ -229,9 +245,9 @@ class ApiController extends Controller
             'update'       => 'PUT',
             'destroy'      => 'DELETE',
         ];
-        $method_param = isset($method_params[$action_name]) ? [
-            '_method' => ['require' => true, 'name' => '', 'value' => $method_params[$action_name], 'desc' => '']
-        ] : [];
+        $method_param = isset($method_params[$action_name])
+            ? ['_method' => ['require' => true, 'name' => '', 'value' => $method_params[$action_name], 'desc' => '']]
+            : [];
         
         $url_params = $body_params = [];
         // 格式化 faker 标识
@@ -241,6 +257,8 @@ class ApiController extends Controller
             $url_params                = $this->formatParams($action_data['url_params'], $dictionaries, $fields, $lang_fields);
             $url_params                = array_merge($method_param, $rule_params, $url_params);
             $action_data['url_params'] = $this->formatToFaker($faker, $url_params);
+            
+            unset($action_data['body_params']);
         }
         
         //if (isset($action_data['body_params']))
@@ -249,6 +267,8 @@ class ApiController extends Controller
             $body_params                = $this->formatParams($action_data['body_params'], $dictionaries, $fields, $lang_fields);
             $body_params                = array_merge($method_param, $rule_params, $body_params);
             $action_data['body_params'] = $this->formatToFaker($faker, $body_params);
+    
+            unset($action_data['url_params']);
         }
         //dump($action_data);
 
@@ -267,7 +287,7 @@ class ApiController extends Controller
         $method = $request[0];
         $url    = $request[1];
     
-        $url    = preg_replace('/\{[a-z_]+\}/i', rand(1, 5), $url);
+        $url    = preg_replace('/\{[a-z_]+\}/i', 1, $url);
         
         return [strtoupper($method), $url];
     }

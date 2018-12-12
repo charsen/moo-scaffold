@@ -57,6 +57,7 @@ class CreateModelGenerator extends Generator
 
             $fields            = $table_attr['fields'];
             $dictionaries      = $table_attr['dictionaries'];
+            $hidden            = [];
             $use_trait         = [];
             $use_class         = [];
             
@@ -71,6 +72,7 @@ class CreateModelGenerator extends Generator
             {
                 $use_trait[]   = 'SoftDeletes';
                 $use_class[]   = 'use Illuminate\Database\Eloquent\SoftDeletes;';
+                $hidden[]      = 'deleted_at';
             }
 
             // 目录及 namespace 处理
@@ -88,9 +90,9 @@ class CreateModelGenerator extends Generator
                 'dictionaries'          => $dictionaries_code['dictionaries'],
                 'casts'                 => $casts_code,
                 'appends'               => $this->buildAppends($dictionaries_code['appends']),
+                'hidden'                => $this->buildHidden($hidden),
                 'fillable'              => $this->buildFillable($fields),
                 'dates'                 => $this->buildDates($fields),
-                //'set_temporary_visible' => $this->buildTemporaryVisible($table_attr),
                 'get_txt_attribute'     => $dictionaries_code['get_txt_attribute'],
                 'get_intval_attribute'  => $get_intval_attribute,
             ];
@@ -101,48 +103,31 @@ class CreateModelGenerator extends Generator
     }
     
     /**
-     * 生成 设置临时可见的属性
+     * 生成隐藏属性
      *
-     * @param $table_attr
+     * @param $hidden
      *
      * @return string
      */
-    private function buildTemporaryVisible($table_attr)
+    private function buildHidden($hidden)
     {
-        if ( ! isset($table_attr['repository_class']) || $table_attr['repository_class'] == null)
+        if (empty($hidden))
         {
             return '';
         }
-        
+    
         $code = [
-            '', //先空一行
             $this->getTabs(1) . '/**',
-            $this->getTabs(1) . ' * 设置临时可见的属性',
-            $this->getTabs(1) . ' *',
+            $this->getTabs(1) . ' * The attributes that should be hidden for arrays.',
             $this->getTabs(1) . ' * @var array',
             $this->getTabs(1) . ' */',
-            $this->getTabs(1) . "public static \$temporary_visible = [];",
+            $this->getTabs(1) . "protected \$hidden = [" . implode(',', $hidden) . "];",
             '', //空一行
-            $this->getTabs(1) . '/**',
-            $this->getTabs(1) . ' * Create a new Eloquent model instance.',
-            $this->getTabs(1) . ' *',
-            $this->getTabs(1) . ' * @param  array  $attributes',
-            $this->getTabs(1) . ' * @return void',
-            $this->getTabs(1) . ' */',
-            $this->getTabs(1) . 'public function __construct(array $attributes = [])',
-            $this->getTabs(1) . '{',
-            $this->getTabs(2) . 'parent::__construct($attributes);',
-            '',
-            $this->getTabs(2) . 'if ( ! empty(static::$temporary_visible))',
-            $this->getTabs(2) . '{',
-            $this->getTabs(3) . '$this->setVisible(static::$temporary_visible);',
-            $this->getTabs(2) . '}',
-            $this->getTabs(1) . '}',
-            '' // 空一行
         ];
     
         return implode("\n", $code);
     }
+    
     
     /**
      * 生成附加属性
@@ -253,6 +238,11 @@ class CreateModelGenerator extends Generator
 
         foreach ($fields as $field_name => $attr)
         {
+            if ($field_name == 'deleted_at')
+            {
+                continue;
+            }
+            
             if (in_array($attr['type'], ['date', 'datetime', 'timestamp', 'time']))
             {
                 $code[] = "'{$field_name}'";

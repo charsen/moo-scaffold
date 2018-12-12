@@ -22,6 +22,7 @@
                                data-f="{{ $folder_name }}"
                                data-c="{{ $controller_class }}"
                                data-a="{{ $action }}"
+                               data-m="{{ $api['method'] }}"
                                data-url="{{ route('api.request', ['f' => $folder_name, 'c' => $controller_class, 'a' => $action]) }}"
                             >
                                 {{ $api['name'] }}
@@ -85,10 +86,10 @@
 
         $('#left_container').html('<p class="loading">loading...</p>');
 
-        getParams($(this).data('f'), $(this).data('c'), $(this).data('a'));
+        getParams($(this).data('f'), $(this).data('c'), $(this).data('a'), $(this).data('m'));
     });
 
-    var getParams = function(folder, controller, action)
+    var getParams = function(folder, controller, action, method)
     {
         document.title = $('#aside_container li.active a').data('module')
                        + '-'
@@ -101,7 +102,9 @@
             dataType: 'html',
             success: function (result) {
                 $('#left_container').removeClass('transparent').html(result);
-                if (action != 'store' && action != 'update' && action != 'destroy' && action != 'destroyBatch' && action != 'restoreBatch')
+
+                var check = new RegExp(/^(create|edit|index|authenticate)$/);
+                if (check.test(action) || method == 'GET')
                 {
                     $('#send').trigger('click');
                 }
@@ -110,7 +113,7 @@
     };
 
     @if (!empty($current_controller) && ! empty($current_action))
-    getParams('{{ $current_folder }}', '{{ $current_controller }}', '{{ $current_action }}');
+    getParams('{{ $current_folder }}', '{{ $current_controller }}', '{{ $current_action }}', '{{ $current_method }}');
     @endif
 </script>
 @endsection

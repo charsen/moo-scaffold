@@ -190,7 +190,7 @@ php artisan scaffold:i18n
 ```sh
 php artisan scaffold:auth
 ```
-- 更新 ./app/Gates.php
+- 更新 ./app/ACL.php
 - 更新 ./resources/lang/{en, zh-CN}/actions.php (维护一处注释，同步多个语言文件)
 - 更新 ./app/config/actions.php
 - 需要做授权的 action 必须在注释中写 @acl {zh-CN: 中文 | en: English} 否则会被加入白名单

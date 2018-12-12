@@ -198,7 +198,7 @@ class CreateControllerGenerator extends Generator
             $code[] = $this->getTabs(3) . "],";
         }
         
-        $code[] = $this->getTabs(2) . "];";
+        $code[] = $this->getTabs(2) . "]";
         
         return implode("\n", $code);
     }

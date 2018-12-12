@@ -28,6 +28,28 @@ class Utility
     }
     
     /**
+     * 去除接口文档中动作名带有的请示方法后缀
+     *
+     * @param $action
+     *
+     * @return mixed
+     */
+    public function removeActionNameMethod($action)
+    {
+        if (is_array($action))
+        {
+            foreach ($action as &$val)
+            {
+                $val = str_replace(['_get', '_post', '_delete', '_put', '_patch', '_head'], '', $val);
+            }
+            
+            return $action;
+        }
+        
+        return str_replace(['_get', '_post', '_delete', '_put', '_patch', '_head'], '', $action);
+    }
+    
+    /**
      * 根据语言解析
      *
      * @param $string

@@ -24,6 +24,7 @@ class {{class}} extends Model
     protected $table = '{{table_name}}';
 {{dictionaries}}
 {{casts}}
+{{hidden}}
 {{appends}}
     /**
      * The attributes that are mass assignable.
@@ -38,6 +39,29 @@ class {{class}} extends Model
      * @var array
      */
     protected $dates = [{{dates}}];
+
+    /**
+     * 设置临时可见的属性
+     *
+     * @var array
+     */
+    public static $temporary_visible = [];
+
+    /**
+     * Create a new Eloquent model instance.
+     *
+     * @param  array  $attributes
+     * @return void
+     */
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
+
+        if ( ! empty(static::$temporary_visible))
+        {
+            $this->setVisible(static::$temporary_visible);
+        }
+    }
 
 {{get_txt_attribute}}
 {{get_intval_attribute}}
