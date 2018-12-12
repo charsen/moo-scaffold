@@ -94,20 +94,19 @@ class UpdateAuthorizationGenerator extends Generator
             {
                 continue;
             }
-        
-            $lang_action = str_replace('\\', '.', $controller);
-            $lang_key    = $this->short_md5($lang_action . '@' . $val);
+
+            $action_key  = $this->getMd5($controller . '@' . $val);
             $acl_info    = $this->utility->parseActionNames($val, $reflection_class);
-        
+            
             if ( ! isset($acl_info['whitelist']))
             {
-                $lang_actions[$lang_key] = $acl_info;
-                $new_actions[$lang_key]  = $this->short_md5($controller . '@' . $val);
+                $lang_actions[$action_key]  = $acl_info;
+                $new_actions[]              = $action_key;
             }
             else
             {
                 // App\Http\Controllers\Enterprise\Personnels\DepartmentController@index
-                $whitelist[] = "'" . $this->short_md5($controller . '@' . $val) . "'";
+                $whitelist[] = "'" . $action_key . "'";
             }
         }
         
@@ -138,7 +137,7 @@ class UpdateAuthorizationGenerator extends Generator
             if ($i == 0)
             {
                 $is_controller  = preg_match("/[\w]+Controller$/", $paths[0]);
-                $package_key    = $this->short_md5($paths[0]);
+                $package_key    = $this->getMd5($paths[0]);
                 $package_key    = $is_controller ? $package_key . 'Controller' : $package_key;
                 
                 if ($is_controller)
@@ -160,8 +159,8 @@ class UpdateAuthorizationGenerator extends Generator
                 $controller_key = "$paths[0].$paths[1]";
                 $is_controller  = preg_match("/[\w]+Controller$/", $controller_key);
                 
-                $package_key    = $this->short_md5($paths[0]);
-                $controller_key = $this->short_md5($controller_key);
+                $package_key    = $this->getMd5($paths[0]);
+                $controller_key = $this->getMd5($controller_key);
                 $controller_key = $is_controller ? $controller_key . 'Controller' : $controller_key;
                 
                 if ($is_controller)
@@ -182,9 +181,9 @@ class UpdateAuthorizationGenerator extends Generator
             {
                 $controller_key = "$paths[0].$paths[1].$paths[2]";
                 
-                $package_key    = $this->short_md5($paths[0]);
-                $module_key     = $this->short_md5("$paths[0].$paths[1]");
-                $controller_key = $this->short_md5($controller_key) . 'Controller';
+                $package_key    = $this->getMd5($paths[0]);
+                $module_key     = $this->getMd5("$paths[0].$paths[1]");
+                $controller_key = $this->getMd5($controller_key) . 'Controller';
     
                 $config_actions[$package_key][$module_key][$controller_key] = $actions;
                 $lang_actions[$controller_key]                              = $PMCNames['controller'];
@@ -228,7 +227,7 @@ class UpdateAuthorizationGenerator extends Generator
     {
         $header_code  = "<?php";
         $header_code .= "\n";
-        $header_code .= "use Illuminate\Auth\Access\Gate;\n";
+        $header_code .= "use Illuminate\Support\Facades\Gate;\n";
         $header_code .= "use Illuminate\Support\Facades\Auth;\n";
         $header_code .= "\n";
         
@@ -252,7 +251,7 @@ class UpdateAuthorizationGenerator extends Generator
     private function getOneGate($controller, $action)
     {
         //$controller = str_replace(['App\\Http\\Controllers\\', '\\', 'Controller'], ['', '.', ''], $controller);
-        $gate_action = $this->short_md5($controller . '@' . $action);
+        $gate_action = $this->getMd5($controller . '@' . $action);
 
         $code        = [
             "# " . $controller . '@' . $action,
@@ -313,9 +312,20 @@ class UpdateAuthorizationGenerator extends Generator
      *
      * @return bool|string
      */
-    private function short_md5($str)
+    private function getMd5($str)
     {
-        //return $str;
-        return substr(md5($str), 8, 16);
+        if ($this->utility->getConfig('authorization.md5'))
+        {
+            if ($this->utility->getConfig('authorization.short_md5'))
+            {
+                return substr(md5($str), 8, 16);
+            }
+            else
+            {
+                return md5($str);
+            }
+        }
+        
+        return $str;
     }
 }

@@ -7,9 +7,21 @@
  */
 return [
     /**
-     *  当前编码作者信息
+     * 当前编码作者信息
      */
     'author'     => env('LARAVEL_SCAFFOLD_AUTHOR', ''),
+
+    /**
+     * 授权设置
+     */
+    'authorization' => [
+        // 是否通过 md5 多语别名 key
+        'md5'       => TRUE,
+        // 是否用 16位 md5 算法
+        'short_md5' => TRUE,
+        // todo: 根据不同的目录指定不同的 Auth::guard()
+        'guard'     => []
+    ],
 
     /**
      *  多语言设定
