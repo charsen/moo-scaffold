@@ -4,6 +4,7 @@ namespace Charsen\Scaffold\Http\Controllers;
 
 use Faker\Factory as Faker;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
 use Symfony\Component\Yaml\Yaml;
 
@@ -62,8 +63,8 @@ class ApiController extends Controller
         $data                       = $this->getApiList();
         $data['menus_transform']    = $this->getMenusTransform();
         $data['uri']                = $req->getPathInfo();
-        
         $data['request_url']        = str_replace($req->path(), 'api', $req->url());
+        
         $data['api_index']          = 1;
         $data['current_folder']     = $req->input('f', 'Index');
         $data['current_controller'] = $req->input('c', null);
@@ -76,8 +77,29 @@ class ApiController extends Controller
         }
         
         $data['current_method']     = $current_method ?? false;
-        
+    
         return $this->view('api.request', $data);
+    }
+    
+    /**
+     * 缓存结果和参数
+     *
+     * @param \Illuminate\Http\Request $req
+     */
+    public function cache(Request $req)
+    {
+        $uri    = $req->input('uri', NULL);
+        $params = $req->input('params', NULL);
+        $result = $req->input('result', NULL);
+        
+        if ($uri != NULL && $params != NULL && $result != NULL)
+        {
+            unset($params['token']);
+    
+            $uri = md5(trim($uri, '/'));
+            $put_params = Cache::store('file')->put($uri . '_params', $params, 30 * 24 * 60 * 60);
+            $put_result = Cache::store('file')->put($uri . '_result', $result, 30 * 24 * 60 * 60);
+        }
     }
     
     /**
@@ -90,8 +112,50 @@ class ApiController extends Controller
     {
         $data                = $this->getOneApi($req, 'request');
         $data['request_url'] = str_replace($req->path(), 'api', $req->url());
-
+    
+        $rui                 = md5(trim($data['request'][1], '/'));
+        $cache_params        = Cache::get($rui . '_params', NULL);
+        $params              = ($data['request'][0] == 'GET') ? $data['url_params'] : $data['body_params'];
+        
+        // 从 cache 获取数据，并恢复到现有参数中
+        if ($cache_params != NULL)
+        {
+            foreach ($cache_params as $key => $val)
+            {
+                if (isset($params[$key]))
+                {
+                    $params[$key]['require']    = true;
+                    $params[$key]['value']      = $val;
+                }
+            }
+        }
+        
+        if ($data['request'][0] == 'GET')
+        {
+            $data['url_params'] = $params;
+        }
+        else
+        {
+            $data['body_params'] = $params;
+        }
+    
         return $this->view('api.param', array_merge($data));
+    }
+    
+    /**
+     * 获取缓存的请求结果
+     *
+     * @param \Illuminate\Http\Request $req
+     *
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     */
+    public function result(Request $req)
+    {
+        $data                = $this->getOneApi($req, 'request');
+    
+        $rui                 = md5(trim($data['request'][1], '/'));
+        $cache_result        = Cache::get($rui . '_result', NULL);
+        
     }
     
     /**

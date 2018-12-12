@@ -102,6 +102,9 @@
                         $body.beautifyCode('javascript');
                         $(me).removeClass('disabled');
                         $status.html(200).attr('class', 'status font-green');
+    
+                        // 将参数 与 结果提交并保存
+                        cacheParamsSuccess($('#uri').val(), validKey('#request_params'), json);
                     },
                     error: function(response) {
                         $body.html(formatJson(response));
@@ -117,7 +120,16 @@
                     }
                 })
             }
-        })
+        });
+        
+        var cacheParamsSuccess = function(uri, params, success)
+        {
+            $.ajax({
+                url: cache_url, type: 'post',
+                data: {'uri': uri, 'params': params, 'result': success},
+                success: function(json) {}
+            })
+        }
 
         // 点击copy
         if(typeof ClipboardJS !== 'undefined') {
