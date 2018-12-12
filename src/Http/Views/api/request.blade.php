@@ -70,6 +70,8 @@
 <script src="/scaffold/javascript/jQuery.beautyOfCode.js?v={{$version}}"></script>
 <script src="/scaffold/javascript/clipboard.min.js?v={{$version}}"></script>
 <script>
+    var cache_url = '{{ route('api.cache', [], false) }}';
+
     $('#right_container').removeClass('transparent');
 
     $('#aside_container a.link').click(function () {
