@@ -3,7 +3,6 @@
 @section('title', '接口调试')
 
 @section('styles')
-    <link rel="stylesheet" href="/scaffold/css/SyntaxHighlighter.css?v={{$version}}" />
 @endsection
 
 @section('sidebar')
@@ -59,15 +58,13 @@
             <h2>Response</h2>
         </div>
         <div class="bd">
-            <div class="dp-highlighter"></div>
+            <div class="dp-highlighter" id="json_format"></div>
         </div>
     </div>
 @endsection
 
 @section('scripts')
-<script src="/scaffold/javascript/shCore.js?v={{$version}}"></script>
-<script src="/scaffold/javascript/shBrushJScript.js?v={{$version}}"></script>
-<script src="/scaffold/javascript/jQuery.beautyOfCode.js?v={{$version}}"></script>
+<script src="/scaffold/javascript/jsonFormat.js?v={{$version}}"></script>
 <script src="/scaffold/javascript/clipboard.min.js?v={{$version}}"></script>
 <script>
     var cache_url = '{{ route('api.cache', [], false) }}';
