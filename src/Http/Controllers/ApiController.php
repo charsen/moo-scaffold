@@ -125,7 +125,7 @@ class ApiController extends Controller
                 if (isset($params[$key]))
                 {
                     $params[$key]['require']    = true;
-                    $params[$key]['value']      = $val;
+                    $params[$key]['value']      = is_array($val) ? implode(',', $val) : $val;
                 }
             }
         }
