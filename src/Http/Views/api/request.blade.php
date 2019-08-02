@@ -64,8 +64,8 @@
 @endsection
 
 @section('scripts')
-<script src="/scaffold/javascript/jsonFormat.js?v={{$version}}"></script>
-<script src="/scaffold/javascript/clipboard.min.js?v={{$version}}"></script>
+<script src="/scaffold_assets/javascript/jsonFormat.js?v={{$version}}"></script>
+<script src="/scaffold_assets/javascript/clipboard.min.js?v={{$version}}"></script>
 <script>
     var cache_url = '{{ route('api.cache', [], false) }}';
 
