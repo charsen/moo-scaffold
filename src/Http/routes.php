@@ -9,8 +9,7 @@ $prefix = (new Utility)->getConfig('route.prefix');
 
 Route::get($prefix, ScaffoldController::class . '@index');
 
-Route::prefix($prefix)->group(function ()
-{
+Route::prefix($prefix)->group(function () {
     Route::get('/api', ApiController::class . '@index')->name('api.list');
     Route::get('/api/show', ApiController::class . '@show')->name('api.show');
     Route::get('/api/request', ApiController::class . '@request')->name('api.request');
