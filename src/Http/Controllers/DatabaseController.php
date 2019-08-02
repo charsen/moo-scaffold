@@ -63,7 +63,7 @@ class DatabaseController extends Controller
         {
             if (isset($lang_fields[$key]))
             {
-                $attr['name'] = $lang_fields[$key]['zh-CN'];
+                $attr['name'] = $lang_fields[$key]['cn'];
             }
         }
         

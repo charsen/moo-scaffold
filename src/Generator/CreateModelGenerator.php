@@ -72,7 +72,7 @@ class CreateModelGenerator extends Generator
             {
                 $use_trait[]   = 'SoftDeletes';
                 $use_class[]   = 'use Illuminate\Database\Eloquent\SoftDeletes;';
-                $hidden[]      = "'deleted_at'";
+                $hidden[]      = 'deleted_at';
             }
 
             // 目录及 namespace 处理

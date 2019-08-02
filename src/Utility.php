@@ -12,6 +12,10 @@ use Symfony\Component\Yaml\Yaml;
  */
 class Utility
 {
+    /**
+     * @var string
+     */
+    protected $prefix = 'scaffold';
 
     /**
      * @var mixed
@@ -22,7 +26,7 @@ class Utility
     {
         $this->filesystem = new Filesystem();
     }
-
+    
     /**
      * 去除接口文档中动作名带有的请示方法后缀
      *
@@ -38,13 +42,13 @@ class Utility
             {
                 $val = str_replace(['_get', '_post', '_delete', '_put', '_patch', '_head'], '', $val);
             }
-
+            
             return $action;
         }
-
+        
         return str_replace(['_get', '_post', '_delete', '_put', '_patch', '_head'], '', $action);
     }
-
+    
     /**
      * 根据语言解析
      *
@@ -61,10 +65,10 @@ class Utility
             preg_match('/'. $lang .':([^\|]*)[\|}]/i', $string, $temp);
             $data[$lang] = empty($temp) ? '' : trim($temp[1]);
         }
-
+        
         return $data;
     }
-
+    
     /**
      * 解析 包名、模块名、控制器名
      *
@@ -76,22 +80,22 @@ class Utility
     {
         $data               = [];
         $doc_comment        = $reflection_class->getDocComment();
-
+        
         preg_match('/@package\_name\s(.*)\n/', $doc_comment, $package_name);
         preg_match('/@module\_name\s(.*)\n/', $doc_comment, $module_name);
         preg_match('/@controller\_name\s(.*)\n/', $doc_comment, $controller_name);
-
+        
         $package_name               = empty($package_name) ? '' : $package_name[1];
         $module_name                = empty($module_name) ? '' : $module_name[1];
         $controller_name            = empty($controller_name) ? '' : $controller_name[1];
-
+        
         $data['package']['name']    = $this->parseByLanguages($package_name);
         $data['module']['name']     = $this->parseByLanguages($module_name);
         $data['controller']['name'] = $this->parseByLanguages($controller_name);
-
+        
         return $data;
     }
-
+    
     /**
      * 解析动作多语言名称
      *
@@ -105,7 +109,7 @@ class Utility
         $data               = [];
         $reflection_method  = $reflection_class->getMethod($action);
         $doc_comment        = $reflection_method->getDocComment();
-
+        
         preg_match('/@acl\s(.*)\n/', $doc_comment, $name);
         if (empty($name))
         {
@@ -115,10 +119,10 @@ class Utility
         {
             $data['name']       = $this->parseByLanguages($name[1]);
         }
-
+        
         return $data;
     }
-
+    
     /**
      * 解析动作第一行作为名称
      *
@@ -131,12 +135,12 @@ class Utility
     {
         $reflection_method  = $reflection_class->getMethod($action);
         $doc_comment        = $reflection_method->getDocComment();
-
+    
         preg_match_all('#^\s*\*(.*)#m', $doc_comment, $lines);
 
         return isset($lines[1][0]) ? trim($lines[1][0]) : '';
     }
-
+    
     /**
      * Get Route File Content
      *
@@ -148,10 +152,21 @@ class Utility
     public function getRouteFile($name = 'api')
     {
         $file = base_path('routes/' . $name . '.php');
-
         return $this->filesystem->get($file);
     }
-
+    
+    /**
+     * Get RepositoryServiceProvider File Content
+     *
+     * @return string
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     */
+    public function getRepositoryServiceProviderFile()
+    {
+        $file = app_path('Providers/RepositoryServiceProvider.php');
+        return $this->filesystem->get($file);
+    }
+    
     /**
      * 获取控制器的命令空间列表
      *
@@ -167,22 +182,22 @@ class Utility
         {
             return ['nothing'];
         }
-
+        
         foreach ($dirs as $path)
         {
             $more = $this->filesystem->directories($path);
             $dirs = array_merge($dirs, $more);
         }
-
+        
         foreach ($dirs as &$dir)
         {
             $dir = str_replace($base_path, '', $dir);
         }
-
+        
         return $dirs;
     }
-
-
+    
+    
     /**
      * 获取所有 Schema 文件的名称
      *
@@ -192,7 +207,7 @@ class Utility
     {
         $path  = $this->getDatabasePath('schema');
         $files = $this->filesystem->files($path);
-
+        
         $data  = [];
         foreach ($files as $file)
         {
@@ -204,7 +219,7 @@ class Utility
 
         return $data;
     }
-
+    
     /**
      * 获取多语言文件
      *
@@ -221,7 +236,7 @@ class Utility
 
         return $to_string ? $this->filesystem->get($file) : $this->filesystem->getRequire($file);
     }
-
+    
     /**
      * 获取多语言文件路径
      *
@@ -234,10 +249,10 @@ class Utility
     public function getLanguagePath($file_name = 'validation', $language = 'en', $relative = false)
     {
         $path = resource_path("lang/{$language}/{$file_name}.php");
-
+    
         return $relative ? str_replace(base_path(), '.', $path) : $path;
     }
-
+    
     /**
      * 获取 schema 文件路径
      *
@@ -252,7 +267,7 @@ class Utility
 
         return $file_name == null ? $path : ($path . $file_name);
     }
-
+    
     /**
      * 检查 api 下的文件是否存在
      *
@@ -272,7 +287,7 @@ class Utility
 
         return $file;
     }
-
+    
     /**
      * @param $table_name
      *
@@ -281,16 +296,16 @@ class Utility
      */
     public function getOneTable($table_name)
     {
-        $file = $this->getStoragePath() . "{$table_name}.php";
-
+        $file = $this->getDatabasePath('storage') . "{$table_name}.php";
+    
         if (!is_file($file))
         {
             throw new InvalidArgumentException('Invalid Argument (Not Found).');
         }
-
+        
         return $this->filesystem->getRequire($file);
     }
-
+    
     /**
      * 获取 数据表 数据
      *
@@ -299,9 +314,20 @@ class Utility
      */
     public function getTables()
     {
-        return $this->filesystem->getRequire($this->getStoragePath() . 'tables.php');
+        return $this->filesystem->getRequire($this->getDatabasePath('storage') . 'tables.php');
     }
-
+    
+    /**
+     * 获取资源仓库数据
+     *
+     * @return mixed
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     */
+    public function getRepositories()
+    {
+        return $this->filesystem->getRequire($this->getDatabasePath('storage') . 'repositories.php');
+    }
+    
     /**
      * 获取模型数据
      *
@@ -310,9 +336,9 @@ class Utility
      */
     public function getModels()
     {
-        return $this->filesystem->getRequire($this->getStoragePath() . 'models.php');
+        return $this->filesystem->getRequire($this->getDatabasePath('storage') . 'models.php');
     }
-
+    
     /**
      * 获取控制器数据
      *
@@ -323,12 +349,12 @@ class Utility
      */
     public function getControllers($merge_all = true)
     {
-        $data = $this->filesystem->getRequire($this->getStoragePath() . 'controllers.php');
+        $data = $this->filesystem->getRequire($this->getDatabasePath('storage') . 'controllers.php');
         if (! $merge_all)
         {
             return $data;
         }
-
+        
         $result = [];
         foreach ($data as $schema_file => $controllers)
         {
@@ -337,10 +363,10 @@ class Utility
                 $result[$class] = $attr;
             }
         }
-
+        
         return $result;
     }
-
+    
     /**
      * 获取多语言字段数据
      *
@@ -353,16 +379,16 @@ class Utility
         {
             return [];
         }
-
+        
         $yaml      = new Yaml;
         $yaml_data = $yaml::parseFile($file);
         $fields    = isset($yaml_data['append_fields'])
                         ? array_merge($yaml_data['table_fields'], $yaml_data['append_fields'])
                         : $yaml_data['table_fields'];
-
+        
         return empty($fields) ? [] : $fields;
     }
-
+    
     /**
      * 获取字段数据
      *
@@ -371,9 +397,9 @@ class Utility
      */
     public function getFields()
     {
-        return $this->filesystem->getRequire($this->getStoragePath() . 'fields.php');
+        return $this->filesystem->getRequire($this->getDatabasePath('storage') . 'fields.php');
     }
-
+    
     /**
      * 获取字典数据
      *
@@ -384,7 +410,7 @@ class Utility
      */
     public function getDictionaries($merge_all = true)
     {
-        $dictionaries = $this->filesystem->getRequire($this->getStoragePath() . 'dictionaries.php');
+        $dictionaries = $this->filesystem->getRequire($this->getDatabasePath('storage') . 'dictionaries.php');
         if (!$merge_all)
         {
             return $dictionaries;
@@ -401,7 +427,7 @@ class Utility
 
         return $result;
     }
-
+    
     /**
      * 获取字典里的所有词
      *
@@ -422,10 +448,10 @@ class Utility
                 }
             }
         }
-
+    
         return $result;
     }
-
+    
     /**
      * Get Controller Path
      *
@@ -436,10 +462,38 @@ class Utility
     public function getControllerPath($relative = false)
     {
         $path = app_path('Http/Controllers/');
-
+        if ($relative)
+        {
+            $path = str_replace(base_path(), '.', $path);
+        }
+        
+        return $path;
+    }
+    
+    /**
+     * 获取 app Repository 的存储目录
+     *
+     * @return string
+     */
+    public function getRepositoryFolder()
+    {
+        return $this->getConfig('repository.path');
+    }
+    
+    /**
+     * Get Repository Path
+     *
+     * @param bool $relative
+     *
+     * @return string
+     */
+    public function getRepositoryPath($relative = false)
+    {
+        $path = base_path($this->getConfig('repository.path'));
+    
         return $relative ? str_replace(base_path(), '.', $path) : $path;
     }
-
+    
     /**
      * 获取 app Model 的存储目录
      *
@@ -449,7 +503,7 @@ class Utility
     {
         return $this->getConfig('model.path');
     }
-
+    
     /**
      * Get Model Path
      *
@@ -460,10 +514,10 @@ class Utility
     public function getModelPath($relative = false)
     {
         $path = base_path($this->getConfig('model.path'));
-
+    
         return $relative ? str_replace(base_path(), '.', $path) : $path;
     }
-
+    
     /**
      * Get Migration Path
      *
@@ -474,24 +528,10 @@ class Utility
     public function getMigrationPath($relative = false)
     {
         $path = database_path('migrations/');
-
+    
         return $relative ? str_replace(base_path(), '.', $path) : $path;
     }
-
-    /**
-     * Get Storage Path
-     *
-     * @param $relative
-     *
-     * @return string
-     */
-    public function getStoragePath($relative = false)
-    {
-        $path = storage_path('scaffold/');
-
-        return $relative ? str_replace(storage_path(), '.', $path) : $path;
-    }
-
+    
     /**
      * Get Scaffold Database Path
      *
@@ -503,10 +543,10 @@ class Utility
     public function getDatabasePath($folder = 'schema', $relative = false)
     {
         $path = base_path($this->getConfig('database.' . $folder));
-
+        
         return $relative ? str_replace(base_path(), '.', $path) : $path;
     }
-
+    
     /**
      * Get Scaffold Api Path
      *
@@ -518,7 +558,7 @@ class Utility
     public function getApiPath($folder = 'schema', $relative = false)
     {
         $path = base_path($this->getConfig('api.' . $folder));
-
+    
         return $relative ? str_replace(base_path(), '.', $path) : $path;
     }
 
@@ -532,7 +572,7 @@ class Utility
      */
     public function getConfig($key, $default = null)
     {
-        return config("scaffold.$key", $default);
+        return config("{$this->prefix}.$key", $default);
     }
 
 }
