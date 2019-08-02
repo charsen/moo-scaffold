@@ -65,7 +65,7 @@
 
 @section('right')
 <div class="none">
-    <img src="/scaffold_assets/images/none.png">
+    <img src="/scaffold/images/none.png">
     <h2>请选择接口</h2>
 </div>
 @endsection

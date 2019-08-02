@@ -99,7 +99,7 @@ class UpdateMultilingualGenerator extends Generator
         $rebuild_data   = $file_data['attributes'];
         foreach ($new_keys as $key)
         {
-            $rebuild_data[$key] = $all_fields[$key][($lang == 'zh-CN' ? 'zh-CN' : $lang)];
+            $rebuild_data[$key] = $all_fields[$key][($lang == 'zh-CN' ? 'cn' : $lang)];
             if ($lang == 'en')
             {
                 $rebuild_data[$key] = ucwords($rebuild_data[$key]);

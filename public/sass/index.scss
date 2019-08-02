@@ -3,7 +3,6 @@
 @import "_icon";
 @import "_header";
 @import "_aside";
-@import "_json-format";
 
 *{
     box-sizing: border-box;
@@ -247,12 +246,46 @@ html, body {
 }
 
 .dp-highlighter{
+    margin: 0 !important;
+    border: $border-color solid 1px;
     padding: 20px;
-    border-radius: 6px;
     min-height: 300px;
     word-break: break-all;
+}
+
+
+.dp-highlighter{
+    border: $border-color solid 1px;
+    padding: 10px;
+    border-radius: 6px;
     font-size: $base-size;
     background-color: #FBFBFD;
+    .bar{
+        display: none;
+    }
+    ol{
+        margin-left: 0 !important;
+        background-color: #FBFBFD;
+        li{
+            border: 0;
+            list-style: none;
+            line-height: 20px;
+            background-color: #FBFBFD !important;
+        }
+    }
+    .columns{
+        div{
+            list-style: none;
+            line-height: 20px;
+            background-color: #FBFBFD !important;
+        }
+    }
+    .string{
+        color: $blue;
+    }
+    .keyword{
+        color: #9013FE;
+    }
 }
 
 .toggle{
