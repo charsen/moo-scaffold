@@ -7,6 +7,8 @@ use Charsen\Scaffold\Utility;
 
 $prefix = (new Utility)->getConfig('route.prefix');
 
+Route::get($prefix, ScaffoldController::class . '@index');
+
 Route::prefix($prefix)->group(function ()
 {
     Route::get('/api', ApiController::class . '@index')->name('api.list');
@@ -19,6 +21,4 @@ Route::prefix($prefix)->group(function ()
     Route::get('/db', DatabaseController::class . '@index')->name('table.list');
     Route::get('/dictionaries', DatabaseController::class . '@dictionaries')->name('dictionaries');
     Route::get('/db/table', DatabaseController::class . '@show')->name('table.show');
-
-    Route::get('/dashboard', ScaffoldController::class . '@index');
 });
