@@ -33,7 +33,6 @@ return [
      */
     'database'   => [
         'schema'  => 'scaffold/database/',
-        'storage' => 'scaffold/storage/',   // todo: change to app/storage/scaffold
     ],
 
     /**
