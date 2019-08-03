@@ -334,7 +334,7 @@ class ApiController extends Controller
      */
     private function formatRequest($request)
     {
-        $method = $request[0];
+        $method = strtoupper($request[0]) == 'GET' ? 'GET' : 'POST';
         $url    = $request[1];
 
         // 把 model 对象 转换为整数 1
