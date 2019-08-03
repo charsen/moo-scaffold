@@ -24,7 +24,7 @@ class Generator
      * @var mixed
      */
     protected $utility;
-    
+
     /**
      * Create a new command instance.
      *
@@ -104,9 +104,9 @@ class Generator
      */
     protected function getStubPath()
     {
-        return substr(__DIR__, 0, -9) . 'Stub/';
+        return __DIR__ . '../Stub/';
     }
-    
+
     /**
      * 获取模板
      *
@@ -119,5 +119,5 @@ class Generator
     {
         return $this->filesystem->get($this->getStubPath() . "{$file_name}.stub");
     }
-    
+
 }

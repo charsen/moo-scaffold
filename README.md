@@ -8,7 +8,7 @@
 ## 功能（未完，待续）
 
 ### migration
-- 单个数据表的 migration 
+- 单个数据表的 migration
 
 ### controller 部分
 - create: 创建表单
@@ -16,7 +16,7 @@
 - index: 列表
 - trashed: 回收站
 - store: 创建
-- update: 编辑 
+- update: 编辑
 - show: 查看详情
 - destroy: 删除
 - destroyBath: 批量删除
@@ -33,13 +33,13 @@
 
 ### 多语言文件
 - 生成数据库表所有字段 及 模型字典字段多语言
-- resources/lang/{en, zh-CN}/model.php       
-- resources/lang/{en, zh-CN}/validation.php    
+- resources/lang/{en, zh-CN}/model.php
+- resources/lang/{en, zh-CN}/validation.php
 
 ### 授权文件
 - app/ACL.php
 - config/actions.php (内含白名单)
-- resources/lang/{en, zh-CN}/actions.php   
+- resources/lang/{en, zh-CN}/actions.php
 
 
 ## 安装
@@ -62,9 +62,14 @@ php artisan vendor:publish --provider=Charsen\\Scaffold\\ScaffoldProvider --tag=
 
 ## 使用方法
 ### 1. 初始化（记录编码作者及创建目录）
-- 生成的 controller, model, repository, migration 会在注释里加上作者和日期
+- 生成的 controller, model, migration 会在注释里加上作者和日期
 ```sh
 php artisan scaffold:init `author`
+
+```
+**Example:**
+```
+php artisan scaffold:init "Charsen <https://github.com/charsen>"
 ```
 
 
@@ -91,7 +96,7 @@ http://{{url}}}/scaffold/db
 ```
 - 字段名称会优先从 `scaffold/database/_fields.yaml` 读取
 
-**PS：** 
+**PS：**
 - 此时是很好的检查表设计的环节，表名、字段、类型等等；
 - 及时调整后 `artisan scaffold:fresh` ，偶尔可以加入 -c 会清掉错误的缓存文件。
 
@@ -115,7 +120,7 @@ php artisan scaffold:model `schema_file_name`
 - 添加 `-r` 同时生成 `repository`
 
 
-### 7. 创建资源仓库文件 
+### 7. 创建资源仓库文件
 ```sh
 php artisan scaffold:repository `schema_file_name`
 ```
@@ -228,5 +233,3 @@ If you discover any security related issues, please email 780537@gmail.com inste
 
 ## License
 The MIT License (MIT). Please see [License File](*LICENSE.md*) for more information.
- 
- 

@@ -7,7 +7,6 @@ use Charsen\Scaffold\Command\UpdateAuthorizationCommand;
 use Charsen\Scaffold\Command\UpdateMultilingualCommand;
 use Charsen\Scaffold\Command\CreateMigrationCommand;
 use Charsen\Scaffold\Command\CreateModelCommand;
-use Charsen\Scaffold\Command\CreateRepositoryCommand;
 use Charsen\Scaffold\Command\CreateSchemaCommand;
 use Charsen\Scaffold\Command\CreateControllerCommand;
 use Charsen\Scaffold\Command\FreshStorageCommand;
@@ -49,7 +48,6 @@ class ScaffoldProvider extends ServiceProvider
                 FreeCommand::class,
                 CreateSchemaCommand::class,
                 CreateModelCommand::class,
-                CreateRepositoryCommand::class,
                 FreshStorageCommand::class,
                 CreateMigrationCommand::class,
                 CreateControllerCommand::class,

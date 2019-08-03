@@ -15,7 +15,7 @@ class Command extends BaseCommand
     protected $filesystem;
 
     protected $utility;
-    
+
     /**
      * Create a new command instance.
      *
@@ -37,7 +37,7 @@ class Command extends BaseCommand
      */
     protected function checkScaffoldFolder()
     {
-        $check_scaffold_folder = base_path() . '/scaffold';
+        $check_scaffold_folder = base_path('scaffold');
         if ( ! $this->filesystem->isDirectory($check_scaffold_folder))
         {
             return $this->call('artisan scaffold:folders');
@@ -45,7 +45,7 @@ class Command extends BaseCommand
 
         return true;
     }
-    
+
     /**
      * 提示执行的命令
      *
@@ -55,7 +55,7 @@ class Command extends BaseCommand
     {
         $this->warn("\n************************* {$command} *************************");
     }
-    
+
     /**
      * 提示执行完成
      */
