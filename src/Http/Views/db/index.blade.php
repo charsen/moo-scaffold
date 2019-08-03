@@ -20,10 +20,6 @@
     @endforeach
     </ul>
 </li>
-
-<li class="none-open">
-    <a href="{{ route('dictionaries') }}">数据字典</a>
-</li>
 @endsection
 
 @section('middle')
