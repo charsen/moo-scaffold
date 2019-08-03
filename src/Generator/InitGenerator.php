@@ -8,7 +8,7 @@ namespace Charsen\Scaffold\Generator;
  */
 class InitGenerator extends Generator
 {
-    
+
     /**
      * @param string $author
      *
@@ -17,10 +17,10 @@ class InitGenerator extends Generator
     public function start(string $author)
     {
         $this->updateEnvFile($author);
-        
+
         $this->createFolder();
     }
-    
+
     /**
      * 在 .evn 文件里添加 LARAVEL_SCAFFOLD_AUTHOR 信息
      *
@@ -42,20 +42,20 @@ class InitGenerator extends Generator
             {
                 $env_txt = preg_replace(
                     '/LARAVEL_SCAFFOLD_AUTHOR=.*/',
-                    "LARAVEL_SCAFFOLD_AUTHOR={$author}",
+                    "LARAVEL_SCAFFOLD_AUTHOR=\"{$author}\"",
                     $env_txt
                 );
                 $this->filesystem->put($file, $env_txt);
-                $this->command->info(" .env updated LARAVEL_SCAFFOLD_AUTHOR={$author}");
+                $this->command->info(" .env updated LARAVEL_SCAFFOLD_AUTHOR=\"{$author}\"");
             }
             else
             {
-                $this->filesystem->append($file, "\nLARAVEL_SCAFFOLD_AUTHOR={$author}");
-                $this->command->info("+ .env added LARAVEL_SCAFFOLD_AUTHOR={$author}");
+                $this->filesystem->append($file, "\nLARAVEL_SCAFFOLD_AUTHOR=\"{$author}\"");
+                $this->command->info("+ .env added LARAVEL_SCAFFOLD_AUTHOR=\"{$author}\"");
             }
         }
     }
-    
+
     /**
      * 创建目录
      */
@@ -63,19 +63,19 @@ class InitGenerator extends Generator
     {
         $database = [
             $this->utility->getDatabasePath('schema'),
-            $this->utility->getDatabasePath('storage'),
+            storage_path('scaffold'),
         ];
-    
+
         $api = [
             $this->utility->getApiPath('schema'),
         ];
-    
+
         $folders = array_merge($database, $api);
-    
+
         foreach ($folders as $folder)
         {
             $relative_path = str_replace(base_path(), '', $folder);
-            if (!$this->filesystem->isDirectory($folder))
+            if ( ! $this->filesystem->isDirectory($folder))
             {
                 $this->filesystem->makeDirectory($folder, 0777, true, true);
                 $this->command->info('+ .' . $relative_path);
