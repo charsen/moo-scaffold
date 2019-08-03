@@ -74,13 +74,18 @@ php artisan scaffold:init "Charsen <https://github.com/charsen>"
 
 
 ### 2. 创建某模块的 schema 表
-- 主要是数据库设计及对应关系
+- 数据库设计及对应关系
 ```sh
 php artisan scaffold:schema `module_name`
 ```
 - 添加 `-f` 覆盖已存在文件
 - PS1: 暂不支持多级目录！建议：`module_name = schema_file_name`
 - PS2：`controller` 的定义，只支持 `app/Http/Controllers/` 往下**两级**，更深的层级**不支持**!!!
+
+**Example:**
+```
+php artisan scaffold:schema Personels
+```
 
 ### 3. 刷新/生成 schema 数据缓存
 ```sh
