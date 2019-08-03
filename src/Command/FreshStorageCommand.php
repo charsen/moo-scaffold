@@ -17,7 +17,7 @@ class FreshStorageCommand extends Command
      *
      * @var string
      */
-    protected $title = 'Fresh Database Storage Command';
+    protected $title = 'Fresh Sechma Storage Command';
 
     /**
      * The console command name.
@@ -31,7 +31,7 @@ class FreshStorageCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Fresh Database Storage Command';
+    protected $description = 'Fresh Sechma Storage Command';
 
     /**
      * Get the console command options.
@@ -45,7 +45,7 @@ class FreshStorageCommand extends Command
                 'clean',
                 '-c',
                 InputOption::VALUE_OPTIONAL,
-                'Overwrite All Storage Files.',
+                'Rebuild All Storage Files.',
                 false,
             ],
         ];
@@ -63,7 +63,7 @@ class FreshStorageCommand extends Command
         $clean  = $this->option('clean') === null;
         $result = (new FreshStorageGenerator($this, $this->filesystem, $this->utility))
             ->start($clean);
-    
-        $this->tipDone();
+
+        $this->tipDone($result);
     }
 }
