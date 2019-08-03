@@ -16,9 +16,6 @@
             <select id="send_method">
                 <option value="POST" <?= strtoupper($request[0]) == 'POST' ? 'selected' : '' ?>>POST</option>
                 <option value="GET" <?= strtoupper($request[0]) == 'GET' ? 'selected' : '' ?>>GET</option>
-                <option value="PUT" <?= strtoupper($request[0]) == 'PUT' ? 'selected' : '' ?>>PUT</option>
-                <option value="PATCH" <?= strtoupper($request[0]) == 'PATCH' ? 'selected' : '' ?>>PATCH</option>
-                <option value="DELETE" <?= strtoupper($request[0]) == 'DELETE' ? 'selected' : '' ?>>DELETE</option>
             </select>
             <input type="hidden" id="host" value="{{ $request_url }}" />
             <input class="txt" id="uri" value="/{{ $request[1] }}" />
