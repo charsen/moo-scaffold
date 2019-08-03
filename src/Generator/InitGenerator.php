@@ -16,9 +16,11 @@ class InitGenerator extends Generator
      */
     public function start(string $author)
     {
+        $this->createFolder();
+
         $this->updateEnvFile($author);
 
-        $this->createFolder();
+        return true;
     }
 
     /**

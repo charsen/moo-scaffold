@@ -1,5 +1,5 @@
 ###
-#
+# {{schame_name}}
 #
 # @author {{author}}
 # @date   {{date}}
@@ -10,8 +10,6 @@ tables:
     table_name1:
         model:
             class: ModelClassName
-        repository:
-            class: RepositoryClassName
         controller:
             class: ControllerClassName
         attrs:
@@ -33,4 +31,3 @@ tables:
             status:
                 online: [1, online, 上架 ]
                 offline: [2, offline, 下架 ]
-
