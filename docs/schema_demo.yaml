@@ -26,8 +26,6 @@ tables:
     departments:
         model:   # 不生成时，可删除此项
             class: Department                # Eloquent 名称，可带目录，如：Personnels/Department
-        repository:  # 不生成时，可删除此项
-            class: Personnels/Department     # 系统会自动加上 Repository
         controller:  # 不生成时，可删除此项
             class: Personnels/Department     # 系统会自动加上 Controller
         attrs:
@@ -122,4 +120,3 @@ tables:
                 initial: [3, initial, 初始化 ]
                 locked: [4, locked, 锁定 ]
                 normal: [7, normal, 正常 ]
-
