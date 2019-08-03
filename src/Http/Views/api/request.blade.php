@@ -74,9 +74,8 @@
     $('#aside_container a.link').click(function () {
         if ($(this).data('f') == undefined) return true;
         $('#result_status').html('');
-        $('#result_status').html('');
         $('#result_uri').html('');
-        $('.dp-highlighter').html('');
+        $('#json_format').html('');
 
         window.history.pushState({}, 0, $(this).data('url'));
 
@@ -91,7 +90,7 @@
     var getParams = function(folder, controller, action, method)
     {
         document.title = $('#aside_container li.active a').data('module')
-                       + '-'
+                       + ' - '
                        + $('#aside_container li.active a').html();
 
         $.ajax({
@@ -100,10 +99,11 @@
             data: {'f': folder, 'c': controller, 'a': action},
             dataType: 'html',
             success: function (result) {
-                $('#left_container').removeClass('transparent').html(result);
+                $('#left_container').html(result);
 
-                var check = new RegExp(/^(create|edit|index|authenticate)$/);
-                if (check.test(action) || method == 'GET')
+                //var check = new RegExp(/^(create|edit|index|authenticate)$/);
+                //check.test(action) ||
+                if (method == 'GET')
                 {
                     $('#send').trigger('click');
                 }

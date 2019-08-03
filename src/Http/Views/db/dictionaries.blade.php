@@ -29,7 +29,10 @@
     </div>
 
     @foreach ($data as $table => $dictionaries)
-    <?php if (empty($dictionaries)) continue; ?>
+        @if (empty($dictionaries))
+            continue
+        @endif
+
     <a name="{{ $table }}"></a>
     <div class="panel">
         <div class="hd">

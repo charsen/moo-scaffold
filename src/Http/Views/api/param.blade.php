@@ -4,7 +4,8 @@
             <a href="{{$prototype}}" target="_blank"><i class="icon-prot"></i></a>
         @endif
         <a href="{{ route('api.list', ['f' => $current_folder, 'c' => $current_controller, 'a' => $current_action]) }}" target="_blank">
-            <i class="icon-file"></i></a>
+            <i class="icon-file"></i>
+        </a>
     </div>
     <i class="icon-wordbook"></i> {{ $name }}
 </h2>
@@ -13,8 +14,11 @@
         <div class="send-box">
             <a href="javascript:;" class="btn" id="send">发送</a>
             <select id="send_method">
-                <option value="POST"<?= strtoupper($request[0]) == 'POST' ? 'selected' : '' ?>>POST</option>
-                <option value="GET"<?= strtoupper($request[0]) == 'GET' ? 'selected' : '' ?>>GET</option>
+                <option value="POST" <?= strtoupper($request[0]) == 'POST' ? 'selected' : '' ?>>POST</option>
+                <option value="GET" <?= strtoupper($request[0]) == 'GET' ? 'selected' : '' ?>>GET</option>
+                <option value="PUT" <?= strtoupper($request[0]) == 'PUT' ? 'selected' : '' ?>>PUT</option>
+                <option value="PATCH" <?= strtoupper($request[0]) == 'PATCH' ? 'selected' : '' ?>>PATCH</option>
+                <option value="DELETE" <?= strtoupper($request[0]) == 'DELETE' ? 'selected' : '' ?>>DELETE</option>
             </select>
             <input type="hidden" id="host" value="{{ $request_url }}" />
             <input class="txt" id="uri" value="/{{ $request[1] }}" />
@@ -44,14 +48,18 @@
                         <th width="100">名称</th>
                         <th width="150">key</th>
                         <th>value</th>
-                        <th>说明</th>
                     </tr>
                     <tr>
-                        <td><input type="checkbox" class="checkbox" checked ></td>
+                        <td><input type="checkbox" class="checkbox" checked /></td>
                         <td><input type="text" class="txt" value="Accept"></td>
                         <td><input type="text" class="txt key" value="Accept"></td>
                         <td><input type="text" class="txt value" value="application/json"></td>
-                        <td><input type="text" class="txt" value=""></td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="checkbox" /></td>
+                        <td><input type="text" class="txt" value="X-Requested-With"></td>
+                        <td><input type="text" class="txt key" value="X-Requested-With"></td>
+                        <td><input type="text" class="txt value" value="XMLHttpRequest"></td>
                     </tr>
                 </table>
             </div>
