@@ -138,6 +138,37 @@ class Utility
     }
 
     /**
+     * 解析动作参数中的 Request 类
+     *
+     * @param $action
+     * @param $reflection_class
+     *
+     * @return null || string
+     */
+    public function getActionRequestClass($action, $reflection_class)
+    {
+        $result            = null;
+        $reflection_action = $reflection_class->getMethod($action);    // ReflectionMethod
+        $reflection_params = $reflection_action->getParameters();   // ReflectionParameter
+
+        foreach ($reflection_params as $param)
+        {
+            if ($param->getType() !== null)
+            {
+                $param_class = $param->getType()->getName(); // ReflectionNamedType
+
+                if (strstr($param_class, 'App\Http\Requests\\'))
+                {
+                    $result = new $param_class();
+                    break;
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Get Route File Content
      *
      * @param string $name

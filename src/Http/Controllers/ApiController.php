@@ -26,17 +26,17 @@ class ApiController extends Controller
         $data                       = $this->getApiList();
         $data['menus_transform']    = $this->getMenusTransform();
         $data['uri']                = $req->getPathInfo();
-        
+
         $data['current_folder']     = $req->input('f', 'Index');
         $data['current_controller'] = $req->input('c', null);
         $data['current_action']     = $req->input('a', null);
-        
+
         $data['first_menu_active']  = $data['current_controller'] != null;
         $data['first_table_active'] = $data['current_controller'] != null;
 
         return $this->view('api.index', $data);
     }
-    
+
     /**
      * api view
      *
@@ -63,24 +63,24 @@ class ApiController extends Controller
         $data                       = $this->getApiList();
         $data['menus_transform']    = $this->getMenusTransform();
         $data['uri']                = $req->getPathInfo();
-        $data['request_url']        = str_replace($req->path(), 'api', $req->url());
-        
+        //$data['request_url']        = str_replace($req->path(), 'api', $req->url());
+
         $data['api_index']          = 1;
         $data['current_folder']     = $req->input('f', 'Index');
         $data['current_controller'] = $req->input('c', null);
         $data['current_action']     = $req->input('a', null);
         $data['first_menu_active']  = false;
-    
+
         if (isset($data['apis'][$data['current_folder']][$data['current_controller']][$data['current_action']]))
         {
             $current_method = $data['apis'][$data['current_folder']][$data['current_controller']][$data['current_action']]['method'];
         }
-        
+
         $data['current_method']     = $current_method ?? false;
-    
+
         return $this->view('api.request', $data);
     }
-    
+
     /**
      * 缓存结果和参数
      *
@@ -91,17 +91,17 @@ class ApiController extends Controller
         $uri    = $req->input('uri', NULL);
         $params = $req->input('params', NULL);
         $result = $req->input('result', NULL);
-        
+
         if ($uri != NULL && $params != NULL && $result != NULL)
         {
             unset($params['token']);
-    
+
             $uri = md5(trim($uri, '/'));
             $put_params = Cache::store('file')->put($uri . '_params', $params, 30 * 24 * 60 * 60);
             $put_result = Cache::store('file')->put($uri . '_result', $result, 30 * 24 * 60 * 60);
         }
     }
-    
+
     /**
      * @param Request $req
      *
@@ -112,12 +112,12 @@ class ApiController extends Controller
     {
         $data                = $this->getOneApi($req, 'request');
         $data['request_url'] = str_replace($req->path(), 'api', $req->url());
-    
-        $rui                 = md5(trim($data['request'][1], '/'));
-        $cache_params        = Cache::get($rui . '_params', NULL);
+        //dump($data);
+
         $params              = ($data['request'][0] == 'GET') ? $data['url_params'] : $data['body_params'];
-        
+
         // 从 cache 获取数据，并恢复到现有参数中
+        $cache_params        = Cache::get(md5(trim($data['request'][1], '/')) . '_params', NULL);
         if ($cache_params != NULL)
         {
             foreach ($cache_params as $key => $val)
@@ -129,7 +129,7 @@ class ApiController extends Controller
                 }
             }
         }
-        
+
         if ($data['request'][0] == 'GET')
         {
             $data['url_params'] = $params;
@@ -138,10 +138,10 @@ class ApiController extends Controller
         {
             $data['body_params'] = $params;
         }
-    
+
         return $this->view('api.param', array_merge($data));
     }
-    
+
     /**
      * 获取缓存的请求结果
      *
@@ -152,12 +152,12 @@ class ApiController extends Controller
     public function result(Request $req)
     {
         $data                = $this->getOneApi($req, 'request');
-    
+
         $rui                 = md5(trim($data['request'][1], '/'));
         $cache_result        = Cache::get($rui . '_result', NULL);
-        
+
     }
-    
+
     /**
      * 获取菜单转换名称数据
      *
@@ -170,7 +170,7 @@ class ApiController extends Controller
         {
             return [];
         }
-    
+
         return  (new Yaml)::parseFile($yaml_file);
     }
 
@@ -192,7 +192,7 @@ class ApiController extends Controller
             {
                 continue;
             }
-            
+
             $file_name = $file->getPathname();
             $path      = empty($file->getRelativePath()) ? 'Index' : $file->getRelativePath();
             $data      = $yaml::parseFile($file_name);
@@ -216,7 +216,7 @@ class ApiController extends Controller
 
         return ['menus' => $menus, 'apis' => $apis];
     }
-    
+
     /**
      * @param $req
      *
@@ -228,11 +228,11 @@ class ApiController extends Controller
     private function getOneApi($req, $from_action)
     {
         $folder_name      = $req->input('f', 'Index');
-        $folder_path      = $folder_name == 'Index' ? '' : '' . $folder_name;
+        $folder_path      = $folder_name == 'Index' ? '' : $folder_name;
         $controller_class = $req->input('c', null);
         $action_name      = $req->input('a', null);
 
-        // 判断
+        // 判断文件是否存在
         $file = $this->utility->isApiFileExist($folder_path, $controller_class, 'schema');
 
         // 格式化 接口数据
@@ -247,10 +247,10 @@ class ApiController extends Controller
         $action_data['current_action']     = $action_name;
         $action_data['current_folder']     = $folder_path;
         $action_data['current_controller'] = $controller_class;
-    
+
         // 12-09, 因为出现了同一个 url 多个 method ，api.yaml 的键名重复了，附加了方法，在这里特殊处理一下
         $action_name = $this->utility->removeActionNameMethod($action_name);
-        
+
         // 针对 创建 及 更新 两个动作的原型做特殊处理
         if ($action_name == 'store' || $action_name == 'update')
         {
@@ -259,19 +259,19 @@ class ApiController extends Controller
                                       ? $data['actions'][$temp_name]['prototype']
                                       : $action_data['prototype'];
         }
-        
+
         // 字典数据
         $dictionaries   = $this->utility->getDictionaries();
 
         // 字段数据，从中获取字段格式，以便 faker 伪造数据
         $fields         = $this->utility->getFields();
-        
+
         // i18n 润色
         $lang_fields    = $this->utility->getLangFields();
-        
-        // 添加 cookie 到 body params
+
         if (! empty($req->cookie('api_token')) && $action_name != 'authenticate')
         {
+            // 接口测试时从 cookie 中取值，若是文件则为空
             $param = ['Token', ($from_action == 'request' ? $req->cookie('api_token') : '')];
             if ($action_data['request'][0] == 'GET')
             {
@@ -282,63 +282,53 @@ class ApiController extends Controller
                 $action_data['body_params']['token'] = $param;
             }
         }
-    
+
         // controllers, 从 repository 中获取验证规则的字段名，作为接口参数
-        $rule_params    = [];
-        $controllers    = $this->utility->getControllers();
-        if (! in_array($action_name, ['create', 'edit']) && isset($controllers[$folder_name . '/' . $controller_class]))
+        $controller        = 'App\Http\Controllers\\' . trim($folder_path . '/' . $controller_class . 'Controller', '/');
+        $reflection_class  = new \ReflectionClass($controller);
+        $request_object    = $this->utility->getActionRequestClass($action_name, $reflection_class);
+
+        $rule_params       = [];
+        if ( $request_object != null && ! empty($request_object->rules()))
         {
-            $action_name      = ($action_name == 'store') ? 'create' : $action_name;
-        
-            $repository_class = $controllers[$folder_name . '/' . $controller_class]['repository_class'] . 'Repository';
-            $repository_class = '\App\Repositories\\' . str_replace('/', '\\', $repository_class);
-            
-            // 12-09, 因为出现了同一个 url 多个 method，导致真实的动作未知，可通过 rule_action 指定
-            $rule_action      = isset($action_data['rule_action']) ? $action_data['rule_action'] : $action_name;
-            $rules            = (new $repository_class(app()))->getRules($rule_action);
-        
-            // 从 验证规则 里获取 api 参数
-            if ( ! empty($rules))
-            {
-                $rule_params = $this->formatRules($action_name, $rules, $dictionaries, $fields, $lang_fields);
-            }
+            $rule_params = $this->formatRules($action_name, $request_object->rules(), $dictionaries, $fields, $lang_fields);
         }
-        
+
         // method params
-        $method_params = [
-            'update'       => 'PUT',
+        $method_rest = [
+            'update'       => 'PATCH',
             'destroy'      => 'DELETE',
+            'destroyBatch' => 'DELETE',
+            'restoreBatch' => 'PATCH',
         ];
-        $method_param = isset($method_params[$action_name])
-            ? ['_method' => ['require' => true, 'name' => '', 'value' => $method_params[$action_name], 'desc' => '']]
+        $method_param = isset($method_rest[$action_name])
+            ? ['_method' => ['require' => true, 'name' => '', 'value' => $method_rest[$action_name], 'desc' => '']]
             : [];
-        
-        $url_params = $body_params = [];
+
+        $url_params     = $this->formatParams($action_data['url_params'], $dictionaries, $fields, $lang_fields);
+        $body_params    = $this->formatParams($action_data['body_params'], $dictionaries, $fields, $lang_fields);
+
         // 格式化 faker 标识
         $faker = Faker::create('zh_CN');
         if ($action_data['request'][0] == 'GET')
         {
-            $url_params                = $this->formatParams($action_data['url_params'], $dictionaries, $fields, $lang_fields);
-            $url_params                = array_merge($method_param, $rule_params, $url_params);
-            $action_data['url_params'] = $this->formatToFaker($faker, $url_params);
-            
-            unset($action_data['body_params']);
+            $url_params    = array_merge($method_param, $rule_params, $url_params);
         }
-        
-        //if (isset($action_data['body_params']))
-        if ($action_data['request'][0] == 'POST')
+        else
         {
-            $body_params                = $this->formatParams($action_data['body_params'], $dictionaries, $fields, $lang_fields);
-            $body_params                = array_merge($method_param, $rule_params, $body_params);
-            $action_data['body_params'] = $this->formatToFaker($faker, $body_params);
-    
-            unset($action_data['url_params']);
+            $body_params   = array_merge($method_param, $rule_params, $body_params);
         }
-        //dump($action_data);
+
+        // 伪造数据
+        $action_data['url_params']  = $this->formatToFaker($faker, $url_params);
+        $action_data['body_params'] = $this->formatToFaker($faker, $body_params);
+
+        // dump($action_data['url_params']);
+        // dump($action_data['body_params']);
 
         return $action_data;
     }
-    
+
     /**
      * 格式化请求参数
      *
@@ -350,9 +340,10 @@ class ApiController extends Controller
     {
         $method = $request[0];
         $url    = $request[1];
-    
+
+        // 把 model 对象 转换为整数 1
         $url    = preg_replace('/\{[a-z_]+\}/i', 1, $url);
-        
+
         return [strtoupper($method), $url];
     }
 
@@ -366,11 +357,8 @@ class ApiController extends Controller
      */
     private function formatToFaker($faker, array $params)
     {
-        if (empty($params))
-        {
-            return [];
-        }
-        
+        if (empty($params)) return [];
+
         foreach ($params as $field_name => &$attr)
         {
             if ($attr['value'] != '' || $field_name == '_method')
@@ -461,7 +449,7 @@ class ApiController extends Controller
 
         return $params;
     }
-    
+
     /**
      * 格式 验证规则 成为api参数
      *
@@ -482,7 +470,7 @@ class ApiController extends Controller
             $data[$key]['name']         = $fields[$key]['zh-CN'] ?? $key;
             $data[$key]['value']        = '';
             $data[$key]['desc']         = '';
-            
+
             if ($key == 'page')
             {
                 $data[$key]['value']    = 1;
@@ -503,21 +491,21 @@ class ApiController extends Controller
                 $data[$key]['value']    = 1;
                 $data[$key]['desc']     = '{0: false, 1: true}';
             }
-            
+
             if (isset($dictionaries[$key]))
             {
                 $data[$key]['value'] = array_random(array_pluck($dictionaries[$key], 0));
                 $data[$key]['desc'] .= ' ' . json_encode(array_pluck($dictionaries[$key], 2, 0), JSON_UNESCAPED_UNICODE);
             }
-        
+
             if (isset($lang_fields[$key]))
             {
                 $data[$key]['name'] = $lang_fields[$key]['zh-CN'];
             }
-        
+
             $data[$key]['type'] = isset($fields[$key]['type']) ? $fields[$key]['type'] : null;
         }
-    
+
         return $data;
     }
 
@@ -533,6 +521,8 @@ class ApiController extends Controller
      */
     private function formatParams(array $params, array $dictionaries, array $fields, array $lang_fields)
     {
+        if (empty($params)) return [];
+
         $data = [];
         foreach ($params as $key => $attr)
         {
@@ -556,7 +546,7 @@ class ApiController extends Controller
                 $data[$key]['value'] = array_random(array_pluck($dictionaries[$key], 0));
                 $data[$key]['desc'] .= ' ' . json_encode(array_pluck($dictionaries[$key], 2, 0), JSON_UNESCAPED_UNICODE);
             }
-            
+
             if (isset($lang_fields[$key]))
             {
                 $data[$key]['name'] = $lang_fields[$key]['zh-CN'];

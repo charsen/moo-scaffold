@@ -113,7 +113,7 @@
     }
 
     @if (!empty($current_controller) && ! empty($current_action))
-    getParams('{{ $current_folder }}', '{{ $current_controller }}', '{{ $current_action }}');
+        getParams('{{ $current_folder }}', '{{ $current_controller }}', '{{ $current_action }}');
     @endif
 </script>
 @endsection
