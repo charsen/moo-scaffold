@@ -294,37 +294,33 @@ class ApiController extends Controller
             $rule_params = $this->formatRules($action_name, $request_object->rules(), $dictionaries, $fields, $lang_fields);
         }
 
-        // method params
-        $method_rest = [
-            'update'       => 'PATCH',
-            'destroy'      => 'DELETE',
-            'destroyBatch' => 'DELETE',
-            'restoreBatch' => 'PATCH',
-        ];
-        $method_param = isset($method_rest[$action_name])
-            ? ['_method' => ['require' => true, 'name' => '', 'value' => $method_rest[$action_name], 'desc' => '']]
-            : [];
-
         $url_params     = $this->formatParams($action_data['url_params'], $dictionaries, $fields, $lang_fields);
         $body_params    = $this->formatParams($action_data['body_params'], $dictionaries, $fields, $lang_fields);
 
-        // 格式化 faker 标识
-        $faker = Faker::create('zh_CN');
+
         if ($action_data['request'][0] == 'GET')
         {
-            $url_params    = array_merge($method_param, $rule_params, $url_params);
+            $url_params    = array_merge($rule_params, $url_params);
         }
         else
         {
+            $method_rest = [
+                'update'       => 'PATCH',
+                'destroy'      => 'DELETE',
+                'destroyBatch' => 'DELETE',
+                'restoreBatch' => 'PATCH',
+            ];
+            $method_param = isset($method_rest[$action_name])
+                ? ['_method' => ['require' => true, 'name' => '', 'value' => $method_rest[$action_name], 'desc' => '']]
+                : [];
+
             $body_params   = array_merge($method_param, $rule_params, $body_params);
         }
 
         // 伪造数据
+        $faker = Faker::create('zh_CN');
         $action_data['url_params']  = $this->formatToFaker($faker, $url_params);
         $action_data['body_params'] = $this->formatToFaker($faker, $body_params);
-
-        // dump($action_data['url_params']);
-        // dump($action_data['body_params']);
 
         return $action_data;
     }

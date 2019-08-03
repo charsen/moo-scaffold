@@ -89,7 +89,7 @@
                     </tr>
                     @foreach ($url_params as $key => $v)
                     <tr>
-                        <td><input type="checkbox" class="checkbox" {{ (($v['require']) ? 'checked' : '') }}></td>
+                        <td><input type="checkbox" class="checkbox" {{ ($v['require'] ? 'checked' : '') }}></td>
                         <td><input type="text" value="{{ $v['name'] }}" class="txt" readonly ></td>
                         <td><input type="text" value="{{ $key }}" class="txt key" readonly ></td>
                         <td><input type="text" value="{{ $v['value'] }}" class="txt value"></td>
