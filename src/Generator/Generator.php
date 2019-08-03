@@ -104,7 +104,7 @@ class Generator
      */
     protected function getStubPath()
     {
-        return __DIR__ . '../Stub/';
+        return __DIR__ . '/../Stub/';
     }
 
     /**
