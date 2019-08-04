@@ -22,7 +22,7 @@ class CreateModelGenerator extends Generator
      * @var mixed
      */
     protected $model_folder;
-    
+
     /**
      * @param      $schema_name
      * @param bool $force
@@ -33,40 +33,40 @@ class CreateModelGenerator extends Generator
     {
         $this->model_path          = $this->utility->getModelPath();
         $this->model_relative_path = $this->utility->getModelPath(true);
-        $this->model_folder        = $this->utility->getModelFolder();
+        $this->model_folder        = $this->utility->getConfig('model.path');
 
         // 从 storage 里获取模型数据，在修改了 schema 后忘了执行 scaffold:fresh 的话会不准确！！
-        $all = $this->utility->getModels();
+        $all = $this->filesystem->getRequire($this->utility->getStoragePath() . 'models.php');
 
         if (!isset($all[$schema_name]))
         {
-            return $this->command->error("Schema File \"{$schema_name}\" could not be found.");
+            $this->command->error("Schema File \"{$schema_name}\" could not be found.");
+            return false;
         }
 
         foreach ($all[$schema_name] as $class => $attr)
         {
-            $table_attr = $this->utility->getOneTable($attr['table_name']);
-
             $model_file          = $this->model_path . "{$class}.php";
             $model_relative_file = $this->model_relative_path . "{$class}.php";
-            if ($this->filesystem->isFile($model_file) && !$force)
+            if ($this->filesystem->isFile($model_file) && ! $force)
             {
                 $this->command->error('x Model is existed (' . $model_relative_file . ')');
                 continue;
             }
 
+            $table_attr        = $this->utility->getOneTable($attr['table_name']);
             $fields            = $table_attr['fields'];
             $dictionaries      = $table_attr['dictionaries'];
             $hidden            = [];
             $use_trait         = [];
             $use_class         = [];
-            
+
             // 数据字典代码
             $dictionaries_code      = $this->buildDictionaries($dictionaries, $fields);
-    
+
             $casts_code             = $this->buildCasts($fields);
             $get_intval_attribute   = $this->buildIntvalAttribute($fields);
-            
+
             // 软删除
             if (isset($fields['deleted_at']))
             {
@@ -101,7 +101,7 @@ class CreateModelGenerator extends Generator
             $this->command->info('+ ' . $model_relative_file);
         }
     }
-    
+
     /**
      * 生成隐藏属性
      *
@@ -115,20 +115,20 @@ class CreateModelGenerator extends Generator
         {
             return '';
         }
-    
+
         $code = [
             $this->getTabs(1) . '/**',
-            $this->getTabs(1) . ' * The attributes that should be hidden for arrays.',
+            $this->getTabs(1) . ' * 数组中的属性会被隐藏',
             $this->getTabs(1) . ' * @var array',
             $this->getTabs(1) . ' */',
             $this->getTabs(1) . "protected \$hidden = [" . implode(',', $hidden) . "];",
             '', //空一行
         ];
-    
+
         return implode("\n", $code);
     }
-    
-    
+
+
     /**
      * 生成附加属性
      *
@@ -142,19 +142,19 @@ class CreateModelGenerator extends Generator
         {
             return '';
         }
-        
+
         $code = [
             $this->getTabs(1) . '/**',
             $this->getTabs(1) . ' * 追加到模型数组表单的访问器',
             $this->getTabs(1) . ' * @var array',
             $this->getTabs(1) . ' */',
-            $this->getTabs(1) . "protected \$appends = [" . implode(',', $appends) . "];",
+            $this->getTabs(1) . "protected \$appends = [" . implode(', ', $appends) . "];",
             '', //空一行
         ];
-    
+
         return implode("\n", $code);
     }
-    
+
     /**
      * 生成 原生类型的属性
      *
@@ -165,13 +165,14 @@ class CreateModelGenerator extends Generator
     private function buildCasts(array $fields)
     {
         $code = [];
-        
+
         foreach ($fields as $field_name => $attr)
         {
             if ($attr['type'] == 'boolean')
             {
                 $code[] = $this->getTabs(2) . "'{$field_name}' => 'boolean',";
             }
+            // todo: 转换更多类型
         }
         if (empty($code))
         {
@@ -179,7 +180,7 @@ class CreateModelGenerator extends Generator
         }
         $code[] = $this->getTabs(1) . '];';
         $code[] = '';
-        
+
         $temp = [
             $this->getTabs(1) . '/**',
             $this->getTabs(1) . ' * 应该被转换成原生类型的属性',
@@ -187,10 +188,10 @@ class CreateModelGenerator extends Generator
             $this->getTabs(1) . ' */',
             $this->getTabs(1) . 'protected $casts = [',
         ];
-        
+
         return implode("\n", array_merge($temp, $code));
     }
-    
+
     /**
      * 生成 整形转浮点数处理函数
      *
@@ -201,14 +202,14 @@ class CreateModelGenerator extends Generator
     private function buildIntvalAttribute(array $fields)
     {
         $code = [];
-    
+
         foreach ($fields as $field_name => $attr)
         {
             if (isset($attr['format']) && strstr($attr['format'], 'intval:'))
             {
                 list($intval, $divisor) = explode(':', trim($attr['format']));
                 $function_name = str_replace(' ', '', ucwords(str_replace('_', ' ', $field_name)));
-    
+
                 $code[] = $this->getTabs(1) . '/**';
                 $code[] = $this->getTabs(1) . " * {$fields[$field_name]['name']} 浮点数转整数 互转";
                 $code[] = $this->getTabs(1) . ' */';
@@ -223,7 +224,7 @@ class CreateModelGenerator extends Generator
                 $code[] = '';
             }
         }
-    
+
         return implode("\n", $code);
     }
 
@@ -242,7 +243,7 @@ class CreateModelGenerator extends Generator
             {
                 continue;
             }
-            
+
             if (in_array($attr['type'], ['date', 'datetime', 'timestamp', 'time']))
             {
                 $code[] = "'{$field_name}'";
@@ -329,7 +330,7 @@ class CreateModelGenerator extends Generator
             'get_txt_attribute' => implode("\n", $function_code),
         ];
     }
-    
+
     /**
      * 编译模板
      *

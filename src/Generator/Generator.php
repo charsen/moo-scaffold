@@ -54,9 +54,9 @@ class Generator
         $namespace = str_replace('/', '\\', trim($folder, '/'));
         if (strstr($class, '/') || strstr($class, '\\'))
         {
-            $class   = str_replace('\\', '/', trim($class, '/'));
-            $folders = explode('/', $class);
-            $class   = array_pop($folders);
+            $class      = str_replace('\\', '/', trim($class, '/'));
+            $folders    = explode('/', $class);
+            $class      = array_pop($folders);
             $namespace .= '\\' . implode('\\', $folders);
 
             if (!$this->filesystem->isDirectory($path . implode('/', $folders)))

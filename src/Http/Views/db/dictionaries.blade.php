@@ -15,10 +15,6 @@
         @endforeach
         </ul>
     </li>
-
-    <li class="none-open active">
-        <a href="{{ route('dictionaries') }}">数据字典</a>
-    </li>
 @endsection
 
 @section('right')
@@ -30,7 +26,7 @@
 
     @foreach ($data as $table => $dictionaries)
         @if (empty($dictionaries))
-            continue
+            @continue
         @endif
 
     <a name="{{ $table }}"></a>
