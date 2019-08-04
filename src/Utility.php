@@ -499,7 +499,7 @@ class Utility
      */
     public function getStoragePath($relative = false)
     {
-        $path = storage_path('scaffold');
+        $path = storage_path('scaffold/');
 
         return $relative ? str_replace(storage_path(), '.', $path) : $path;
     }
