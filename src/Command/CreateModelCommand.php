@@ -2,10 +2,7 @@
 
 namespace Charsen\Scaffold\Command;
 
-use Charsen\Scaffold\Generator\CreateControllerGenerator;
-use Charsen\Scaffold\Generator\CreateMigrationGenerator;
 use Charsen\Scaffold\Generator\CreateModelGenerator;
-use Charsen\Scaffold\Generator\CreateRepositoryGenerator;
 use Charsen\Scaffold\Generator\FreshStorageGenerator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
