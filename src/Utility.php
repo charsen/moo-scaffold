@@ -305,6 +305,8 @@ class Utility
     }
 
     /**
+     * 获取一表数据表的数据
+     *
      * @param $table_name
      *
      * @return mixed
@@ -331,17 +333,6 @@ class Utility
     public function getTables()
     {
         return $this->filesystem->getRequire($this->getStoragePath() . 'tables.php');
-    }
-
-    /**
-     * 获取模型数据
-     *
-     * @return mixed
-     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
-     */
-    public function getModels()
-    {
-        return $this->filesystem->getRequire($this->getStoragePath() . 'models.php');
     }
 
     /**
@@ -469,16 +460,6 @@ class Utility
         $path = app_path('Http/Controllers/');
 
         return $relative ? str_replace(base_path(), '.', $path) : $path;
-    }
-
-    /**
-     * 获取 app Model 的存储目录
-     *
-     * @return string
-     */
-    public function getModelFolder()
-    {
-        return $this->getConfig('model.path');
     }
 
     /**

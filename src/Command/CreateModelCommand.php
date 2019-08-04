@@ -23,21 +23,21 @@ class CreateModelCommand extends Command
      * @var string
      */
     protected $title = 'Create Model Command';
-    
+
     /**
      * The console command name.
      *
      * @var string
      */
     protected $name = 'scaffold:model';
-    
+
     /**
      * The console command description.
      *
      * @var string
      */
     protected $description = 'Create Model Command';
-    
+
     /**
      * Get the console command arguments.
      *
@@ -49,7 +49,7 @@ class CreateModelCommand extends Command
             ['schema_name', InputArgument::OPTIONAL, 'The name of the schema. (Ex: Personnels)'],
         ];
     }
-    
+
     /**
      * Get the console command options.
      *
@@ -72,16 +72,9 @@ class CreateModelCommand extends Command
                 'Fresh all cache files.',
                 false,
             ],
-            [
-                'repository',
-                '-r',
-                InputOption::VALUE_OPTIONAL,
-                'Create Repository File.',
-                false,
-            ],
         ];
     }
-    
+
     /**
      * Execute the console command.
      *
@@ -91,36 +84,27 @@ class CreateModelCommand extends Command
     public function handle()
     {
         $this->alert($this->title);
-    
+
         $schema_name = $this->argument('schema_name');
         if (empty($schema_name))
         {
             $file_names  = $this->utility->getSchemaNames();
             $schema_name = $this->choice('What is schema name?', $file_names);
         }
-        
+
         $force       = $this->option('force') === null;
         $fresh       = $this->option('fresh') === null;
-        $repository  = $this->option('repository') === null;
-    
+
         if ($fresh)
         {
             $this->tipCallCommand('scaffold:fresh');
             $result = (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
-    
-            $this->tipCallCommand('scaffold:model');
         }
-    
+
         $this->tipCallCommand('scaffold:model');
         $result = (new CreateModelGenerator($this, $this->filesystem, $this->utility))
             ->start($schema_name, $force);
-        
-        if ($repository) {
-            $this->tipCallCommand('scaffold:repository');
-            $result = (new CreateRepositoryGenerator($this, $this->filesystem, $this->utility))
-                ->start($schema_name, $force);
-        }
-    
+
         $this->tipDone();
     }
 }
