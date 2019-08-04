@@ -37,7 +37,6 @@ class FreshStorageGenerator extends Generator
         $tables        = [];
         $dictionaries  = [];
         $models        = [];
-        $repositories  = [];
         $controllers   = [];
         $all_fields    = [];
 
@@ -61,7 +60,7 @@ class FreshStorageGenerator extends Generator
 
             foreach ($data['tables'] as $table_name => $config)
             {
-                // 缓存 控制器 与 模型和资源仓库的关系
+                // 缓存 控制器 与 模型等的关系
                 if (isset($config['controller']))
                 {
                     $controllers[$file_name][$config['controller']['class']] = [
@@ -70,16 +69,6 @@ class FreshStorageGenerator extends Generator
                         'entity_name'      => $config['attrs']['name'],
                         'table_name'       => $table_name,
                         'model_class'      => $config['model']['class'] ?? '',
-                        'repository_class' => $config['repository']['class'] ?? '',
-                    ];
-                }
-
-                // 不是所有数据表都有对应的资源仓库
-                if (isset($config['repository']))
-                {
-                    $repositories[$file_name][$config['repository']['class']] = [
-                        'table_name'  => $table_name,
-                        'model_class' => $config['model']['class'] ?? '',
                     ];
                 }
 
@@ -88,7 +77,6 @@ class FreshStorageGenerator extends Generator
                 {
                     $models[$file_name][$config['model']['class']] = [
                         'table_name'       => $table_name,
-                        'repository_class' => $config['repository']['class'] ?? '',
                     ];
                 }
 
@@ -101,7 +89,6 @@ class FreshStorageGenerator extends Generator
                 $tables[$table_name] = [
                     'table_name'       => $table_name,
                     'model_class'      => $config['model']['class'] ?? NULL,
-                    'repository_class' => $config['repository']['class'] ?? NULL,
                     'name'             => $config['attrs']['name'],
                     'desc'             => $config['attrs']['desc'],
                     'remark'           => $config['attrs']['remark'] ?? [],
@@ -118,13 +105,12 @@ class FreshStorageGenerator extends Generator
         }
 
         $this->buildModelList($models);
-        $this->buildRepositoryList($repositories);
         $this->buildControllerList($controllers);
         $this->buildTableList($menus);
         $this->buildDictionaries($dictionaries);
         $this->buildTables($tables);
         $this->buildFields($all_fields);
-        $this->buildFieldsCache($all_fields);        //生成缓存的所有字段数据
+        $this->buildFieldsCache($all_fields);
 
         return true;
     }
@@ -172,6 +158,33 @@ class FreshStorageGenerator extends Generator
     }
 
     /**
+     * 格式化默认字段
+     *
+     * @param &$fields
+     *
+     * @return array
+     */
+    private function formatDefaultFields(&$fields)
+    {
+        $default_fields = [
+            'id'         => ['name' => '编号', 'type' => 'int'],
+            'deleted_at' => ['require' => false, 'name' => '删除于', 'type' => 'timestamp', 'default' => null],
+            'created_at' => ['name' => '创建于', 'type' => 'timestamp'],
+            'updated_at' => ['name' => '更新于', 'type' => 'timestamp'],
+        ];
+
+        foreach ($default_fields as $filed => $attr)
+        {
+            if (isset($fields[$filed]) && empty($fields[$filed]))
+            {
+                $fields[$filed] = $attr;
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
      * 获取 size 值，char|varchar 时会有最小长度作为检验时使用
      *
      * @param  array &$attr
@@ -185,7 +198,7 @@ class FreshStorageGenerator extends Generator
         {
             // 添加 unsigned 属性
             $attr['unsigned'] = $attr['unsigned'] ?? true;
-            $attr['default']  = $attr['default'] === null ? 0 : $attr['default'];
+            $attr['default']  = empty($attr['default']) ? 0 : $attr['default'];
             if ($attr['type'] == 'bigint')
             {
                 $attr['size'] = $attr['size'] == '' ? 20 : $attr['size'];
@@ -201,8 +214,8 @@ class FreshStorageGenerator extends Generator
         }
         elseif (in_array($attr['type'], ['char', 'varchar']))
         {
-            $attr['default'] = $attr['default'] === null ? '' : $attr['default'];
-            $attr['size']    = $attr['size'] == '' ? 32 : $attr['size'];
+            $attr['default'] = empty($attr['default']) ? '' : $attr['default'];
+            $attr['size']    = empty($attr['size']) ? 32 : $attr['size'];
             if (strstr($attr['size'], '|'))
             {
                 // 保存最小长度，用于生成检验时使用
@@ -213,34 +226,8 @@ class FreshStorageGenerator extends Generator
         {
             unset($attr['size']);
         }
+
         return $attr;
-    }
-
-    /**
-     * 格式化默认字段
-     *
-     * @param &$fields
-     *
-     * @return array
-     */
-    private function formatDefaultFields(&$fields)
-    {
-        $default_fields = [
-            'id'         => ['name' => '编号', 'type' => 'int'],
-            'deleted_at' => ['require' => false, 'name' => '删除于', 'type' => 'timestamp', 'default' => 'null'],
-            'created_at' => ['name' => '创建于', 'type' => 'timestamp'],
-            'updated_at' => ['name' => '更新于', 'type' => 'timestamp'],
-        ];
-
-        foreach ($default_fields as $filed => $attr)
-        {
-            if (isset($fields[$filed]) && empty($fields[$filed]))
-            {
-                $fields[$filed] = $attr;
-            }
-        }
-
-        return $fields;
     }
 
     /**
@@ -264,14 +251,14 @@ class FreshStorageGenerator extends Generator
             if (isset($lang_fields[$field_name]))
             {
                 $temp = [
-                    'zh-CN'      => $lang_fields[$field_name]['zh-CN'],
+                    'zh-CN'   => $lang_fields[$field_name]['zh-CN'],
                     'en'      => $lang_fields[$field_name]['en'],
                 ];
             }
             else
             {
                 $temp = [
-                    'zh-CN'      => $attr['name'],
+                    'zh-CN'   => $attr['name'],
                     'en'      => trim(ucwords(str_replace('_', ' ', $field_name))),
                 ];
             }
@@ -318,14 +305,17 @@ class FreshStorageGenerator extends Generator
             {
                 unset($yaml_data['table_fields'][$field_name]);
             }
+
             foreach ($increase_field_keys as $field_name)
             {
                 $yaml_data['table_fields'][$field_name] = $all_fields['table_fields'][$field_name];
             }
+
             if (isset($all_fields['duplicate_fields']))
             {
                 $yaml_data['duplicate_fields'] = $all_fields['duplicate_fields'];
             }
+
             $all_fields = $yaml_data;
         }
 
@@ -346,6 +336,7 @@ class FreshStorageGenerator extends Generator
             {
                 continue;
             }
+
             foreach ($fields as $field_name => $attr)
             {
                 $yaml   = ["en: '{$attr['en']}'"];
@@ -400,6 +391,7 @@ class FreshStorageGenerator extends Generator
             {
                 continue;
             }
+
             foreach ($fields as $field_name => $attr)
             {
                 $php_data[$field_name] = [
@@ -474,29 +466,6 @@ class FreshStorageGenerator extends Generator
         }
 
         return $this->command->error('x ' . $this->storage_path_relative . 'dictionaries.php (Failed)');
-    }
-
-    /**
-     * 生成资源仓库列表数据
-     *
-     * @param array $repositories
-     * @return mixed
-     */
-    private function buildRepositoryList(array $repositories)
-    {
-        /** 数据首页生成，列表 */
-        $php_code = '<?php' . PHP_EOL
-            . 'return ' . var_export($repositories, true) . ';'
-            . PHP_EOL;
-
-        $put = $this->filesystem->put($this->storage_path . 'repositories.php', $php_code);
-
-        if ($put)
-        {
-            return $this->command->info('+ ' . $this->storage_path_relative . 'repositories.php (Updated)');
-        }
-
-        return $this->command->error('x ' . $this->storage_path . 'repositories.php (Failed)');
     }
 
     /**
