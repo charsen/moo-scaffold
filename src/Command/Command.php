@@ -37,7 +37,7 @@ class Command extends BaseCommand
      */
     protected function tipCallCommand($command)
     {
-        $this->warn("\n***     {$command}     ***");
+        $this->warn("\n******************     {$command}     ******************");
     }
 
     /**

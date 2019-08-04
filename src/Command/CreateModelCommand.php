@@ -99,9 +99,10 @@ class CreateModelCommand extends Command
         {
             $this->tipCallCommand('scaffold:fresh');
             $result = (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
+
+            $this->tipCallCommand('scaffold:model');
         }
 
-        $this->tipCallCommand('scaffold:model');
         $result = (new CreateModelGenerator($this, $this->filesystem, $this->utility))
             ->start($schema_name, $force);
 

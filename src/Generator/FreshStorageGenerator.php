@@ -205,7 +205,7 @@ class FreshStorageGenerator extends Generator
             }
             else if ($attr['type'] == 'tinyint')
             {
-                $attr['size'] = $attr['size'] == '' ? 2 : $attr['size'];
+                $attr['size'] = $attr['size'] == '' ? 3 : $attr['size'];
             }
             else
             {
