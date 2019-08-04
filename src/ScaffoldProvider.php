@@ -45,15 +45,15 @@ class ScaffoldProvider extends ServiceProvider
         {
             $this->commands([
                 InitCommand::class,
-                FreeCommand::class,
                 CreateSchemaCommand::class,
-                CreateModelCommand::class,
                 FreshStorageCommand::class,
+                CreateModelCommand::class,
                 CreateMigrationCommand::class,
                 CreateControllerCommand::class,
                 UpdateMultilingualCommand::class,
                 CreateApiCommand::class,
                 UpdateAuthorizationCommand::class,
+                FreeCommand::class,
             ]);
         }
 
