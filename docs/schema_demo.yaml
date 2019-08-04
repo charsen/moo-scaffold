@@ -8,7 +8,7 @@
 # - require 默认 = true
 # - type: int 时，默认 size = 10, unsigned = true, default = 0
 # - type: bigint 时，默认 size = 20, unsigned = true, default = 0
-# - type: tinyint 时，默认 size = 2, unsigned = true, default = 0
+# - type: tinyint 时，默认 size = 3, unsigned = true, default = 0
 # - varchar: {char|varchar} 时, 默认 size = 32, default = ''
 # - format: 'intval:100' 时，整数转浮点数，100 对应2位小数，1000 3位小数
 # - size: 3|128 时，分割两个数字时，第一个表示最小长度（会生成验证），第二个表示最大长度

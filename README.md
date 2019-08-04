@@ -84,7 +84,7 @@ php artisan scaffold:schema `module_name`
 
 **Example:**
 ```
-php artisan scaffold:schema Personels
+php artisan scaffold:schema Personnels
 ```
 
 ### 3. 刷新/生成 schema 数据缓存
@@ -111,8 +111,8 @@ http://{{url}}}/scaffold/db
 php artisan scaffold:migration `schema_file_name`
 ```
 - `schema_file_name` 非必写，若不写会有提示做选择
-- 添加 `-m` 执行 `php artisan migrate`
-- 添加 `--fresh` 刷新缓存数据，等于先执行 `artisan scaffold:fresh`
+- 添加 `-m` 会执行 `php artisan migrate`
+- 添加 `--fresh` 刷新缓存数据，会先执行 `artisan scaffold:fresh`
 
 
 ### 6. 创建模型文件
@@ -120,10 +120,14 @@ php artisan scaffold:migration `schema_file_name`
 ```sh
 php artisan scaffold:model `schema_file_name`
 ```
+- `schema_file_name` 非必写，若不写会有提示做选择
 - 添加 `-f` 覆盖已存在文件
-- 添加 `--fresh` 刷新缓存数据，等于先执行 `artisan scaffold:fresh`
-- 添加 `-r` 同时生成 `repository`
+- 添加 `--fresh` 刷新缓存数据，会先执行 `artisan scaffold:fresh`
 
+**Example:**
+```
+php artisan scaffold:model personnels
+```
 
 ### 7. 创建资源仓库文件
 ```sh
