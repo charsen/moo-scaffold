@@ -289,14 +289,13 @@ class ApiController extends Controller
         $request_object    = $this->utility->getActionRequestClass($action_name, $reflection_class);
 
         $rule_params       = [];
-        if ( $request_object != null && ! empty($request_object->rules()))
+        if ( $request_object != null && ! empty($request_object->getActionRules($action_name)))
         {
-            $rule_params = $this->formatRules($action_name, $request_object->rules(), $dictionaries, $fields, $lang_fields);
+            $rule_params = $this->formatRules($action_name, $request_object->getActionRules($action_name), $dictionaries, $fields, $lang_fields);
         }
 
         $url_params     = $this->formatParams($action_data['url_params'], $dictionaries, $fields, $lang_fields);
         $body_params    = $this->formatParams($action_data['body_params'], $dictionaries, $fields, $lang_fields);
-
 
         if ($action_data['request'][0] == 'GET')
         {
