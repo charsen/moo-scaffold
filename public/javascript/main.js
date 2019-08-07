@@ -96,7 +96,7 @@
                         {
                             $.cookie('api_token', json.data.token);
                         }
-                        
+
                         Process({
                             id: 'json_format',
                             data: json
@@ -104,7 +104,7 @@
 
                         $(me).removeClass('disabled');
                         $status.html(200).attr('class', 'status font-green');
-    
+
                         // 将参数 与 结果提交并保存
                         cacheParamsSuccess($('#uri').val(), validKey('#request_params'), json);
                     },
@@ -126,7 +126,7 @@
                 })
             }
         });
-        
+
         var cacheParamsSuccess = function(uri, params, success)
         {
             $.ajax({
@@ -166,7 +166,7 @@
             });
 
             clipboard.on('error', function(e) {
-               showEm(e, 'error'); 
+               showEm(e, 'error');
             });
         }
 
@@ -178,7 +178,7 @@
 
             for(var key in option) {
                 var value = option[key];
-                
+
                 if(Object.prototype.toString.call(value) === '[object Array]') {
                     // 数组
                     str += key + ': [';
@@ -200,7 +200,7 @@
                 } else {
                     // 字符串
                     str += key + ': "' + value + '",<br/>';
-                }    
+                }
             }
 
             var reStr = str.replace(/,<br\/>$/g, function(){
