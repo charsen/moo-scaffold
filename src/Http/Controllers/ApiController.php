@@ -284,7 +284,8 @@ class ApiController extends Controller
         }
 
         // controllers, 从 repository 中获取验证规则的字段名，作为接口参数
-        $controller        = 'App\Http\Controllers\\' . trim($folder_path . '/' . $controller_class . 'Controller', '/');
+        $controller        = 'App\Http\Controllers\\' . trim($folder_path . '\\' . $controller_class . 'Controller', '/');
+        $controller        = str_replace('/', '\\', $controller);
         $reflection_class  = new \ReflectionClass($controller);
         $request_object    = $this->utility->getActionRequestClass($action_name, $reflection_class);
 
@@ -294,8 +295,13 @@ class ApiController extends Controller
             $rule_params = $this->formatRules($action_name, $request_object->getActionRules($action_name), $dictionaries, $fields, $lang_fields);
         }
 
-        $url_params     = $this->formatParams($action_data['url_params'], $dictionaries, $fields, $lang_fields);
-        $body_params    = $this->formatParams($action_data['body_params'], $dictionaries, $fields, $lang_fields);
+        $url_params     =  ! isset($action_data['url_params'])
+                        ? []
+                        : $this->formatParams($action_data['url_params'], $dictionaries, $fields, $lang_fields);
+
+        $body_params    = ! isset($action_data['body_params'])
+                        ? []
+                        :$this->formatParams($action_data['body_params'], $dictionaries, $fields, $lang_fields);
 
         if ($action_data['request'][0] == 'GET')
         {

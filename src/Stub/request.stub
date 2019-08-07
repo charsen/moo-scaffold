@@ -1,0 +1,72 @@
+<?php
+
+namespace App\Http\Requests;
+
+use App\Http\Requests\FormRequest;
+{{model_class}}
+
+class TagRequest extends FormRequest
+{
+
+    public function indexRules()
+    {
+        return [
+            'page'       => 'sometimes|required|integer|min:1',
+            'page_limit' => 'nullable|integer|min:1',
+        ];
+    }
+
+    public function trashedRules()
+    {
+        return [
+            'page'       => 'sometimes|required|integer|min:1',
+            'page_limit' => 'nullable|integer|min:5',
+        ];
+    }
+
+    public function storeRules()
+    {
+        return [];
+    }
+
+    public function updateRules()
+    {
+        return [];
+    }
+
+    public function showRules()
+    {
+        return [];
+    }
+
+    public function destroyRules()
+    {
+        return [];
+    }
+
+    public function destroyBatchRules()
+    {
+        return [
+            'ids'       => 'required|array',
+            'force'     => 'sometimes|required|boolean',
+        ];
+    }
+
+    public function restoreBatchRules()
+    {
+        return [
+            'ids'       => 'required|array',
+        ];
+    }
+
+    public function createRules()
+    {
+        return [];
+    }
+
+    public function editRules()
+    {
+        return [];
+    }
+
+}
