@@ -59,6 +59,7 @@ class CreateControllerGenerator extends Generator
             }
 
             // 目录及 namespace 处理
+            $request_class      = "App\\Http\\Requests\\{$attr['package']['folder']}\\{$attr['module']['folder']}\\{$attr['model_class']}Request";
             $namespace          = "App\\Http\\Controllers\\{$attr['package']['folder']}\\{$attr['module']['folder']}";
             $model_class        = $this->utility->getConfig('model.path') . $attr['module']['folder'] . '/' . $attr['model_class'];
 
@@ -74,7 +75,7 @@ class CreateControllerGenerator extends Generator
                 'namespace'         => ucfirst($namespace),
                 'model_class'       => ucfirst(str_replace('/', '\\', $model_class)),
                 'model_name'        => $attr['model_class'],
-                'request_class'     => 'App\Http\Requests\\' . $attr['model_class'] . 'Request',
+                'request_class'     => $request_class,
                 'request_name'      => $attr['model_class'] . 'Request',
                 'form_widgets'      => '[]', //$this->getFormWidgets($model_class, $fields, $dictionaries)
             ];
