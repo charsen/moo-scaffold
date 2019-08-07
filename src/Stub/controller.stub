@@ -2,35 +2,36 @@
 
 namespace {{namespace}};
 
-{{use_model}}
+use {{model_class}};
 use App\Exceptions\BatchActionException;
+use App\Http\Controllers\Controller;
 use App\Http\Resources\BaseResource;
 use App\Http\Resources\FormWidgetCollection;
-use App\Http\Requests\{{request_class}};
+use {{request_class}};
 
 /**
  * {{entity_name}}控制器
  *
  * @package_name {zh-CN: {{package_name}} | en: {{package_en_name}}}
  * @module_name {zh-CN: {{module_name}} | en: {{module_en_name}}}
- * @controller_name {zh-CN: {{entity_name}}管理 | en: Management {{controller_class}}}
+ * @controller_name {zh-CN: {{entity_name}}管理 | en: Management {{entity_en_name}}}
  *
  * @package {{namespace}};
  * @author  {{author}}
  * @date    {{date}}
  */
-class {{controller_class}}Controller extends Controller
+class {{entity_en_name}} extends Controller
 {
 
     protected $model;
 
     /**
      *
-     * @param {{use_model}} $model
+     * @param \{{model_class}} $model
      */
-    public function __construct({{model_class}} $model)
+    public function __construct({{model_name}} $model)
     {
-        //$this->checkAuthorization();
+        $this->checkAuthorization();
 
         $this->model = $model;
     }
@@ -38,12 +39,12 @@ class {{controller_class}}Controller extends Controller
     /**
      * 列表
      *
-     * @acl {zh-CN: {{entity_name}}列表 | en: {{controller_class}} List}
+     * @acl {zh-CN: {{entity_name}}列表 | en: {{entity_en_name}} List}
      *
-     * @param  \App\Http\Requests\{{request_class}}  $request
+     * @param  \{{request_class}}  $request
      * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
      */
-    public function index(TagRequest $request)
+    public function index({{request_name}} $request)
     {
         $validated = $request->validated();
 
@@ -55,12 +56,12 @@ class {{controller_class}}Controller extends Controller
     /**
      * 回收站列表
      *
-     * @acl {zh-CN: {{entity_name}}回收站 | en: {{controller_class}} Trashed}
+     * @acl {zh-CN: {{entity_name}}回收站 | en: {{entity_en_name}} Trashed}
      *
-     * @param  \App\Http\Requests\{{request_class}} $request
+     * @param  \{{request_class}} $request
      * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
      */
-    public function trashed(TagRequest $request)
+    public function trashed({{request_name}} $request)
     {
         $validated = $request->validated();
 
@@ -72,12 +73,12 @@ class {{controller_class}}Controller extends Controller
     /**
      * 创建
      *
-     * @acl {zh-CN: 创建{{entity_name}} | en: Create {{controller_class}}}
+     * @acl {zh-CN: 创建{{entity_name}} | en: Create {{entity_en_name}}}
      *
-     * @param  \App\Http\Requests\{{request_class}} $request
+     * @param  \{{request_class}} $request
      * @return \App\Http\Resources\BaseResource
      */
-    public function store(TagRequest $request)
+    public function store({{request_name}} $request)
     {
         $validated = $request->validated();
 
@@ -90,13 +91,13 @@ class {{controller_class}}Controller extends Controller
     /**
      * 更新
      *
-     * @acl {zh-CN: 更新{{entity_name}} | en: Update {{controller_class}}}
+     * @acl {zh-CN: 更新{{entity_name}} | en: Update {{entity_en_name}}}
      *
-     * @param  \App\Http\Requests\{{request_class}} $request
+     * @param  \{{request_class}} $request
      * @param  int $id
      * @return \App\Http\Resources\BaseResource
      */
-    public function update(TagRequest $request, $id)
+    public function update({{request_name}} $request, $id)
     {
         $validated = $request->validated();
 
@@ -110,9 +111,9 @@ class {{controller_class}}Controller extends Controller
     /**
      * 查看
      *
-     * @acl {zh-CN: 查看{{entity_name}} | en: Show {{controller_class}}}
+     * @acl {zh-CN: 查看{{entity_name}} | en: Show {{entity_en_name}}}
      *
-     * @param int $id
+     * @param  int $id
      * @return \App\Http\Resources\BaseResource
      */
     public function show($id)
@@ -125,9 +126,9 @@ class {{controller_class}}Controller extends Controller
     /**
      * 删除
      *
-     * @acl {zh-CN: 删除{{entity_name}} | en: Destroy {{controller_class}}}
+     * @acl {zh-CN: 删除{{entity_name}} | en: Destroy {{entity_en_name}}}
      *
-     * @param int $id
+     * @param  int $id
      * @return \App\Http\Resources\BaseResource
      */
     public function destroy($id)
@@ -141,19 +142,18 @@ class {{controller_class}}Controller extends Controller
     /**
      * 批量删除
      *
-     * @acl {zh-CN: 批量删除{{entity_name}} | en: Destroy Batch {{controller_class}}}
+     * @acl {zh-CN: 批量删除{{entity_name}} | en: Destroy Batch {{entity_en_name}}}
      *
-     * @param  \App\Http\Requests\{{request_class}} $request
+     * @param  \{{request_class}} $request
      * @return \App\Http\Resources\BaseResource
      */
-    public function destroyBatch(TagRequest $request)
+    public function destroyBatch({{request_name}} $request)
     {
         $validated  = $request->validated();
         $force      = isset($validated['force']) ?? FALSE;
 
         $data       = $force ? $this->model->onlyTrashed() : $this->model;
         $data       = $data->whereIn($this->model->getKeyName(), $validated['ids'])->get();
-
         $result     = $data->map(function ($item) use ($force) {
             if ($force) {
                 if ($item->forceDelete()) return $item;
@@ -174,16 +174,16 @@ class {{controller_class}}Controller extends Controller
     /**
      * 批量恢复
      *
-     * @acl {zh-CN: 批量恢复{{entity_name}} | en: Restore Batch{{controller_class}}}
+     * @acl {zh-CN: 批量恢复{{entity_name}} | en: Restore Batch{{entity_en_name}}}
      *
-     * @param  \App\Http\Requests\{{request_class}} $request
+     * @param  \{{request_class}} $request
      * @return \App\Http\Resources\BaseResource
      */
-    public function restoreBatch(TagRequest $request)
+    public function restoreBatch({{request_name}} $request)
     {
         $validated  = $request->validated();
-        $data       = $this->model->onlyTrashed()->whereIn($this->model->getKeyName(), $validated['ids'])->get();
 
+        $data       = $this->model->onlyTrashed()->whereIn($this->model->getKeyName(), $validated['ids'])->get();
         $result     = $data->map(function ($item) {
             if ($item->restore()) {
                 return $item;
@@ -200,10 +200,10 @@ class {{controller_class}}Controller extends Controller
     /**
      *  创建表单控件
      *
-     * @param  \App\Http\Requests\{{request_class}}  $request
+     * @param  \{{request_class}}  $request
      * @return \App\Http\Resources\FormWidgetCollection
      */
-    public function create(TagRequest $request)
+    public function create({{request_name}} $request)
     {
         $form_widgets = {{form_widgets}};
 
@@ -213,16 +213,16 @@ class {{controller_class}}Controller extends Controller
     /**
      * 编辑表单控件
      *
-     * @param  \App\Http\Requests\{{request_class}}  $request
+     * @param  \{{request_class}}  $request
      * @param  int $id
      * @return \App\Http\Resources\FormWidgetCollection
      */
-    public function edit(TagRequest $request, $id)
+    public function edit({{request_name}} $request, $id)
     {
         $result = $this->model->findOrFail($id);
 
         return (new BaseResource($result))->additional([
-            'form_widgets' => $this->create()
+            'form_widgets' => $this->create($request)
         ]);
     }
 
