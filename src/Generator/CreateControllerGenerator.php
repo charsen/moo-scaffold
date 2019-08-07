@@ -11,7 +11,6 @@ class CreateControllerGenerator extends Generator
 
     protected $controller_path;
     protected $controller_relative_path;
-    protected $repository_folder;
 
     /**
      * @param      $schema_name
@@ -23,7 +22,6 @@ class CreateControllerGenerator extends Generator
     {
         $this->controller_path          = $this->utility->getControllerPath();
         $this->controller_relative_path = $this->utility->getControllerPath(true);
-        $this->repository_folder        = $this->utility->getRepositoryFolder();
 
         // 从 storage 里获取控制器数据，在修改了 schema 后忘了执行 scaffold:fresh 的话会不准确！！
         $all = $this->utility->getControllers(false);
@@ -43,52 +41,55 @@ class CreateControllerGenerator extends Generator
         //dump($all[$schema_name]);
         foreach ($all[$schema_name] as $class => $attr)
         {
-            $controller_file          = $this->controller_path . "{$class}Controller.php";
-            $controller_relative_file = $this->controller_relative_path . "{$class}Controller.php";
-            if ($this->filesystem->isFile($controller_file) && !$force)
+            $folders                 = "{$attr['package']['folder']}/{$attr['module']['folder']}/";
+
+            // 检查目录是否存在，不存在则创建
+            if (!$this->filesystem->isDirectory($this->controller_path . $folders))
+            {
+                $this->filesystem->makeDirectory($this->controller_path . $folders, 0777, true, true);
+            }
+
+            $controller_file          = $this->controller_path . $folders . "{$class}.php";
+            $controller_relative_file = $this->controller_relative_path . "{$class}.php";
+
+            if ($this->filesystem->isFile($controller_file) && ! $force)
             {
                 $this->command->error('x Controller is existed (' . $controller_relative_file . ')');
                 continue;
             }
 
             // 目录及 namespace 处理
-            $namespace          = $this->dealNameSpaceAndPath($this->controller_path, 'app/Http/Controllers', $class);
-
-            // 资源仓库 类名处理
-            $repository_class   = ucfirst($this->repository_folder) . $attr['repository_class'] . 'Repository';
-            $repository_class   = str_replace('/', '\\', $repository_class);
-            $temp               = explode('/', $attr['repository_class']);
-
-            // 处理成英文的 package_en_name 和 module_en_name
-            $temp_names         = explode('\\', str_replace('app\\Http\\Controllers\\', '', $namespace));
-            $package_en_name    = $temp_names[0];
-            $module_en_name     = count($temp_names) > 1 ? $temp_names[1] : '';
+            $namespace          = "App\\Http\\Controllers\\{$attr['package']['folder']}\\{$attr['module']['folder']}";
+            $model_class        = $this->utility->getConfig('model.path') . $attr['module']['folder'] . '/' . $attr['model_class'];
 
             $meta               = [
                 'author'            => $this->utility->getConfig('author'),
                 'date'              => date('Y-m-d H:i:s'),
-                'controller_class'  => $class,
-                'namespace'         => ucfirst($namespace),
-                'use_repository'    => 'use ' . $repository_class . ';',
-                'repository_class'  => end($temp) . 'Repository',
-                'package_name'      => $attr['package_name'],
-                'package_en_name'   => $package_en_name,
-                'module_name'       => $attr['module_name'],
-                'module_en_name'    => $module_en_name,
+                'package_name'      => $attr['package']['name'],
+                'package_en_name'   => $attr['package']['folder'],
+                'module_name'       => $attr['module']['name'],
+                'module_en_name'    => $attr['module']['folder'],
                 'entity_name'       => $attr['entity_name'],
-                'form_widgets'      => $this->getFormWidgets($repository_class, $fields, $dictionaries)
+                'entity_en_name'    => $class,
+                'namespace'         => ucfirst($namespace),
+                'model_class'       => ucfirst(str_replace('/', '\\', $model_class)),
+                'model_name'        => $attr['model_class'],
+                'request_class'     => 'App\Http\Requests\\' . $attr['model_class'] . 'Request',
+                'request_name'      => $attr['model_class'] . 'Request',
+                'form_widgets'      => '[]', //$this->getFormWidgets($model_class, $fields, $dictionaries)
             ];
 
             $build_controllers[] = [
-                'namespace'         => ucfirst($namespace),
-                'class'             => $class . 'Controller',
+                'namespace'         => $meta['package_en_name'] . '\\' . $meta['module_en_name'] . '\\',
+                'model'             => strtolower($attr['model_class']) . 's',
+                'class'             => $class,
             ];
 
             $this->filesystem->put($controller_file, $this->compileStub($meta));
             $this->command->info('+ ' . $controller_relative_file);
         }
 
-        //$this->updateRoutes($build_controllers);
+        $this->updateRoutes($build_controllers);
     }
 
     /**
@@ -101,20 +102,18 @@ class CreateControllerGenerator extends Generator
      */
     private function updateRoutes($build_controllers)
     {
-        $file = $this->utility->getRouteFile('api');
+        $file       = base_path('routes/api.php');
+        $file_txt   = $this->filesystem->get($file);
 
         $code = [];
         foreach ($build_controllers as $controller)
         {
-            if (strstr($file, '\\' . $controller['class']))
+            if (strstr($file_txt, $controller['class']))
             {
                 continue;
             }
 
-            //$code[] = "Route::get('buildings/trashed', 'Enterprise\\Resources\\BuildingController@trashed');";
-            //$code[] = "Route::delete('buildings/destroy/batch', 'Enterprise\\Resources\\BuildingController@destroyBatch');";
-            //$code[] = "Route::resources(['buildings' => 'Enterprise\\Resources\\BuildingController']);";
-            $code[] = '';
+            $code[] = "Route::resourceHasTrashes('" . $controller['model'] . "', '" . $controller['namespace'] . $controller['class'] . "');";
         }
 
         if (empty($code))
@@ -122,11 +121,12 @@ class CreateControllerGenerator extends Generator
             return true;
         }
 
-        $code[] = $this->getTabs(2) . '//:end:do_not_delete';
-        $code   = implode("\n", $code);
+        $code[]     = "\n\n" . '//:end:do_not_delete';
+        $code       = implode("\n", $code);
 
-        $file = str_replace("//:end:do_not_delete", $code, $file);
-        $this->filesystem->put(base_path('routes/api.php'), $file);
+        $file_txt   = str_replace("//:end:do_not_delete", $code, $file_txt);
+
+        $this->filesystem->put($file, $file_txt);
         $this->command->warn('+ ./app/routes/api.php (Updated)');
 
         return true;
