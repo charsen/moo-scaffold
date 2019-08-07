@@ -148,16 +148,13 @@ class {{controller_class}}Controller extends Controller
      */
     public function destroyBatch(TagRequest $request)
     {
-        $validated   = $request->validated();
-        $force       = isset($validated['force']) ?? FALSE;
-        $key_name    = $this->model->getKeyName();
+        $validated  = $request->validated();
+        $force      = isset($validated['force']) ?? FALSE;
 
-        if ($force) {
-            $this->model    = $this->model->onlyTrashed();
-        }
-        $data = $this->model->whereIn($key_name, $validated['ids'])->get();
+        $data       = $force ? $this->model->onlyTrashed() : $this->model;
+        $data       = $data->whereIn($this->model->getKeyName(), $validated['ids'])->get();
 
-        $result  = $data->map(function ($item) use ($force) {
+        $result     = $data->map(function ($item) use ($force) {
             if ($force) {
                 if ($item->forceDelete()) return $item;
             }
