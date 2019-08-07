@@ -53,7 +53,7 @@ class FreshStorageGenerator extends Generator
 
             $data              = $yaml::parseFile($file);
             $menus[$file_name] = [
-                'folder_name'  => $data['module_name'],
+                'folder_name'  => $data['module']['folder'],
                 'tables_count' => 0,
                 'tables'       => [],
             ];
@@ -64,11 +64,11 @@ class FreshStorageGenerator extends Generator
                 if (isset($config['controller']))
                 {
                     $controllers[$file_name][$config['controller']['class']] = [
-                        'package_name'     => $data['package_name'],
-                        'module_name'      => $data['module_name'],
-                        'entity_name'      => $config['attrs']['name'],
-                        'table_name'       => $table_name,
-                        'model_class'      => $config['model']['class'] ?? '',
+                        'package'           => $data['package'],
+                        'module'            => $data['module'],
+                        'entity_name'       => $config['attrs']['name'],
+                        'table_name'        => $table_name,
+                        'model_class'       => $config['model']['class'] ?? '',
                     ];
                 }
 
@@ -76,6 +76,7 @@ class FreshStorageGenerator extends Generator
                 if (isset($config['model']))
                 {
                     $models[$file_name][$config['model']['class']] = [
+                        'module'           => $data['module'],
                         'table_name'       => $table_name,
                     ];
                 }
@@ -102,6 +103,12 @@ class FreshStorageGenerator extends Generator
 
                 $dictionaries[$table_name] = $tables[$table_name]['dictionaries'];
             }
+        }
+
+        // 检查目录是否存在，不存在则创建
+        if (!$this->filesystem->isDirectory($this->storage_path))
+        {
+            $this->filesystem->makeDirectory($this->storage_path, 0777, true, true);
         }
 
         $this->buildModelList($models);

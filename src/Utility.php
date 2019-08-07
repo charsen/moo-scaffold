@@ -169,21 +169,6 @@ class Utility
     }
 
     /**
-     * Get Route File Content
-     *
-     * @param string $name
-     *
-     * @return string
-     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
-     */
-    public function getRouteFile($name = 'api')
-    {
-        $file = base_path('routes/' . $name . '.php');
-
-        return $this->filesystem->get($file);
-    }
-
-    /**
      * 获取控制器的命令空间列表
      *
      * !!! 只支持 Http/Controllers/ 再往下两级，更深的层级不支持!!!

@@ -41,34 +41,6 @@ class Generator
     }
 
     /**
-     * 处理命名空间 及 创建对应的目录
-     *
-     * @param  [type] $path
-     * @param  [type] $folder
-     * @param  [type] &$class
-     * @return string
-     */
-    protected function dealNameSpaceAndPath($path, $folder, &$class)
-    {
-        // 目录及 namespace 处理
-        $namespace = str_replace('/', '\\', trim($folder, '/'));
-        if (strstr($class, '/') || strstr($class, '\\'))
-        {
-            $class      = str_replace('\\', '/', trim($class, '/'));
-            $folders    = explode('/', $class);
-            $class      = array_pop($folders);
-            $namespace .= '\\' . implode('\\', $folders);
-
-            if (!$this->filesystem->isDirectory($path . implode('/', $folders)))
-            {
-                $this->filesystem->makeDirectory($path . implode('/', $folders), 0777, true, true);
-            }
-        }
-
-        return $namespace;
-    }
-
-    /**
      * 获取 tabs 缩进
      *
      * @param  integer $size

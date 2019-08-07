@@ -18,10 +18,7 @@ class CreateModelGenerator extends Generator
      * @var mixed
      */
     protected $model_relative_path;
-    /**
-     * @var mixed
-     */
-    protected $model_folder;
+
 
     /**
      * @param      $schema_name
@@ -33,7 +30,6 @@ class CreateModelGenerator extends Generator
     {
         $this->model_path          = $this->utility->getModelPath();
         $this->model_relative_path = $this->utility->getModelPath(true);
-        $this->model_folder        = $this->utility->getConfig('model.path');
 
         // 从 storage 里获取模型数据，在修改了 schema 后忘了执行 scaffold:fresh 的话会不准确！！
         $all = $this->filesystem->getRequire($this->utility->getStoragePath() . 'models.php');
@@ -46,8 +42,14 @@ class CreateModelGenerator extends Generator
 
         foreach ($all[$schema_name] as $class => $attr)
         {
-            $model_file          = $this->model_path . "{$class}.php";
-            $model_relative_file = $this->model_relative_path . "{$class}.php";
+            // 检查目录是否存在，不存在则创建
+            if ( ! $this->filesystem->isDirectory($this->model_path . $attr['module']['folder']))
+            {
+                $this->filesystem->makeDirectory($this->model_path . $attr['module']['folder'], 0777, true, true);
+            }
+
+            $model_file          = $this->model_path . $attr['module']['folder'] . "/{$class}.php";
+            $model_relative_file = $this->model_relative_path . $attr['module']['folder'] . "/{$class}.php";
             if ($this->filesystem->isFile($model_file) && ! $force)
             {
                 $this->command->error('x Model is existed (' . $model_relative_file . ')');
@@ -76,12 +78,12 @@ class CreateModelGenerator extends Generator
             }
 
             // 目录及 namespace 处理
-            $namespace = $this->dealNameSpaceAndPath($this->model_path, $this->model_folder, $class);
+            $namespace = $this->utility->getConfig('model.path') . $attr['module']['folder'];
 
             $meta = [
                 'author'                => $this->utility->getConfig('author'),
                 'date'                  => date('Y-m-d H:i:s'),
-                'namespace'             => ucfirst($namespace),
+                'namespace'             => ucfirst(str_replace('/', '\\', $namespace)),
                 'use_class'             => implode("\n", $use_class),
                 'use_trait'             => ! empty($use_trait) ? 'use ' . implode(', ', $use_trait) . ';' : '',
                 'class'                 => $class,
