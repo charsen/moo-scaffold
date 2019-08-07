@@ -54,6 +54,15 @@
         </div>
     </div>
     <div class="panel">
+    <div class="hd">
+            <h2>Header</h2>
+        </div>
+        <div class="bd">
+            <div class="dp-highlighter" id="header" style="min-height: auto; margin-bottom: 20px">
+
+            </div>
+        </div>
+
         <div class="hd">
             <h2>Response</h2>
         </div>
@@ -100,10 +109,10 @@
             dataType: 'html',
             success: function (result) {
                 $('#left_container').html(result);
+                $('#header').html('');
 
-                //var check = new RegExp(/^(create|edit|index|authenticate)$/);
-                //check.test(action) ||
-                if (method == 'GET')
+                var check = new RegExp(/^(index|authenticate)$/);
+                if (check.test(action) || method == 'GET')
                 {
                     $('#send').trigger('click');
                 }
