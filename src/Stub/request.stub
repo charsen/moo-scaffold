@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Requests\{{namespace}};
+namespace {{namespace}};
 
 use App\Http\Requests\FormRequest;
 
-class {{request_class}} extends FormRequest
+class {{request_name}} extends FormRequest
 {
 
     public function indexRules()
@@ -27,14 +27,14 @@ class {{request_class}} extends FormRequest
     {
         $model = new {{model_class}};
 
-        return [];
+        return {{store_rules}};
     }
 
     public function updateRules()
     {
         $model = new {{model_class}};
 
-        return [];
+        return {{update_rules}};
     }
 
     public function showRules()
