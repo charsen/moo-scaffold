@@ -8,7 +8,7 @@ namespace Charsen\Scaffold\Generator;
  */
 class UpdateMultilingualGenerator extends Generator
 {
-    
+
     /**
      * 只做增量，不做替换，因为可能会有手工润色
      *
@@ -17,13 +17,13 @@ class UpdateMultilingualGenerator extends Generator
     {
         $languages  = $this->utility->getConfig('languages');
         $files      = ['model', 'validation'];
-        
+
         $all_fields             = $this->utility->getLangFields();
         $all_field_keys         = array_keys($all_fields);
-        
+
         $all_dictionaries       = $this->utility->getDictionaryWords();
         $all_dictionary_alias   = array_keys($all_dictionaries);
-    
+
         foreach ($files as $file_name)
         {
             foreach ($languages as $lang)
@@ -42,8 +42,10 @@ class UpdateMultilingualGenerator extends Generator
                 }
             }
         }
+
+        return true;
     }
-    
+
     /**
      * 编译生成模型字典的多语言
      *
@@ -57,29 +59,30 @@ class UpdateMultilingualGenerator extends Generator
     {
         $old_alias = array_keys($data);
         $new_alias = array_diff($all_dictionary_alias, $old_alias);
-    
+
         foreach ($new_alias as $alias) {
             $data[$alias] = $all_dictionaries[$alias][$lang];
-            $data[$alias] = str_replace("'", "\'", $data[$alias]);
+            $data[$alias] = str_replace("'", "&apos;", $data[$alias]);
+
             if ($lang == 'en') {
                 $data[$alias] = ucwords($data[$alias]);
             }
         }
-    
+
         // 格式化代码
         $code   = ["<?php"];
         $code[] = '';
         $code[] = 'return [';
         foreach ($data as $alias => $word) {
-            $word   = str_replace("'", "\'", $word);
+            $word   = str_replace("'", "&apos;", $word);
             $code[] = $this->getTabs(1) . "'{$alias}' => '{$word}',";
         }
         $code[] = '];';
         $code[] = '';
-        
+
         return $this->updateFile($file_name, $lang, implode("\n", $code));
     }
-    
+
     /**
      * @param       $file_name
      * @param       $lang
@@ -95,7 +98,7 @@ class UpdateMultilingualGenerator extends Generator
         $file_data      = $this->utility->getLanguage($file_name, $lang);
         $old_keys       = array_keys($file_data['attributes']);
         $new_keys       = array_diff($all_field_keys, $old_keys);
-        
+
         $rebuild_data   = $file_data['attributes'];
         foreach ($new_keys as $key)
         {
@@ -105,17 +108,17 @@ class UpdateMultilingualGenerator extends Generator
                 $rebuild_data[$key] = ucwords($rebuild_data[$key]);
             }
         }
-        
+
         $code = ["'attributes' => ["];
-        
+
         foreach ($rebuild_data as $key => $val)
         {
-            $val    = str_replace("'", "\'", $val);
+            $val    = str_replace("'", "&apos;", $val);
             $code[] = $this->getTabs(2) . "'{$key}' => '{$val}',";
         }
-        
+
         $code[] = $this->getTabs(1) . "],";
-        
+
         // 只替换 attributes 部分
         $file_txt = preg_replace(
             '/\'attributes\'[\s]*=>[\s]*\[.*\],/is',
@@ -124,7 +127,7 @@ class UpdateMultilingualGenerator extends Generator
         );
         $this->updateFile($file_name, $lang, $file_txt);
     }
-    
+
     /**
      * 更新文件内容
      *
@@ -141,8 +144,8 @@ class UpdateMultilingualGenerator extends Generator
         {
             return $this->command->info('+ ' . $relative_file . ' (Updated)');
         }
-        
+
         return $this->command->error('x ' . $relative_file . ' (Failed)');
     }
-    
+
 }

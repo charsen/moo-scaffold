@@ -33,7 +33,7 @@ class UpdateMultilingualCommand extends Command
      * @var string
      */
     protected $description = 'Update Multilingual Command';
-    
+
     /**
      * Get the console command options.
      *
@@ -51,7 +51,7 @@ class UpdateMultilingualCommand extends Command
             ],
         ];
     }
-    
+
     /**
      * Execute the console command.
      *
@@ -60,19 +60,19 @@ class UpdateMultilingualCommand extends Command
     public function handle()
     {
         $this->alert($this->title);
-    
+
         $fresh       = $this->option('fresh') === null;
         if ($fresh)
         {
             $this->tipCallCommand('scaffold:fresh');
-            $result = (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
-    
+            (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
+
             $this->tipCallCommand('scaffold:i18n');
         }
-    
+
         $result = (new UpdateMultilingualGenerator($this, $this->filesystem, $this->utility))
             ->start();
-    
-        $this->tipDone();
+
+        $this->tipDone($result);
     }
 }
