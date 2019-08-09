@@ -31,12 +31,8 @@ class CreateControllerGenerator extends Generator
             return $this->command->error("Schema File \"{$schema_name}\" could not be found.");
         }
 
-        // 所有字段信息
-        $fields             = $this->utility->getFields();
-        // 字典数据
-        $dictionaries       = $this->utility->getDictionaries();
         // 生成的 controllers
-        $build_controllers  = [];
+        $created  = [];
 
         //dump($all[$schema_name]);
         foreach ($all[$schema_name] as $class => $attr)
@@ -63,6 +59,16 @@ class CreateControllerGenerator extends Generator
             $namespace          = "App\\Http\\Controllers\\{$attr['package']['folder']}\\{$attr['module']['folder']}";
             $model_class        = $this->utility->getConfig('model.path') . $attr['module']['folder'] . '/' . $attr['model_class'];
 
+            // Request 处理
+            $table_attrs      = $this->utility->getOneTable($attr['table_name']);
+            $fields           = $table_attrs['fields'];
+            $dictionaries     = $table_attrs['dictionaries'];
+            $dictionaries_ids = $this->rebuildDictionaries($dictionaries);
+            $rules            = $this->rebuildFieldsRules($fields, $dictionaries_ids);
+            dump($rules);
+            $this->createRequest($rules);
+
+
             $meta               = [
                 'author'            => $this->utility->getConfig('author'),
                 'date'              => date('Y-m-d H:i:s'),
@@ -80,9 +86,10 @@ class CreateControllerGenerator extends Generator
                 'form_widgets'      => '[]', //$this->getFormWidgets($model_class, $fields, $dictionaries)
             ];
 
-            $build_controllers[] = [
+            $created[] = [
                 'namespace'         => $meta['package_en_name'] . '\\' . $meta['module_en_name'] . '\\',
                 'model'             => strtolower($attr['model_class']) . 's',
+                'model_class'       => $meta['model_class'],
                 'class'             => $class,
             ];
 
@@ -90,24 +97,171 @@ class CreateControllerGenerator extends Generator
             $this->command->info('+ ' . $controller_relative_file);
         }
 
-        $this->updateRoutes($build_controllers);
+        //$this->createRequests($created);
+        $this->updateRoutes($created);
+    }
+
+    public function createRequest($rules)
+    {
+
+    }
+
+    private function createRequests($created)
+    {
+        if (empty($created)) return true;
+
+        $request_path = app_path('Http/Requests/');
+
+        //dump($created);
+        foreach ($created as $controller)
+        {
+            $tmp_folder  = $request_path . $controller['namespace'];
+            $tmp_folder  = str_replace('\\', '/', $tmp_folder);
+
+            // 检查目录是否存在，不存在则创建
+            if (!$this->filesystem->isDirectory($tmp_folder))
+            {
+                $this->filesystem->makeDirectory($tmp_folder, 0777, true, true);
+            }
+
+            $request_class         = str_replace('Controller', 'Request', $controller['class']);
+            $request_file          = $tmp_folder . $request_class . '.php';
+            $request_relative_file = str_replace(base_path(), '.', $request_file);
+
+            if ($this->filesystem->isFile($request_file))
+            {
+                $this->command->error('x Request is existed (' . $request_relative_file . ')');
+                continue;
+            }
+
+            $meta = [
+                'namespace'           => trim($controller['namespace'], '\\'),
+                'model_class'         => '\\' . $controller['model_class'],
+                'request_class'       => $request_class,
+            ];
+
+            $file_txt = $this->buildStub($meta, $this->getStub('request'));
+
+            $this->filesystem->put($request_file, $file_txt);
+            $this->command->info('+ ' . $request_relative_file);
+        }
+
+    }
+
+    /**
+     * 重建 字段的规则
+     *
+     * @param  array $fields
+     * @param array  $dictionaries_ids
+     *
+     * @return array
+     */
+    private function rebuildFieldsRules(array $fields, array $dictionaries_ids)
+    {
+        //todo, 根据 索引 unique 附加 unique 规则
+        $rules = [];
+        foreach ($fields as $field_name => $attr)
+        {
+            if (in_array($field_name, ['id', 'deleted_at', 'created_at', 'updated_at']))
+            {
+                continue;
+            }
+
+            $filed_rules        = [];
+            if ($attr['require'])
+            {
+                $filed_rules[]  = 'required';
+            }
+
+            if ($attr['allow_null'])
+            {
+                $filed_rules[]  = 'nullable';
+            }
+
+            if (in_array($attr['type'], ['int', 'tinyint', 'bigint']))
+            {
+                // 整数转浮点数时，需要调整为 numeric
+                if (isset($attr['format']) && strstr($attr['format'], 'intval:'))
+                {
+                    $filed_rules[] = 'numeric';
+                }
+                else
+                {
+                    $filed_rules[] = 'integer';
+                }
+
+                if (isset($attr['unsigned']) && ! isset($dictionaries_ids[$field_name]))
+                {
+                    $filed_rules[] = 'min:0';
+                }
+            }
+
+            if ($attr['type'] == 'boolean')
+            {
+                $filed_rules[] = 'in:0,1';
+            }
+
+            if ($attr['type'] == 'date' || $attr['type'] == 'datetime')
+            {
+                $filed_rules[] = 'date';
+            }
+
+            if (isset($attr['min_size']) && in_array($attr['type'], ['char', 'varchar']))
+            {
+                $filed_rules[] = 'min:' . $attr['min_size'];
+            }
+
+            if (isset($attr['size']) && in_array($attr['type'], ['char', 'varchar']))
+            {
+                $filed_rules[] = 'max:' . $attr['size'];
+            }
+            if (isset($dictionaries_ids[$field_name]))
+            {
+                $filed_rules[] = 'in:' . implode(',', $dictionaries_ids[$field_name]);
+            }
+            $rules[$field_name] = implode('|', $filed_rules);
+        }
+
+        return $rules;
+    }
+
+        /**
+     * 重建 数据字典
+     *
+     * @param  array $dictionaries [description]
+     *
+     * @return array [type]               [description]
+     */
+    private function rebuildDictionaries(array $dictionaries)
+    {
+        $data = [];
+        foreach ($dictionaries as $field_name => $rows)
+        {
+            foreach ($rows as $one)
+            {
+                $data[$field_name][] = $one[0];
+            }
+        }
+        return $data;
     }
 
     /**
      * 更新路由
      *
-     * @param $build_controllers
+     * @param $builded_controllers
      *
      * @return bool
      * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
-    private function updateRoutes($build_controllers)
+    private function updateRoutes($created)
     {
+        if (empty($created)) return true;
+
         $file       = base_path('routes/api.php');
         $file_txt   = $this->filesystem->get($file);
 
         $code = [];
-        foreach ($build_controllers as $controller)
+        foreach ($created as $controller)
         {
             if (strstr($file_txt, $controller['class']))
             {

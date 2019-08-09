@@ -1,11 +1,10 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\{{namespace}};
 
 use App\Http\Requests\FormRequest;
-{{model_class}}
 
-class TagRequest extends FormRequest
+class {{request_class}} extends FormRequest
 {
 
     public function indexRules()
@@ -26,11 +25,15 @@ class TagRequest extends FormRequest
 
     public function storeRules()
     {
+        $model = new {{model_class}};
+
         return [];
     }
 
     public function updateRules()
     {
+        $model = new {{model_class}};
+
         return [];
     }
 

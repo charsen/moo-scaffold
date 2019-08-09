@@ -18,6 +18,13 @@ class {{class}} extends Model
 
     protected $table = '{{table_name}}';
 
+    /**
+     * 给定字段默认值。
+     *
+     * @var array
+     */
+    protected $attributes = [];
+
      /**
      * 可以被批量赋值的属性
      *
