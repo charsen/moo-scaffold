@@ -129,58 +129,53 @@ php artisan scaffold:model `schema_file_name`
 php artisan scaffold:model personnels
 ```
 
-### 7. 创建资源仓库文件
-```sh
-php artisan scaffold:repository `schema_file_name`
-```
-- `schema_file_name` 非必写，若不写会有提示做选择
-- 添加 `-f` 覆盖已存在文件
-- 添加 `--fresh` 刷新缓存数据，等于先执行 `artisan scaffold:fresh`
 
-**更新 RepositoryServiceProvider**
-- 自动更新 `app/Providers/RepositoryServiceProvider.php` 将新生成的类添加到 register() 中
-- register() 函数体内最后一行必须是 `//:end-bindings:` 才能实现此功能
-
-_**!!! PS: !!!**_
-- 到此，不要急于后续的生成 `controller, api` ，因为类里的验证规则是生成 `api` 及 `表单控件` 时的数据来源
-- 请先 **认真** 调整好 `repository` 里的验证规则
-
-
-### 8. 创建控制器
+### 7. 创建控制器
 ```sh
 php artisan scaffold:controller `schema_file_name`
 ```
 - `schema_file_name` 非必写，若不写会有提示做选择
 - 添加 `-f` 覆盖已存在文件
-- 添加 `--fresh` 刷新缓存数据，等于先执行 `artisan scaffold:fresh`
+- 添加 `--fresh` 刷新缓存数据，会先执行 `artisan scaffold:fresh`
+- **同时会生成对应的 `From Request` 对象于 app/Http/Requests/ 路径下（目录层次与 Controller 的一致）**
+
+_**!!! PS: !!!**_
 - `controller` 里的 `action` 是生成 接口文档及调试 的依据，`one action == one api`
+- 到此，不要急于后续的生成 `controller, api` ，因为类里的验证规则是生成 `api` 及 `表单控件` 时的数据来源
+- 请先 **认真** 设置 `From Request` 里的验证规则
 
 
-### 9. 生成接口配置文件
+### 8. 生成接口配置文件
 ```sh
 php artisan scaffold:api `namesapce`
 ```
 - `namesapce` 非必写，若不写会有提示做选择（app/controllers 下的某个目录，或多级目录）
 - 添加 `-f` 覆盖已存在文件
 - 添加 `-i` 忽略用 controller 里的 actions 求交集（若 route.php 里用了 ::resource 方式可能会生成多余的请求）（todo: 移除）
-- 添加 `--fresh` 刷新缓存数据，等于先执行 `artisan scaffold:fresh`
+- 添加 `--fresh` 刷新缓存数据，会先执行 `artisan scaffold:fresh`
 
 **PS1:**
-- api 里的参数 默认通过 repository 验证规则里读取
+- api 里的参数 默认通过 `From Request` 对象 验证规则里读取
 - 可在 api 的 yaml 配置文件中重写 url_params 及 body_params 来覆盖 默认的参数设置
 - 默认的接口名称能过 "反射" 控制器中动作的注释来获取
 - api demo [docs/api_demo.yaml](https://github.com/charsen/laravel-scaffold/blob/master/docs/api_demo.yaml)
 
 **PS2:**
 ```php
-Route::get('departments/trashed', 'Enterprise\\Personnels\\DepartmentController@trashed');
-Route::post('departments/destroy/batch', 'Enterprise\\Personnels\\DepartmentController@destroyBatch');
-Route::post('departments/restore/batch', 'Enterprise\\Personnels\\DepartmentController@restoreBatch');
-Route::resource('departments', 'Enterprise\\Personnels\\DepartmentController');
+Route::resourceHasTrashes('departments', 'Admin\\Personnels\\DepartmentController');
 ```
 - 要先设置好路由规则，程序通过 `Route::getRoutes()` 获取接口地址（但由于用了 `Route::resources`，实际可能没那么多）
 - 用路由与控制器的 action 求交集，得出真实的接口
 - 生成时：默认是附加新的 action 到对应的配置文件，若有action被删减了会提醒，需要手工删除接口配置文件的代码
+
+
+### 9. 更新 i18n 文件
+```sh
+php artisan scaffold:i18n
+```
+- 添加 `--fresh` 刷新缓存数据，会先执行 `artisan scaffold:fresh`
+- 目前支持两个 英文 、中文(需要手动在 `resources/lang/` 下创建 `zh-CN` 目录) 两个语种
+- 可先润色 `scaffold/database/_fields.yaml` 里的内容，此文件会自动根据数据表的字段，添加或删掉项目
 
 
 ### 10. 查看接口文档
@@ -190,17 +185,7 @@ http://{{url}}}/scaffold/api
 - 字段名称会优先从 `scaffold/database/_fields.yaml` 读取
 
 
-### 11. 更新 i18n 文件
-```sh
-php artisan scaffold:i18n
-```
-- 添加 `--fresh` 刷新缓存数据，等于先执行 `artisan scaffold:fresh`
-- 目前支持两个 英文 、中文(需要手动在 `resources/lang/` 下创建 `zh-CN` 目录) 两个语种
-- 可先润色 `scaffold/database/_fields.yaml` 里的内容，此文件会自动根据数据表的字段，添加或删掉项目
-
-
-
-### 12. 更新 Authorization 文件
+### 11. 更新 Authorization 文件
 ```sh
 php artisan scaffold:auth
 ```
@@ -210,7 +195,7 @@ php artisan scaffold:auth
 - 需要做授权的 action 必须在注释中写 @acl {zh-CN: 中文 | en: English} 否则会被加入白名单
 
 
-### 13. Free : “释放双手”
+### 12. Free : “释放双手”
 ```sh
 php artisan scaffold:free  `schema_file_name`
 ```
