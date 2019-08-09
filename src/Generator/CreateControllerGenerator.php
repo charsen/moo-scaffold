@@ -51,12 +51,18 @@ class CreateControllerGenerator extends Generator
                 continue;
             }
 
-            // 目录及 namespace 处理
+            // Request, namespace 处理
             $request_name       = str_replace('Controller', 'Request', $class);
             $request_class      = "App\\Http\\Requests\\{$attr['package']['folder']}\\{$attr['module']['folder']}\\{$request_name}";
 
             $namespace          = "App\\Http\\Controllers\\{$attr['package']['folder']}\\{$attr['module']['folder']}";
             $model_class        = $this->utility->getConfig('model.path') . $attr['module']['folder'] . '/' . $attr['model_class'];
+
+            // 验证规则 ，字段 处理
+            $table_attrs      = $this->utility->getOneTable($attr['table_name']);
+            $fields           = $table_attrs['fields'];
+            $dictionaries     = $table_attrs['dictionaries'];
+            $rules            = $this->rebuildFieldsRules($fields, $dictionaries);
 
             $meta               = [
                 'author'            => $this->utility->getConfig('author'),
@@ -68,38 +74,42 @@ class CreateControllerGenerator extends Generator
                 'entity_name'       => $attr['entity_name'],
                 'entity_en_name'    => $class,
                 'namespace'         => ucfirst($namespace),
+                'route_key'         => strtolower($attr['model_class']),
                 'model_class'       => ucfirst(str_replace('/', '\\', $model_class)),
                 'model_name'        => $attr['model_class'],
                 'request_class'     => $request_class,
                 'request_name'      => $request_name,
-                'form_widgets'      => '[]', //$this->getFormWidgets($model_class, $fields, $dictionaries)
-            ];
-
-            // Request 处理
-            $table_attrs      = $this->utility->getOneTable($attr['table_name']);
-            $fields           = $table_attrs['fields'];
-            $dictionaries     = $table_attrs['dictionaries'];
-            $rules            = $this->rebuildFieldsRules($fields, $dictionaries);
-            // dump($rules);
-            $this->createRequest($rules, $meta['request_class'], $meta['request_name'], $meta['model_class']);
-
-
-            $created[] = [
-                'namespace'         => $meta['package_en_name'] . '\\' . $meta['module_en_name'] . '\\',
-                'model'             => strtolower($attr['model_class']) . 's',
-                'model_class'       => $meta['model_class'],
-                'class'             => $class,
+                'form_widgets'      => $this->getFormWidgets($rules, $fields, $dictionaries)
             ];
 
             $this->filesystem->put($controller_file, $this->compileStub($meta));
             $this->command->info('+ ' . $controller_relative_file);
+
+            // Request 处理
+            $this->createRequest($rules, $meta['request_class'], $meta['request_name'], $meta['model_class'], $meta['route_key']);
+
+            $created[] = [
+                'namespace'         => $meta['package_en_name'] . '\\' . $meta['module_en_name'] . '\\',
+                'model'             => $meta['route_key'] . 's',
+                'model_class'       => $meta['model_class'],
+                'class'             => $class,
+            ];
         }
 
-        //$this->createRequests($created);
         $this->updateRoutes($created);
     }
 
-    public function createRequest($rules, $request_class, $request_name, $model_class)
+    /**
+     * 生成 Request
+     *
+     * @param array $rules
+     * @param string $request_class
+     * @param string $request_name
+     * @param string $model_class
+     * @param string $route_key
+     * @return void
+     */
+    public function createRequest($rules, $request_class, $request_name, $model_class, $route_key)
     {
         // 检查目录是否存在，不存在则创建
         $tmp_folder = app_path() . '/' . str_replace(['App\\', '\\', $request_name], ['', '/', ''], $request_class);
@@ -114,12 +124,35 @@ class CreateControllerGenerator extends Generator
             return $this->command->error('x Request is existed (' . $request_relative_file . ')');
         }
 
+        // create & update action
+        $create_code = ['['];
+        $update_code = ['['];
+        foreach ($rules as $field_name => $rule)
+        {
+            if (strstr($rule, ":'")) {    // $model->int_field 时拼接代码，结尾的 ' 提前了
+                $tmp_create = "'{$field_name}' => '{$rule},";
+                if (strstr($rule, "unique:")) {
+                    $tmp_update = "'{$field_name}' => 'sometimes|{$rule} . ',{$field_name},' . \$this->route('{$route_key}'),";
+                } else {
+                    $tmp_update = "'{$field_name}' => 'sometimes|{$rule},";
+                }
+            } else {
+                $tmp_create = "'{$field_name}' => '{$rule}',";
+                $tmp_update = "'{$field_name}' => 'sometimes|{$rule}',";
+            }
+
+            $create_code[] = $this->getTabs(3) . $tmp_create;
+            $update_code[] = $this->getTabs(3) . $tmp_update;
+        }
+        $create_code[] = $this->getTabs(2) . ']';
+        $update_code[] = $this->getTabs(2) . ']';
+
         $meta = [
             'namespace'     => str_replace('\\' . $request_name, '', $request_class),
             'model_class'   => '\\' . $model_class,
             'request_name'  => $request_name,
-            'store_rules'   => '[]',
-            'update_rules'  => '[]',
+            'store_rules'   => implode(PHP_EOL, $create_code),
+            'update_rules'  => implode(PHP_EOL, $update_code),
         ];
 
         $file_txt = $this->buildStub($meta, $this->getStub('request'));
@@ -138,9 +171,6 @@ class CreateControllerGenerator extends Generator
      */
     private function rebuildFieldsRules(array $fields, array $dictionaries)
     {
-        //todo, 根据 索引 unique 附加 unique 规则
-        // 'sometimes|string|unique:' . $model->getTable(),
-        // 'required|string|unique:' . $model->getTable() . ',department_name,' . $this->route('department'),
         $rules = [];
         foreach ($fields as $field_name => $attr) {
             if (in_array($field_name, ['id', 'deleted_at', 'created_at', 'updated_at'])) {
@@ -186,7 +216,11 @@ class CreateControllerGenerator extends Generator
             }
 
             if (isset($dictionaries[$field_name])) {
-                $filed_rules[] = "in: . implode(',', array_keys(\$model->init_{$field_name}))";
+                $filed_rules[] = "in:' . implode(',', array_keys(\$model->init_{$field_name}))";
+            }
+
+            if (isset($attr['unique']) && $attr['unique']) {
+                $filed_rules[] = "unique:' . \$model->getTable()";
             }
 
             $rules[$field_name] = implode('|', $filed_rules);
@@ -243,16 +277,13 @@ class CreateControllerGenerator extends Generator
      *
      * @return string
      */
-    private function getFormWidgets($repository_class, array $fields, array $dictionaries)
+    private function getFormWidgets($rules, array $fields, array $dictionaries)
     {
-        $rules = $this->getRules($repository_class);
-        if (!isset($rules['create'])) {
-            return "[];";
-        }
+        if (empty($rules)) return "[];";
 
         $code = ["["];
 
-        foreach ($rules['create'] as $field_name => $rule_string) {
+        foreach ($rules as $field_name => $rule_string) {
             $code[] = $this->getTabs(3) . "[";
             $code[] = $this->getTabs(4) . "'field_name'    => '{$field_name}',";
 
@@ -278,7 +309,7 @@ class CreateControllerGenerator extends Generator
 
             if (isset($dictionaries[$field_name])) {
                 $code[] = $this->getTabs(4) . "'widget_type'   => 'radio',";
-                $code[] = $this->getTabs(4) . "'options'       => \$this->repository->getModel()->init_{$field_name},";
+                $code[] = $this->getTabs(4) . "'options'       => \$this->model->init_{$field_name},";
             }
 
             $code[] = $this->getTabs(3) . "],";
@@ -287,18 +318,6 @@ class CreateControllerGenerator extends Generator
         $code[] = $this->getTabs(2) . "]";
 
         return implode("\n", $code);
-    }
-
-    /**
-     * @param $repository_class
-     *
-     * @return mixed
-     */
-    private function getRules($repository_class)
-    {
-        $rules      = (new $repository_class(app()))->getRules();
-
-        return $rules;
     }
 
     /**
