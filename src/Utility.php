@@ -177,8 +177,8 @@ class Utility
      */
     public function getControllerNamespaces()
     {
-        $base_path = app_path('Http/Controllers/');
-        $dirs = $this->filesystem->directories($base_path);
+        $base_path  = app_path('Http/Controllers/');
+        $dirs       = $this->filesystem->directories($base_path);
         if (empty($dirs))
         {
             return ['nothing'];

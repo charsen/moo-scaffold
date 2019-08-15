@@ -1,7 +1,6 @@
 <?php
 namespace Charsen\Scaffold\Generator;
 
-
 /**
  * Create Model
  *
@@ -26,9 +25,10 @@ class CreateModelGenerator extends Generator
      *
      * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
-    public function start($schema_name, $force = false)
+    public function start($schema_name, $factory = false, $force = false)
     {
         $this->model_path          = $this->utility->getModelPath();
+        $this->factory_path        = database_path('factories/');
         $this->model_relative_path = $this->utility->getModelPath(true);
 
         // 从 storage 里获取模型数据，在修改了 schema 后忘了执行 scaffold:fresh 的话会不准确！！
@@ -47,17 +47,30 @@ class CreateModelGenerator extends Generator
             {
                 $this->filesystem->makeDirectory($this->model_path . $attr['module']['folder'], 0777, true, true);
             }
+            if ( ! $this->filesystem->isDirectory($this->factory_path . $attr['module']['folder']))
+            {
+                $this->filesystem->makeDirectory($this->factory_path . $attr['module']['folder'], 0777, true, true);
+            }
+
+            $table_attr        = $this->utility->getOneTable($attr['table_name']);
+            $fields            = $table_attr['fields'];
+            // 目录及 namespace 处理
+            $namespace = $this->utility->getConfig('model.path') . $attr['module']['folder'];
+            $namespace = ucfirst(str_replace('/', '\\', $namespace));
 
             $model_file          = $this->model_path . $attr['module']['folder'] . "/{$class}.php";
             $model_relative_file = $this->model_relative_path . $attr['module']['folder'] . "/{$class}.php";
             if ($this->filesystem->isFile($model_file) && ! $force)
             {
                 $this->command->error('x Model is existed (' . $model_relative_file . ')');
+
+                // 生成对应的 factory 文件并更新 Seeder
+                if ($factory) {
+                    $this->buildFactory($attr['module']['folder'], $attr['table_name'], $class, $namespace, $fields, $force);
+                }
                 continue;
             }
 
-            $table_attr        = $this->utility->getOneTable($attr['table_name']);
-            $fields            = $table_attr['fields'];
             $dictionaries      = $table_attr['dictionaries'];
             $hidden            = [];
             $use_trait         = [];
@@ -77,13 +90,10 @@ class CreateModelGenerator extends Generator
                 $hidden[]      = "'deleted_at'";
             }
 
-            // 目录及 namespace 处理
-            $namespace = $this->utility->getConfig('model.path') . $attr['module']['folder'];
-
             $meta = [
                 'author'                => $this->utility->getConfig('author'),
                 'date'                  => date('Y-m-d H:i:s'),
-                'namespace'             => ucfirst(str_replace('/', '\\', $namespace)),
+                'namespace'             => $namespace,
                 'use_class'             => implode("\n", $use_class),
                 'use_trait'             => ! empty($use_trait) ? 'use ' . implode(', ', $use_trait) . ';' : '',
                 'class'                 => $class,
@@ -101,7 +111,144 @@ class CreateModelGenerator extends Generator
 
             $this->filesystem->put($model_file, $this->compileStub($meta));
             $this->command->info('+ ' . $model_relative_file);
+
+            // 生成对应的 factory 文件并更新 Seeder
+            if ($factory) {
+                $this->buildFactory($attr['module']['folder'], $attr['table_name'], $class, $meta['namespace'], $fields, $force);
+            }
         }
+    }
+
+    /**
+     * 生成 factory 文件
+     *
+     * @param string $table_name
+     * @param string $class
+     * @param string $namespace
+     * @return void
+     */
+    private function buildFactory($folder, $table_name, $class, $namespace, $fields, $force)
+    {
+        $words = array_map(function ($item) {
+            return ucfirst($item);
+        }, explode('_', $table_name));
+
+        $factory_file           = $this->factory_path . $folder . '/' . implode('', $words) . 'Factory.php';
+        $factory_relative_file  = str_replace(base_path(), '.', $factory_file);
+        if ($this->filesystem->isFile($factory_file) && ! $force)
+        {
+            return $this->command->error('x Factory is existed (' . $factory_relative_file . ')');
+        }
+
+        $meta = [
+            'author'        => $this->utility->getConfig('author'),
+            'date'          => date('Y-m-d H:i:s'),
+            'model_class'   => $namespace . '\\' . $class,
+            'class'         => $class,
+            'fields'        => '[]',
+        ];
+
+        $codes = ['['];
+        foreach ($fields as $field_name => $attr)
+        {
+            if (\in_array($field_name, ['id', 'deleted_at'])) continue;
+
+            // https://github.com/fzaninotto/Faker
+            if (strstr($field_name, '_ids'))
+            {
+                $rule = "\$faker->numberBetween(1, 3) . ',' . \$faker->numberBetween(4, 7)";
+            }
+            elseif ($field_name == 'password' || strstr($field_name, '_password'))
+            {
+                $rule = "\$faker->password";
+            }
+            elseif ($field_name == 'address' || strstr($field_name, '_address'))
+            {
+                $rule = "\$faker->address";
+            }
+            elseif ($field_name == 'mobile' || strstr($field_name, '_mobile'))
+            {
+                $rule = "\$faker->phoneNumber";
+            }
+            elseif ($field_name == 'email' || strstr($field_name, '_email'))
+            {
+                $rule = "\$faker->unique()->safeEmail";
+            }
+            elseif ($field_name == 'user_name' || $field_name == 'nick_name')
+            {
+                $rule = "\$faker->userName";
+            }
+            elseif ($field_name == 'real_name')
+            {
+                $rule = "\$faker->name(array_random(['male', 'female']))";
+            }
+            elseif (strstr($field_name, '_code'))
+            {
+                $rule = "\$faker->numerify('C####')";
+            }
+            elseif (in_array($attr['type'], ['int', 'tinyint', 'bigint']))
+            {
+                $rule = "rand(0, 1)";
+            }
+            elseif ($attr['type'] == 'varchar' || $attr['type'] == 'char')
+            {
+                $rule = "implode(' ', \$faker->words(2))";
+            }
+            elseif ($attr['type'] == 'text')
+            {
+                $rule = "\$faker->text(100)";
+            }
+            elseif ($attr['type'] == 'date')
+            {
+                $rule = "\$faker->date()";
+            }
+            elseif ($attr['type'] == 'datetime' || $attr['type'] == 'timestamp')
+            {
+                $rule = "\$faker->date() . ' ' . \$faker->time()";
+            }
+            elseif ($attr['type'] == 'boolean')
+            {
+                $rule = "\rand(0, 1)";
+            }
+
+            $codes[] = $this->getTabs(2) . "'{$field_name}' => {$rule},";
+        }
+        $codes[] = $this->getTabs(1) . ']';
+        $meta['fields'] = implode(PHP_EOL, $codes);
+
+        $this->updateSeeder($meta['model_class']);
+
+        $content        = $this->buildStub($meta, $this->getStub('factory'));
+        $this->filesystem->put($factory_file, $content);
+        $this->command->info('+ ' . $factory_relative_file);
+    }
+
+    /**
+     * 更新 Databse Seeder
+     *
+     * @param string $model_class
+     * @return void
+     */
+    private function updateSeeder($model_class)
+    {
+        $file       = database_path('seeds/DatabaseSeeder.php');
+        $file_txt   = $this->filesystem->get($file);
+
+        // 判断是否已存在于 seeder 中
+        if (strstr($file_txt, $model_class)) return false;
+
+        $code       = [];
+        $code[]     = "factory({$model_class}::class, 30)->create();";
+
+        $code[]     = PHP_EOL . $this->getTabs(2) . '//:insert_code_here:do_not_delete';
+        $code       = implode(PHP_EOL, $code);
+
+        $file_txt   = str_replace("//:insert_code_here:do_not_delete", $code, $file_txt);
+
+        $this->filesystem->put($file, $file_txt);
+        $this->command->warn('+ ./app/routes/api.php (Updated)');
+
+        return true;
     }
 
     /**
@@ -241,7 +388,7 @@ class CreateModelGenerator extends Generator
 
         foreach ($fields as $field_name => $attr)
         {
-            if ($field_name == 'deleted_at')
+            if (in_array($field_name, ['deleted_at', 'created_at', 'updated_at']))
             {
                 continue;
             }
