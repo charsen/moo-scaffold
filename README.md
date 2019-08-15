@@ -123,6 +123,7 @@ php artisan scaffold:model `schema_file_name`
 - `schema_file_name` 非必写，若不写会有提示做选择
 - 添加 `-f` 覆盖已存在文件
 - 添加 `--fresh` 刷新缓存数据，会先执行 `artisan scaffold:fresh`
+- 添加 `--factory` 同时生成 model 对应的 factory 文件，并更新 `DatabaseSeeder`
 
 **Example:**
 ```
@@ -137,21 +138,20 @@ php artisan scaffold:controller `schema_file_name`
 - `schema_file_name` 非必写，若不写会有提示做选择
 - 添加 `-f` 覆盖已存在文件
 - 添加 `--fresh` 刷新缓存数据，会先执行 `artisan scaffold:fresh`
-- **同时会生成对应的 `From Request` 对象于 app/Http/Requests/ 路径下（目录层次与 Controller 的一致）**
+- 同时会生成对应的 `From Request` 对象于 `app/Http/Requests/` 路径下（目录层次与 Controller 的一致）
 
 _**!!! PS: !!!**_
 - `controller` 里的 `action` 是生成 接口文档及调试 的依据，`one action == one api`
-- 到此，不要急于后续的生成 `controller, api` ，因为类里的验证规则是生成 `api` 及 `表单控件` 时的数据来源
-- 请先 **认真** 设置 `From Request` 里的验证规则
+- 请先 **认真** 设置 `From Request` 里的验证规则，因为类里的验证规则是生成 `api` 及 `表单控件` 时的数据来源
 
 
 ### 8. 生成接口配置文件
 ```sh
 php artisan scaffold:api `namesapce`
 ```
-- `namesapce` 非必写，若不写会有提示做选择（app/controllers 下的某个目录，或多级目录）
+- `namesapce` 非必写，若不写会有提示做选择（`app/controllers` 下的某个目录，或多级目录）
 - 添加 `-f` 覆盖已存在文件
-- 添加 `-i` 忽略用 controller 里的 actions 求交集（若 route.php 里用了 ::resource 方式可能会生成多余的请求）（todo: 移除）
+- 添加 `-i` 忽略用 `controller` 里的 `actions` 求交集
 - 添加 `--fresh` 刷新缓存数据，会先执行 `artisan scaffold:fresh`
 
 **PS1:**
@@ -165,8 +165,8 @@ php artisan scaffold:api `namesapce`
 Route::resourceHasTrashes('departments', 'Admin\\Personnels\\DepartmentController');
 ```
 - 要先设置好路由规则，程序通过 `Route::getRoutes()` 获取接口地址（但由于用了 `Route::resources`，实际可能没那么多）
-- 用路由与控制器的 action 求交集，得出真实的接口
-- 生成时：默认是附加新的 action 到对应的配置文件，若有action被删减了会提醒，需要手工删除接口配置文件的代码
+- 用路由与控制器的`actions`求交集，得出真实的接口
+- 生成时：默认是附加新的`action`到对应的配置文件，若有`action`被删减了会提醒，需要手工删除接口配置文件的代码
 
 
 ### 9. 更新 i18n 文件
@@ -174,7 +174,7 @@ Route::resourceHasTrashes('departments', 'Admin\\Personnels\\DepartmentControlle
 php artisan scaffold:i18n
 ```
 - 添加 `--fresh` 刷新缓存数据，会先执行 `artisan scaffold:fresh`
-- 目前支持两个 英文 、中文(需要手动在 `resources/lang/` 下创建 `zh-CN` 目录) 两个语种
+- 目前支持 `英文` 、`中文` (需要手动在 `resources/lang/` 下创建 `zh-CN` 目录) 两个语种
 - 可先润色 `scaffold/database/_fields.yaml` 里的内容，此文件会自动根据数据表的字段，添加或删掉项目
 
 
@@ -189,10 +189,10 @@ http://{{url}}}/scaffold/api
 ```sh
 php artisan scaffold:auth
 ```
-- 更新 ./app/ACL.php
-- 更新 ./resources/lang/{en, zh-CN}/actions.php (维护一处注释，同步多个语言文件)
-- 更新 ./app/config/actions.php
-- 需要做授权的 action 必须在注释中写 @acl {zh-CN: 中文 | en: English} 否则会被加入白名单
+- 更新 `./app/ACL.php`
+- 更新 `./resources/lang/{en, zh-CN}/actions.php` (维护一处注释，同步多个语言文件)
+- 更新 `./app/config/actions.php`
+- 需要做授权的 `action` 必须在注释中写 `@acl {zh-CN: 中文 | en: English}` 否则会被加入白名单
 
 
 ### 12. Free : “释放双手”
@@ -200,12 +200,10 @@ php artisan scaffold:auth
 php artisan scaffold:free  `schema_file_name`
 ```
 - `schema_file_name` 非必写，若不写会有提示做选择
-- 先执行 `artisan scaffold:fresh` 更新缓存数据
-- 生成 `mode`, `repository`, `migration` 相关文件，更新 `RepositoryServiceProvider`
+- 执行 `artisan scaffold:fresh` 更新缓存数据
+- 生成 `mode`, `migration` , `controller`, `api` 相关文件
 - 执行 `artisan scaffold:i18` 更新多语言文件
 - 询问是否执行 `artisan migrate` 创建数据表？
-- **不执行** `artisan scaffold:controller` 因为需手动调整 repository 里的字段验证规则（为了生成更准确的表单控件信息）
-- **不执行** `artisan scaffold:api` 因需手动调整 repository 里的字段验证规则（为了生成更准确的 api）_(PS: 要先写路由规则)_
 
 
 ## 文档

@@ -97,6 +97,8 @@ class CreateControllerGenerator extends Generator
         }
 
         $this->updateRoutes($created);
+
+        return true;
     }
 
     /**
