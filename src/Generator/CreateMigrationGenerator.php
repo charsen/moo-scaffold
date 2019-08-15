@@ -220,10 +220,10 @@ class CreateMigrationGenerator extends Generator
                 $fields_string = [];
                 foreach (explode(',', $attr['fields']) as $value)
                 {
-                    $fields_string[] = "'{$value}'";
+                    $fields_string[] = "'" . trim($value) . "'";
                 }
-                $index_name = str_replace('_id', '', implode('_', $fields_string));
-                $code[] = $this->getTabs(3) . $functions[$attr['type']] . '[' . implode(',', $fields_string) . "], '{$index_name}');";
+                $index_name = implode('_', array_map(function($item) { return trim($item, '\''); }, $fields_string));
+                $code[]     = $this->getTabs(3) . $functions[$attr['type']] . '[' . implode(', ', $fields_string) . "], '{$index_name}');";
             }
             else
             {
