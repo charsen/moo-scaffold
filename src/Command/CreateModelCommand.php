@@ -63,6 +63,13 @@ class CreateModelCommand extends Command
                 false,
             ],
             [
+                'factory',
+                '--factory',
+                InputOption::VALUE_OPTIONAL,
+                'Build The Factory File & Update DatabaseSeeder.',
+                false,
+            ],
+            [
                 'fresh',
                 '--fresh',
                 InputOption::VALUE_OPTIONAL,
@@ -91,7 +98,7 @@ class CreateModelCommand extends Command
 
         $force       = $this->option('force') === null;
         $fresh       = $this->option('fresh') === null;
-
+        $factory     = $this->option('factory') === null;
         if ($fresh)
         {
             $this->tipCallCommand('scaffold:fresh');
@@ -101,7 +108,7 @@ class CreateModelCommand extends Command
         }
 
         $result = (new CreateModelGenerator($this, $this->filesystem, $this->utility))
-            ->start($schema_name, $force);
+            ->start($schema_name, $factory, $force);
 
         $this->tipDone();
     }
