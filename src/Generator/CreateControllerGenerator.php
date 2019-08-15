@@ -257,10 +257,10 @@ class CreateControllerGenerator extends Generator
             return true;
         }
 
-        $code[]     = "\n\n" . '//:end:do_not_delete';
+        $code[]     = "\n\n" . '//:insert_code_here:do_not_delete';
         $code       = implode("\n", $code);
 
-        $file_txt   = str_replace("//:end:do_not_delete", $code, $file_txt);
+        $file_txt   = str_replace("//:insert_code_here:do_not_delete", $code, $file_txt);
 
         $this->filesystem->put($file, $file_txt);
         $this->command->warn('+ ./app/routes/api.php (Updated)');
