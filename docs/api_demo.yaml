@@ -2,9 +2,9 @@
 # 一个 controller 一个 api.schema 文件
 #
 ### 参数的几种写法举例：
-# 1. 名称、默认值：                    id: [ID, '']
-# 2. 非必填、名称、默认值：             id: [false, ID, 2]
-# 3. 非必填、名称、默认值、描述：        id: [false, ID, 2, '描述']
+# 1. 名称、默认值：                    field: [ID, '']
+# 2. 非必填、名称、默认值：             field: [false, ID, 2]
+# 3. 非必填、名称、默认值、描述：        field: [false, ID, 2, '描述']
 ##
 controller:
     code: 001
@@ -14,6 +14,7 @@ controller:
 actions:
     index:
         name: 部门列表
+        prototype: ''
         desc: []
         request: [GET, departments]
         url_params: []
@@ -21,11 +22,10 @@ actions:
         name: 添加部门
         desc: []
         request: [POST, departments]
+        url_params: []
         body_params:
             parent_id: [父级ID, '']
             department_code: [false, 部门编号, '']
-            department_type: [部门类型, 3]
-            department_name: [部门名称, '']
     show:
         name: 查看部门
         desc: []
@@ -35,16 +35,11 @@ actions:
         name: 更新部门
         desc: []
         request: [POST, departments/{department}]
-        body_params:
-            _method: [PUT]
-            parent_id: [父级ID, '']
-            department_code: [false, 部门编号, '']
-            department_type: [部门类型, 3]
-            department_name: [部门类型, '']
-            department_status: [部门状态, 7]
+        url_params: []
+        body_params: []
     destroy:
         name: 删除部门
         desc: []
         request: [POST, departments/{department}]
-        body_params:
-            _method: [DELETE]
+        url_params: []
+        body_params: []

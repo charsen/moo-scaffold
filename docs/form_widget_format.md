@@ -5,8 +5,9 @@
 - label          : label, 默认从多语言 validation.attributes 中取值
 - widget_type    : 建议的控件类型，默认为 text
 - widget_status  : 控件状态，默认为 normal, 可选 { normal, readonly, disabled, hidden }
+- value          : 默认值，默认为空
 - placeholder    : 默认为空
-- help           : 控件附加的提示文本内容
+- tip            : 控件附加的提示文本内容
 - append_attr    : 其它附加属性
 - options        : 数据，可能是 select options ，radio, checkbox ...
 
@@ -117,4 +118,3 @@
     }
 }
 ```
-

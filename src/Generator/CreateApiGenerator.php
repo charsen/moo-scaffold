@@ -47,7 +47,8 @@ class CreateApiGenerator extends Generator
             $reflection_class = new \ReflectionClass($controller);
 
             // 过滤掉当前控制器 - 路由里多余的 action
-            if (! $ignore_controller)
+            // 由于用了 `Route::resources`，实际controller中可能没那么多action
+            if ( ! $ignore_controller)
             {
                 $methods    = get_class_methods($controller);
                 if (empty($methods)) {
@@ -238,7 +239,7 @@ class CreateApiGenerator extends Generator
      */
     private function getActionName($reflection_class, $action_name)
     {
-        $default_names  = ['create' => '创建', 'edit' => '编辑'];
+        $default_names  = ['create' => '创建表单', 'edit' => '编辑表单'];
 
         if (isset($default_names[$action_name]))
         {

@@ -9,7 +9,8 @@ use Charsen\Scaffold\Generator\FreshStorageGenerator;
 use Charsen\Scaffold\Generator\UpdateMultilingualGenerator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
-
+use Charsen\Scaffold\Generator\CreateApiGenerator;
+use Symfony\Component\Yaml\Yaml;
 /**
  * Free : Release your hands
  *
@@ -91,8 +92,12 @@ class FreeCommand extends Command
             $schema_name = $this->choice('What is schema name?', $file_names);
         }
 
-        $clean = $this->option('clean') === null;
-        $force = $this->option('force') === null;
+        $clean         = $this->option('clean') === null;
+        $force         = $this->option('force') === null;
+
+        $schema_path   = $this->utility->getDatabasePath('schema');
+        $yaml          = new Yaml;
+        $data          = $yaml::parseFile($schema_path . $schema_name . '.yaml');
 
         $this->tipCallCommand('scaffold:fresh');
         (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start($clean);
@@ -102,6 +107,10 @@ class FreeCommand extends Command
 
         $this->tipCallCommand('scaffold:controller');
         (new CreateControllerGenerator($this, $this->filesystem, $this->utility))->start($schema_name, $force);
+
+        $this->tipCallCommand('scaffold:api');
+        $namespace     = "{$data['package']['folder']}/{$data['module']['folder']}";
+        (new CreateApiGenerator($this, $this->filesystem, $this->utility))->start($namespace, false, $force);
 
         $this->tipCallCommand('scaffold:i18n');
         (new UpdateMultilingualGenerator($this, $this->filesystem, $this->utility))->start();

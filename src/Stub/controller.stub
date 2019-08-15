@@ -198,7 +198,7 @@ class {{entity_en_name}} extends Controller
     }
 
     /**
-     *  创建表单控件
+     *  创建表单
      *
      * @param  \{{request_class}}  $request
      * @return \App\Http\Resources\FormWidgetCollection
@@ -211,7 +211,7 @@ class {{entity_en_name}} extends Controller
     }
 
     /**
-     * 编辑表单控件
+     * 编辑表单
      *
      * @param  \{{request_class}}  $request
      * @param  int $id
