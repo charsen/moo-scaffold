@@ -205,7 +205,7 @@ class FreshStorageGenerator extends Generator
         {
             // 添加 unsigned 属性
             $attr['unsigned'] = $attr['unsigned'] ?? true;
-            $attr['default']  = empty($attr['default']) ? 0 : $attr['default'];
+            $attr['default']  = $attr['default'] ?? 0;
             if ($attr['type'] == 'bigint')
             {
                 $attr['size'] = $attr['size'] == '' ? 20 : $attr['size'];
@@ -221,7 +221,7 @@ class FreshStorageGenerator extends Generator
         }
         elseif (in_array($attr['type'], ['char', 'varchar']))
         {
-            $attr['default'] = empty($attr['default']) ? '' : $attr['default'];
+            $attr['default'] = $attr['default'] ?? '';
             $attr['size']    = empty($attr['size']) ? 32 : $attr['size'];
             if (strstr($attr['size'], '|'))
             {
