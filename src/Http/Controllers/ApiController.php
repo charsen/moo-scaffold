@@ -272,15 +272,9 @@ class ApiController extends Controller
         if (! empty($req->cookie('api_token')) && $action_name != 'authenticate')
         {
             // 接口测试时从 cookie 中取值，若是文件则为空
-            $param = ['Token', ($from_action == 'request' ? $req->cookie('api_token') : '')];
-            if ($action_data['request'][0] == 'GET')
-            {
-                $action_data['url_params']['token'] = $param;
-            }
-            else
-            {
-                $action_data['body_params']['token'] = $param;
-            }
+            // 加到 header 中，建议用这种，因为在 https 情况下更安全：Authorization:Bearer token
+            $param = $from_action == 'request' ? $req->cookie('api_token') : '';
+            $action_data['header_params']['token'] = $param;
         }
 
         // controllers, 从 repository 中获取验证规则的字段名，作为接口参数

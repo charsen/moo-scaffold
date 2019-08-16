@@ -111,7 +111,7 @@
                 $('#left_container').html(result);
                 $('#header').html('');
 
-                var check = new RegExp(/^(index|authenticate)$/);
+                var check = new RegExp(/^(index|authenticate|logout)$/);
                 if (check.test(action) || method == 'GET')
                 {
                     $('#send').trigger('click');
