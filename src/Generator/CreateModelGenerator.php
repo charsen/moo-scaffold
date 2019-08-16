@@ -54,6 +54,8 @@ class CreateModelGenerator extends Generator
 
             $table_attr        = $this->utility->getOneTable($attr['table_name']);
             $fields            = $table_attr['fields'];
+            $dictionaries      = $table_attr['dictionaries'];
+
             // 目录及 namespace 处理
             $namespace = $this->utility->getConfig('model.path') . $attr['module']['folder'];
             $namespace = ucfirst(str_replace('/', '\\', $namespace));
@@ -66,19 +68,16 @@ class CreateModelGenerator extends Generator
 
                 // 生成对应的 factory 文件并更新 Seeder
                 if ($factory) {
-                    $this->buildFactory($attr['module']['folder'], $attr['table_name'], $class, $namespace, $fields, $force);
+                    $this->buildFactory($attr['module']['folder'], $attr['table_name'], $class, $namespace, $fields, $dictionaries, $force);
                 }
                 continue;
             }
 
-            $dictionaries      = $table_attr['dictionaries'];
             $hidden            = [];
             $use_trait         = [];
             $use_class         = [];
 
-            // 数据字典代码
             $dictionaries_code      = $this->buildDictionaries($dictionaries, $fields);
-
             $casts_code             = $this->buildCasts($fields);
             $get_intval_attribute   = $this->buildIntvalAttribute($fields);
 
@@ -114,7 +113,7 @@ class CreateModelGenerator extends Generator
 
             // 生成对应的 factory 文件并更新 Seeder
             if ($factory) {
-                $this->buildFactory($attr['module']['folder'], $attr['table_name'], $class, $meta['namespace'], $fields, $force);
+                $this->buildFactory($attr['module']['folder'], $attr['table_name'], $class, $meta['namespace'], $fields, $dictionaries, $force);
             }
         }
     }
@@ -127,7 +126,7 @@ class CreateModelGenerator extends Generator
      * @param string $namespace
      * @return void
      */
-    private function buildFactory($folder, $table_name, $class, $namespace, $fields, $force)
+    private function buildFactory($folder, $table_name, $class, $namespace, $fields, $dictionaries, $force)
     {
         $words = array_map(function ($item) {
             return ucfirst($item);
@@ -209,6 +208,11 @@ class CreateModelGenerator extends Generator
             elseif ($attr['type'] == 'boolean')
             {
                 $rule = "\rand(0, 1)";
+            }
+
+            if (isset($dictionaries[$field_name])) {
+                $temp = array_pluck($dictionaries[$field_name], 1, 0);
+                $rule = "\$faker->randomElement([" . implode(', ', array_keys($temp)) . "])";
             }
 
             $codes[] = $this->getTabs(2) . "'{$field_name}' => {$rule},";
