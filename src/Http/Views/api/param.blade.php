@@ -63,7 +63,7 @@
                         <td><input type="checkbox" class="checkbox" checked /></td>
                         <td><input type="text" class="txt" value="Token"></td>
                         <td><input type="text" class="txt key" value="Authorization"></td>
-                        <td><input type="text" class="txt value" value="Bearer {{ $header_params['token'] }}"></td>
+                        <td><input type="text" class="txt value" id="auth_token" value="Bearer {{ $header_params['token'] }}"></td>
                     </tr>
                     @endif
                 </table>
