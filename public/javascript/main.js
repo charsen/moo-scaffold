@@ -111,30 +111,11 @@
                             $.cookie("api_token", json.data.token);
                         }
 
-                        // 获取相关Http Response header
-                        var wpoInfo = {
-                            // 服务器端时间
-                            "date" : xhr.getResponseHeader('Date'),
-                            // 如果开启了gzip，会返回这个东西
-                            "contentEncoding" : xhr.getResponseHeader('Content-Encoding'),
-                            // keep-alive ？ close？
-                            "connection" : xhr.getResponseHeader('Connection'),
-                            // 响应长度
-                            "contentLength" : xhr.getResponseHeader('Content-Length'),
-                            // 服务器类型，apache？lighttpd？
-                            "server" : xhr.getResponseHeader('Server'),
-                            "vary" : xhr.getResponseHeader('Vary'),
-                            "transferEncoding" : xhr.getResponseHeader('Transfer-Encoding'),
-                            // text/html ? text/xml?
-                            "contentType" : xhr.getResponseHeader('Content-Type'),
-                            "cacheControl" : xhr.getResponseHeader('Cache-Control'),
-                            // 生命周期？
-                            "exprires" : xhr.getResponseHeader('Exprires'),
-                            "lastModified" : xhr.getResponseHeader('Last-Modified')
-                        };
-                        var header_html = '';
-
-                        $('#header').text(xhr.getAllResponseHeaders());  // xhr.getAllResponseHeaders().replace("\\n", " \n ") 返回全部头信息,string
+                        if (xhr.getResponseHeader('authorization') != null) {
+                            $.cookie("api_token", xhr.getResponseHeader('authorization').replace("Bearer ", ""));
+                            $('#auth_token').val(xhr.getResponseHeader('authorization'));
+                            $('#header').text(xhr.getResponseHeader('authorization'));
+                        }
 
                         Process({
                             id: "json_format",
@@ -171,6 +152,10 @@
                 });
             }
         });
+
+        var updateToken = function() {
+
+        };
 
         var cacheParamsSuccess = function(uri, params, success) {
             $.ajax({
