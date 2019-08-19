@@ -84,7 +84,7 @@ class CreateApiGenerator extends Generator
      */
     private function getDefaultActions()
     {
-        return ['create', 'edit', 'index', 'trashed', 'store', 'update', 'show', 'destroy', 'destroyBatch', 'restoreBatch'];
+        return ['create', 'edit', 'index', 'trashed', 'store', 'update', 'show', 'destroy', 'destroyBatch', 'restore'];
     }
 
     /**

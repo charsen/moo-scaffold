@@ -29,7 +29,7 @@
 - 数据字典 添加 appends 及 getAttribute 函数
 
 ### 资源仓库
-- 验证规则：{ index, trashed, create, update, destroyBatch, restoreBatch}
+- 验证规则：{ index, trashed, create, update, destroyBatch, restore}
 
 ### 多语言文件
 - 生成数据库表所有字段 及 模型字典字段多语言

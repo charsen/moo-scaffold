@@ -55,10 +55,10 @@ class {{request_name}} extends FormRequest
         ];
     }
 
-    public function restoreBatchRules()
+    public function restoreRules()
     {
         return [
-            'ids'       => 'required|array',
+            'ids'       => 'required',
         ];
     }
 
