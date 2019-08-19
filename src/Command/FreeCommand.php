@@ -109,7 +109,8 @@ class FreeCommand extends Command
         (new CreateControllerGenerator($this, $this->filesystem, $this->utility))->start($schema_name, $force);
 
         $this->tipCallCommand('scaffold:api');
-        $namespace     = "{$data['package']['folder']}/{$data['module']['folder']}";
+        //$namespace     = "{$data['package']['folder']}/{$data['module']['folder']}";
+        $namespace     = "{$data['module']['folder']}";
         (new CreateApiGenerator($this, $this->filesystem, $this->utility))->start($namespace, false, $force);
 
         $this->tipCallCommand('scaffold:i18n');

@@ -67,8 +67,8 @@ class ApiController extends Controller
 
         $data['api_index']          = 1;
         $data['current_folder']     = $req->input('f', 'Index');
-        $data['current_controller'] = $req->input('c', null);
-        $data['current_action']     = $req->input('a', null);
+        $data['current_controller'] = $req->input('c', 'Authentication');
+        $data['current_action']     = $req->input('a', 'authenticate');
         $data['first_menu_active']  = false;
 
         if (isset($data['apis'][$data['current_folder']][$data['current_controller']][$data['current_action']]))
@@ -279,7 +279,7 @@ class ApiController extends Controller
 
         // controllers, 从 repository 中获取验证规则的字段名，作为接口参数
         $controller        = 'App\Http\Controllers\\' . trim($folder_path . '\\' . $controller_class . 'Controller', '/');
-        $controller        = str_replace('/', '\\', $controller);
+        $controller        = str_replace(['/', '\\\\'], ['\\', '\\'], $controller);
         $reflection_class  = new \ReflectionClass($controller);
         $request_object    = $this->utility->getActionRequestClass($action_name, $reflection_class);
 

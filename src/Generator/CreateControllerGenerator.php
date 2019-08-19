@@ -36,7 +36,8 @@ class CreateControllerGenerator extends Generator
 
         //dump($all[$schema_name]);
         foreach ($all[$schema_name] as $class => $attr) {
-            $folders                 = "{$attr['package']['folder']}/{$attr['module']['folder']}/";
+           // $folders                 = "{$attr['package']['folder']}/{$attr['module']['folder']}/";
+            $folders                 = "{$attr['module']['folder']}/";
 
             // 检查目录是否存在，不存在则创建
             if (!$this->filesystem->isDirectory($this->controller_path . $folders)) {
@@ -46,16 +47,18 @@ class CreateControllerGenerator extends Generator
             $controller_file          = $this->controller_path . $folders . "{$class}.php";
             $controller_relative_file = $this->controller_relative_path . "{$class}.php";
 
-            if ($this->filesystem->isFile($controller_file) && !$force) {
+            if ($this->filesystem->isFile($controller_file) && ! $force) {
                 $this->command->error('x Controller is existed (' . $controller_relative_file . ')');
                 continue;
             }
 
             // Request, namespace 处理
             $request_name       = str_replace('Controller', 'Request', $class);
-            $request_class      = "App\\Http\\Requests\\{$attr['package']['folder']}\\{$attr['module']['folder']}\\{$request_name}";
+            //$request_class      = "App\\Http\\Requests\\{$attr['package']['folder']}\\{$attr['module']['folder']}\\{$request_name}";
+            $request_class      = "App\\Http\\Requests\\{$attr['module']['folder']}\\{$request_name}";
 
-            $namespace          = "App\\Http\\Controllers\\{$attr['package']['folder']}\\{$attr['module']['folder']}";
+            //$namespace          = "App\\Http\\Controllers\\{$attr['package']['folder']}\\{$attr['module']['folder']}";
+            $namespace          = "App\\Http\\Controllers\\{$attr['module']['folder']}";
             $model_class        = $this->utility->getConfig('model.path') . $attr['module']['folder'] . '/' . $attr['model_class'];
 
             // 验证规则 ，字段 处理
@@ -89,7 +92,7 @@ class CreateControllerGenerator extends Generator
             $this->createRequest($rules, $meta['request_class'], $meta['request_name'], $meta['model_class'], $meta['route_key']);
 
             $created[] = [
-                'namespace'         => $meta['package_en_name'] . '\\' . $meta['module_en_name'] . '\\',
+                'namespace'         => $meta['module_en_name'] . '\\',
                 'model'             => $meta['route_key'] . 's',
                 'model_class'       => $meta['model_class'],
                 'class'             => $class,
@@ -243,8 +246,9 @@ class CreateControllerGenerator extends Generator
     {
         if (empty($created)) return true;
 
-        $file       = base_path('routes/api.php');
-        $file_txt   = $this->filesystem->get($file);
+        $file          = $this->utility->getRouteFile('admin');
+        $file_relative = $this->utility->getRouteFile('admin', true);
+        $file_txt      = $this->filesystem->get($file);
 
         $code = [];
         foreach ($created as $controller) {
@@ -259,13 +263,13 @@ class CreateControllerGenerator extends Generator
             return true;
         }
 
-        $code[]     = "\n\n" . '//:insert_code_here:do_not_delete';
+        $code[]     = "\n\n" . $this->getTabs(1) . '//:insert_code_here:do_not_delete';
         $code       = implode("\n", $code);
 
         $file_txt   = str_replace("//:insert_code_here:do_not_delete", $code, $file_txt);
 
         $this->filesystem->put($file, $file_txt);
-        $this->command->warn('+ ./app/routes/api.php (Updated)');
+        $this->command->warn('+ ' . $file_relative . ' (Updated)');
 
         return true;
     }
