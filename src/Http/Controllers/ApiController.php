@@ -307,7 +307,7 @@ class ApiController extends Controller
                 'update'       => 'PATCH',
                 'destroy'      => 'DELETE',
                 'destroyBatch' => 'DELETE',
-                'restoreBatch' => 'PATCH',
+                'restore'      => 'PATCH',
             ];
             $method_param = isset($method_rest[$action_name])
                 ? ['_method' => ['require' => true, 'name' => '', 'value' => $method_rest[$action_name], 'desc' => '']]

@@ -181,16 +181,20 @@ class {{entity_en_name}} extends Controller
 
 
     /**
-     * 批量恢复
+     * 恢复
      *
-     * @acl {zh-CN: 批量恢复{{entity_name}} | en: Restore Batch{{entity_en_name}}}
+     * @acl {zh-CN: 恢复{{entity_name}} | en: Restore {{entity_en_name}}}
      *
      * @param  \{{request_class}} $request
      * @return \App\Http\Resources\BaseResource
      */
-    public function restoreBatch({{request_name}} $request)
+    public function restore({{request_name}} $request)
     {
         $validated  = $request->validated();
+
+        if ( ! is_array($validated['ids'])) {
+            $validated['ids'] = [$validated['ids']];
+        }
 
         $data       = $this->model->onlyTrashed()->whereIn($this->model->getKeyName(), $validated['ids'])->get();
         $result     = $data->map(function ($item) {
