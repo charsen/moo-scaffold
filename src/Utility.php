@@ -520,6 +520,35 @@ class Utility
     }
 
     /**
+     * Get App Route Path
+     *
+     * @param $folder
+     * @param $relative
+     *
+     * @return string
+     */
+    public function getRoutePath($relative = false)
+    {
+        $path = base_path('routes/');
+
+        return $relative ? str_replace(base_path(), '.', $path) : $path;
+    }
+
+    /**
+     * 获取路由文件
+     *
+     * @param string $name
+     * @param boolean $relative
+     * @return string
+     */
+    public function getRouteFile($name = 'api', $relative = false)
+    {
+        $file = base_path('/') . $this->getConfig('routes.' . $name);
+
+        return $relative ? str_replace(base_path('/'), '.', $file) : $file;
+    }
+
+    /**
      * Helper to get the config values.
      *
      * @param  string  $key
