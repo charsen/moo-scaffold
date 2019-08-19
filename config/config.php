@@ -24,6 +24,14 @@ return [
     ],
 
     /**
+     * App 路由文件设定
+     */
+    'routes' => [
+        'admin' => 'routes/admin.php',
+        'api'   => 'routes/api.php',
+    ],
+
+    /**
      *  多语言设定
      */
     'languages' => ['en', 'zh-CN'],
