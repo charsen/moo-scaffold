@@ -136,7 +136,7 @@ php artisan scaffold:model personnels
 php artisan scaffold:controller `schema_file_name`
 ```
 - `schema_file_name` 非必写，若不写会有提示做选择
-- 添加 `-f` 覆盖已存在文件
+- 添加 `-f` 覆盖已存在文件（Request 文件不会被覆盖，需要手动删除）
 - 添加 `--fresh` 刷新缓存数据，会先执行 `artisan scaffold:fresh`
 - 同时会生成对应的 `From Request` 对象于 `app/Http/Requests/` 路径下（目录层次与 Controller 的一致）
 

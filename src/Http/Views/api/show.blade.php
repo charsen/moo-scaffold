@@ -34,11 +34,19 @@
                     <th>说明</th>
                 </tr>
                 <tr>
-                    <td><em class="font-red">*</em> Accept</td>
+                    <td><em class="font-red">*</em> X-Requested-With</td>
                     <td></td>
-                    <td>application/json</td>
+                    <td>XMLHttpRequest</td>
                     <td></td>
                 </tr>
+                @if (isset($header_params['token']))
+                <tr>
+                    <td><em class="font-red">*</em> Authorization</td>
+                    <td></td>
+                    <td>Bearer {Token}</td>
+                    <td></td>
+                </tr>
+                @endif
             </table>
         </div>
     </div>
