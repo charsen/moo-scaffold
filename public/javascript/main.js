@@ -115,6 +115,8 @@
                             $.cookie("api_token", xhr.getResponseHeader('authorization').replace("Bearer ", ""));
                             $('#auth_token').val(xhr.getResponseHeader('authorization'));
                             $('#header').text(xhr.getResponseHeader('authorization'));
+                        } else {
+                            $('#header').text(xhr.getAllResponseHeaders());
                         }
 
                         Process({
