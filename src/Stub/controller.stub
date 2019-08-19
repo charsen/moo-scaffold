@@ -31,9 +31,15 @@ class {{entity_en_name}} extends Controller
      */
     public function __construct({{model_name}} $model)
     {
-        $this->checkAuthorization();
-
         $this->model = $model;
+    }
+
+    /**
+     * 执行 action 前先验证权限
+     */
+    public function boot()
+    {
+        $this->checkAuthorization();
     }
 
     /**
