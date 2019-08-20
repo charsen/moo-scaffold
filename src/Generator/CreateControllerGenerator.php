@@ -134,6 +134,7 @@ class CreateControllerGenerator extends Generator
         $update_code = ['['];
         foreach ($rules as $field_name => $rule)
         {
+            $rule = str_replace(['|required|', 'required|', 'required'], '', $rule);
             if (strstr($rule, ":'")) {    // $model->int_field 时拼接代码，结尾的 ' 提前了
                 $tmp_create = "'{$field_name}' => '{$rule},";
                 if (strstr($rule, "unique:")) {
@@ -202,6 +203,14 @@ class CreateControllerGenerator extends Generator
                 if (isset($attr['unsigned']) && ! isset($dictionaries[$field_name])) {
                     $filed_rules[] = 'min:0';
                 }
+            }
+
+            if (strstr($field_name, '_ids')) {
+                $filed_rules[] = 'array';
+            }
+
+            if (in_array($attr['type'], ['char', 'varchar'])) {
+                $filed_rules[] = 'string';
             }
 
             if ($attr['type'] == 'boolean') {
