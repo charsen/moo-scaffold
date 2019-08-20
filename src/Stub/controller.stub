@@ -179,7 +179,6 @@ class {{entity_en_name}} extends Controller
         return new BaseResource($result);
     }
 
-
     /**
      * 恢复
      *
