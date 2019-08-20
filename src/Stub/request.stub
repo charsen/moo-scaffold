@@ -51,7 +51,7 @@ class {{request_name}} extends FormRequest
     {
         return [
             'ids'       => 'required|array',
-            'force'     => 'sometimes|required|boolean',
+            'force'     => 'sometimes|boolean',
         ];
     }
 
