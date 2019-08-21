@@ -2,15 +2,16 @@
 
 namespace Charsen\Scaffold\Command;
 
-use Charsen\Scaffold\Generator\CreateControllerGenerator;
-use Charsen\Scaffold\Generator\CreateMigrationGenerator;
-use Charsen\Scaffold\Generator\CreateModelGenerator;
-use Charsen\Scaffold\Generator\FreshStorageGenerator;
-use Charsen\Scaffold\Generator\UpdateMultilingualGenerator;
-use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Yaml\Yaml;
 use Symfony\Component\Console\Input\InputOption;
 use Charsen\Scaffold\Generator\CreateApiGenerator;
-use Symfony\Component\Yaml\Yaml;
+use Symfony\Component\Console\Input\InputArgument;
+use Charsen\Scaffold\Generator\CreateModelGenerator;
+use Charsen\Scaffold\Generator\FreshStorageGenerator;
+use Charsen\Scaffold\Generator\CreateMigrationGenerator;
+use Charsen\Scaffold\Generator\CreateControllerGenerator;
+use Charsen\Scaffold\Generator\UpdateMultilingualGenerator;
+use Charsen\Scaffold\Generator\UpdateAuthorizationGenerator;
 /**
  * Free : Release your hands
  *
@@ -115,6 +116,9 @@ class FreeCommand extends Command
 
         $this->tipCallCommand('scaffold:i18n');
         (new UpdateMultilingualGenerator($this, $this->filesystem, $this->utility))->start();
+
+        $this->tipCallCommand('scaffold:auth');
+        (new UpdateAuthorizationGenerator($this, $this->filesystem, $this->utility))->start();
 
         $this->tipCallCommand('scaffold:migration');
         (new CreateMigrationGenerator($this, $this->filesystem, $this->utility))->start($schema_name);

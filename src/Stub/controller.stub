@@ -20,7 +20,7 @@ use {{request_class}};
  * @author  {{author}}
  * @date    {{date}}
  */
-class {{entity_en_name}} extends Controller
+class {{class}} extends Controller
 {
 
     protected $model;
