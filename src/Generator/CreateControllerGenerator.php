@@ -324,6 +324,7 @@ class CreateControllerGenerator extends Generator
 
             if (isset($dictionaries[$field_name])) {
                 $code[] = $this->getTabs(4) . "'widget_type'   => 'radio',";
+                $code[] = $this->getTabs(4) . "'dictionary'    => true,";
                 $code[] = $this->getTabs(4) . "'options'       => \$this->model->init_{$field_name},";
             }
 
