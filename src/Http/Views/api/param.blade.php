@@ -86,9 +86,9 @@
             <div class="table input" id="request_params">
                 <table>
                     <tr>
-                       <th width="30"><input type="checkbox" class="checkbox-all"></th>
-                       <th width="100">名称</th>
-                       <th width="150">key</th>
+                        <th width="30"><input type="checkbox" class="checkbox-all"></th>
+                        <th width="100">名称</th>
+                        <th width="150">key</th>
                         <th>value</th>
                         <th>说明</th>
                     </tr>
@@ -130,7 +130,7 @@
                     </tr>
                     @foreach ($body_params as $key => $v)
                     <tr>
-                        <td><input type="checkbox" class="checkbox" {{ (($v['require']) ? 'checked' : '') }}></td>
+                        <td><input type="checkbox" class="checkbox" {{ ($v['require'] ? 'checked' : '') }}></td>
                         <td><input type="text" value="{{ $v['name'] }}" class="txt" readonly ></td>
                         <td><input type="text" value="{{ $key }}" class="txt key" readonly ></td>
                         <td><input type="text" value="{{ $v['value'] }}" class="txt value"></td>
