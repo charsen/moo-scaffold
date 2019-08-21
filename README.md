@@ -203,6 +203,7 @@ php artisan scaffold:free  `schema_file_name`
 - 执行 `artisan scaffold:fresh` 更新缓存数据
 - 生成 `mode`, `migration` , `controller`, `api` 相关文件
 - 执行 `artisan scaffold:i18` 更新多语言文件
+- 执行 `artisan scaffold:auth` 更新权限验证文件
 - 询问是否执行 `artisan migrate` 创建数据表？
 
 
