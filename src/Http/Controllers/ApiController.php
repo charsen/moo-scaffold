@@ -248,7 +248,6 @@ class ApiController extends Controller
         $action_data['current_folder']     = $folder_path;
         $action_data['current_controller'] = $controller_class;
 
-        // 12-09, 因为出现了同一个 url 多个 method ，api.yaml 的键名重复了，附加了方法，在这里特殊处理一下
         $action_name = $this->utility->removeActionNameMethod($action_name);
 
         // 针对 创建 及 更新 两个动作的原型做特殊处理
@@ -281,12 +280,17 @@ class ApiController extends Controller
         $controller        = 'App\Http\Controllers\\' . trim($folder_path . '\\' . $controller_class . 'Controller', '/');
         $controller        = str_replace(['/', '\\\\'], ['\\', '\\'], $controller);
         $reflection_class  = new \ReflectionClass($controller);
-        $request_object    = $this->utility->getActionRequestClass($action_name, $reflection_class);
-
+        // 因为出现了同一个 url 多个 method，导致真实的动作未知，可通过 rule_action 指定
+        // 比如 一个控制器中有 GET createPersonnels 又有 POST storePersonnels，为了简化授权，只要 createPersonnels ，
+        // 再从 createPersonnels 判断 isMethod('POST') 跳转到 storePersonnels
+        $rule_action       = isset($action_data['rule_action']) ? $action_data['rule_action'] : $action_name;
+        $request_object    = $this->utility->getActionRequestClass($rule_action, $reflection_class);
+        dump($rule_action);
+        dump($request_object->getActionRules($rule_action));
         $rule_params       = [];
-        if ( $request_object != null && ! empty($request_object->getActionRules($action_name)))
+        if ( $request_object != null && ! empty($request_object->getActionRules($rule_action)))
         {
-            $rule_params = $this->formatRules($action_name, $request_object->getActionRules($action_name), $dictionaries, $fields, $lang_fields);
+            $rule_params = $this->formatRules($action_name, $request_object->getActionRules($rule_action), $dictionaries, $fields, $lang_fields);
         }
 
         $url_params     =  ! isset($action_data['url_params'])
