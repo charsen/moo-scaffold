@@ -111,7 +111,7 @@ class ApiController extends Controller
     public function param(Request $req)
     {
         $data                = $this->getOneApi($req, 'request');
-        $data['request_url'] = str_replace($req->path(), 'api', $req->url());
+        $data['request_url'] = str_replace($req->path(), $this->config('routes.prefix'), $req->url());
         //dump($data);
 
         $params              = ($data['request'][0] == 'GET') ? $data['url_params'] : $data['body_params'];
@@ -285,8 +285,8 @@ class ApiController extends Controller
         // 再从 createPersonnels 判断 isMethod('POST') 跳转到 storePersonnels
         $rule_action       = isset($action_data['rule_action']) ? $action_data['rule_action'] : $action_name;
         $request_object    = $this->utility->getActionRequestClass($rule_action, $reflection_class);
-        dump($rule_action);
-        dump($request_object->getActionRules($rule_action));
+        //dump($rule_action);
+        //dump($request_object->getActionRules($rule_action));
         $rule_params       = [];
         if ( $request_object != null && ! empty($request_object->getActionRules($rule_action)))
         {
