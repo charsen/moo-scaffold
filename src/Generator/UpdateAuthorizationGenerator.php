@@ -24,7 +24,7 @@ class UpdateAuthorizationGenerator extends Generator
         $config_actions     = [];
         $whitelist          = [];
         $lang_actions       = [];
-
+        // dump($route_actions);
         foreach ($route_actions as $controller => $actions)
         {
             foreach ($actions as $action)
@@ -129,12 +129,15 @@ class UpdateAuthorizationGenerator extends Generator
     {
         $reflection_class   = new \ReflectionClass($controller);
         $PMCNames           = $this->utility->parsePMCNames($reflection_class);
+        //dump($PMCNames);
 
-        // 只支持 `app/Http/Controllers/` 往下**两级**，todo: 用递归来处理
+        // 用 namespace 来解析目录深度，只支持 `app/Http/Controllers/` 往下**两级**，
+        // todo: 用递归来处理
         $paths              = str_replace('App\\Http\\Controllers\\', '', $controller);
         $paths              = explode('\\', $paths);
         for ($i = 0; $i < count($paths); $i++)
         {
+            // App/Http/Controllers/ 根目录下的所有 控制器
             if ($i == 0)
             {
                 $is_controller  = preg_match("/[\w]+Controller$/", $paths[0]);
@@ -155,6 +158,7 @@ class UpdateAuthorizationGenerator extends Generator
                     $lang_actions[$package_key]         = $PMCNames['package'];
                 }
             }
+            // App/Http/Controllers/{**}/    某{**}目录下的所有 控制器
             elseif ($i == 1)
             {
                 $controller_key = "$paths[0].$paths[1]";
@@ -178,6 +182,7 @@ class UpdateAuthorizationGenerator extends Generator
                     $lang_actions[$controller_key] = $PMCNames['module'];
                 }
             }
+            // App/Http/Controllers/{**}/{$$}    某{**}/{$$}目录下的所有 控制器
             elseif ($i == 2)
             {
                 $controller_key = "$paths[0].$paths[1].$paths[2]";
@@ -226,11 +231,17 @@ class UpdateAuthorizationGenerator extends Generator
      */
     private function buildAcl($code)
     {
+        if ( ! $this->utility->getConfig('authorization.make_acl')) {
+            return $this->filesystem->delete(app_path('ACL.php'));
+        }
+
         $header_code  = "<?php";
-        $header_code .= "\n";
+        $header_code .= PHP_EOL;
         $header_code .= "use Illuminate\Support\Facades\Gate;\n";
         $header_code .= "use Illuminate\Support\Facades\Auth;\n";
-        $header_code .= "\n";
+        $header_code .= PHP_EOL;
+        $header_code .= "# !!!不需要用到，只是用于核对生成的数据是否正确!!!";
+        $header_code .= PHP_EOL . PHP_EOL;
 
         $put  = $this->filesystem->put(app_path('ACL.php'), $header_code . $code);
         if ($put)
@@ -257,7 +268,7 @@ class UpdateAuthorizationGenerator extends Generator
         $code        = [
             "# " . $controller . '@' . $action,
             "Gate::define('{$gate_action}', function() {",
-            $this->getTabs(1) . "return Auth::guard('api')->user()->hasAction('{$gate_action}');",
+            $this->getTabs(1) . "return Auth::user()->hasAction('{$gate_action}');",
             "});",
             "",
         ];
