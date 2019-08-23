@@ -129,7 +129,12 @@ class UpdateAuthorizationGenerator extends Generator
     {
         $reflection_class   = new \ReflectionClass($controller);
         $PMCNames           = $this->utility->parsePMCNames($reflection_class);
-        //dump($PMCNames);
+        //dump($controller, $PMCNames);
+
+        //$package_key    = $this->getMd5($paths[0]);
+        $package_key        = $this->getMd5($PMCNames['package']['name']['en']);
+        //dump($package_key);
+        //exit;
 
         // 用 namespace 来解析目录深度，只支持 `app/Http/Controllers/` 往下**两级**，
         // todo: 用递归来处理
@@ -137,62 +142,73 @@ class UpdateAuthorizationGenerator extends Generator
         $paths              = explode('\\', $paths);
         for ($i = 0; $i < count($paths); $i++)
         {
-            // App/Http/Controllers/ 根目录下的所有 控制器
+            // App/Http/Controllers/TestController.php
+            // App/Http/Controllers/Authorization/AuthController.php
+            // App/Http/Controllers/{$Path[0]}
             if ($i == 0)
             {
-                $is_controller  = preg_match("/[\w]+Controller$/", $paths[0]);
-                $package_key    = $this->getMd5($paths[0]);
-                $package_key    = $is_controller ? $package_key . 'Controller' : $package_key;
+                $lang_actions[$package_key] = $PMCNames['package'];
 
+                $is_controller              = preg_match("/[\w]+Controller$/", $paths[0]);
                 if ($is_controller)
                 {
-                    $config_actions[$package_key]       = $actions;
-                    $lang_actions[$package_key]         = $PMCNames['controller'];
+                    $controller_key                  = $this->getMd5($paths[0]);
+                    $lang_actions[$controller_key]   = $PMCNames['controller'];
+                    $config_actions[$package_key][$controller_key] = $actions;
                 }
                 else
                 {
-                    if ( ! isset($config_actions[$package_key]))
+                    // $module_key = $package_key . $paths[0];
+                    $tmp_key = $this->getMd5("$package_key.$paths[0]");
+                    if ( ! isset($config_actions[$package_key][$tmp_key]))
                     {
-                        $config_actions[$package_key]   = [];
+                        $config_actions[$package_key][$tmp_key] = [];
                     }
-                    $lang_actions[$package_key]         = $PMCNames['package'];
+                    // 如果下一级不是一个 Controller , App/Http/Controllers/App/Authorization/AuthController.php
+                    // $tmp_key = {package_key}.App
+                    if ( ! preg_match("/[\w]+Controller$/", "$paths[0].$paths[1]")) {
+                        $lang_actions[$tmp_key]     = $PMCNames['package'];
+                    } else {
+                        $lang_actions[$tmp_key]     = $PMCNames['module'];
+                    }
                 }
             }
-            // App/Http/Controllers/{**}/    某{**}目录下的所有 控制器
+            // App/Http/Controllers/Authorization/AuthController.php
+            // App/Http/Controllers/App/Authorization/AuthController.php
+            // App/Http/Controllers/{$Path[0]}/{$Path[1]}
             elseif ($i == 1)
             {
                 $controller_key = "$paths[0].$paths[1]";
                 $is_controller  = preg_match("/[\w]+Controller$/", $controller_key);
 
-                $package_key    = $this->getMd5($paths[0]);
                 $controller_key = $this->getMd5($controller_key);
                 $controller_key = $is_controller ? $controller_key . 'Controller' : $controller_key;
 
                 if ($is_controller)
                 {
-                    $config_actions[$package_key][$controller_key] = $actions;
+                    $config_actions[$package_key]["$package_key.$paths[0]"][$controller_key] = $actions;
                     $lang_actions[$controller_key] = $PMCNames['controller'];
                 }
                 else
                 {
-                    if ( ! isset($config_actions[$package_key][$controller_key]))
+                    // $tmp_key = {package_key}.App/Authorization/
+                    $tmp_key = $this->getMd5("$package_key.$paths[0].$paths[1]");
+                    if ( ! isset($config_actions[$package_key][$tmp_key]))
                     {
-                        $config_actions[$package_key][$controller_key] = [];
+                        $config_actions[$package_key][$tmp_key] = [];
                     }
-                    $lang_actions[$controller_key] = $PMCNames['module'];
+                    $lang_actions[$tmp_key]     = $PMCNames['module'];
                 }
             }
-            // App/Http/Controllers/{**}/{$$}    某{**}/{$$}目录下的所有 控制器
+            // App/Http/Controllers/App/Authorization/AuthController.php
+            // App/Http/Controllers/{$Path[0]}/{$Path[1]}/{$Path[2]}
             elseif ($i == 2)
             {
-                $controller_key = "$paths[0].$paths[1].$paths[2]";
-
-                $package_key    = $this->getMd5($paths[0]);
-                $module_key     = $this->getMd5("$paths[0].$paths[1]");
-                $controller_key = $this->getMd5($controller_key) . 'Controller';
-
+                $controller_key                 = "$paths[0].$paths[1].$paths[2]";
+                $module_key                     = $this->getMd5("$package_key.$paths[0].$paths[1]");
+                $controller_key                 = $this->getMd5($controller_key) . 'Controller';
+                $lang_actions[$controller_key]  = $PMCNames['controller'];
                 $config_actions[$package_key][$module_key][$controller_key] = $actions;
-                $lang_actions[$controller_key]                              = $PMCNames['controller'];
             }
         }
 
