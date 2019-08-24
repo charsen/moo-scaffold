@@ -20,7 +20,41 @@
 - show: 查看详情
 - destroy: 删除
 - destroyBath: 批量删除
-- restoreBath: 批量恢复
+- restore: 恢复（可批量）
+
+#### 关于目录结构
+1. `app_path()` 路径下的优先理解为管理后台。
+每个 controller 头部注释格式如下（在生成 `actions.php` 时需要用到，`zh-cn|en` 是为了做多语言）：
+```php
+/**
+ * 授权管理控制器
+ *
+ * @package_name {zh-CN: 后台管理 | en: Admin}
+ * @module_name {zh-CN: 授权管理 | en: Authorizations}
+ * @controller_name {zh-CN: 授权管理 | en: Authorziation Role}
+ *
+ */
+```
+
+2. 若需要归集某个端的功能，如 App，可在 `app_path()` 下创建 App 目录
+```php
+/**
+ * 部门控制器
+ *
+ * @package_name {zh-CN: App | en: App}
+ * @module_name {zh-CN: 人事管理 | en: Personnels}
+ * @controller_name {zh-CN: 部门管理 | en: Management Department}
+ *
+ * @package App\Http\Controllers\Personnels;
+ * @author  Charsen <https://github.com/charsen>
+ * @date    2019-08-20 20:39:48
+ */
+```
+
+注：在 controller 头部不写这块注释代码，`scaffold:auth` command 时不会生成到 `actions.php` 中
+
+#### controller 对应的 FormRequest 对象
+会同步生成，一个 action 对应一个 actionRules
 
 
 ### model 部分
@@ -28,16 +62,15 @@
 - 整形 转 浮点数 (repository 的验证规则转换为 numeric)
 - 数据字典 添加 appends 及 getAttribute 函数
 
-### 资源仓库
-- 验证规则：{ index, trashed, create, update, destroyBatch, restore}
 
 ### 多语言文件
 - 生成数据库表所有字段 及 模型字典字段多语言
 - resources/lang/{en, zh-CN}/model.php
 - resources/lang/{en, zh-CN}/validation.php
 
+
 ### 授权文件
-- app/ACL.php
+- app/ACL.php （非必须，仅作为人工核查）
 - config/actions.php (内含白名单)
 - resources/lang/{en, zh-CN}/actions.php
 

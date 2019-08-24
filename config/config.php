@@ -15,6 +15,8 @@ return [
      * 授权设置
      */
     'authorization' => [
+        // 在 app_path() 下需要排除的目录，不生成权限验证 actions 的
+        'exclude_forder' => ['App'],
         // 是否在 app_path() 下生成 ACL.php ，用于人工核对数据
         'make_acl'  => FALSE,
         // 是否通过 md5 多语别名 key
