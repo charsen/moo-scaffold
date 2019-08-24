@@ -276,7 +276,8 @@ class CreateApiGenerator extends Generator
         foreach ($routes as $route)
         {
             // 过滤掉不是 api 的
-            if ( ! preg_match('/^api\/(.*)/', $route->uri()))
+            $url_prefix = $this->utility->getConfig('routes.prefix');
+            if ( ! preg_match('/^'. $url_prefix . '\/(.*)/', $route->uri()))
             {
                 continue;
             }
