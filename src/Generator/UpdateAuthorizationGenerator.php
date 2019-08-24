@@ -140,6 +140,12 @@ class UpdateAuthorizationGenerator extends Generator
         // todo: 用递归来处理
         $paths              = str_replace('App\\Http\\Controllers\\', '', $controller);
         $paths              = explode('\\', $paths);
+
+        // 需要忽略的目录
+        if (in_array($paths[0], $this->utility->getConfig('authorization.exclude_forder'))) {
+            return $config_actions;
+        }
+
         for ($i = 0; $i < count($paths); $i++)
         {
             // App/Http/Controllers/TestController.php
