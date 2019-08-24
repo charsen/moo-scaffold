@@ -53,7 +53,7 @@
 
 注：在 controller 头部不写这块注释代码，`scaffold:auth` command 时不会生成到 `actions.php` 中
 
-#### 2.2.2controller 对应的 FormRequest 对象
+#### 2.2.2 controller 对应的 FormRequest 对象
 会同步生成，一个 action 对应一个 actionRules
 
 
