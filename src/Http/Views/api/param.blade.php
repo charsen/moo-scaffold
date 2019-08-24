@@ -26,7 +26,7 @@
 @if ( ! empty($desc))
     <div class="alert">
         @foreach ($desc as $v)
-            <p> {{ $v }}</p>
+            <p>· {{ $v }}</p>
         @endforeach
     </div>
 @endif
