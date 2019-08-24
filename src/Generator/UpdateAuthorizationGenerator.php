@@ -186,8 +186,9 @@ class UpdateAuthorizationGenerator extends Generator
 
                 if ($is_controller)
                 {
-                    $config_actions[$package_key]["$package_key.$paths[0]"][$controller_key] = $actions;
-                    $lang_actions[$controller_key] = $PMCNames['controller'];
+                    $tmp_key                                                 = $this->getMd5("$package_key.$paths[0]");
+                    $config_actions[$package_key][$tmp_key][$controller_key] = $actions;
+                    $lang_actions[$controller_key]                           = $PMCNames['controller'];
                 }
                 else
                 {
