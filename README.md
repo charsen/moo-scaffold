@@ -197,6 +197,7 @@ php artisan scaffold:api `namesapce`
 - 添加 `--fresh` 刷新缓存数据，会先执行 `artisan scaffold:fresh`
 
 **PS1:**
+- 若需要调整接口调试软件里显示的前后顺序，可在生成的 `*.ymal` 文件名前加 `数字-` 来实现
 - api 里的参数 默认通过 `From Request` 对象 验证规则里读取
 - 可在 api 的 yaml 配置文件中重写 url_params 及 body_params 来覆盖 默认的参数设置
 - 默认的接口名称能过 "反射" 控制器中动作的注释来获取
