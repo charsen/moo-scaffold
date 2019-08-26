@@ -338,7 +338,7 @@ class ApiController extends Controller
         $url    = $request[1];
 
         // 把 model 对象 转换为整数 1
-        $url    = preg_replace('/\{[a-z_]+\}/i', 1, $url);
+        $url    = preg_replace('/\{[a-z_]+\}/i', 2, $url);
 
         return [strtoupper($method), $url];
     }
