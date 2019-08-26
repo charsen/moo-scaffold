@@ -319,10 +319,9 @@ class CreateControllerGenerator extends Generator
      */
     private function getFormWidgets($all_rules, array $fields, array $dictionaries)
     {
-        if (empty($rules)) return "[];";
+        if (empty($all_rules)) return "[];";
 
         $code = ["["];
-
         foreach ($all_rules as $field_name => $rules) {
             $code[] = $this->getTabs(3) . "[";
             $code[] = $this->getTabs(4) . "'field_name'    => '{$field_name}',";
