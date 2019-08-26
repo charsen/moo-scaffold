@@ -133,23 +133,18 @@ class CreateControllerGenerator extends Generator
         // create & update action
         $create_code = ['['];
         $update_code = ['['];
-        foreach ($rules as $field_name => $rule)
+        foreach ($rules as $field_name => $rules)
         {
-            $rule = str_replace(['|required|', 'required|', 'required'], '', $rule);
-            if (strstr($rule, ":'")) {    // $model->int_field 时拼接代码，结尾的 ' 提前了
-                $tmp_create = "'{$field_name}' => '{$rule},";
-                if (strstr($rule, "unique:")) {
-                    $tmp_update = "'{$field_name}' => 'sometimes|{$rule} . ',{$field_name},' . \$this->route('{$route_key}'),";
-                } else {
-                    $tmp_update = "'{$field_name}' => 'sometimes|{$rule},";
-                }
-            } else {
-                $tmp_create = "'{$field_name}' => '{$rule}',";
-                $tmp_update = "'{$field_name}' => 'sometimes|{$rule}',";
-            }
+            $tmp_create     = "'{$field_name}' => [" . implode(', ', $this->addQuotation($rules)) ."],";
 
-            $create_code[] = $this->getTabs(3) . $tmp_create;
-            $update_code[] = $this->getTabs(3) . $tmp_update;
+            if ( ! isset($rules['nullable'])) {
+                array_unshift($rules, 'sometimes');
+            }
+            unset($rules['required']);
+            $tmp_update     = "'{$field_name}' => [" . implode(', ', $this->addQuotation($rules, $field_name, $route_key)) ."],";
+
+            $create_code[]  = $this->getTabs(3) . $tmp_create;
+            $update_code[]  = $this->getTabs(3) . $tmp_update;
         }
         $create_code[] = $this->getTabs(2) . ']';
         $update_code[] = $this->getTabs(2) . ']';
@@ -166,6 +161,27 @@ class CreateControllerGenerator extends Generator
 
         $this->filesystem->put($request_file, $file_txt);
         return $this->command->info('+ ' . $request_relative_file);
+    }
+
+    private function addQuotation($rules, $field_name = null, $route_key = null)
+    {
+        foreach ($rules as &$value) {
+            if (strstr($value, 'getDictKeys')) {
+                continue;
+            }
+
+            if (strstr($value, 'getUnique')) {
+                if ($route_key == null) {
+                    continue;
+                } else {
+                    // 对编辑运作的 Unique 进行二次处理
+                    $value = "\$this->getUnique(\$model, '{$field_name}', '{$route_key}')";
+                }
+            } else {
+                $value = "'{$value}'";
+            }
+        }
+        return $rules;
     }
 
     /**
@@ -223,22 +239,22 @@ class CreateControllerGenerator extends Generator
             }
 
             if (isset($attr['min_size']) && in_array($attr['type'], ['char', 'varchar'])) {
-                $filed_rules[] = 'min:' . $attr['min_size'];
+                $filed_rules[] = "min:{$attr['min_size']}";
             }
 
             if (isset($attr['size']) && in_array($attr['type'], ['char', 'varchar'])) {
-                $filed_rules[] = 'max:' . $attr['size'];
+                $filed_rules[] = "max:{$attr['size']}";
             }
 
             if (isset($dictionaries[$field_name])) {
-                $filed_rules[] = "in:' . implode(',', array_keys(\$model->init_{$field_name}))";
+                $filed_rules[] = "'in:' . \$this->getDictKeys(\$model, '{$field_name}')";
             }
 
             if (isset($attr['unique']) && $attr['unique']) {
-                $filed_rules[] = "unique:' . \$model->getTable()";
+                $filed_rules[] = '$this->getUnique($model)';
             }
 
-            $rules[$field_name] = implode('|', $filed_rules);
+            $rules[$field_name] = $filed_rules;
         }
 
         return $rules;
@@ -293,17 +309,18 @@ class CreateControllerGenerator extends Generator
      *
      * @return string
      */
-    private function getFormWidgets($rules, array $fields, array $dictionaries)
+    private function getFormWidgets($all_rules, array $fields, array $dictionaries)
     {
         if (empty($rules)) return "[];";
 
         $code = ["["];
 
-        foreach ($rules as $field_name => $rule_string) {
+        foreach ($all_rules as $field_name => $rules) {
             $code[] = $this->getTabs(3) . "[";
             $code[] = $this->getTabs(4) . "'field_name'    => '{$field_name}',";
 
-            if (strstr($rule_string, 'sometimes') || strstr($rule_string, 'nullable')) {
+            //if (strstr($rule_string, 'sometimes') || strstr($rule_string, 'nullable')) {
+            if (isset($rules['sometimes']) OR isset($rules['nullable'])) {
                 $code[] = $this->getTabs(4) . "'require'       => FALSE,";
             }
 
