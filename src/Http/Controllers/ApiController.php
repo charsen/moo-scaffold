@@ -112,30 +112,25 @@ class ApiController extends Controller
     {
         $data                = $this->getOneApi($req, 'request');
         $data['request_url'] = str_replace($req->path(), $this->config('routes.prefix'), $req->url());
-        //dump($data);
 
         $params              = ($data['request'][0] == 'GET') ? $data['url_params'] : $data['body_params'];
 
         // 从 cache 获取数据，并恢复到现有参数中
-        $cache_params        = Cache::get(md5(trim($data['request'][1], '/')) . '_params', NULL);
-        if ($cache_params != NULL)
-        {
-            foreach ($cache_params as $key => $val)
-            {
-                if (isset($params[$key]))
-                {
+        $cache_key           = $data['current_controller'] . $data['current_action'] . $data['request'][1];
+        $cache_params        = Cache::get(md5($cache_key) . '_params', NULL);
+        if ($cache_params != NULL) {
+            foreach ($cache_params as $key => $val) {
+                if (isset($params[$key])) {
                     $params[$key]['require']    = true;
                     $params[$key]['value']      = is_array($val) ? implode(',', $val) : $val;
                 }
             }
         }
 
-        if ($data['request'][0] == 'GET')
-        {
+        if ($data['request'][0] == 'GET') {
             $data['url_params'] = $params;
         }
-        else
-        {
+        else {
             $data['body_params'] = $params;
         }
 
@@ -153,8 +148,8 @@ class ApiController extends Controller
     {
         $data                = $this->getOneApi($req, 'request');
 
-        $rui                 = md5(trim($data['request'][1], '/'));
-        $cache_result        = Cache::get($rui . '_result', NULL);
+        $cache_key           = $data['current_controller'] . $data['current_action'] . $data['request'][1];
+        $cache_result        = Cache::get(md5($cache_key) . '_result', NULL);
 
     }
 
@@ -285,8 +280,8 @@ class ApiController extends Controller
         // 再从 createPersonnels 判断 isMethod('POST') 跳转到 storePersonnels
         $rule_action       = isset($action_data['rule_action']) ? $action_data['rule_action'] : $action_name;
         $request_object    = $this->utility->getActionRequestClass($rule_action, $reflection_class);
-        //dump($rule_action);
-        //dump($request_object->getActionRules($rule_action));
+        // dump($rule_action);
+        // dump($request_object->getActionRules($rule_action));
         $rule_params       = [];
         if ( $request_object != null && ! empty($request_object->getActionRules($rule_action)))
         {
@@ -301,7 +296,7 @@ class ApiController extends Controller
                         ? []
                         :$this->formatParams($action_data['body_params'], $dictionaries, $fields, $lang_fields);
 
-        if ($action_data['request'][0] == 'GET')
+                        if ($action_data['request'][0] == 'GET')
         {
             $url_params    = array_merge($rule_params, $url_params);
         }
@@ -313,18 +308,20 @@ class ApiController extends Controller
                 'destroyBatch' => 'DELETE',
                 'restore'      => 'PATCH',
             ];
+            // dump($action_name);
+            // dump($method_rest[$action_name]);
             $method_param = isset($method_rest[$action_name])
                 ? ['_method' => ['require' => true, 'name' => '', 'value' => $method_rest[$action_name], 'desc' => '']]
                 : [];
 
             $body_params   = array_merge($method_param, $rule_params, $body_params);
         }
-
+        // dump($body_params);
         // 伪造数据
         $faker = Faker::create('zh_CN');
         $action_data['url_params']  = $this->formatToFaker($faker, $url_params);
         $action_data['body_params'] = $this->formatToFaker($faker, $body_params);
-
+        // dump($action_data['body_params']);
         return $action_data;
     }
 
