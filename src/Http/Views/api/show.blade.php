@@ -34,9 +34,9 @@
                     <th>说明</th>
                 </tr>
                 <tr>
-                    <td><em class="font-red">*</em> X-Requested-With</td>
+                    <td><em class="font-red">*</em> Accept</td>
                     <td></td>
-                    <td>XMLHttpRequest</td>
+                    <td>application/json</td>
                     <td></td>
                 </tr>
                 @if (isset($header_params['token']))

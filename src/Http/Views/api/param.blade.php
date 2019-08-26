@@ -46,18 +46,18 @@
                         <th width="150">key</th>
                         <th>value</th>
                     </tr>
-                    <!--<tr>
+                    <tr>
                         <td><input type="checkbox" class="checkbox" checked /></td>
                         <td><input type="text" class="txt" value="Accept"></td>
                         <td><input type="text" class="txt key" value="Accept"></td>
                         <td><input type="text" class="txt value" value="application/json"></td>
-                    </tr>-->
-                    <tr>
+                    </tr>
+                    <!--<tr>
                         <td><input type="checkbox" class="checkbox" checked /></td>
                         <td><input type="text" class="txt" value="X-Requested-With"></td>
                         <td><input type="text" class="txt key" value="X-Requested-With"></td>
                         <td><input type="text" class="txt value" value="XMLHttpRequest"></td>
-                    </tr>
+                    </tr>-->
                     @if (isset($header_params['token']))
                     <tr>
                         <td><input type="checkbox" class="checkbox" checked /></td>
