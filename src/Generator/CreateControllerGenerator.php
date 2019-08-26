@@ -163,6 +163,14 @@ class CreateControllerGenerator extends Generator
         return $this->command->info('+ ' . $request_relative_file);
     }
 
+    /**
+     * 添加引号
+     *
+     * @param  $rules
+     * @param  $field_name
+     * @param  $route_key
+     * @return array
+     */
     private function addQuotation($rules, $field_name = null, $route_key = null)
     {
         foreach ($rules as &$value) {
@@ -319,7 +327,6 @@ class CreateControllerGenerator extends Generator
             $code[] = $this->getTabs(3) . "[";
             $code[] = $this->getTabs(4) . "'field_name'    => '{$field_name}',";
 
-            //if (strstr($rule_string, 'sometimes') || strstr($rule_string, 'nullable')) {
             if (isset($rules['sometimes']) OR isset($rules['nullable'])) {
                 $code[] = $this->getTabs(4) . "'require'       => FALSE,";
             }
