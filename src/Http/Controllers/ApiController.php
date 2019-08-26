@@ -465,7 +465,7 @@ class ApiController extends Controller
         $data = [];
         foreach ($rules as $key => $attr)
         {
-            $data[$key]                 = strstr($attr, 'nullable') ? ['require' => false] : ['require' => true];
+            $data[$key]                 = isset($attr['nullable']) ? ['require' => false] : ['require' => true];
             $data[$key]['name']         = $fields[$key]['zh-CN'] ?? $key;
             $data[$key]['value']        = '';
             $data[$key]['desc']         = '';
