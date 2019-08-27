@@ -352,6 +352,8 @@ class CreateControllerGenerator extends Generator
                 $code[] = $this->getTabs(4) . "'options'       => \$this->model->init_{$field_name},";
             }
 
+            $code[] = $this->getTabs(4) . "'rules'         => \$rules['{$field_name}'] ?? [],";
+
             $code[] = $this->getTabs(3) . "],";
         }
 
