@@ -16,7 +16,7 @@ class UpdateMultilingualGenerator extends Generator
     public function start()
     {
         $languages  = $this->utility->getConfig('languages');
-        $files      = ['model', 'validation'];
+        $files      = ['model', 'validation', 'db'];
 
         $all_fields             = $this->utility->getLangFields();
         $all_field_keys         = array_keys($all_fields);
@@ -33,12 +33,14 @@ class UpdateMultilingualGenerator extends Generator
                 {
                     $this->compileModel($file_name, $lang, $all_dictionaries, $all_dictionary_alias, $data);
                 }
-                else
+                else if ($file_name == 'validation')
                 {
-                    if ($file_name == 'validation')
-                    {
-                        $this->compileValidation($file_name, $lang, $all_fields, $all_field_keys, $data);
-                    }
+                    $this->compileValidation($file_name, $lang, $all_fields, $all_field_keys, $data);
+
+                }
+                else if ($file_name == 'db')
+                {
+                    $this->compileDBFields($file_name, $lang, $all_fields, $all_field_keys, $data);
                 }
             }
         }
@@ -76,6 +78,34 @@ class UpdateMultilingualGenerator extends Generator
         foreach ($data as $alias => $word) {
             $word   = str_replace("'", "&apos;", $word);
             $code[] = $this->getTabs(1) . "'{$alias}' => '{$word}',";
+        }
+        $code[] = '];';
+        $code[] = '';
+
+        return $this->updateFile($file_name, $lang, implode("\n", $code));
+    }
+
+    private function compileDBFields($file_name, $lang, array $all_fields, array $all_field_keys, array $data)
+    {
+        $old_key = array_keys($data);
+        $new_key = array_diff($all_field_keys, $old_key);
+
+        foreach ($new_key as $alias) {
+            $data[$alias] = $all_fields[$alias][$lang];
+            $data[$alias] = str_replace("'", "&apos;", $data[$alias]);
+
+            if ($lang == 'en') {
+                $data[$alias] = ucwords($data[$alias]);
+            }
+        }
+
+        // 格式化代码
+        $code   = ["<?php"];
+        $code[] = '';
+        $code[] = 'return [';
+        foreach ($data as $key => $word) {
+            $word   = str_replace("'", "&apos;", $word);
+            $code[] = $this->getTabs(1) . "'{$key}' => '{$word}',";
         }
         $code[] = '];';
         $code[] = '';
