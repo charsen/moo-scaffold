@@ -57,7 +57,8 @@ class {{class}} extends Controller
     {
         $validated = $request->validated();
 
-        $result    = $this->model->paginate(($validated['page_limit'] ?? NULL));
+        $fields    = [{{index_fields}}];
+        $result    = $this->model->paginate(($validated['page_limit'] ?? NULL), $fields);
 
         return BaseResource::collection($result);
     }
@@ -74,7 +75,8 @@ class {{class}} extends Controller
     {
         $validated = $request->validated();
 
-        $result    = $this->model->onlyTrashed()->paginate(($validated['page_limit'] ?? NULL));
+        $fields    = [{{trashed_fields}}];
+        $result    = $this->model->onlyTrashed()->paginate(($validated['page_limit'] ?? NULL), $fields);
 
         return BaseResource::collection($result);
     }

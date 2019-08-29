@@ -78,6 +78,8 @@ class CreateControllerGenerator extends Generator
                 'entity_en_name'    => str_replace('Controller', '', $class),
                 'namespace'         => ucfirst($namespace),
                 'class'             => $class,
+                'index_fields'      => $this->getListFields($fields),
+                'trashed_fields'    => $this->getListFields($fields, true),
                 'route_key'         => strtolower($attr['model_class']),
                 'model_class'       => ucfirst(str_replace('/', '\\', $model_class)),
                 'model_name'        => $attr['model_class'],
@@ -103,6 +105,30 @@ class CreateControllerGenerator extends Generator
         $this->updateRoutes($created);
 
         return true;
+    }
+
+    /**
+     * 获取列表查询字段
+     *
+     * @param array $fields
+     * @param boolean $trashed
+     * @return array
+     */
+    private function getListFields($fields, $trashed = false)
+    {
+        $fields = array_keys($fields);
+        if ( ! $trashed) {
+            unset($fields['deleted_at'], $fields['created_at']);
+        } else {
+            unset($fields['updated_at'], $fields['created_at']);
+        }
+
+        // dump($fields);
+        foreach ($fields as &$value) {
+            $value = "'{$value}'";
+        }
+
+        return implode(', ', $fields);
     }
 
     /**
