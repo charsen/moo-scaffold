@@ -321,6 +321,7 @@ class ApiController extends Controller
         $faker = Faker::create('zh_CN');
         $action_data['url_params']  = $this->formatToFaker($faker, $url_params);
         $action_data['body_params'] = $this->formatToFaker($faker, $body_params);
+        // dump($action_data['url_params']);
         // dump($action_data['body_params']);
         return $action_data;
     }
