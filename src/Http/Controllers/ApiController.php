@@ -530,11 +530,13 @@ class ApiController extends Controller
 
             if ($attr[0] === false)
             {
-                $data[$key] = ['require' => false, 'name' => $attr[1], 'value' => ($attr[2] ?? ''), 'desc' => ($attr[3] ?? '')];
+                $name       = $attr[1] ?? $fields[$key];
+                $data[$key] = ['require' => false, 'name' => $name, 'value' => ($attr[2] ?? ''), 'desc' => ($attr[3] ?? '')];
             }
             else
             {
-                $data[$key] = ['require' => true, 'name' => $attr[0], 'value' => $attr[1], 'desc' => ($attr[2] ?? '')];
+                $name       = $attr[0] ?? $fields[$key];
+                $data[$key] = ['require' => true, 'name' => $name, 'value' => ($attr[1] ?? ''), 'desc' => ($attr[2] ?? '')];
             }
 
             if (isset($dictionaries[$key]))
