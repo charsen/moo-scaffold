@@ -287,7 +287,7 @@ class ApiController extends Controller
         {
             $rule_params = $this->formatRules($action_name, $request_object->getActionRules($rule_action), $dictionaries, $fields, $lang_fields);
         }
-
+        //dump($rule_params);
         $url_params     =  ! isset($action_data['url_params'])
                         ? []
                         : $this->formatParams($action_data['url_params'], $dictionaries, $fields, $lang_fields);
@@ -463,7 +463,7 @@ class ApiController extends Controller
         $data = [];
         foreach ($rules as $key => $attr)
         {
-            $data[$key]                 = isset($attr['nullable']) ? ['require' => false] : ['require' => true];
+            $data[$key]                 = ['require' => ! \in_array('nullable', $attr)];
             $data[$key]['name']         = $fields[$key]['zh-CN'] ?? $key;
             $data[$key]['value']        = '';
             $data[$key]['desc']         = '';
