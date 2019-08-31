@@ -58,6 +58,7 @@ class Utility
         $data       = [];
         foreach ($languages as $lang)
         {
+            $string = str_replace("'", "&apos;", $string);
             preg_match('/'. $lang .':([^\|]*)[\|}]/i', $string, $temp);
             $data[$lang] = empty($temp) ? '' : trim($temp[1]);
         }
