@@ -157,11 +157,11 @@ class CreateMigrationGenerator extends Generator
         {
             $one = $templates[$attr['type']];
             $one = str_replace('{{name}}', $name, $one);
-            if ( ! empty($attr['size']))
+            if (isset($attr['size']))
             {
                 $one = str_replace('{{size}}', $attr['size'], $one);
             }
-            if ( ! empty($attr['precision']))
+            if (isset($attr['precision']))
             {
                 $one = str_replace('{{precision}}', $attr['precision'], $one);
             }
@@ -172,11 +172,11 @@ class CreateMigrationGenerator extends Generator
             {
                 if (in_array($attr['type'], ['tinyint', 'int', 'bigint']))
                 {
-                    $one .= ! empty($attr['default']) ? "->default({$attr['default']})" : '';
+                    $one .= isset($attr['default']) ? "->default({$attr['default']})" : '';
                 }
                 elseif (in_array($attr['type'], ['char', 'varchar', 'text']))
                 {
-                    $one .= ! empty($attr['default'])  ? "->default('{$attr['default']}')" : '';
+                    $one .= isset($attr['default'])  ? "->default('{$attr['default']}')" : '';
                 }
             }
             else
