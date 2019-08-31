@@ -124,7 +124,19 @@ class CreateControllerGenerator extends Generator
         }
 
         // dump($fields);
-        foreach ($fields as &$value) {
+        foreach ($fields as $k => &$value) {
+            if ( ! $trashed) {
+                if (in_array($value, ['deleted_at', 'created_at'])) {
+                    unset ($fields[$k]);
+                    continue;
+                }
+            } else {
+                if (in_array($value, ['created_at', 'updated_at'])) {
+                    unset ($fields[$k]);
+                    continue;
+                }
+            }
+
             $value = "'{$value}'";
         }
 
@@ -163,10 +175,15 @@ class CreateControllerGenerator extends Generator
         {
             $tmp_create     = "'{$field_name}' => [" . implode(', ', $this->addQuotation($rules)) ."],";
 
-            if ( ! isset($rules['nullable'])) {
+            if ( ! \in_array('nullable', $rules)) {
                 array_unshift($rules, 'sometimes');
             }
-            unset($rules['required']);
+
+            foreach ($rules as $k => $v) {
+                if ($v == 'required') {
+                    unset($rules[$k]);
+                }
+            }
             $tmp_update     = "'{$field_name}' => [" . implode(', ', $this->addQuotation($rules, $field_name, $route_key)) ."],";
 
             $create_code[]  = $this->getTabs(3) . $tmp_create;
