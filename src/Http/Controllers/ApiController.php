@@ -181,6 +181,7 @@ class ApiController extends Controller
         $yaml  = new Yaml;
         $menus = [];
         $apis  = [];
+        $taxis = [];
         foreach ($yaml_files as $file)
         {
             if ($file->getBasename()== '_menus_transform.yaml')
@@ -195,7 +196,8 @@ class ApiController extends Controller
             $data['controller']['api_count']            = 0;
             $menus[$path][$data['controller']['class']] = $data['controller'];
 
-            $temp = [];
+
+            $temp  = [];
             foreach ($data['actions'] as $action_name => $attr)
             {
                 $temp[$action_name] = [
@@ -206,10 +208,31 @@ class ApiController extends Controller
                 ];
                 $menus[$path][$data['controller']['class']]['api_count']++;
             }
-            $apis[$path][$data['controller']['class']] = $temp;
+
+            $apis[$path][$data['controller']['class']]  = $temp;
+            $taxis[$path][$data['controller']['class']] = $data['controller']['code'] ?? 1;
         }
 
-        return ['menus' => $menus, 'apis' => $apis];
+
+
+        // Controller 排序处理
+        $tmp = [];
+        foreach ($taxis as $path => &$controllers) {
+            asort($controllers);
+
+            foreach ($controllers as $c => $code) {
+                $tmp[$path][$c] = $menus[$path][$c];
+            }
+        }
+
+        // 目录 排序处理
+        $result = [];
+        $menus  = $this->getMenusTransform();
+        foreach ($menus as $key => $value) {
+            $result[$key] = $tmp[$key] ?? [];
+        }
+
+        return ['menus' =>$result , 'apis' => $apis];
     }
 
     /**
