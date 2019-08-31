@@ -235,6 +235,7 @@ class {{class}} extends Controller
     public function edit({{request_name}} $request, $id)
     {
         $result = $this->model->findOrFail($id);
+        $rules  = $request->getActionRules('update', TRUE);
 
         return (new BaseResource($result))->additional([
             'form_widgets' => $this->create($request)
