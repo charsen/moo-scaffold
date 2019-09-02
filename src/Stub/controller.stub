@@ -232,12 +232,10 @@ class {{class}} extends Controller
      */
     public function edit({{request_name}} $request, $id)
     {
-        $result         = $this->model->findOrFail($id);
-        $default        = [];
-        $form_widgets   = $this->getFormWidgets($request, $default);
+        $result = $this->model->findOrFail($id);
 
         return (new BaseResource($result))->additional([
-            'form_widgets' => new FormWidgetCollection(collect($form_widgets)),
+            'form_widgets' => $this->create($request)
         ]);
     }
 
