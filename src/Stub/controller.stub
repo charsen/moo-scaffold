@@ -22,7 +22,6 @@ use {{request_class}};
  */
 class {{class}} extends Controller
 {
-
     protected $model;
 
     /**
@@ -42,7 +41,7 @@ class {{class}} extends Controller
      */
     public function boot($method)
     {
-        $this->checkAuthorization($method);
+        $this->checkAuthorization();
     }
 
     /**
@@ -219,8 +218,8 @@ class {{class}} extends Controller
      */
     public function create({{request_name}} $request)
     {
-        $rules        = $request->getActionRules('store', TRUE);
-        $form_widgets = {{form_widgets}};
+        $default        = [];
+        $form_widgets   = $this->getFormWidgets($request, $default);
 
         return new FormWidgetCollection(collect($form_widgets));
     }
@@ -234,11 +233,12 @@ class {{class}} extends Controller
      */
     public function edit({{request_name}} $request, $id)
     {
-        $result = $this->model->findOrFail($id);
-        $rules  = $request->getActionRules('update', TRUE);
+        $result         = $this->model->findOrFail($id);
+        $default        = [];
+        $form_widgets   = $this->getFormWidgets($request, $default);
 
         return (new BaseResource($result))->additional([
-            'form_widgets' => $this->create($request)
+            'form_widgets' => new FormWidgetCollection(collect($form_widgets)),
         ]);
     }
 
