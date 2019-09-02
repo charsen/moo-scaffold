@@ -36,10 +36,9 @@ class {{class}} extends Controller
     /**
      * 执行 action 前先验证权限
      *
-     * @param  string $method
      * @return \Illuminate\Auth\Access\Response
      */
-    public function boot($method)
+    public function boot()
     {
         $this->checkAuthorization();
     }
