@@ -213,8 +213,9 @@ class ApiController extends Controller
             $taxis[$path][$data['controller']['class']] = $data['controller']['code'] ?? 1;
         }
 
-
-
+        // $movies->sortByDesc(function ($movie, $key) {
+        //     return count($movie['releases']);
+        // });
         // Controller 排序处理
         $tmp = [];
         foreach ($taxis as $path => &$controllers) {
@@ -551,6 +552,7 @@ class ApiController extends Controller
                 $data[$key] = ['require' => true, 'name' => '', 'value' => strtoupper($attr[0]), 'desc' => '兼容处理'];
                 continue;
             }
+            $attr[0] = $attr[0] ?? true;
 
             if ($attr[0] === false)
             {
