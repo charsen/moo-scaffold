@@ -107,18 +107,18 @@ class Controller extends BaseController
         $result = [];
         foreach ($all_rules as $field_name => $rules) {
             $tmp = [
-                'field_name' => $field_name,
-                'required'   => ! (in_array('sometimes', $rules) OR in_array('nullable',  $rules)),
+                'id'        => $field_name,
+                'required'  => ! (in_array('sometimes', $rules) OR in_array('nullable',  $rules)),
                 //'rules'      => $frontend_rules[$field_name] ?? [],
             ];
 
             // 通过字段类型指定 控件类型, todo: datetime?
             if (in_array('data', $rules)) {
-                $tmp['widget_type'] = 'date';
+                $tmp['type'] = 'date-picker';
             }
 
             if (strstr($field_name, 'password')) {
-                $tmp['widget_type'] = 'password';
+                $tmp['type'] = 'password';
             }
 
             foreach ($rules as $r) {
@@ -130,7 +130,7 @@ class Controller extends BaseController
                 if (preg_match('/^in\:[0-9\,]+$/i', $r)) {
                     // 判断 model 的字典字段
                     if (property_exists($this->model, "init_" . $field_name)) {
-                        $tmp['widget_type'] = 'radio';
+                        $tmp['type']        = 'radio';
                         $tmp['dictionary']  = true;
                         $tmp['options']     = $this->model->{"init_" . $field_name};
                     }

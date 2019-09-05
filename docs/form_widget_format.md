@@ -1,30 +1,33 @@
 # 表单控件格式
 
 ## 1. 每个控件返回的数据说明
+
 - required       : 是否必填，默认为 true
 - label          : label, 默认从多语言 validation.attributes 中取值
-- widget_type    : 建议的控件类型，默认为 text
-- widget_status  : 控件状态，默认为 normal, 可选 { normal, readonly, disabled, hidden }
+- type           : 建议的控件类型，默认为 text
+- status         : 控件状态，默认为 normal, 可选 { normal, readonly, disabled, hidden }
 - value          : 默认值，默认为空
 - placeholder    : 默认为空
 - tip            : 控件附加的提示文本内容
 - append_attr    : 其它附加属性
 - options        : 数据，可能是 select options ，radio, checkbox ...
 
-### 1.1 widget_type 取值示例
-- text      : 普通文本框
-- select    : 下拉选框，配合 append_attr 里的 max_choice 指定是单选还是多选
-- radio     : 单选
-- checkbox  : 多选
-- password  : 密码文本框
-- date      : 日期，Ex: 2018-11-11
-- datetime  : 日期时间, Ex: 2018-11-11 18:20:30
-- textarea  : 普通多行文本框
-- editor    : 富文本编辑器
-- tree      : 树状结构
-- switch    : 开关
+### 1.1 type 取值示例
+
+- text          : 普通文本框
+- select        : 下拉选框，配合 append_attr 里的 max_choice 指定是单选还是多选
+- radio         : 单选
+- checkbox      : 多选
+- password      : 密码文本框
+- date-picker   : 日期选择，Ex: 2018-11-11
+- datetime      : 日期时间, Ex: 2018-11-11 18:20:30
+- textarea      : 普通多行文本框
+- editor        : 富文本编辑器
+- tree          : 树状结构
+- switch        : 开关
 
 ### 1.2 其它附加属性 的一些示例
+
 ```json
 .
 .
@@ -62,6 +65,7 @@
 ```
 
 ## 2.1 create form json 结果示例
+
 ```json
 {
     "data": {
@@ -69,25 +73,27 @@
             "required"       : true,
             "label"          : "ID",
             "placeholder"    : "",
-            "widget_type"    : "text",
-            "widget_status"  : "readonly",
+            "type"           : "text",
+            "status"         : "readonly",
             "help"           : "",
         },
         "password": {
             "required"        :  true,
-            "label"          :  "密码",
-            "widget_type"    :  "password",
-            "widget_status"  :  "normal",
-            "placeholder"    :  "",
-            "help"           :  "",
+            "label"           :  "密码",
+            "type"            :  "password",
+            "status"          :  "normal",
+            "placeholder"     :  "",
+            "help"            :  "",
         }
     }
 }
 ```
 
 ## 2.2 edit form json 结果示例
+
 - data: 为 model/entity 数据
 - meta.form_widgets 是表单控件数据
+
 ```json
 {
     "data": {
@@ -98,8 +104,8 @@
         "form_widgets": {
             "parent_id": {
                 "field_name"        : "parent_id",
-                "widget_status"     : "hidden",
-                "widget_type"       : "hidden",
+                "status"            : "hidden",
+                "type"              : "hidden",
                 "required"          : true,
                 "label"             : "上一级",
                 "placeholder"       : "",
@@ -110,8 +116,8 @@
                 "required"           : false,
                 "label"             : "部门编号",
                 "placeholder"       : "",
-                "widget_type"       : "",
-                "widget_status"     : "",
+                "type"              : "",
+                "status"            : "",
                 "help"              : ""
             },
         }
