@@ -327,6 +327,7 @@ class UpdateAuthorizationGenerator extends Generator
             if (empty($methods))
             {
                 unset($controllers[$controller]);
+                continue;
             }
 
             $real_actions  = array_intersect($actions, $methods);
