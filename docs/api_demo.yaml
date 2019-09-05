@@ -2,9 +2,11 @@
 # 一个 controller 一个 api.schema 文件
 #
 ### 参数的几种写法举例：
-# 1. 名称、默认值：                    field: [ID, '']
-# 2. 非必填、名称、默认值：             field: [false, ID, 2]
-# 3. 非必填、名称、默认值、描述：        field: [false, ID, 2, '描述']
+# 1. 非必填、默认情况：                 field: [false]
+# 1. 默认情况：                        field: []
+# 2. 名称、默认值：                    field: [ID, '']
+# 3. 非必填、名称、默认值：             field: [false, ID, 2]
+# 4. 非必填、名称、默认值、描述：        field: [false, ID, 2, '描述']
 ##
 controller:
     code: 001

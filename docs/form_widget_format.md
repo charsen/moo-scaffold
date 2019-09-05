@@ -1,7 +1,7 @@
 # 表单控件格式
 
 ## 1. 每个控件返回的数据说明
-- require        : 是否必填，默认为 true
+- required       : 是否必填，默认为 true
 - label          : label, 默认从多语言 validation.attributes 中取值
 - widget_type    : 建议的控件类型，默认为 text
 - widget_status  : 控件状态，默认为 normal, 可选 { normal, readonly, disabled, hidden }
@@ -66,7 +66,7 @@
 {
     "data": {
         "id": {
-            "require"        : true,
+            "required"       : true,
             "label"          : "ID",
             "placeholder"    : "",
             "widget_type"    : "text",
@@ -74,7 +74,7 @@
             "help"           : "",
         },
         "password": {
-            "require"        :  true,
+            "required"        :  true,
             "label"          :  "密码",
             "widget_type"    :  "password",
             "widget_status"  :  "normal",
@@ -100,14 +100,14 @@
                 "field_name"        : "parent_id",
                 "widget_status"     : "hidden",
                 "widget_type"       : "hidden",
-                "require"           : true,
+                "required"          : true,
                 "label"             : "上一级",
                 "placeholder"       : "",
                 "help": ""
             },
             "department_code": {
                 "field_name"        : "department_code",
-                "require"           : false,
+                "required"           : false,
                 "label"             : "部门编号",
                 "placeholder"       : "",
                 "widget_type"       : "",
