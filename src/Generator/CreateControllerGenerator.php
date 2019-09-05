@@ -375,22 +375,22 @@ class CreateControllerGenerator extends Generator
 
             // 字段以 _id 结尾的，一般是下拉选择
             if (preg_match('/[a-z]_id$/i', $field_name)) {
-                $code[] = $this->getTabs(4) . "'widget_type'   => 'select',";
+                $code[] = $this->getTabs(4) . "'type'   => 'select',";
             }
 
             // 通过字段类型指定 控件类型
             if (isset($fields[$field_name])) {
                 if ($fields[$field_name]['type'] == 'date') {
-                    $code[] = $this->getTabs(4) . "'widget_type'   => 'date',";
+                    $code[] = $this->getTabs(4) . "'type'   => 'date',";
                 }
 
                 if ($fields[$field_name]['type'] == 'timestamp') {
-                    $code[] = $this->getTabs(4) . "'widget_type'   => 'datetime',";
+                    $code[] = $this->getTabs(4) . "'type'   => 'datetime',";
                 }
             }
 
             if (isset($dictionaries[$field_name])) {
-                $code[] = $this->getTabs(4) . "'widget_type'   => 'radio',";
+                $code[] = $this->getTabs(4) . "'type'   => 'radio',";
                 $code[] = $this->getTabs(4) . "'dictionary'    => true,";
                 $code[] = $this->getTabs(4) . "'options'       => \$this->model->init_{$field_name},";
             }
