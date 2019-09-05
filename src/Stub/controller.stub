@@ -4,10 +4,10 @@ namespace {{namespace}};
 
 use {{model_class}};
 use App\Exceptions\BatchActionException;
-use App\Http\Controllers\Controller;
 use App\Http\Resources\BaseResource;
 use App\Http\Resources\FormWidgetCollection;
 use {{request_class}};
+use Charsen\Scaffold\Foundation\Controller;
 
 /**
  * {{entity_name}}控制器

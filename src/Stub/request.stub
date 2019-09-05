@@ -2,7 +2,7 @@
 
 namespace {{namespace}};
 
-use App\Http\Requests\FormRequest;
+use Charsen\Scaffold\Foundation\FormRequest;
 
 class {{request_name}} extends FormRequest
 {
