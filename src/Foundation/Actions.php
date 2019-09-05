@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Libs\Authorization;
+namespace Charsen\Scaffold\Foundation;
 
 /**
  * Actions
