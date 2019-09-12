@@ -63,7 +63,7 @@ class ApiController extends Controller
         $data                       = $this->getApiList();
         $data['menus_transform']    = $this->getMenusTransform();
         $data['uri']                = $req->getPathInfo();
-        //$data['request_url']        = str_replace($req->path(), 'api', $req->url());
+        // $data['request_url']        = str_replace($req->path(), 'api', $req->url());
 
         $data['api_index']          = 1;
         $data['current_folder']     = $req->input('f', 'Index');
@@ -88,17 +88,18 @@ class ApiController extends Controller
      */
     public function cache(Request $req)
     {
-        $uri    = $req->input('uri', NULL);
-        $params = $req->input('params', NULL);
-        $result = $req->input('result', NULL);
+        // 不能用，因为同个 uri 有可能有 post ，get 等多种请求
+        // $uri       = $req->input('uri', NULL);
+        $cache_key = $req->input('key', NULL);
+        $params    = $req->input('params', NULL);
+        $result    = $req->input('result', NULL);
 
-        if ($uri != NULL && $params != NULL && $result != NULL)
+        if ($cache_key != NULL && $params != NULL)
         {
             unset($params['token']);
 
-            $uri = md5(trim($uri, '/'));
-            $put_params = Cache::store('file')->put($uri . '_params', $params, 30 * 24 * 60 * 60);
-            $put_result = Cache::store('file')->put($uri . '_result', $result, 30 * 24 * 60 * 60);
+            $put_params = Cache::store('file')->put($cache_key . '_params', $params, 30 * 24 * 60 * 60);
+            $put_result = Cache::store('file')->put($cache_key . '_result', $result, 30 * 24 * 60 * 60);
         }
     }
 
@@ -117,7 +118,8 @@ class ApiController extends Controller
 
         // 从 cache 获取数据，并恢复到现有参数中
         $cache_key           = $data['current_controller'] . $data['current_action'] . $data['request'][1];
-        $cache_params        = Cache::get(md5($cache_key) . '_params', NULL);
+        $data['cache_key']   = md5($cache_key);
+        $cache_params        = Cache::get($data['cache_key'] . '_params', NULL);
         if ($cache_params != NULL) {
             foreach ($cache_params as $key => $val) {
                 if (isset($params[$key])) {
@@ -146,11 +148,14 @@ class ApiController extends Controller
      */
     public function result(Request $req)
     {
-        $data                = $this->getOneApi($req, 'request');
+        $cache_key      = $req->input('key', NULL);
+        $cache_result   = Cache::get($cache_key . '_result', NULL);
 
-        $cache_key           = $data['current_controller'] . $data['current_action'] . $data['request'][1];
-        $cache_result        = Cache::get(md5($cache_key) . '_result', NULL);
+        if ($cache_result == NULL) {
+            return response()->json('', 200);
+        }
 
+        return response()->json($cache_result, 200);
     }
 
     /**

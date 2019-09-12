@@ -4,8 +4,12 @@
 # @author {{author}}
 # @date   {{date}}
 ##
-package_name: PackageName
-module_name: ModuleName
+package:
+    name: PackageName
+    folder: PackageFolder
+module:
+    name: ModuleName
+    folder: ModuleFolder
 tables:
     table_name1:
         model:

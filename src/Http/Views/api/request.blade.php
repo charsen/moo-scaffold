@@ -96,6 +96,31 @@
         getParams($(this).data('f'), $(this).data('c'), $(this).data('a'), $(this).data('m'));
     });
 
+    var getResult = function(cache_key)
+    {
+        $.ajax({
+            type: "GET",
+            url: '{{ route('api.result') }}',
+            data: {'key': cache_key},
+            dataType: 'json',
+            success: function (json) {
+                if (json == '') return ;
+
+                var uri = $("#host").val() + $("#uri").val(),
+                    mothod = $("#send_method").val();
+
+                $("#result_method").html(mothod);
+                $("#result_uri").html(uri);
+                $('#result_status').html('CACHE').attr("class", "status font-orange");
+
+                Process({
+                    id: "json_format",
+                    data: json
+                });
+        }
+        });
+    };
+
     var getParams = function(folder, controller, action, method)
     {
         document.title = $('#aside_container li.active a').data('module')
@@ -115,6 +140,11 @@
                 if (check.test(action) || method == 'GET')
                 {
                     $('#send').trigger('click');
+                }
+                else
+                {
+                    var cache_key = $('#cache_key').val();
+                    getResult(cache_key);
                 }
             }
         });

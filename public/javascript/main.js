@@ -155,15 +155,12 @@
             }
         });
 
-        var updateToken = function() {
-
-        };
-
         var cacheParamsSuccess = function(uri, params, success) {
+            var cache_key = $('#cache_key').val();
             $.ajax({
                 url: cache_url,
                 type: "post",
-                data: { uri: uri, params: params, result: success },
+                data: { uri: uri, key: cache_key, params: params, result: success },
                 success: function(json) {}
             });
         };

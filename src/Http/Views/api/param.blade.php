@@ -17,6 +17,7 @@
                 <option value="POST" <?= strtoupper($request[0]) == 'POST' ? 'selected' : '' ?>>POST</option>
                 <option value="GET" <?= strtoupper($request[0]) == 'GET' ? 'selected' : '' ?>>GET</option>
             </select>
+            <input type="hidden" id="cache_key" value="{{ $cache_key }}" />
             <input type="hidden" id="host" value="{{ $request_url }}" />
             <input class="txt" id="uri" value="/{{ $request[1] }}" />
         </div>
