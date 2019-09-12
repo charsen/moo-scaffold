@@ -106,11 +106,8 @@
             success: function (json) {
                 if (json == '') return ;
 
-                var uri = $("#host").val() + $("#uri").val(),
-                    mothod = $("#send_method").val();
-
-                $("#result_method").html(mothod);
-                $("#result_uri").html(uri);
+                $('#header').html('<span class="font-orange">THE RESPONSE IS CACHED !</span>');
+                $("#result_uri").html($("#host").val() + $("#uri").val());
                 $('#result_status').html('CACHE').attr("class", "status font-orange");
 
                 Process({
@@ -135,6 +132,7 @@
             success: function (result) {
                 $('#left_container').html(result);
                 $('#header').html('');
+                $("#result_method").html($("#send_method").val());
 
                 var check = new RegExp(/^(index|authenticate|logout)$/);
                 if (check.test(action) || method == 'GET')
