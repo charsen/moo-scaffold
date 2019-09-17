@@ -298,7 +298,7 @@ class CreateControllerGenerator extends Generator
             }
 
             if (isset($dictionaries[$field_name])) {
-                $filed_rules[] = "'in:' . \$this->getDictKeys(\$model, '{$field_name}')";
+                $filed_rules[] = "\$this->getInDict(\$model, '{$field_name}')";
             }
 
             if (isset($attr['unique']) && $attr['unique']) {

@@ -86,13 +86,25 @@ class FormRequest extends BaseFormRequest
     /**
      * 获取模型某字典字段的键值
      *
-     * @param  $model
+     * @param  \Illuminate\Database\Eloquent\Model $model
      * @param  $filed
      * @return string
      */
     public function getDictKeys($model, $filed)
     {
         return implode(',', array_keys($model->{"init_{$filed}"}));
+    }
+
+    /**
+     * 获取模型字典字段的 In 验证规则
+     *
+     * @param \Illuminate\Database\Eloquent\Model $model
+     * @param string $filed
+     * @return string
+     */
+    public function getInDict($model, $filed)
+    {
+        return 'in:' . $this->getDictKeys($model, $filed);
     }
 
     /**
