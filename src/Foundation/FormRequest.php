@@ -21,7 +21,7 @@ class FormRequest extends BaseFormRequest
      *
      * @return array
      */
-    public function rules()
+    public function rules(): array
     {
         //list($class, $action) = explode('@', \Route::current()->getActionName());
         list($class, $action) = explode('@', \Route::currentRouteAction());
@@ -35,7 +35,7 @@ class FormRequest extends BaseFormRequest
      * @param  $action
      * @return array
      */
-    public function getActionRules($action = NULL)
+    public function getActionRules($action = NULL): array
     {
         if ($action === NULL) return [];
 
@@ -50,7 +50,7 @@ class FormRequest extends BaseFormRequest
      * @param  array $all_rules
      * @return array
      */
-    public function getFrontendRules(array $all_rules)
+    public function getFrontendRules(array $all_rules): array
     {
         if (empty($all_rules)) return [];
 
@@ -90,7 +90,7 @@ class FormRequest extends BaseFormRequest
      * @param  $filed
      * @return string
      */
-    public function getDictKeys($model, $filed)
+    public function getDictKeys($model, $filed): string
     {
         return implode(',', array_keys($model->{"init_{$filed}"}));
     }
@@ -102,7 +102,7 @@ class FormRequest extends BaseFormRequest
      * @param string $filed
      * @return string
      */
-    public function getInDict($model, $filed)
+    public function getInDict($model, $filed): string
     {
         return 'in:' . $this->getDictKeys($model, $filed);
     }
@@ -115,14 +115,16 @@ class FormRequest extends BaseFormRequest
      * @param  $route_key       // 当是编辑动作时，要排除自己，必传
      * @return string
      */
-    public function getUnique($model, $field = null, $route_key = null)
+    public function getUnique($model, $field = null, $route_key = null): string
     {
         $rule = 'unique:' . $model->getTable();
-        if ($route_key != null)
+
+        if ($field != null && $route_key != null)
         {
             $rule .= ",{$field}," . $this->route($route_key);
         }
 
         return $rule;
     }
+
 }
