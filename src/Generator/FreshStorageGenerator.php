@@ -156,9 +156,10 @@ class FreshStorageGenerator extends Generator
         {
             $attr['require']    = $attr['require'] ?? true;
             $attr['desc']       = $attr['desc'] ?? '';
-            $attr['default']    = $attr['default'] ?? null;
             $attr['allow_null'] = $attr['require'] ? false : true;
-            $this->getSize($attr);
+
+            $this->getDefault($attr, $key);
+            $this->getSize($attr, $key);
         }
 
         return $fields;
@@ -192,42 +193,66 @@ class FreshStorageGenerator extends Generator
     }
 
     /**
-     * 获取 size 值，char|varchar 时会有最小长度作为检验时使用
+     * 获取默认值
      *
-     * @param  array &$attr
+     * @param  array $attr
+     * @param  string $field_name
+     * @param  string $default
      *
      * @return array
      */
-    private function getSize(&$attr)
+    private function getDefault(&$attr, $field_name, $default = '')
+    {
+        if (in_array('default', array_keys($attr))) {
+            //dump($attr);
+            $attr['default'] = is_null($attr['default']) ? null : $attr['default'];
+        }
+
+        return $attr;
+    }
+
+    /**
+     * 获取 size 值，char|varchar 时会有最小长度作为检验时使用
+     *
+     * @param  array &$attr
+     * @param  string $field_name
+     *
+     * @return array
+     */
+    private function getSize(&$attr, $field_name)
     {
         $attr['size'] = $attr['size'] ?? '';
         if (in_array($attr['type'], ['int', 'bigint', 'tinyint', 'decimal', 'float']))
         {
             // 添加 unsigned 属性
             $attr['unsigned'] = $attr['unsigned'] ?? true;
-            $attr['default']  = $attr['default'] ?? 0;
+            //$attr['default']  = is_null($attr['default']) ? null : $attr['default'];
+            //$attr['default']  = $field_name != 'id' && $attr['default'] == '' ? 0 : $attr['default'];
+
             if ($attr['type'] == 'bigint')
             {
-                $attr['size'] = $attr['size'] == '' ? 20 : $attr['size'];
+                $attr['size'] = empty($attr['size']) ? 20 : $attr['size'];
             }
             else if ($attr['type'] == 'tinyint')
             {
-                $attr['size'] = $attr['size'] == '' ? 3 : $attr['size'];
+                $attr['size'] = empty($attr['size']) ? 3 : $attr['size'];
             }
             else
             {
-                $attr['size'] = $attr['size'] == '' ? 10 : $attr['size'];
+                $attr['size'] = empty($attr['size']) ? 10 : $attr['size'];
             }
         }
         elseif (in_array($attr['type'], ['char', 'varchar']))
         {
-            $attr['default'] = $attr['default'] ?? '';
-            $attr['size']    = empty($attr['size']) ? 32 : $attr['size'];
+            $attr['default'] = empty($attr['default']) ? '' : $attr['default'];
+            $attr['size']    = $attr['size'] == '' ? 32 : $attr['size'];
             if (strstr($attr['size'], '|'))
             {
                 // 保存最小长度，用于生成检验时使用
                 list($attr['min_size'], $attr['size']) = explode('|', $attr['size']);
+                $attr['min_size']   = intval($attr['min_size']);
             }
+            $attr['size']       = intval($attr['size']);
         }
         else
         {
@@ -271,8 +296,8 @@ class FreshStorageGenerator extends Generator
             }
             $temp['type']     = $attr['type'];
             $temp['table']    = $table_name;
-            $temp['default']  = !empty($attr['default']) ? $attr['default'] : '';
-            $temp['format']   = !empty($attr['format']) ? $attr['format'] : '';
+            $temp['default']  = $attr['default'] ?? null;
+            $temp['format']   = $attr['format'] ?? '';
 
             if (isset($all_fields['table_fields'][$field_name]))
             {
@@ -406,8 +431,8 @@ class FreshStorageGenerator extends Generator
                     'zh-CN'   => $attr['zh-CN'],
                     'type'    => $attr['type'] ?? null,
                     'format'  => $attr['format'] ?? null,
-                    'default' => ! empty($attr['default']) ? $attr['default'] : '',
-                    'table'   => ! empty($attr['table']) ? $attr['table'] : '',
+                    'default' => $attr['default'],
+                    'table'   => $attr['table'] ?? '',
                 ];
 
             }
