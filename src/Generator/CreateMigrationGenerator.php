@@ -168,7 +168,11 @@ class CreateMigrationGenerator extends Generator
 
             $one .= (isset($attr['unsigned']) && $attr['unsigned']) ? '->unsigned()' : '';
 
-            if ( ! $attr['allow_null'])
+            if ($attr['allow_null'])
+            {
+                $one .= '->nullable()';
+            }
+            else
             {
                 if (in_array($attr['type'], ['tinyint', 'int', 'bigint']))
                 {
@@ -176,12 +180,8 @@ class CreateMigrationGenerator extends Generator
                 }
                 elseif (in_array($attr['type'], ['char', 'varchar', 'text']))
                 {
-                    $one .= isset($attr['default'])  ? "->default('{$attr['default']}')" : '';
+                    $one .= isset($attr['default']) ? "->default('{$attr['default']}')" : '';
                 }
-            }
-            else
-            {
-                $one .= '->nullable()';
             }
 
             $one .= "->comment('{$attr['name']}');";
