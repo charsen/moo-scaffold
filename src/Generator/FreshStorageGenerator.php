@@ -246,10 +246,10 @@ class FreshStorageGenerator extends Generator
         {
             $attr['default'] = empty($attr['default']) ? '' : $attr['default'];
             $attr['size']    = $attr['size'] == '' ? 32 : $attr['size'];
-            if (strstr($attr['size'], '|'))
+            if (strstr($attr['size'], ','))
             {
                 // 保存最小长度，用于生成检验时使用
-                list($attr['min_size'], $attr['size']) = explode('|', $attr['size']);
+                list($attr['min_size'], $attr['size']) = explode(',', $attr['size']);
                 $attr['min_size']   = intval($attr['min_size']);
             }
             $attr['size']       = intval($attr['size']);

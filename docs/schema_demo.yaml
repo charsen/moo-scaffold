@@ -2,17 +2,17 @@
 # 数据库表字段配置的默认规则 （目的减少代码输入量）
 #
 # *** 字段 *********************************************************
-# - 为 id 时，索引默认设为 AI，UNSIGNED INTEGER
+# - 为 id 时，索引默认设为 Atuo Icrement，UNSIGNED INTEGER
 #
 # *** 字段-属性 *****************************************************
 # - require 默认 = true
 # - unique: true 时生成的表单验证会加入 unique 规则
-# - type: int 时，默认 size = 10, unsigned = true, default = 0
-# - type: bigint 时，默认 size = 20, unsigned = true, default = 0
-# - type: tinyint 时，默认 size = 3, unsigned = true, default = 0
-# - varchar: {char|varchar} 时, 默认 size = 32, default = ''
+# - type: int 时，默认 size = 10, unsigned = true
+# - type: bigint 时，默认 size = 20, unsigned = true
+# - type: tinyint 时，默认 size = 3, unsigned = true
+# - varchar: {char|varchar} 时, 默认 size = 32
 # - format: 'intval:100' 时，整数转浮点数，100 对应2位小数，1000 3位小数
-# - size: 3|128 时，分割两个数字时，第一个表示最小长度（会生成验证），第二个表示最大长度
+# - size: '3,128' 时，分割两个数字时，第一个表示最小长度（会生成验证），第二个表示最大长度
 ###
 
 ####
