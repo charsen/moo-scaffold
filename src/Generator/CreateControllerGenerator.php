@@ -221,10 +221,11 @@ class CreateControllerGenerator extends Generator
                 continue;
             }
 
-            if (strstr($value, 'getUnique')) {
+            if (strstr($value, 'getUnique') || strstr($value, 'getInDict')) {
                 if ($route_key == null) {
                     continue;
-                } else {
+                }
+                else if (strstr($value, 'getUnique')) {
                     // 对编辑运作的 Unique 进行二次处理
                     $value = "\$this->getUnique(\$model, '{$field_name}', '{$route_key}')";
                 }
