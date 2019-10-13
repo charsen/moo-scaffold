@@ -310,7 +310,7 @@ class CreateApiGenerator extends Generator
 
             $data[$result[1]][$result[2]] = [
                 'name'   => $route->getName(),
-                'uri'    => str_replace('api/', '', $route->uri()),
+                'uri'    => str_replace(['api/', 'admin/'], '', $route->uri()),
                 //'method' => $method,
                 'methods' => $methods,
             ];
