@@ -294,9 +294,6 @@ class CreateApiGenerator extends Generator
             // 正则匹配出 controller 和 action 名称
             preg_match('/^' . $pre_pattern . '([a-zA-Z]+)Controller@([a-zA-Z]+)/', $action_name, $result);
 
-            //$method                       = implode('|', $route->methods());
-            //$method                       = ($method == 'GET|HEAD') ? 'GET' : $method;
-            //$method                       = ($method == 'PUT|PATCH') ? 'PUT' : $method;
             $methods = $route->methods();
             $delete_keys = ['HEAD', 'PATCH'];
             foreach ($delete_keys as $val)
@@ -310,8 +307,7 @@ class CreateApiGenerator extends Generator
 
             $data[$result[1]][$result[2]] = [
                 'name'   => $route->getName(),
-                'uri'    => str_replace(['api/', 'admin/'], '', $route->uri()),
-                //'method' => $method,
+                'uri'    => $route->uri(),
                 'methods' => $methods,
             ];
         }
