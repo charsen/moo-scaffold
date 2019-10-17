@@ -112,7 +112,9 @@ class ApiController extends Controller
     public function param(Request $req)
     {
         $data                = $this->getOneApi($req, 'request');
-        $data['request_url'] = str_replace($req->path(), $this->config('routes.prefix'), $req->url());
+        //$data['request_url'] = str_replace($req->path(), $this->config('routes.prefix'), $req->url());
+        $data['request_url'] = str_replace($req->path(), '', $req->url());
+        $data['request_url'] = trim($data['request_url'], '/');
 
         $params              = ($data['request'][0] == 'GET') ? $data['url_params'] : $data['body_params'];
 
