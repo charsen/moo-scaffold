@@ -25,6 +25,8 @@ class Controller extends BaseController
     {
         $this->method = $method;
 
+        // 假如存在boot方法 就执行中间件之后 先执行boot 再执行action
+        // https://github.com/laravel/framework/blob/5.8/src/Illuminate/Routing/ControllerDispatcher.php#L44
         if (method_exists($this, 'boot')) {
             $this->boot();
         }
