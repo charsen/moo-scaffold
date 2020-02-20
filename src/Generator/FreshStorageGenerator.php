@@ -94,7 +94,7 @@ class FreshStorageGenerator extends Generator
                     'desc'             => $config['attrs']['desc'],
                     'remark'           => $config['attrs']['remark'] ?? [],
                     'index'            => $this->formatIndex($config['index'] ?? []),
-                    'fields'           => $this->formatFields($config['fields']),
+                    'fields'           => $this->formatFields($config['fields'], $config['dictionaries'] ?? []),
                     'dictionaries'     => $config['dictionaries'] ?? [],
                 ];
 
@@ -147,15 +147,17 @@ class FreshStorageGenerator extends Generator
      * 格式化字段
      *
      * @param array $fields
+     * @param array $dictionaries
+     *
      * @return array
      */
-    private function formatFields(array $fields)
+    private function formatFields(array $fields, array $dictionaries = [])
     {
         $fields = $this->formatDefaultFields($fields);
         foreach ($fields as $key => &$attr)
         {
             $attr['require']    = $attr['require'] ?? true;
-            $attr['desc']       = $attr['desc'] ?? '';
+            $attr['desc']       = $this->getFieldDesc($key, $attr['desc'] ?? '', $dictionaries);
             $attr['allow_null'] = $attr['require'] ? false : true;
 
             $this->getDefault($attr, $key);
@@ -163,6 +165,31 @@ class FreshStorageGenerator extends Generator
         }
 
         return $fields;
+    }
+
+    /**
+     * 获取字段的描述
+     *
+     * @param string $key
+     * @param string $desc
+     * @param array $dictionaries
+     *
+     * @return string|array
+     */
+    private function getFieldDesc($key, $desc, array $dictionaries)
+    {
+        $temp = [];
+
+        if (array_key_exists($key, $dictionaries))
+        {
+            foreach ($dictionaries[$key] as $v)
+            {
+                $temp[] = "{$v[0]}: {$v[2]}";
+            }
+            $desc = '{' . implode(', ', $temp) . '}';
+        }
+
+        return $desc;
     }
 
     /**
@@ -203,9 +230,20 @@ class FreshStorageGenerator extends Generator
      */
     private function getDefault(&$attr, $field_name, $default = '')
     {
-        if (in_array('default', array_keys($attr))) {
-            //dump($attr);
-            $attr['default'] = is_null($attr['default']) ? null : $attr['default'];
+        if (in_array('default', array_keys($attr)))
+        {
+            if (is_null($attr['default']))
+            {
+                $attr['default'] = null;
+            }
+            else if ($attr['default'] === 0)
+            {
+                $attr['default'] = 0;
+            }
+            else
+            {
+                $attr['default'] = $attr['default'];
+            }
         }
 
         return $attr;
@@ -226,8 +264,6 @@ class FreshStorageGenerator extends Generator
         {
             // 添加 unsigned 属性
             $attr['unsigned'] = $attr['unsigned'] ?? true;
-            //$attr['default']  = is_null($attr['default']) ? null : $attr['default'];
-            //$attr['default']  = $field_name != 'id' && $attr['default'] == '' ? 0 : $attr['default'];
 
             if ($attr['type'] == 'bigint')
             {
@@ -235,7 +271,7 @@ class FreshStorageGenerator extends Generator
             }
             else if ($attr['type'] == 'tinyint')
             {
-                $attr['size'] = empty($attr['size']) ? 3 : $attr['size'];
+                $attr['size'] = empty($attr['size']) ? 4 : $attr['size'];
             }
             else
             {
@@ -244,15 +280,14 @@ class FreshStorageGenerator extends Generator
         }
         elseif (in_array($attr['type'], ['char', 'varchar']))
         {
-            $attr['default'] = empty($attr['default']) ? '' : $attr['default'];
-            $attr['size']    = $attr['size'] == '' ? 32 : $attr['size'];
+            $attr['size']    = empty($attr['size']) ? 32 : $attr['size'];
             if (strstr($attr['size'], ','))
             {
                 // 保存最小长度，用于生成检验时使用
-                list($attr['min_size'], $attr['size']) = explode(',', $attr['size']);
-                $attr['min_size']   = intval($attr['min_size']);
+                list($attr['min_size'], $attr['size'])  = explode(',', $attr['size']);
+                $attr['min_size']                       = intval($attr['min_size']);
             }
-            $attr['size']       = intval($attr['size']);
+            $attr['size']                               = intval($attr['size']);
         }
         else
         {
@@ -296,7 +331,7 @@ class FreshStorageGenerator extends Generator
             }
             $temp['type']     = $attr['type'];
             $temp['table']    = $table_name;
-            $temp['default']  = $attr['default'] ?? null;
+            $temp['default']  = $attr['default'] ?? '';
             $temp['format']   = $attr['format'] ?? '';
 
             if (isset($all_fields['table_fields'][$field_name]))
