@@ -326,7 +326,17 @@ class CreateControllerGenerator extends Generator
 
         $file          = $this->utility->getRouteFile('admin');
         $file_relative = $this->utility->getRouteFile('admin', true);
-        $file_txt      = $this->filesystem->get($file);
+
+        if ($this->filesystem->isFile($file))
+        {
+            $file_txt      = $this->filesystem->get($file);
+        }
+        else
+        {
+            $file_txt      = '<?php' . PHP_EOL
+                           . 'use Illuminate\Http\Request;' . PHP_EOL . PHP_EOL
+                           . '//:insert_code_here:do_not_delete';
+        }
 
         $code = [];
         foreach ($created as $controller) {

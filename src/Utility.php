@@ -223,6 +223,16 @@ class Utility
     }
 
     /**
+     * Get the Stub Path.
+     *
+     * @return string
+     */
+    protected function getStubPath()
+    {
+        return __DIR__ . '/Stub/';
+    }
+
+    /**
      * 获取多语言文件
      *
      * @param string $file_name
@@ -235,6 +245,12 @@ class Utility
     public function getLanguage($file_name = 'validation', $language = 'en', $to_string = false)
     {
         $file = resource_path("lang/{$language}/{$file_name}.php");
+
+        if ( ! $this->filesystem->isFile($file))
+        {
+            // 获取语言文件的默认模板数据
+            $file = $this->getStubPath() . "lang/{$language}.{$file_name}.stub";
+        }
 
         return $to_string ? $this->filesystem->get($file) : $this->filesystem->getRequire($file);
     }
@@ -250,8 +266,14 @@ class Utility
      */
     public function getLanguagePath($file_name = 'validation', $language = 'en', $relative = false)
     {
-        $path = resource_path("lang/{$language}/{$file_name}.php");
+        $path = resource_path("lang/{$language}/");
 
+        if ( ! $this->filesystem->isDirectory($path))
+        {
+            $this->filesystem->makeDirectory($path);
+        }
+
+        $path .= "{$file_name}.php";
         return $relative ? str_replace(base_path(), '.', $path) : $path;
     }
 

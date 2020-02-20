@@ -1,0 +1,7 @@
+<?php
+
+/**
+ * The fields in database's table
+ */
+return [
+];

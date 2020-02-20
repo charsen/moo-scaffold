@@ -1,0 +1,7 @@
+<?php
+
+/**
+ * The fields in model dictionary
+ */
+return [
+];
