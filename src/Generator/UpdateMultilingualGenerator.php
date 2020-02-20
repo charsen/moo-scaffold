@@ -124,12 +124,13 @@ class UpdateMultilingualGenerator extends Generator
      */
     private function compileValidation($file_name, $lang, array $all_fields, array $all_field_keys, array $data)
     {
+
         $file_txt       = $this->utility->getLanguage($file_name, $lang, true);
         $file_data      = $this->utility->getLanguage($file_name, $lang);
-        $old_keys       = array_keys($file_data['attributes']);
+        $old_keys       = isset($file_data['attributes']) ? array_keys($file_data['attributes']) : [];
         $new_keys       = array_diff($all_field_keys, $old_keys);
 
-        $rebuild_data   = $file_data['attributes'];
+        $rebuild_data   = $file_data['attributes'] ?? [];
         foreach ($new_keys as $key)
         {
             $rebuild_data[$key] = $all_fields[$key][($lang == 'zh-CN' ? 'zh-CN' : $lang)];
