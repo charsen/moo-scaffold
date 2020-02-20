@@ -82,7 +82,11 @@
                             no
                         @endif
                     </td>
-                    <td>{{ $v['default'] ?? '' }}</td>
+                    <td>
+                        @if (array_key_exists('default', $v))
+                            {{ is_null($v['default']) ? 'null' : $v['default'] }}
+                        @endif
+                    </td>
                     <td>{{ $v['desc'] }}</td>
                 </tr>
                 @endforeach
