@@ -19,7 +19,7 @@ return [
         'exclude_forder' => ['App'],
         // 是否在 app_path() 下生成 ACL.php ，用于人工核对数据
         'make_acl'  => FALSE,
-        // 是否通过 md5 多语别名 key
+        // 是否通过 md5 加密别名 key
         'md5'       => FALSE,
         // 是否用 16位 md5 算法
         'short_md5' => TRUE,
@@ -74,5 +74,5 @@ return [
             : null,
     ],
 
-    'version' => '0.1.2'
+    'version' => '1.0.0'
 ];

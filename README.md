@@ -106,7 +106,7 @@ php artisan vendor:publish --provider=Charsen\\Scaffold\\ScaffoldProvider --tag=
 ### 4.1 初始化（记录编码作者及创建目录）
 - 生成的 controller, model, migration 会在注释里加上作者和日期
 ```sh
-php artisan scaffold:init `author`
+php artisan scaffold:init "`author`"
 
 ```
 **Example:**
