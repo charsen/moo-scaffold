@@ -442,9 +442,7 @@ class ApiController extends Controller
             }
             elseif ($field_name == 'real_name')
             {
-                //$attr['value'] = $faker->name(array_random(['male', 'female']));
-                $sex = ['male', 'female'];
-                $attr['value'] = $faker->name($sex[rand(0, 1)]);
+                $attr['value'] = $faker->name(array_random(['male', 'female']));
             }
             elseif (strstr($field_name, '_code'))
             {
