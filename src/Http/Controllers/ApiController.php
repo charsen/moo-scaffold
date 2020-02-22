@@ -306,19 +306,21 @@ class ApiController extends Controller
         $controller        = 'App\Http\Controllers\\' . trim($folder_path . '\\' . $controller_class . 'Controller', '/');
         $controller        = str_replace(['/', '\\\\'], ['\\', '\\'], $controller);
         $reflection_class  = new \ReflectionClass($controller);
+        //dump($reflection_class);
         // 因为出现了同一个 url 多个 method，导致真实的动作未知，可通过 rule_action 指定
         // 比如 一个控制器中有 GET createPersonnels 又有 POST storePersonnels，为了简化授权，只要 createPersonnels ，
         // 再从 createPersonnels 判断 isMethod('POST') 跳转到 storePersonnels
         $rule_action       = isset($action_data['rule_action']) ? $action_data['rule_action'] : $action_name;
         $request_object    = $this->utility->getActionRequestClass($rule_action, $reflection_class);
+
         // dump($rule_action);
         // dump($request_object->getActionRules($rule_action));
-        $rule_params       = [];
+        $rule_params     = [];
         if ( $request_object != null && ! empty($request_object->getActionRules($rule_action)))
         {
             $rule_params = $this->formatRules($action_name, $request_object->getActionRules($rule_action), $dictionaries, $fields, $lang_fields);
         }
-        //dump($rule_params);
+
         $url_params     =  ! isset($action_data['url_params'])
                         ? []
                         : $this->formatParams($action_data['url_params'], $dictionaries, $fields, $lang_fields);
@@ -327,7 +329,7 @@ class ApiController extends Controller
                         ? []
                         :$this->formatParams($action_data['body_params'], $dictionaries, $fields, $lang_fields);
 
-                        if ($action_data['request'][0] == 'GET')
+        if ($action_data['request'][0] == 'GET')
         {
             $url_params    = array_merge($rule_params, $url_params);
         }
@@ -347,7 +349,7 @@ class ApiController extends Controller
 
             $body_params   = array_merge($method_param, $rule_params, $body_params);
         }
-        // dump($body_params);
+        //dump($body_params);
         // 伪造数据
         $faker = Faker::create('zh_CN');
         $action_data['url_params']  = $this->formatToFaker($faker, $url_params);
@@ -522,8 +524,9 @@ class ApiController extends Controller
 
             if (isset($dictionaries[$key]))
             {
-                $data[$key]['value'] = array_random(array_pluck($dictionaries[$key], 0));
-                $data[$key]['desc'] .= ' ' . json_encode(array_pluck($dictionaries[$key], 2, 0), JSON_UNESCAPED_UNICODE);
+                $data[$key]['value']   = array_random(array_pluck($dictionaries[$key], 0));
+                $data[$key]['options'] = array_pluck($dictionaries[$key], 2, 0);
+                $fields[$key]['type']  = 'radio';
             }
 
             if (isset($lang_fields[$key]))
@@ -574,8 +577,9 @@ class ApiController extends Controller
 
             if (isset($dictionaries[$key]))
             {
-                $data[$key]['value'] = array_random(array_pluck($dictionaries[$key], 0));
-                $data[$key]['desc'] .= ' ' . json_encode(array_pluck($dictionaries[$key], 2, 0), JSON_UNESCAPED_UNICODE);
+                $data[$key]['value']   = array_random(array_pluck($dictionaries[$key], 0));
+                $data[$key]['options'] = array_pluck($dictionaries[$key], 2, 0);
+                $fields[$key]['type']  = 'radio';
             }
 
             if (isset($lang_fields[$key]))

@@ -140,6 +140,7 @@ class Utility
 
     /**
      * 解析动作参数中的 Request 类
+     * ! 变量名，必须是 $request !
      *
      * @param $action
      * @param $reflection_class
@@ -154,15 +155,14 @@ class Utility
 
         foreach ($reflection_params as $param)
         {
-            if ($param->getType() !== null)
+            if ($param->getType() === null) continue;
+
+            // if (strstr($param_class, 'App\Http\Requests\\'))
+            if ($param->getName() == 'request')
             {
                 $param_class = $param->getType()->getName(); // ReflectionNamedType
-
-                if (strstr($param_class, 'App\Http\Requests\\'))
-                {
-                    $result = new $param_class();
-                    break;
-                }
+                $result      = new $param_class();
+                break;
             }
         }
 
