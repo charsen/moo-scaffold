@@ -46,7 +46,6 @@ return [
      */
     'database'   => [
         'schema'  => 'scaffold/database/',
-        'storage' => 'scaffold/storage/',
     ],
 
     /**
@@ -60,14 +59,7 @@ return [
      * Eloquent ORM 的路径
      */
     'model'      => [
-        'path' => 'app/Entities/',
-    ],
-
-    /**
-     * Repository 的路径
-     */
-    'repository' => [
-        'path' => 'app/Repositories/',
+        'path' => 'app/Models/',
     ],
 
     /**
@@ -81,11 +73,6 @@ return [
             ? explode(',', env('LARAVEL_SCAFFOLD_MIDDLEWARE'))
             : null,
     ],
-<<<<<<< HEAD
-    
-    'version' => '0.1.2'
-=======
 
     'version' => '1.0.0'
->>>>>>> 1.0
 ];

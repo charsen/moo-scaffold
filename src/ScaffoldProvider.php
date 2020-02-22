@@ -28,19 +28,9 @@ class ScaffoldProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole())
         {
-<<<<<<< HEAD
-            $this->publishes([
-                __DIR__ . '/../config/config.php' => config_path('scaffold.php'),
-            ], 'config');
-    
-            $this->publishes([
-                __DIR__ . '/../public' => public_path('scaffold'),
-            ], 'public');
-=======
             $this->publishes([__DIR__ . '/../config/config.php' => config_path('scaffold.php')], 'config');
 
             $this->publishes([__DIR__ . '/../public' => public_path('vendor/scaffold')], 'public');
->>>>>>> 1.0
         }
     }
 
@@ -69,7 +59,6 @@ class ScaffoldProvider extends ServiceProvider
 
         // 加载 路由
         $this->loadRoutesFrom(__DIR__ . '/Http/routes.php');
-        //$this->app->make('Charsen\Scaffold\Http\Controllers\ScaffoldController');
 
         // 注册扩展包 视图
         $this->loadViewsFrom(__DIR__ . '/Http/Views', 'scaffold');

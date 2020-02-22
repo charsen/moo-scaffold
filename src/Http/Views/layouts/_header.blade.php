@@ -1,11 +1,7 @@
 <div class="header">
     <div class="user" id="user">
         <a href="javascript:;" class="cover">
-<<<<<<< HEAD
-            <img src="/scaffold/images/cover.png">
-=======
             <img src="/vendor/scaffold/images/cover.png">
->>>>>>> 1.0
         </a>
         <div class="drop-down">
             <a href="#">设置</a>
@@ -13,11 +9,7 @@
         </div>
     </div>
     <a href="javascript:;" class="logo">
-<<<<<<< HEAD
-        <img src="/scaffold/images/logo.png">
-=======
         <img src="/vendor/scaffold/images/logo.png">
->>>>>>> 1.0
     </a>
     <div class="collapse">
         <div class="menu">
