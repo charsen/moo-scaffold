@@ -218,7 +218,7 @@ class {{class}} extends Controller
     public function create({{request_name}} $request)
     {
         $default        = [];
-        $form_widgets   = $this->getFormWidgets($request, $default);
+        $form_widgets   = $request->getFormWidgets($this->getMethod(), $default);
 
         return new FormWidgetCollection(collect($form_widgets));
     }
@@ -234,8 +234,11 @@ class {{class}} extends Controller
     {
         $result = $this->model->findOrFail($id);
 
+        $default        = [];
+        $form_widgets   = $request->getFormWidgets($this->getMethod(), $default);
+
         return (new BaseResource($result))->additional([
-            'form_widgets' => $this->create($request)
+            'form_widgets' => $form_widgets
         ]);
     }
 
