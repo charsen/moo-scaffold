@@ -25,7 +25,7 @@ class CreateModelGenerator extends Generator
      *
      * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
-    public function start($schema_name, $factory = false, $force = false)
+    public function start($schema_name, $factory = false, $force = false, $trait = false)
     {
         $this->model_path          = $this->utility->getModelPath();
         $this->factory_path        = database_path('factories/');
@@ -34,7 +34,7 @@ class CreateModelGenerator extends Generator
         // 从 storage 里获取模型数据，在修改了 schema 后忘了执行 scaffold:fresh 的话会不准确！！
         $all = $this->filesystem->getRequire($this->utility->getStoragePath() . 'models.php');
 
-        if (!isset($all[$schema_name]))
+        if ( ! isset($all[$schema_name]))
         {
             $this->command->error("Schema File \"{$schema_name}\" could not be found.");
             return false;
@@ -42,44 +42,59 @@ class CreateModelGenerator extends Generator
 
         foreach ($all[$schema_name] as $class => $attr)
         {
-            // 检查目录是否存在，不存在则创建
-            if ( ! $this->filesystem->isDirectory($this->model_path . $attr['module']['folder']))
+            $model_path = $this->model_path . $attr['module']['folder'];
+            // Model 目录检查，不存在则创建
+            if ( ! $this->filesystem->isDirectory($model_path))
             {
-                $this->filesystem->makeDirectory($this->model_path . $attr['module']['folder'], 0777, true, true);
-            }
-            if ( ! $this->filesystem->isDirectory($this->factory_path . $attr['module']['folder']))
-            {
-                $this->filesystem->makeDirectory($this->factory_path . $attr['module']['folder'], 0777, true, true);
+                $this->filesystem->makeDirectory($model_path, 0777, true, true);
             }
 
             $table_attr        = $this->utility->getOneTable($attr['table_name']);
             $fields            = $table_attr['fields'];
             $dictionaries      = $table_attr['dictionaries'];
 
-            // 目录及 namespace 处理
-            $namespace = $this->utility->getConfig('model.path') . $attr['module']['folder'];
-            $namespace = ucfirst(str_replace('/', '\\', $namespace));
+            // Model 目录及 namespace 处理
+            $trait_class       = "{$class}Trait";
+            $namespace         = $this->utility->getConfig('model.path') . $attr['module']['folder'];
+            $trait_namespace   = $namespace . '/Traits';
+            $namespace         = ucfirst(str_replace('/', '\\', $namespace));
+            $trait_namespace   = ucfirst(str_replace('/', '\\', $trait_namespace));
 
-            $model_file          = $this->model_path . $attr['module']['folder'] . "/{$class}.php";
-            $model_relative_file = $this->model_relative_path . $attr['module']['folder'] . "/{$class}.php";
+            // 文件处理
+            $model_file           = $model_path . "/{$class}.php";
+            $model_relative_file  = $this->model_relative_path . $attr['module']['folder'] . "/{$class}.php";
+
+            $dictionaries_code    = $this->buildDictionaries($dictionaries, $fields);
+            $get_intval_attribute = $this->buildIntvalAttribute($fields);
+
+            // 检查是否存在，存在则不更新
             if ($this->filesystem->isFile($model_file) && ! $force)
             {
                 $this->command->error('x Model is existed (' . $model_relative_file . ')');
 
+                // 生成对应的 Trait
+                if ($trait) {
+                    $this->buildTrait($model_path, $trait_namespace, $trait_class, $attr['table_name'], $dictionaries_code['dictionaries'],
+                                    $dictionaries_code['get_txt_attribute'], $get_intval_attribute);
+                }
+
                 // 生成对应的 factory 文件并更新 Seeder
                 if ($factory) {
-                    $this->buildFactory($attr['module']['folder'], $attr['table_name'], $class, $namespace, $fields, $dictionaries, $force);
+                    $this->buildFactory($this->factory_path, $attr['module']['folder'], $attr['table_name'], $class,
+                                            $namespace, $fields, $dictionaries, $force);
                 }
+
                 continue;
             }
 
+            $casts_code        = $this->buildCasts($fields);
             $hidden            = [];
             $use_trait         = [];
             $use_class         = [];
 
-            $dictionaries_code      = $this->buildDictionaries($dictionaries, $fields);
-            $casts_code             = $this->buildCasts($fields);
-            $get_intval_attribute   = $this->buildIntvalAttribute($fields);
+            // Model Trait
+            $use_trait[]   = "{$trait_class}";
+            $use_class[]   = "use {$trait_namespace}\\{$trait_class};";
 
             // 软删除
             if (isset($fields['deleted_at']))
@@ -98,24 +113,66 @@ class CreateModelGenerator extends Generator
                 'class'                 => $class,
                 'class_name'            => $table_attr['name'] . '模型',
                 'table_name'            => $attr['table_name'],
-                'dictionaries'          => $dictionaries_code['dictionaries'],
                 'casts'                 => $casts_code,
                 'appends'               => $this->buildAppends($dictionaries_code['appends']),
                 'hidden'                => $this->buildHidden($hidden),
                 'fillable'              => $this->buildFillable($fields),
                 'dates'                 => $this->buildDates($fields),
-                'get_txt_attribute'     => $dictionaries_code['get_txt_attribute'],
-                'get_intval_attribute'  => $get_intval_attribute,
             ];
 
             $this->filesystem->put($model_file, $this->compileStub($meta));
             $this->command->info('+ ' . $model_relative_file);
 
+            // 生成对应的 Trait
+            $this->buildTrait($model_path, $trait_namespace, $trait_class, $meta['table_name'], $dictionaries_code['dictionaries'],
+                                $dictionaries_code['get_txt_attribute'], $get_intval_attribute);
+
             // 生成对应的 factory 文件并更新 Seeder
-            if ($factory) {
-                $this->buildFactory($attr['module']['folder'], $attr['table_name'], $class, $meta['namespace'], $fields, $dictionaries, $force);
+            if ($factory)
+            {
+                $this->buildFactory($this->factory_path, $attr['module']['folder'], $attr['table_name'], $class,
+                                    $meta['namespace'], $fields, $dictionaries, $force);
             }
         }
+    }
+
+    /**
+     * 生成 Trait 文件
+     *
+     * @param string $path
+     * @param string $namespace
+     * @param string $class
+     * @param string $table_name
+     * @param string $dictionaries
+     * @param string $txt_attribute
+     * @param string $intval_attribute
+     * @return void
+     */
+    private function buildTrait($path, $namespace, $class, $table_name, $dictionaries, $txt_attribute, $intval_attribute)
+    {
+        $path .= '/Traits/';
+        // Traits 目录检查，不存在则创建
+        if ( ! $this->filesystem->isDirectory($path))
+        {
+            $this->filesystem->makeDirectory($path, 0777, true, true);
+        }
+
+        $trait_file          = $path . $class . '.php';
+        $trait_relative_file = str_replace(base_path(), '.', $trait_file);
+
+        $meta = [
+            'trait_namespace'       => $namespace,
+            'trait_class'           => $class,
+            'table_name'            => $table_name,
+            'dictionaries'          => $dictionaries,
+            'get_txt_attribute'     => $txt_attribute,
+            'get_intval_attribute'  => $intval_attribute,
+        ];
+
+        $this->filesystem->put($trait_file, $this->compileTraitStub($meta));
+        $this->command->info('+ ' . $trait_relative_file);
+
+        return true;
     }
 
     /**
@@ -126,8 +183,14 @@ class CreateModelGenerator extends Generator
      * @param string $namespace
      * @return void
      */
-    private function buildFactory($folder, $table_name, $class, $namespace, $fields, $dictionaries, $force)
+    private function buildFactory($path, $folder, $table_name, $class, $namespace, $fields, $dictionaries, $force)
     {
+        // Factory 目录检查，不存在则创建
+        if ( ! $this->filesystem->isDirectory($path . $folder))
+        {
+            $this->filesystem->makeDirectory($path . $folder, 0777, true, true);
+        }
+
         $words = array_map(function ($item) {
             return ucfirst($item);
         }, explode('_', $table_name));
@@ -250,7 +313,7 @@ class CreateModelGenerator extends Generator
         $file_txt   = str_replace("//:insert_code_here:do_not_delete", $code, $file_txt);
 
         $this->filesystem->put($file, $file_txt);
-        $this->command->warn('+ ./app/routes/api.php (Updated)');
+        $this->command->warn('+ ./database/seeds/DatabaseSeeder.php (Updated)');
 
         return true;
     }
@@ -264,10 +327,7 @@ class CreateModelGenerator extends Generator
      */
     private function buildHidden($hidden)
     {
-        if (empty($hidden))
-        {
-            return '';
-        }
+        if (empty($hidden)) return '';
 
         $code = [
             $this->getTabs(1) . '/**',
@@ -281,7 +341,6 @@ class CreateModelGenerator extends Generator
         return implode("\n", $code);
     }
 
-
     /**
      * 生成附加属性
      *
@@ -291,10 +350,7 @@ class CreateModelGenerator extends Generator
      */
     private function buildAppends($appends)
     {
-        if (empty($appends))
-        {
-            return '';
-        }
+        if (empty($appends)) return '';
 
         $code = [
             $this->getTabs(1) . '/**',
@@ -327,10 +383,9 @@ class CreateModelGenerator extends Generator
             }
             // todo: 转换更多类型
         }
-        if (empty($code))
-        {
-            return '';
-        }
+
+        if (empty($code)) return '';
+
         $code[] = $this->getTabs(1) . '];';
         $code[] = '';
 
@@ -495,5 +550,18 @@ class CreateModelGenerator extends Generator
     private function compileStub($meta)
     {
         return $this->buildStub($meta, $this->getStub('model'));
+    }
+
+    /**
+     * 编译 Trait 模板
+     *
+     * @param $meta
+     *
+     * @return string
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     */
+    private function compileTraitStub($meta)
+    {
+        return $this->buildStub($meta, $this->getStub('model-trait'));
     }
 }

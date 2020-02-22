@@ -1,0 +1,19 @@
+<?php
+namespace {{trait_namespace}};
+
+/**
+ * Model 与 Request 共用 (会被生成直接覆盖)
+ *
+ * Request 用于验证，生成表单控件，生成接口参数
+ */
+trait {{trait_class}}
+{
+    /**
+     * 给 Request 调用，如 uniqure 验证
+     * @return void
+     */
+    protected $model_table = '{{table_name}}';
+{{dictionaries}}
+{{get_txt_attribute}}
+{{get_intval_attribute}}
+}

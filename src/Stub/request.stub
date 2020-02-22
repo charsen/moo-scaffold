@@ -1,11 +1,13 @@
 <?php
-
 namespace {{namespace}};
 
+use {{model_trait}};
 use Charsen\Scaffold\Foundation\FormRequest;
 
 class {{request_name}} extends FormRequest
 {
+    // Model Trait 用于 unique, in: 等规则，减少冗余
+    use {{model_trait_name}};
 
     public function indexRules()
     {
@@ -25,15 +27,11 @@ class {{request_name}} extends FormRequest
 
     public function storeRules()
     {
-        $model = new {{model_class}};
-
         return {{store_rules}};
     }
 
     public function updateRules()
     {
-        $model = new {{model_class}};
-
         return {{update_rules}};
     }
 

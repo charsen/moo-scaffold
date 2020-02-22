@@ -102,7 +102,7 @@
                             @if (isset($v['type']) && $v['type'] == 'radio')
                                 <select class="select value">
                                 @foreach ($v['options'] as $sk => $sv)
-                                    <option value="{{ $sk }}">{{ $sk }}: {{ $sv }}</option>
+                                    <option value="{{ $sk }}" {{ $sk == $v['value'] ? 'selected' : ''}}>{{ $sk }}: {{ $sv }}</option>
                                 @endforeach
                                 </select>
                             @else

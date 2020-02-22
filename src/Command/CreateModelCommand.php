@@ -56,6 +56,14 @@ class CreateModelCommand extends Command
     {
         return [
             [
+                'trait',
+                '-t',
+                InputOption::VALUE_OPTIONAL,
+                'Overwrite Trait File.',
+                false,
+            ],
+
+            [
                 'force',
                 '-f',
                 InputOption::VALUE_OPTIONAL,
@@ -97,6 +105,7 @@ class CreateModelCommand extends Command
         }
 
         $force       = $this->option('force') === null;
+        $trait       = $this->option('trait') === null;
         $fresh       = $this->option('fresh') === null;
         $factory     = $this->option('factory') === null;
         if ($fresh)
@@ -108,7 +117,7 @@ class CreateModelCommand extends Command
         }
 
         $result = (new CreateModelGenerator($this, $this->filesystem, $this->utility))
-            ->start($schema_name, $factory, $force);
+            ->start($schema_name, $factory, $force, $trait);
 
         $this->tipDone();
     }
