@@ -98,7 +98,17 @@
                         <td><input type="checkbox" class="checkbox" {{ ($v['require'] ? 'checked' : '') }}></td>
                         <td><input type="text" value="{{ $v['name'] }}" class="txt" readonly ></td>
                         <td><input type="text" value="{{ $key }}" class="txt key" readonly ></td>
-                        <td><input type="text" value="{{ $v['value'] }}" class="txt value"></td>
+                        <td>
+                            @if (isset($v['type']) && $v['type'] == 'radio')
+                                <select class="select value">
+                                @foreach ($v['options'] as $sk => $sv)
+                                    <option value="{{ $sk }}">{{ $sk }}: {{ $sv }}</option>
+                                @endforeach
+                                </select>
+                            @else
+                                <input type="text" value="{{ $v['value'] }}" class="txt value">
+                            @endif
+                        </td>
                         <td><input type="text" value="{{ $v['desc'] }}" class="txt" readonly ></td>
                     </tr>
                     @endforeach
@@ -134,7 +144,17 @@
                         <td><input type="checkbox" class="checkbox" {{ ($v['require'] ? 'checked' : '') }}></td>
                         <td><input type="text" value="{{ $v['name'] }}" class="txt" readonly ></td>
                         <td><input type="text" value="{{ $key }}" class="txt key" readonly ></td>
-                        <td><input type="text" value="{{ $v['value'] }}" class="txt value"></td>
+                        <td>
+                            @if (isset($v['type']) && $v['type'] == 'radio')
+                                <select class="select value">
+                                @foreach ($v['options'] as $sk => $sv)
+                                    <option value="{{ $sk }}" {{ $sk == $v['value'] ? 'selected' : ''}}>{{ $sk }}: {{ $sv }}</option>
+                                @endforeach
+                                </select>
+                            @else
+                                <input type="text" value="{{ $v['value'] }}" class="txt value">
+                            @endif
+                        </td>
                         <td><input type="text" value="{{ $v['desc'] }}" class="txt" readonly ></td>
                     </tr>
                     @endforeach
