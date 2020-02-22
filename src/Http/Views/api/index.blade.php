@@ -65,7 +65,7 @@
 
 @section('right')
 <div class="none">
-    <img src="/scaffold/images/none.png">
+    <img src="/vendor/scaffold/images/none.png">
     <h2>请选择接口</h2>
 </div>
 @endsection
@@ -113,7 +113,7 @@
     }
 
     @if (!empty($current_controller) && ! empty($current_action))
-    getParams('{{ $current_folder }}', '{{ $current_controller }}', '{{ $current_action }}');
+        getParams('{{ $current_folder }}', '{{ $current_controller }}', '{{ $current_action }}');
     @endif
 </script>
 @endsection

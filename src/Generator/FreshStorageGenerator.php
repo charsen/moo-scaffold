@@ -10,12 +10,11 @@ use Symfony\Component\Yaml\Yaml;
  */
 class FreshStorageGenerator extends Generator
 {
-    
+
     protected $db_schema_path;
-    protected $db_storage_path;
+    protected $storage_path;
     protected $db_relative_schema_path;
-    protected $db_relative_storage_path;
-    protected $api_relative_storage_path;
+    protected $storage_path_relative;
 
     /**
      * @param $clean
@@ -24,9 +23,9 @@ class FreshStorageGenerator extends Generator
     {
         $this->db_schema_path           = $this->utility->getDatabasePath('schema');
         $this->db_relative_schema_path  = $this->utility->getDatabasePath('schema', true);
-        $this->db_storage_path          = $this->utility->getDatabasePath('storage');
-        $this->db_relative_storage_path = $this->utility->getDatabasePath('storage', true);
-        $this->api_relative_storage_path = $this->utility->getApiPath('storage', true);
+
+        $this->storage_path          = $this->utility->getStoragePath();
+        $this->storage_path_relative = $this->utility->getStoragePath(true);
 
         if ($clean)
         {
@@ -38,10 +37,9 @@ class FreshStorageGenerator extends Generator
         $tables        = [];
         $dictionaries  = [];
         $models        = [];
-        $repositories  = [];
         $controllers   = [];
         $all_fields    = [];
-        
+
         $lang_fields   = $this->utility->getLangFields();
         $yaml_files    = $this->filesystem->allFiles($this->db_schema_path);
         foreach ($yaml_files as $file)
@@ -55,32 +53,22 @@ class FreshStorageGenerator extends Generator
 
             $data              = $yaml::parseFile($file);
             $menus[$file_name] = [
-                'folder_name'  => $data['module_name'],
+                'folder_name'  => $data['module']['folder'],
                 'tables_count' => 0,
                 'tables'       => [],
             ];
 
             foreach ($data['tables'] as $table_name => $config)
             {
-                // 缓存 控制器 与 模型和资源仓库的关系
+                // 缓存 控制器 与 模型等的关系
                 if (isset($config['controller']))
                 {
                     $controllers[$file_name][$config['controller']['class']] = [
-                        'package_name'     => $data['package_name'],
-                        'module_name'      => $data['module_name'],
-                        'entity_name'      => $config['attrs']['name'],
-                        'table_name'       => $table_name,
-                        'model_class'      => $config['model']['class'] ?? '',
-                        'repository_class' => $config['repository']['class'] ?? '',
-                    ];
-                }
-
-                // 不是所有数据表都有对应的资源仓库
-                if (isset($config['repository']))
-                {
-                    $repositories[$file_name][$config['repository']['class']] = [
-                        'table_name'  => $table_name,
-                        'model_class' => $config['model']['class'] ?? '',
+                        'package'           => $data['package'],
+                        'module'            => $data['module'],
+                        'entity_name'       => $config['attrs']['name'],
+                        'table_name'        => $table_name,
+                        'model_class'       => $config['model']['class'] ?? '',
                     ];
                 }
 
@@ -88,8 +76,8 @@ class FreshStorageGenerator extends Generator
                 if (isset($config['model']))
                 {
                     $models[$file_name][$config['model']['class']] = [
+                        'module'           => $data['module'],
                         'table_name'       => $table_name,
-                        'repository_class' => $config['repository']['class'] ?? '',
                     ];
                 }
 
@@ -102,12 +90,11 @@ class FreshStorageGenerator extends Generator
                 $tables[$table_name] = [
                     'table_name'       => $table_name,
                     'model_class'      => $config['model']['class'] ?? NULL,
-                    'repository_class' => $config['repository']['class'] ?? NULL,
                     'name'             => $config['attrs']['name'],
                     'desc'             => $config['attrs']['desc'],
                     'remark'           => $config['attrs']['remark'] ?? [],
                     'index'            => $this->formatIndex($config['index'] ?? []),
-                    'fields'           => $this->formatFields($config['fields']),
+                    'fields'           => $this->formatFields($config['fields'], $config['dictionaries'] ?? []),
                     'dictionaries'     => $config['dictionaries'] ?? [],
                 ];
 
@@ -118,14 +105,21 @@ class FreshStorageGenerator extends Generator
             }
         }
 
+        // 检查目录是否存在，不存在则创建
+        if (!$this->filesystem->isDirectory($this->storage_path))
+        {
+            $this->filesystem->makeDirectory($this->storage_path, 0777, true, true);
+        }
+
         $this->buildModelList($models);
-        $this->buildRepositoryList($repositories);
         $this->buildControllerList($controllers);
         $this->buildTableList($menus);
         $this->buildDictionaries($dictionaries);
         $this->buildTables($tables);
         $this->buildFields($all_fields);
-        $this->buildFieldsCache($all_fields);        //生成缓存的所有字段数据
+        $this->buildFieldsCache($all_fields);
+
+        return true;
     }
 
     /**
@@ -153,68 +147,51 @@ class FreshStorageGenerator extends Generator
      * 格式化字段
      *
      * @param array $fields
+     * @param array $dictionaries
+     *
      * @return array
      */
-    private function formatFields(array $fields)
+    private function formatFields(array $fields, array $dictionaries = [])
     {
         $fields = $this->formatDefaultFields($fields);
         foreach ($fields as $key => &$attr)
         {
             $attr['require']    = $attr['require'] ?? true;
-            $attr['desc']       = $attr['desc'] ?? '';
-            $attr['default']    = $attr['default'] ?? null;
+            $attr['desc']       = $this->getFieldDesc($key, $attr['desc'] ?? '', $dictionaries);
             $attr['allow_null'] = $attr['require'] ? false : true;
-            $this->getSize($attr);
+
+            $this->getDefault($attr, $key);
+            $this->getSize($attr, $key);
         }
 
         return $fields;
     }
-    
+
     /**
-     * 获取 size 值，char|varchar 时会有最小长度作为检验时使用
+     * 获取字段的描述
      *
-     * @param  array &$attr
+     * @param string $key
+     * @param string $desc
+     * @param array $dictionaries
      *
-     * @return array
+     * @return string|array
      */
-    private function getSize(&$attr)
+    private function getFieldDesc($key, $desc, array $dictionaries)
     {
-        $attr['size'] = $attr['size'] ?? '';
-        if (in_array($attr['type'], ['int', 'bigint', 'tinyint', 'decimal', 'float']))
+        $temp = [];
+
+        if (array_key_exists($key, $dictionaries))
         {
-            // 添加 unsigned 属性
-            $attr['unsigned'] = $attr['unsigned'] ?? true;
-            $attr['default']  = $attr['default'] === null ? 0 : $attr['default'];
-            if ($attr['type'] == 'bigint')
+            foreach ($dictionaries[$key] as $v)
             {
-                $attr['size'] = $attr['size'] == '' ? 20 : $attr['size'];
+                $temp[] = "{$v[0]}: {$v[2]}";
             }
-            else if ($attr['type'] == 'tinyint')
-            {
-                $attr['size'] = $attr['size'] == '' ? 1 : $attr['size'];
-            }
-            else
-            {
-                $attr['size'] = $attr['size'] == '' ? 10 : $attr['size'];
-            }
+            $desc = '{' . implode(', ', $temp) . '}';
         }
-        elseif (in_array($attr['type'], ['char', 'varchar']))
-        {
-            $attr['default'] = $attr['default'] === null ? '' : $attr['default'];
-            $attr['size']    = $attr['size'] == '' ? 32 : $attr['size'];
-            if (strstr($attr['size'], '|'))
-            {
-                // 保存最小长度，用于生成检验时使用
-                list($attr['min_size'], $attr['size']) = explode('|', $attr['size']);
-            }
-        }
-        else
-        {
-            unset($attr['size']);
-        }
-        return $attr;
+
+        return $desc;
     }
-    
+
     /**
      * 格式化默认字段
      *
@@ -226,7 +203,7 @@ class FreshStorageGenerator extends Generator
     {
         $default_fields = [
             'id'         => ['name' => '编号', 'type' => 'int'],
-            'deleted_at' => ['require' => false, 'name' => '删除于', 'type' => 'timestamp', 'default' => 'null'],
+            'deleted_at' => ['require' => false, 'name' => '删除于', 'type' => 'timestamp', 'default' => null],
             'created_at' => ['name' => '创建于', 'type' => 'timestamp'],
             'updated_at' => ['name' => '更新于', 'type' => 'timestamp'],
         ];
@@ -241,7 +218,85 @@ class FreshStorageGenerator extends Generator
 
         return $fields;
     }
-    
+
+    /**
+     * 获取默认值
+     *
+     * @param  array $attr
+     * @param  string $field_name
+     * @param  string $default
+     *
+     * @return array
+     */
+    private function getDefault(&$attr, $field_name, $default = '')
+    {
+        if (in_array('default', array_keys($attr)))
+        {
+            if (is_null($attr['default']))
+            {
+                $attr['default'] = null;
+            }
+            else if ($attr['default'] === 0)
+            {
+                $attr['default'] = 0;
+            }
+            else
+            {
+                $attr['default'] = $attr['default'];
+            }
+        }
+
+        return $attr;
+    }
+
+    /**
+     * 获取 size 值，char|varchar 时会有最小长度作为检验时使用
+     *
+     * @param  array &$attr
+     * @param  string $field_name
+     *
+     * @return array
+     */
+    private function getSize(&$attr, $field_name)
+    {
+        $attr['size'] = $attr['size'] ?? '';
+        if (in_array($attr['type'], ['int', 'bigint', 'tinyint', 'decimal', 'float']))
+        {
+            // 添加 unsigned 属性
+            $attr['unsigned'] = $attr['unsigned'] ?? true;
+
+            if ($attr['type'] == 'bigint')
+            {
+                $attr['size'] = empty($attr['size']) ? 20 : $attr['size'];
+            }
+            else if ($attr['type'] == 'tinyint')
+            {
+                $attr['size'] = empty($attr['size']) ? 4 : $attr['size'];
+            }
+            else
+            {
+                $attr['size'] = empty($attr['size']) ? 10 : $attr['size'];
+            }
+        }
+        elseif (in_array($attr['type'], ['char', 'varchar']))
+        {
+            $attr['size']    = empty($attr['size']) ? 32 : $attr['size'];
+            if (strstr($attr['size'], ','))
+            {
+                // 保存最小长度，用于生成检验时使用
+                list($attr['min_size'], $attr['size'])  = explode(',', $attr['size']);
+                $attr['min_size']                       = intval($attr['min_size']);
+            }
+            $attr['size']                               = intval($attr['size']);
+        }
+        else
+        {
+            unset($attr['size']);
+        }
+
+        return $attr;
+    }
+
     /**
      * 格式化多语言字段
      *
@@ -257,27 +312,27 @@ class FreshStorageGenerator extends Generator
     private function formatI18NFields(array &$all_fields, $table_name, array $fields, array $lang_fields)
     {
         //unset($data['id'], $data['created_at'], $data['updated_at'], $data['deleted_at']);
-        
+
         foreach ($fields as $field_name => $attr)
         {
             if (isset($lang_fields[$field_name]))
             {
                 $temp = [
-                    'zh-CN'      => $lang_fields[$field_name]['zh-CN'],
+                    'zh-CN'   => $lang_fields[$field_name]['zh-CN'],
                     'en'      => $lang_fields[$field_name]['en'],
                 ];
             }
             else
             {
                 $temp = [
-                    'zh-CN'      => $attr['name'],
+                    'zh-CN'   => $attr['name'],
                     'en'      => trim(ucwords(str_replace('_', ' ', $field_name))),
                 ];
             }
             $temp['type']     = $attr['type'];
             $temp['table']    = $table_name;
-            $temp['default']  = !empty($attr['default']) ? $attr['default'] : '';
-            $temp['format']   = !empty($attr['format']) ? $attr['format'] : '';
+            $temp['default']  = $attr['default'] ?? '';
+            $temp['format']   = $attr['format'] ?? '';
 
             if (isset($all_fields['table_fields'][$field_name]))
             {
@@ -288,7 +343,7 @@ class FreshStorageGenerator extends Generator
                 $all_fields['table_fields'][$field_name] = $temp;
             }
         }
-        
+
         return $all_fields;
     }
 
@@ -317,14 +372,17 @@ class FreshStorageGenerator extends Generator
             {
                 unset($yaml_data['table_fields'][$field_name]);
             }
+
             foreach ($increase_field_keys as $field_name)
             {
                 $yaml_data['table_fields'][$field_name] = $all_fields['table_fields'][$field_name];
             }
+
             if (isset($all_fields['duplicate_fields']))
             {
                 $yaml_data['duplicate_fields'] = $all_fields['duplicate_fields'];
             }
+
             $all_fields = $yaml_data;
         }
 
@@ -337,7 +395,7 @@ class FreshStorageGenerator extends Generator
             '# duplicate_fields: 数据库里重复出现的，有可能是重名了',
             '##',
         ];
-        
+
         foreach ($all_fields as $type => $fields)
         {
             $code[] = "{$type}:";
@@ -345,26 +403,27 @@ class FreshStorageGenerator extends Generator
             {
                 continue;
             }
+
             foreach ($fields as $field_name => $attr)
             {
                 $yaml   = ["en: '{$attr['en']}'"];
                 $yaml[] = "'zh-CN': '{$attr['zh-CN']}'";
-                
+
                 $code[] = $this->getTabs(1) . "{$field_name}: { " . implode(', ', $yaml) . ' }';
             }
         }
         $code[] = '';
-    
+
         // 生成可手动修改，用于多语言的，不能被清空覆盖的
         $put    = $this->filesystem->put($yaml_file, implode("\n", $code));
         if ($put)
         {
             return $this->command->info('+ ' . $yaml_relative_file . ' (Updated)');
         }
-    
+
         return $this->command->error('x ' . $yaml_relative_file . '(Failed)');
     }
-    
+
     /**
      *  生成缓存的所有字段数据
      *
@@ -391,7 +450,7 @@ class FreshStorageGenerator extends Generator
             'int'     => 'varchar',
             'default' => '2,3',
         ];
-        
+
         $php_data = [];
         foreach ($data as $type => $fields)
         {
@@ -399,6 +458,7 @@ class FreshStorageGenerator extends Generator
             {
                 continue;
             }
+
             foreach ($fields as $field_name => $attr)
             {
                 $php_data[$field_name] = [
@@ -406,26 +466,26 @@ class FreshStorageGenerator extends Generator
                     'zh-CN'   => $attr['zh-CN'],
                     'type'    => $attr['type'] ?? null,
                     'format'  => $attr['format'] ?? null,
-                    'default' => ! empty($attr['default']) ? $attr['default'] : '',
-                    'table'   => ! empty($attr['table']) ? $attr['table'] : '',
+                    'default' => $attr['default'],
+                    'table'   => $attr['table'] ?? '',
                 ];
-            
+
             }
         }
         // 生成缓存的，可被覆盖的，因为有时修改字段 type 和 default
         $php_code = '<?php' . PHP_EOL
                     . 'return ' . var_export($php_data, true) . ';'
                     . PHP_EOL;
-    
-        $put = $this->filesystem->put($this->db_storage_path . 'fields.php', $php_code);
+
+        $put = $this->filesystem->put($this->storage_path . 'fields.php', $php_code);
         if ($put)
         {
-            return $this->command->info('+ ' . $this->db_relative_storage_path . 'fields.php (Updated)');
+            return $this->command->info('+ ' . $this->storage_path_relative . 'fields.php (Updated)');
         }
-    
-        return $this->command->error('x ' . $this->db_relative_storage_path . 'fields.php (Failed)');
+
+        return $this->command->error('x ' . $this->storage_path_relative . 'fields.php (Failed)');
     }
-    
+
     /**
      * @param $tables
      *
@@ -440,14 +500,14 @@ class FreshStorageGenerator extends Generator
                 . 'return ' . var_export($table, true) . ';'
                 . PHP_EOL;
 
-            $put = $this->filesystem->put($this->db_storage_path . "{$name}.php", $php_code);
+            $put = $this->filesystem->put($this->storage_path . "{$name}.php", $php_code);
             if ($put)
             {
-                $this->command->info('+ ' . $this->db_relative_storage_path . "{$name}.php (Updated)");
+                $this->command->info('+ ' . $this->storage_path_relative . "{$name}.php (Updated)");
             }
             else
             {
-                $this->command->error('x ' . $this->db_relative_storage_path . "{$name}.php (Failed)");
+                $this->command->error('x ' . $this->storage_path_relative . "{$name}.php (Failed)");
             }
         }
 
@@ -465,37 +525,14 @@ class FreshStorageGenerator extends Generator
             . 'return ' . var_export($dictionaries, true) . ';'
             . PHP_EOL;
 
-        $put = $this->filesystem->put($this->db_storage_path . 'dictionaries.php', $php_code);
+        $put = $this->filesystem->put($this->storage_path . 'dictionaries.php', $php_code);
 
         if ($put)
         {
-            return $this->command->info('+ ' . $this->db_relative_storage_path . 'dictionaries.php (Updated)');
+            return $this->command->info('+ ' . $this->storage_path_relative . 'dictionaries.php (Updated)');
         }
 
-        return $this->command->error('x ' . $this->db_relative_storage_path . 'dictionaries.php (Failed)');
-    }
-
-    /**
-     * 生成资源仓库列表数据
-     *
-     * @param array $repositories
-     * @return mixed
-     */
-    private function buildRepositoryList(array $repositories)
-    {
-        /** 数据首页生成，列表 */
-        $php_code = '<?php' . PHP_EOL
-            . 'return ' . var_export($repositories, true) . ';'
-            . PHP_EOL;
-
-        $put = $this->filesystem->put($this->db_storage_path . 'repositories.php', $php_code);
-
-        if ($put)
-        {
-            return $this->command->info('+ ' . $this->db_relative_storage_path . 'repositories.php (Updated)');
-        }
-
-        return $this->command->error('x ' . $this->db_storage_path . 'repositories.php (Failed)');
+        return $this->command->error('x ' . $this->storage_path_relative . 'dictionaries.php (Failed)');
     }
 
     /**
@@ -511,14 +548,14 @@ class FreshStorageGenerator extends Generator
             . 'return ' . var_export($controllers, true) . ';'
             . PHP_EOL;
 
-        $put = $this->filesystem->put($this->db_storage_path . 'controllers.php', $php_code);
+        $put = $this->filesystem->put($this->storage_path . 'controllers.php', $php_code);
 
         if ($put)
         {
-            return $this->command->info('+ ' . $this->db_relative_storage_path . 'controllers.php (Updated)');
+            return $this->command->info('+ ' . $this->storage_path_relative . 'controllers.php (Updated)');
         }
 
-        return $this->command->error('x ' . $this->db_storage_path . 'controllers.php (Failed)');
+        return $this->command->error('x ' . $this->storage_path . 'controllers.php (Failed)');
     }
 
     /**
@@ -534,14 +571,14 @@ class FreshStorageGenerator extends Generator
             . 'return ' . var_export($models, true) . ';'
             . PHP_EOL;
 
-        $put = $this->filesystem->put($this->db_storage_path . 'models.php', $php_code);
+        $put = $this->filesystem->put($this->storage_path . 'models.php', $php_code);
 
         if ($put)
         {
-            return $this->command->info('+ ' . $this->db_relative_storage_path . 'models.php (Updated)');
+            return $this->command->info('+ ' . $this->storage_path_relative . 'models.php (Updated)');
         }
 
-        return $this->command->error('x ' . $this->db_storage_path . 'models.php (Failed)');
+        return $this->command->error('x ' . $this->storage_path . 'models.php (Failed)');
     }
 
     /**
@@ -557,14 +594,14 @@ class FreshStorageGenerator extends Generator
             . 'return ' . var_export($menus, true) . ';'
             . PHP_EOL;
 
-        $put = $this->filesystem->put($this->db_storage_path . 'tables.php', $php_code);
+        $put = $this->filesystem->put($this->storage_path . 'tables.php', $php_code);
 
         if ($put)
         {
-            return $this->command->info('+ ' . $this->db_relative_storage_path . 'tables.php (Updated)');
+            return $this->command->info('+ ' . $this->storage_path_relative . 'tables.php (Updated)');
         }
 
-        return $this->command->error('x ' . $this->db_storage_path . 'tables.php (Failed)');
+        return $this->command->error('x ' . $this->storage_path . 'tables.php (Failed)');
     }
 
     /**
@@ -574,16 +611,16 @@ class FreshStorageGenerator extends Generator
      */
     private function cleanAll()
     {
-        $this->command->warn('+ cleaning db caches...');
-        $clean = $this->filesystem->cleanDirectory($this->db_storage_path);
+        $this->command->warn('+ cleaning caches...');
+        $clean = $this->filesystem->cleanDirectory($this->storage_path);
         if ($clean)
         {
-            $this->command->info('+ clean ' . $this->db_relative_storage_path . ' successed!');
+            $this->command->info('+ clean ' . $this->storage_path_relative . ' successed!');
             $this->command->warn('+ cleaned');
         }
         else
         {
-            $this->command->error('x clean ' . $this->db_relative_storage_path . ' failed!');
+            $this->command->error('x clean ' . $this->storage_path_relative . ' failed!');
         }
 
         return true;

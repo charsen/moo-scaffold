@@ -32,7 +32,7 @@ class InitCommand extends Command
      * @var string
      */
     protected $description = 'Init Laravel Scaffold';
-    
+
     /**
      * Get the console command arguments.
      *
@@ -53,11 +53,12 @@ class InitCommand extends Command
     public function handle()
     {
         $this->alert($this->title);
-    
+
         $author = $this->argument('author');
-        
-        $result = (new InitGenerator($this, $this->filesystem, $this->utility))->start($author);
-    
-        $this->tipDone();
+
+        $result = (new InitGenerator($this, $this->filesystem, $this->utility))
+            ->start($author);
+
+        $this->tipDone($result);
     }
 }

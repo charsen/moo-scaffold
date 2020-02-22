@@ -62,6 +62,7 @@ class Utility
         $data       = [];
         foreach ($languages as $lang)
         {
+            $string = str_replace("'", "&apos;", $string);
             preg_match('/'. $lang .':([^\|]*)[\|}]/i', $string, $temp);
             $data[$lang] = empty($temp) ? '' : trim($temp[1]);
         }
@@ -142,17 +143,39 @@ class Utility
     }
     
     /**
-     * Get Route File Content
+     * 解析动作参数中的 Request 类
      *
-     * @param string $name
+     * @param $action
+     * @param $reflection_class
      *
-     * @return string
-     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     * @return null || string
      */
-    public function getRouteFile($name = 'api')
+    public function getActionRequestClass($action, $reflection_class)
     {
+<<<<<<< HEAD
         $file = base_path('routes/' . $name . '.php');
         return $this->filesystem->get($file);
+=======
+        $result            = null;
+        $reflection_action = $reflection_class->getMethod($action);    // ReflectionMethod
+        $reflection_params = $reflection_action->getParameters();   // ReflectionParameter
+
+        foreach ($reflection_params as $param)
+        {
+            if ($param->getType() !== null)
+            {
+                $param_class = $param->getType()->getName(); // ReflectionNamedType
+
+                if (strstr($param_class, 'App\Http\Requests\\'))
+                {
+                    $result = new $param_class();
+                    break;
+                }
+            }
+        }
+
+        return $result;
+>>>>>>> 1.0
     }
     
     /**
@@ -176,8 +199,8 @@ class Utility
      */
     public function getControllerNamespaces()
     {
-        $base_path = app_path('Http/Controllers/');
-        $dirs = $this->filesystem->directories($base_path);
+        $base_path  = app_path('Http/Controllers/');
+        $dirs       = $this->filesystem->directories($base_path);
         if (empty($dirs))
         {
             return ['nothing'];
@@ -221,6 +244,16 @@ class Utility
     }
     
     /**
+     * Get the Stub Path.
+     *
+     * @return string
+     */
+    protected function getStubPath()
+    {
+        return __DIR__ . '/Stub/';
+    }
+
+    /**
      * 获取多语言文件
      *
      * @param string $file_name
@@ -233,6 +266,12 @@ class Utility
     public function getLanguage($file_name = 'validation', $language = 'en', $to_string = false)
     {
         $file = resource_path("lang/{$language}/{$file_name}.php");
+
+        if ( ! $this->filesystem->isFile($file))
+        {
+            // 获取语言文件的默认模板数据
+            $file = $this->getStubPath() . "lang/{$language}.{$file_name}.stub";
+        }
 
         return $to_string ? $this->filesystem->get($file) : $this->filesystem->getRequire($file);
     }
@@ -248,8 +287,19 @@ class Utility
      */
     public function getLanguagePath($file_name = 'validation', $language = 'en', $relative = false)
     {
+<<<<<<< HEAD
         $path = resource_path("lang/{$language}/{$file_name}.php");
     
+=======
+        $path = resource_path("lang/{$language}/");
+
+        if ( ! $this->filesystem->isDirectory($path))
+        {
+            $this->filesystem->makeDirectory($path);
+        }
+
+        $path .= "{$file_name}.php";
+>>>>>>> 1.0
         return $relative ? str_replace(base_path(), '.', $path) : $path;
     }
     
@@ -289,6 +339,8 @@ class Utility
     }
     
     /**
+     * 获取一表数据表的数据
+     *
      * @param $table_name
      *
      * @return mixed
@@ -329,6 +381,7 @@ class Utility
     }
     
     /**
+<<<<<<< HEAD
      * 获取模型数据
      *
      * @return mixed
@@ -340,6 +393,8 @@ class Utility
     }
     
     /**
+=======
+>>>>>>> 1.0
      * 获取控制器数据
      *
      * @param bool $merge_all
@@ -495,6 +550,7 @@ class Utility
     }
     
     /**
+<<<<<<< HEAD
      * 获取 app Model 的存储目录
      *
      * @return string
@@ -505,6 +561,8 @@ class Utility
     }
     
     /**
+=======
+>>>>>>> 1.0
      * Get Model Path
      *
      * @param bool $relative
@@ -560,6 +618,35 @@ class Utility
         $path = base_path($this->getConfig('api.' . $folder));
     
         return $relative ? str_replace(base_path(), '.', $path) : $path;
+    }
+
+    /**
+     * Get App Route Path
+     *
+     * @param $folder
+     * @param $relative
+     *
+     * @return string
+     */
+    public function getRoutePath($relative = false)
+    {
+        $path = base_path('routes/');
+
+        return $relative ? str_replace(base_path(), '.', $path) : $path;
+    }
+
+    /**
+     * 获取路由文件
+     *
+     * @param string $name
+     * @param boolean $relative
+     * @return string
+     */
+    public function getRouteFile($name = 'api', $relative = false)
+    {
+        $file = base_path('/') . $this->getConfig('routes.' . $name);
+
+        return $relative ? str_replace(base_path('/'), '.', $file) : $file;
     }
 
     /**

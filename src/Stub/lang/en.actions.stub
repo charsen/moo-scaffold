@@ -1,0 +1,7 @@
+<?php
+
+/**
+ * The name of authorizations' action
+ */
+return [
+];

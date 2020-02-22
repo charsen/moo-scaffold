@@ -4,7 +4,7 @@
 
 @section('sidebar')
 <li class="open">
-    <a href="javascript:;">Enterprise</a>
+    <a href="javascript:;">Database</a>
     <ul class="sub tag-list">
     @foreach ($menus as $file_name => $folder)
         <li class="{{ (! $first_menu_active || $current_file == $file_name) ? 'active' : '' }}">
@@ -19,10 +19,6 @@
         <?php $first_menu_active = true;?>
     @endforeach
     </ul>
-</li>
-
-<li class="none-open">
-    <a href="{{ route('dictionaries') }}">数据字典</a>
 </li>
 @endsection
 

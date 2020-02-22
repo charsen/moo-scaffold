@@ -2,53 +2,61 @@
 
 namespace {{namespace}};
 
-{{use_repository}}
-use App\Http\Controllers\Controller;
+use {{model_class}};
+use App\Exceptions\BatchActionException;
 use App\Http\Resources\BaseResource;
 use App\Http\Resources\FormWidgetCollection;
-use Illuminate\Http\Request;
+use {{request_class}};
+use Charsen\Scaffold\Foundation\Controller;
 
 /**
  * {{entity_name}}控制器
  *
  * @package_name {zh-CN: {{package_name}} | en: {{package_en_name}}}
  * @module_name {zh-CN: {{module_name}} | en: {{module_en_name}}}
- * @controller_name {zh-CN: {{entity_name}}管理 | en: Management {{controller_class}}}
+ * @controller_name {zh-CN: {{entity_name}}管理 | en: Management {{entity_en_name}}}
  *
  * @package {{namespace}};
  * @author  {{author}}
  * @date    {{date}}
  */
-class {{controller_class}}Controller extends Controller
+class {{class}} extends Controller
 {
-
-    protected $repository;
+    protected $model;
 
     /**
      *
-     * @param {{repository_class}} $repository
+     * @param \{{model_class}} $model
      */
-    public function __construct({{repository_class}} $repository)
+    public function __construct({{model_name}} $model)
+    {
+        $this->model = $model;
+    }
+
+    /**
+     * 执行 action 前先验证权限
+     *
+     * @return \Illuminate\Auth\Access\Response
+     */
+    public function boot()
     {
         $this->checkAuthorization();
-
-        $this->repository = $repository;
     }
 
     /**
      * 列表
      *
-     * @acl {zh-CN: {{entity_name}}列表 | en: {{controller_class}} List}
+     * @acl {zh-CN: {{entity_name}}列表 | en: {{entity_en_name}} List}
      *
-     * @param \Illuminate\Http\Request $req
+     * @param  \{{request_class}}  $request
      * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
-     * @throws \Exception
      */
-    public function index(Request $req)
+    public function index({{request_name}} $request)
     {
-        $this->repository->validator()->with($req)->passesOrFail('index');
+        $validated = $request->validated();
 
-        $result = $this->repository->paginate($req->input('page_limit', NULL));
+        $fields    = [{{index_fields}}];
+        $result    = $this->model->paginate(($validated['page_limit'] ?? NULL), $fields);
 
         return BaseResource::collection($result);
     }
@@ -56,17 +64,17 @@ class {{controller_class}}Controller extends Controller
     /**
      * 回收站列表
      *
-     * @acl {zh-CN: {{entity_name}}回收站 | en: {{controller_class}} Trashed}
+     * @acl {zh-CN: {{entity_name}}回收站 | en: {{entity_en_name}} Trashed}
      *
-     * @param \Illuminate\Http\Request $req
+     * @param  \{{request_class}} $request
      * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
-     * @throws \Exception
      */
-    public function trashed(Request $req)
+    public function trashed({{request_name}} $request)
     {
-        $this->repository->validator()->with($req)->passesOrFail('trashed');
+        $validated = $request->validated();
 
-        $result = $this->repository->getModel()->onlyTrashed()->paginate($req->input('page_limit', NULL));
+        $fields    = [{{trashed_fields}}];
+        $result    = $this->model->onlyTrashed()->paginate(($validated['page_limit'] ?? NULL), $fields);
 
         return BaseResource::collection($result);
     }
@@ -74,14 +82,17 @@ class {{controller_class}}Controller extends Controller
     /**
      * 创建
      *
-     * @acl {zh-CN: 创建{{entity_name}} | en: Create {{controller_class}}}
+     * @acl {zh-CN: 创建{{entity_name}} | en: Create {{entity_en_name}}}
      *
-     * @param \Illuminate\Http\Request $req
+     * @param  \{{request_class}} $request
      * @return \App\Http\Resources\BaseResource
      */
-    public function store(Request $req)
+    public function store({{request_name}} $request)
     {
-        $result = $this->repository->create($req);
+        $validated = $request->validated();
+
+        $result = new $this->model($validated);
+        $result->save();
 
         return new BaseResource($result);
     }
@@ -89,16 +100,19 @@ class {{controller_class}}Controller extends Controller
     /**
      * 更新
      *
-     * @acl {zh-CN: 更新{{entity_name}} | en: Update {{controller_class}}}
+     * @acl {zh-CN: 更新{{entity_name}} | en: Update {{entity_en_name}}}
      *
-     * @param \Illuminate\Http\Request $req
-     * @param                          $id
-     *
+     * @param  \{{request_class}} $request
+     * @param  int $id
      * @return \App\Http\Resources\BaseResource
      */
-    public function update(Request $req, $id)
+    public function update({{request_name}} $request, $id)
     {
-        $result = $this->repository->update($req, $id);
+        $validated = $request->validated();
+
+        $result = $this->model->findOrFail($id);
+        $result->fill($validated);
+        $result->save();
 
         return new BaseResource($result);
     }
@@ -106,14 +120,14 @@ class {{controller_class}}Controller extends Controller
     /**
      * 查看
      *
-     * @acl {zh-CN: 查看{{entity_name}} | en: Show {{controller_class}}}
+     * @acl {zh-CN: 查看{{entity_name}} | en: Show {{entity_en_name}}}
      *
-     * @param int $id
+     * @param  int $id
      * @return \App\Http\Resources\BaseResource
      */
     public function show($id)
     {
-        $result = $this->repository->find($id);
+        $result = $this->model->findOrFail($id);
 
         return new BaseResource($result);
     }
@@ -121,14 +135,15 @@ class {{controller_class}}Controller extends Controller
     /**
      * 删除
      *
-     * @acl {zh-CN: 删除{{entity_name}} | en: Destroy {{controller_class}}}
+     * @acl {zh-CN: 删除{{entity_name}} | en: Destroy {{entity_en_name}}}
      *
-     * @param int $id
+     * @param  int $id
      * @return \App\Http\Resources\BaseResource
      */
     public function destroy($id)
     {
-        $result = $this->repository->delete($id);
+        $result = $this->model->findOrFail($id);
+        $result->delete();
 
         return new BaseResource($result);
     }
@@ -136,85 +151,91 @@ class {{controller_class}}Controller extends Controller
     /**
      * 批量删除
      *
-     * @acl {zh-CN: 批量删除{{entity_name}} | en: Destroy Batch {{controller_class}}}
+     * @acl {zh-CN: 批量删除{{entity_name}} | en: Destroy Batch {{entity_en_name}}}
      *
-     * @param \Illuminate\Http\Request $req
+     * @param  \{{request_class}} $request
      * @return \App\Http\Resources\BaseResource
      */
-    public function destroyBatch(Request $req)
+    public function destroyBatch({{request_name}} $request)
     {
-        $this->repository->validator()->with($req)->passesOrFail('destroyBatch');
+        $validated  = $request->validated();
+        $force      = isset($validated['force']) ?? FALSE;
 
-        if ($req->input('force', FALSE) !== FALSE)
-        {
-            $data   = $this->repository->getModel()->onlyTrashed()->whereIn('id', $req->input('ids'))->get();
-            $result = $data->map(function($item) {
-                if ($item->forceDelete())
-                {
-                    return $item;
-                }
-            });
-        }
-        else
-        {
-            $result = collect($req->input('ids'))->map(function($id) {
-                return $this->repository->delete($id);
-            });
+        $data       = $force ? $this->model->onlyTrashed() : $this->model;
+        $data       = $data->whereIn($this->model->getKeyName(), $validated['ids'])->get();
+        $result     = $data->map(function ($item) use ($force) {
+            if ($force) {
+                if ($item->forceDelete()) return $item;
+            }
+            else {
+                if ($item->delete()) return $item;
+            }
+        });
+
+        if (count($result) < 1) {
+            throw new BatchActionException('No batch operation results.');
         }
 
         return new BaseResource($result);
     }
 
     /**
-     * 批量恢复软删除的数据
+     * 恢复
      *
-     * @acl {zh-CN: 批量恢复{{entity_name}} | en: Restore Batch {{controller_class}}}
+     * @acl {zh-CN: 恢复{{entity_name}} | en: Restore {{entity_en_name}}}
      *
-     * @param \Illuminate\Http\Request $req
+     * @param  \{{request_class}} $request
      * @return \App\Http\Resources\BaseResource
-     * @throws \Exception
      */
-    public function restoreBatch(Request $req)
+    public function restore({{request_name}} $request)
     {
-        $this->repository->validator()->with($req)->passesOrFail('restoreBatch');
+        $validated  = $request->validated();
 
-        $data   = $this->repository->getModel()->onlyTrashed()->whereIn('id', $req->input('ids'))->get();
-        $result = $data->map(function($item) {
-            if ($item->restore())
-            {
+        if ( ! is_array($validated['ids'])) {
+            $validated['ids'] = [$validated['ids']];
+        }
+
+        $data       = $this->model->onlyTrashed()->whereIn($this->model->getKeyName(), $validated['ids'])->get();
+        $result     = $data->map(function ($item) {
+            if ($item->restore()) {
                 return $item;
             }
         });
 
+        if (count($result) < 1) {
+            throw new BatchActionException('No batch operation results.');
+        }
+
         return new BaseResource($result);
     }
 
     /**
-     * 创建表单控件
+     *  创建表单
      *
+     * @param  \{{request_class}}  $request
      * @return \App\Http\Resources\FormWidgetCollection
      */
-    public function create()
+    public function create({{request_name}} $request)
     {
-        $result = {{form_widgets}};
+        $default        = [];
+        $form_widgets   = $this->getFormWidgets($request, $default);
 
-        return new FormWidgetCollection(collect($result));
+        return new FormWidgetCollection(collect($form_widgets));
     }
 
     /**
-     * 编辑表单控件
+     * 编辑表单
      *
-     * @param $id
-     * @return \App\Http\Resources\BaseResource
+     * @param  \{{request_class}}  $request
+     * @param  int $id
+     * @return \App\Http\Resources\FormWidgetCollection
      */
-    public function edit($id)
+    public function edit({{request_name}} $request, $id)
     {
-        $result = $this->repository->find($id);
+        $result = $this->model->findOrFail($id);
 
         return (new BaseResource($result))->additional([
-            'meta' => [
-                'form_widgets' => $this->create()
-            ]
+            'form_widgets' => $this->create($request)
         ]);
     }
 

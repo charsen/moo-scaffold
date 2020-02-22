@@ -1,0 +1,75 @@
+<?php
+
+namespace {{namespace}};
+
+use Charsen\Scaffold\Foundation\FormRequest;
+
+class {{request_name}} extends FormRequest
+{
+
+    public function indexRules()
+    {
+        return [
+            'page'       => ['required', 'integer', 'min:1'],
+            'page_limit' => ['nullable', 'integer', 'min:1'],
+        ];
+    }
+
+    public function trashedRules()
+    {
+        return [
+            'page'       => ['required', 'integer', 'min:1'],
+            'page_limit' => ['nullable', 'integer', 'min:5'],
+        ];
+    }
+
+    public function storeRules()
+    {
+        $model = new {{model_class}};
+
+        return {{store_rules}};
+    }
+
+    public function updateRules()
+    {
+        $model = new {{model_class}};
+
+        return {{update_rules}};
+    }
+
+    public function showRules()
+    {
+        return [];
+    }
+
+    public function destroyRules()
+    {
+        return [];
+    }
+
+    public function destroyBatchRules()
+    {
+        return [
+            'ids'       => ['required', 'array'],
+            'force'     => ['sometimes', 'boolean'],
+        ];
+    }
+
+    public function restoreRules()
+    {
+        return [
+            'ids'       => ['required'],
+        ];
+    }
+
+    public function createRules()
+    {
+        return [];
+    }
+
+    public function editRules()
+    {
+        return [];
+    }
+
+}

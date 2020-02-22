@@ -1,4 +1,5 @@
 <?php
+
 namespace Charsen\Scaffold\Generator;
 
 /**
@@ -8,11 +9,10 @@ namespace Charsen\Scaffold\Generator;
  */
 class CreateControllerGenerator extends Generator
 {
-    
+
     protected $controller_path;
     protected $controller_relative_path;
-    protected $repository_folder;
-    
+
     /**
      * @param      $schema_name
      * @param bool $force
@@ -23,123 +23,345 @@ class CreateControllerGenerator extends Generator
     {
         $this->controller_path          = $this->utility->getControllerPath();
         $this->controller_relative_path = $this->utility->getControllerPath(true);
-        $this->repository_folder        = $this->utility->getRepositoryFolder();
-        
+
         // 从 storage 里获取控制器数据，在修改了 schema 后忘了执行 scaffold:fresh 的话会不准确！！
         $all = $this->utility->getControllers(false);
-        
-        if (!isset($all[$schema_name]))
-        {
+
+        if (!isset($all[$schema_name])) {
             return $this->command->error("Schema File \"{$schema_name}\" could not be found.");
         }
-        
-        // 所有字段信息
-        $fields             = $this->utility->getFields();
-        // 字典数据
-        $dictionaries       = $this->utility->getDictionaries();
+
         // 生成的 controllers
-        $build_controllers  = [];
-        
+        $created  = [];
+
         //dump($all[$schema_name]);
-        foreach ($all[$schema_name] as $class => $attr)
-        {
-            $controller_file          = $this->controller_path . "{$class}Controller.php";
-            $controller_relative_file = $this->controller_relative_path . "{$class}Controller.php";
-            if ($this->filesystem->isFile($controller_file) && !$force)
-            {
+        foreach ($all[$schema_name] as $class => $attr) {
+           // $folders                 = "{$attr['package']['folder']}/{$attr['module']['folder']}/";
+            $folders                 = "{$attr['module']['folder']}/";
+
+            // 检查目录是否存在，不存在则创建
+            if (!$this->filesystem->isDirectory($this->controller_path . $folders)) {
+                $this->filesystem->makeDirectory($this->controller_path . $folders, 0777, true, true);
+            }
+
+            $controller_file          = $this->controller_path . $folders . "{$class}.php";
+            $controller_relative_file = $this->controller_relative_path . "{$class}.php";
+
+            if ($this->filesystem->isFile($controller_file) && ! $force) {
                 $this->command->error('x Controller is existed (' . $controller_relative_file . ')');
                 continue;
             }
-            
-            // 目录及 namespace 处理
-            $namespace          = $this->dealNameSpaceAndPath($this->controller_path, 'app/Http/Controllers', $class);
-            
-            // 资源仓库 类名处理
-            $repository_class   = ucfirst($this->repository_folder) . $attr['repository_class'] . 'Repository';
-            $repository_class   = str_replace('/', '\\', $repository_class);
-            $temp               = explode('/', $attr['repository_class']);
-            
-            // 处理成英文的 package_en_name 和 module_en_name
-            $temp_names         = explode('\\', str_replace('app\\Http\\Controllers\\', '', $namespace));
-            if (count($temp_names) >1)
-            {
-                $package_en_name    = $temp_names[0];
-                $module_en_name     = $temp_names[1];
-            }
-            else
-            {
-                $package_en_name    = $temp_names[0];
-                $module_en_name     = '';
-            }
-            
+
+            // Request, namespace 处理
+            $request_name       = str_replace('Controller', 'Request', $class);
+            //$request_class      = "App\\Http\\Requests\\{$attr['package']['folder']}\\{$attr['module']['folder']}\\{$request_name}";
+            $request_class      = "App\\Http\\Requests\\{$attr['module']['folder']}\\{$request_name}";
+
+            //$namespace          = "App\\Http\\Controllers\\{$attr['package']['folder']}\\{$attr['module']['folder']}";
+            $namespace          = "App\\Http\\Controllers\\{$attr['module']['folder']}";
+            $model_class        = $this->utility->getConfig('model.path') . $attr['module']['folder'] . '/' . $attr['model_class'];
+
+            // 验证规则 ，字段 处理
+            $table_attrs      = $this->utility->getOneTable($attr['table_name']);
+            $fields           = $table_attrs['fields'];
+            $dictionaries     = $table_attrs['dictionaries'];
+            $rules            = $this->rebuildFieldsRules($fields, $dictionaries);
+
             $meta               = [
                 'author'            => $this->utility->getConfig('author'),
                 'date'              => date('Y-m-d H:i:s'),
-                'controller_class'  => $class,
-                'namespace'         => ucfirst($namespace),
-                'use_repository'    => 'use ' . $repository_class . ';',
-                'repository_class'  => end($temp) . 'Repository',
-                'package_name'      => $attr['package_name'],
-                'package_en_name'   => $package_en_name,
-                'module_name'       => $attr['module_name'],
-                'module_en_name'    => $module_en_name,
+                'package_name'      => $attr['package']['name'],
+                'package_en_name'   => $attr['package']['folder'],
+                'module_name'       => $attr['module']['name'],
+                'module_en_name'    => $attr['module']['folder'],
                 'entity_name'       => $attr['entity_name'],
-                'form_widgets'      => $this->getFormWidgets($repository_class, $fields, $dictionaries)
-            ];
-            
-            $build_controllers[] = [
+                'entity_en_name'    => str_replace('Controller', '', $class),
                 'namespace'         => ucfirst($namespace),
-                'class'             => $class . 'Controller',
+                'class'             => $class,
+                'index_fields'      => $this->getListFields($fields),
+                'trashed_fields'    => $this->getListFields($fields, true),
+                'route_key'         => strtolower($attr['model_class']),
+                'model_class'       => ucfirst(str_replace('/', '\\', $model_class)),
+                'model_name'        => $attr['model_class'],
+                'request_class'     => $request_class,
+                'request_name'      => $request_name,
+                'form_widgets'      => $this->getFormWidgets($rules, $fields, $dictionaries)
             ];
-    
+
             $this->filesystem->put($controller_file, $this->compileStub($meta));
             $this->command->info('+ ' . $controller_relative_file);
+
+            // Request 处理
+            $this->createRequest($rules, $meta['request_class'], $meta['request_name'], $meta['model_class'], $meta['route_key']);
+
+            $created[] = [
+                'namespace'         => $meta['module_en_name'] . '\\',
+                'model'             => $meta['route_key'] . 's',
+                'model_class'       => $meta['model_class'],
+                'class'             => $class,
+            ];
         }
-        
-        //$this->updateRoutes($build_controllers);
+
+        $this->updateRoutes($created);
+
+        return true;
     }
-    
+
+    /**
+     * 获取列表查询字段
+     *
+     * @param array $fields
+     * @param boolean $trashed
+     * @return array
+     */
+    private function getListFields($fields, $trashed = false)
+    {
+        $fields = array_keys($fields);
+        if ( ! $trashed) {
+            unset($fields['deleted_at'], $fields['created_at']);
+        } else {
+            unset($fields['updated_at'], $fields['created_at']);
+        }
+
+        // dump($fields);
+        foreach ($fields as $k => &$value) {
+            if ( ! $trashed) {
+                if (in_array($value, ['deleted_at', 'created_at'])) {
+                    unset ($fields[$k]);
+                    continue;
+                }
+            } else {
+                if (in_array($value, ['created_at', 'updated_at'])) {
+                    unset ($fields[$k]);
+                    continue;
+                }
+            }
+
+            $value = "'{$value}'";
+        }
+
+        return implode(', ', $fields);
+    }
+
+    /**
+     * 生成 Request
+     *
+     * @param array $rules
+     * @param string $request_class
+     * @param string $request_name
+     * @param string $model_class
+     * @param string $route_key
+     * @return void
+     */
+    public function createRequest($rules, $request_class, $request_name, $model_class, $route_key)
+    {
+        // 检查目录是否存在，不存在则创建
+        $tmp_folder = app_path() . '/' . str_replace(['App\\', '\\', $request_name], ['', '/', ''], $request_class);
+        if (!$this->filesystem->isDirectory($tmp_folder)) {
+            $this->filesystem->makeDirectory($tmp_folder, 0777, true, true);
+        }
+
+        $request_file          = $tmp_folder . $request_name . '.php';
+        $request_relative_file = str_replace(base_path(), '.', $request_file);
+
+        if ($this->filesystem->isFile($request_file)) {
+            return $this->command->error('x Request is existed (' . $request_relative_file . ')');
+        }
+
+        // create & update action
+        $create_code = ['['];
+        $update_code = ['['];
+        foreach ($rules as $field_name => $rules)
+        {
+            $tmp_create     = "'{$field_name}' => [" . implode(', ', $this->addQuotation($rules)) ."],";
+
+            if ( ! \in_array('nullable', $rules)) {
+                array_unshift($rules, 'sometimes');
+            }
+
+            foreach ($rules as $k => $v) {
+                if ($v == 'required') {
+                    unset($rules[$k]);
+                }
+            }
+            $tmp_update     = "'{$field_name}' => [" . implode(', ', $this->addQuotation($rules, $field_name, $route_key)) ."],";
+
+            $create_code[]  = $this->getTabs(3) . $tmp_create;
+            $update_code[]  = $this->getTabs(3) . $tmp_update;
+        }
+        $create_code[] = $this->getTabs(2) . ']';
+        $update_code[] = $this->getTabs(2) . ']';
+
+        $meta = [
+            'namespace'     => str_replace('\\' . $request_name, '', $request_class),
+            'model_class'   => '\\' . $model_class,
+            'request_name'  => $request_name,
+            'store_rules'   => implode(PHP_EOL, $create_code),
+            'update_rules'  => implode(PHP_EOL, $update_code),
+        ];
+
+        $file_txt = $this->buildStub($meta, $this->getStub('request'));
+
+        $this->filesystem->put($request_file, $file_txt);
+        return $this->command->info('+ ' . $request_relative_file);
+    }
+
+    /**
+     * 添加引号
+     *
+     * @param  $rules
+     * @param  $field_name
+     * @param  $route_key
+     * @return array
+     */
+    private function addQuotation($rules, $field_name = null, $route_key = null)
+    {
+        foreach ($rules as &$value) {
+            if (strstr($value, 'getDictKeys')) {
+                continue;
+            }
+
+            if (strstr($value, 'getUnique') || strstr($value, 'getInDict')) {
+                if ($route_key == null) {
+                    continue;
+                }
+                else if (strstr($value, 'getUnique')) {
+                    // 对编辑运作的 Unique 进行二次处理
+                    $value = "\$this->getUnique(\$model, '{$field_name}', '{$route_key}')";
+                }
+            } else {
+                $value = "'{$value}'";
+            }
+        }
+        return $rules;
+    }
+
+    /**
+     * 重建 字段的规则
+     *
+     * @param  array $fields
+     * @param array  $dictionaries_ids
+     *
+     * @return array
+     */
+    private function rebuildFieldsRules(array $fields, array $dictionaries)
+    {
+        $rules = [];
+        foreach ($fields as $field_name => $attr) {
+            if (in_array($field_name, ['id', 'deleted_at', 'created_at', 'updated_at'])) {
+                continue;
+            }
+
+            $filed_rules        = [];
+            if ($attr['require']) {
+                $filed_rules[]  = 'required';
+            }
+
+            if ($attr['allow_null']) {
+                $filed_rules[]  = 'nullable';
+            }
+
+            if (in_array($attr['type'], ['int', 'tinyint', 'bigint'])) {
+                // 整数转浮点数时，需要调整为 numeric
+                if (isset($attr['format']) && strstr($attr['format'], 'intval:')) {
+                    $filed_rules[] = 'numeric';
+                } else {
+                    $filed_rules[] = 'integer';
+                }
+
+                if (isset($attr['unsigned']) && ! isset($dictionaries[$field_name])) {
+                    $filed_rules[] = 'min:0';
+                }
+            }
+
+            if (strstr($field_name, '_ids')) {
+                $filed_rules[] = 'array';
+            }
+
+            if (in_array($attr['type'], ['char', 'varchar'])) {
+                $filed_rules[] = 'string';
+            }
+
+            if ($attr['type'] == 'boolean') {
+                $filed_rules[] = 'in:0,1';
+            }
+
+            if ($attr['type'] == 'date' || $attr['type'] == 'datetime') {
+                $filed_rules[] = 'date';
+            }
+
+            if (isset($attr['min_size']) && in_array($attr['type'], ['char', 'varchar'])) {
+                $filed_rules[] = "min:{$attr['min_size']}";
+            }
+
+            if (isset($attr['size']) && in_array($attr['type'], ['char', 'varchar'])) {
+                $filed_rules[] = "max:{$attr['size']}";
+            }
+
+            if (isset($dictionaries[$field_name])) {
+                $filed_rules[] = "\$this->getInDict(\$model, '{$field_name}')";
+            }
+
+            if (isset($attr['unique']) && $attr['unique']) {
+                $filed_rules[] = '$this->getUnique($model)';
+            }
+
+            $rules[$field_name] = $filed_rules;
+        }
+
+        return $rules;
+    }
+
     /**
      * 更新路由
      *
-     * @param $build_controllers
+     * @param $builded_controllers
      *
      * @return bool
      * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
-    private function updateRoutes($build_controllers)
+    private function updateRoutes($created)
     {
-        $file = $this->utility->getRouteFile('api');
-    
-        $code = [];
-        foreach ($build_controllers as $controller)
+        if (empty($created)) return true;
+
+        $file          = $this->utility->getRouteFile('admin');
+        $file_relative = $this->utility->getRouteFile('admin', true);
+
+        if ($this->filesystem->isFile($file))
         {
-            if (strstr($file, '\\' . $controller['class']))
-            {
+            $file_txt      = $this->filesystem->get($file);
+        }
+        else
+        {
+            $file_txt      = '<?php' . PHP_EOL
+                           . 'use Illuminate\Http\Request;' . PHP_EOL . PHP_EOL
+                           . '//:insert_code_here:do_not_delete';
+        }
+
+        $code = [];
+        foreach ($created as $controller) {
+            if (strstr($file_txt, $controller['class'])) {
                 continue;
             }
-        
-            //$code[] = "Route::get('buildings/trashed', 'Enterprise\\Resources\\BuildingController@trashed');";
-            //$code[] = "Route::delete('buildings/destroy/batch', 'Enterprise\\Resources\\BuildingController@destroyBatch');";
-            //$code[] = "Route::resources(['buildings' => 'Enterprise\\Resources\\BuildingController']);";
-            $code[] = '';
+
+            $code[] = "Route::resourceHasTrashes('" . $controller['model'] . "', '" . $controller['namespace'] . $controller['class'] . "');";
         }
-    
-        if (empty($code))
-        {
+
+        if (empty($code)) {
             return true;
         }
-    
-        $code[] = $this->getTabs(2) . '//:end:do_not_delete';
-        $code   = implode("\n", $code);
-    
-        $file = str_replace("//:end:do_not_delete", $code, $file);
-        $this->filesystem->put(base_path('routes/api.php'), $file);
-        $this->command->warn('+ ./app/routes/api.php (Updated)');
-    
+
+        $code[]     = "\n\n" . $this->getTabs(1) . '//:insert_code_here:do_not_delete';
+        $code       = implode("\n", $code);
+
+        $file_txt   = str_replace("//:insert_code_here:do_not_delete", $code, $file_txt);
+
+        $this->filesystem->put($file, $file_txt);
+        $this->command->warn('+ ' . $file_relative . ' (Updated)');
+
         return true;
     }
-    
+
     /**
      * 获取 创建/编辑 表单的控件代码
      *
@@ -149,72 +371,51 @@ class CreateControllerGenerator extends Generator
      *
      * @return string
      */
-    private function getFormWidgets($repository_class, array $fields, array $dictionaries)
+    private function getFormWidgets($all_rules, array $fields, array $dictionaries)
     {
-        $rules = $this->getRules($repository_class);
-        if ( ! isset($rules['create']))
-        {
-            return "[];";
-        }
-        
+        if (empty($all_rules)) return "[];";
+
         $code = ["["];
-        
-        foreach ($rules['create'] as $field_name => $rule_string)
-        {
+        foreach ($all_rules as $field_name => $rules) {
             $code[] = $this->getTabs(3) . "[";
             $code[] = $this->getTabs(4) . "'field_name'    => '{$field_name}',";
-            
-            if (strstr($rule_string, 'sometimes') || strstr($rule_string, 'nullable'))
-            {
+
+            if (isset($rules['sometimes']) OR isset($rules['nullable'])) {
                 $code[] = $this->getTabs(4) . "'require'       => FALSE,";
             }
-            
+
             // 字段以 _id 结尾的，一般是下拉选择
-            if (preg_match('/[a-z]_id$/i', $field_name))
-            {
-                $code[] = $this->getTabs(4) . "'widget_type'   => 'select',";
+            if (preg_match('/[a-z]_id$/i', $field_name)) {
+                $code[] = $this->getTabs(4) . "'type'   => 'select',";
             }
-            
+
             // 通过字段类型指定 控件类型
-            if (isset($fields[$field_name]))
-            {
-                if ($fields[$field_name]['type'] == 'date')
-                {
-                    $code[] = $this->getTabs(4) . "'widget_type'   => 'date',";
+            if (isset($fields[$field_name])) {
+                if ($fields[$field_name]['type'] == 'date') {
+                    $code[] = $this->getTabs(4) . "'type'   => 'date',";
                 }
-    
-                if ($fields[$field_name]['type'] == 'timestamp')
-                {
-                    $code[] = $this->getTabs(4) . "'widget_type'   => 'datetime',";
+
+                if ($fields[$field_name]['type'] == 'timestamp') {
+                    $code[] = $this->getTabs(4) . "'type'   => 'datetime',";
                 }
             }
-            
-            if (isset($dictionaries[$field_name]))
-            {
-                $code[] = $this->getTabs(4) . "'widget_type'   => 'radio',";
-                $code[] = $this->getTabs(4) . "'options'       => \$this->repository->getModel()->init_{$field_name},";
+
+            if (isset($dictionaries[$field_name])) {
+                $code[] = $this->getTabs(4) . "'type'   => 'radio',";
+                $code[] = $this->getTabs(4) . "'dictionary'    => true,";
+                $code[] = $this->getTabs(4) . "'options'       => \$this->model->init_{$field_name},";
             }
-            
+
+            $code[] = $this->getTabs(4) . "'rules'         => \$rules['{$field_name}'] ?? [],";
+
             $code[] = $this->getTabs(3) . "],";
         }
-        
+
         $code[] = $this->getTabs(2) . "]";
-        
+
         return implode("\n", $code);
     }
-    
-    /**
-     * @param $repository_class
-     *
-     * @return mixed
-     */
-    private function getRules($repository_class)
-    {
-        $rules      = (new $repository_class(app()))->getRules();
-    
-        return $rules;
-    }
-    
+
     /**
      * 编译模板
      *

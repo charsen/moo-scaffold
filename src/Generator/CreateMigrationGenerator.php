@@ -8,11 +8,11 @@ namespace Charsen\Scaffold\Generator;
  */
 class CreateMigrationGenerator extends Generator
 {
-    
+
     protected $migration_path;
-    
+
     protected $migration_relative_path;
-    
+
     /**
      * @param      $schema_name
      *
@@ -26,7 +26,7 @@ class CreateMigrationGenerator extends Generator
         // 从 storage 里获取 表名列表，在修改了 schema 后忘了执行 scaffold:db:fresh 的话会不准确！！
         $all = $this->utility->getTables();
 
-        if (!isset($all[$schema_name]))
+        if ( ! isset($all[$schema_name]))
         {
             return $this->command->error("Schema File \"{$schema_name}\" could not be found.");
         }
@@ -44,7 +44,7 @@ class CreateMigrationGenerator extends Generator
 
             $migration_name = date('Y_m_d_His') . "_create_{$table_name}_table.php";
             $migration_file = $this->migration_path . $migration_name;
-            
+
             $meta = [
                 'author'        => $this->utility->getConfig('author'),
                 'date'          => date('Y-m-d H:i:s'),
@@ -59,7 +59,7 @@ class CreateMigrationGenerator extends Generator
             $this->command->info('+ ' . $this->migration_relative_path . $migration_name);
         }
     }
-    
+
     /**
      * @param $table_name
      *
@@ -75,7 +75,7 @@ class CreateMigrationGenerator extends Generator
 
         return implode("\n", $code);
     }
-    
+
     /**
      * 生成字段相关代码
      *
@@ -157,31 +157,31 @@ class CreateMigrationGenerator extends Generator
         {
             $one = $templates[$attr['type']];
             $one = str_replace('{{name}}', $name, $one);
-            if (!empty($attr['size']))
+            if (isset($attr['size']))
             {
                 $one = str_replace('{{size}}', $attr['size'], $one);
             }
-            if (!empty($attr['precision']))
+            if (isset($attr['precision']))
             {
                 $one = str_replace('{{precision}}', $attr['precision'], $one);
             }
 
             $one .= (isset($attr['unsigned']) && $attr['unsigned']) ? '->unsigned()' : '';
 
-            if (!$attr['allow_null'])
+            if ($attr['allow_null'])
             {
-                if (in_array($attr['type'], ['tinyint', 'int', 'bigint']))
-                {
-                    $one .= $attr['default'] !== null ? "->default({$attr['default']})" : '';
-                }
-                elseif (in_array($attr['type'], ['char', 'varchar', 'text']))
-                {
-                    $one .= $attr['default'] !== null ? "->default('{$attr['default']}')" : '';
-                }
+                $one .= '->nullable()';
             }
             else
             {
-                $one .= '->nullable()';
+                if (in_array($attr['type'], ['tinyint', 'int', 'bigint']))
+                {
+                    $one .= isset($attr['default']) ? "->default({$attr['default']})" : '';
+                }
+                elseif (in_array($attr['type'], ['char', 'varchar', 'text']))
+                {
+                    $one .= isset($attr['default']) ? "->default('{$attr['default']}')" : '';
+                }
             }
 
             $one .= "->comment('{$attr['name']}');";
@@ -214,16 +214,16 @@ class CreateMigrationGenerator extends Generator
                 'index'  => '$table->index(',
                 'unique'  => '$table->unique(',
             ];
-            
+
             if (strstr($attr['fields'], ','))
             {
                 $fields_string = [];
                 foreach (explode(',', $attr['fields']) as $value)
                 {
-                    $fields_string[] = "'{$value}'";
+                    $fields_string[] = "'" . trim($value) . "'";
                 }
-                $index_name = str_replace('_id', '', implode('_', $fields_string));
-                $code[] = $this->getTabs(3) . $functions[$attr['type']] . '[' . implode(',', $fields_string) . "], '{$index_name}');";
+                $index_name = implode('_', array_map(function($item) { return trim($item, '\''); }, $fields_string));
+                $code[]     = $this->getTabs(3) . $functions[$attr['type']] . '[' . implode(', ', $fields_string) . "], '{$index_name}');";
             }
             else
             {
@@ -233,7 +233,7 @@ class CreateMigrationGenerator extends Generator
 
         return $code;
     }
-    
+
     /**
      * 获取回滚代码
      *
@@ -249,7 +249,7 @@ class CreateMigrationGenerator extends Generator
 
         return implode("\n", $code);
     }
-    
+
     /**
      * 编译模板
      *
@@ -261,7 +261,7 @@ class CreateMigrationGenerator extends Generator
     {
         return $this->buildStub($meta, $this->getStub('migration'));
     }
-    
+
     /**
      * 检查 表的迁移 是否存在
      *
