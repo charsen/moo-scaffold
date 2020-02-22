@@ -53,13 +53,14 @@ class CreateControllerGenerator extends Generator
             }
 
             // Request, namespace 处理
-            $request_name       = str_replace('Controller', 'Request', $class);
+            $request_name     = str_replace('Controller', 'Request', $class);
             //$request_class      = "App\\Http\\Requests\\{$attr['package']['folder']}\\{$attr['module']['folder']}\\{$request_name}";
-            $request_class      = "App\\Http\\Requests\\{$attr['module']['folder']}\\{$request_name}";
+            $request_class    = "App\\Http\\Requests\\{$attr['module']['folder']}\\{$request_name}";
 
             //$namespace          = "App\\Http\\Controllers\\{$attr['package']['folder']}\\{$attr['module']['folder']}";
-            $namespace          = "App\\Http\\Controllers\\{$attr['module']['folder']}";
-            $model_class        = $this->utility->getConfig('model.path') . $attr['module']['folder'] . '/' . $attr['model_class'];
+            $namespace        = "App\\Http\\Controllers\\{$attr['module']['folder']}";
+            $model_class      = $this->utility->getConfig('model.path') . $attr['module']['folder'] . '/' . $attr['model_class'];
+            $trait_class      = $this->utility->getConfig('model.path') . $attr['module']['folder'] . '/Traits/' . $attr['model_class'] . 'Trait';
 
             // 验证规则 ，字段 处理
             $table_attrs      = $this->utility->getOneTable($attr['table_name']);
@@ -92,7 +93,7 @@ class CreateControllerGenerator extends Generator
             $this->command->info('+ ' . $controller_relative_file);
 
             // Request 处理
-            $this->createRequest($rules, $meta['request_class'], $meta['request_name'], $meta['model_class'], $meta['route_key']);
+            $this->createRequest($rules, $meta['request_class'], $meta['request_name'], $trait_class, $meta['route_key']);
 
             $created[] = [
                 'namespace'         => $meta['module_en_name'] . '\\',
@@ -149,11 +150,11 @@ class CreateControllerGenerator extends Generator
      * @param array $rules
      * @param string $request_class
      * @param string $request_name
-     * @param string $model_class
+     * @param string $trait_class
      * @param string $route_key
      * @return void
      */
-    public function createRequest($rules, $request_class, $request_name, $model_class, $route_key)
+    public function createRequest($rules, $request_class, $request_name, $trait_class, $route_key)
     {
         // 检查目录是否存在，不存在则创建
         $tmp_folder = app_path() . '/' . str_replace(['App\\', '\\', $request_name], ['', '/', ''], $request_class);
@@ -193,11 +194,12 @@ class CreateControllerGenerator extends Generator
         $update_code[] = $this->getTabs(2) . ']';
 
         $meta = [
-            'namespace'     => str_replace('\\' . $request_name, '', $request_class),
-            'model_class'   => '\\' . $model_class,
-            'request_name'  => $request_name,
-            'store_rules'   => implode(PHP_EOL, $create_code),
-            'update_rules'  => implode(PHP_EOL, $update_code),
+            'namespace'        => str_replace('\\' . $request_name, '', $request_class),
+            'request_name'     => $request_name,
+            'model_trait'      => ucfirst(str_replace('/', '\\', $trait_class)),
+            'model_trait_name' => str_replace('Request', 'Trait', $request_name),
+            'store_rules'      => implode(PHP_EOL, $create_code),
+            'update_rules'     => implode(PHP_EOL, $update_code),
         ];
 
         $file_txt = $this->buildStub($meta, $this->getStub('request'));
@@ -227,7 +229,7 @@ class CreateControllerGenerator extends Generator
                 }
                 else if (strstr($value, 'getUnique')) {
                     // 对编辑运作的 Unique 进行二次处理
-                    $value = "\$this->getUnique(\$model, '{$field_name}', '{$route_key}')";
+                    $value = "\$this->getUnique('{$field_name}', '{$route_key}')";
                 }
             } else {
                 $value = "'{$value}'";
@@ -299,11 +301,11 @@ class CreateControllerGenerator extends Generator
             }
 
             if (isset($dictionaries[$field_name])) {
-                $filed_rules[] = "\$this->getInDict(\$model, '{$field_name}')";
+                $filed_rules[] = "\$this->getInDict('{$field_name}')";
             }
 
             if (isset($attr['unique']) && $attr['unique']) {
-                $filed_rules[] = '$this->getUnique($model)';
+                $filed_rules[] = '$this->getUnique()';
             }
 
             $rules[$field_name] = $filed_rules;

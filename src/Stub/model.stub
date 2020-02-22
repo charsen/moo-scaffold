@@ -1,5 +1,4 @@
 <?php
-
 namespace {{namespace}};
 
 use Illuminate\Database\Eloquent\Model;
@@ -41,7 +40,5 @@ class {{class}} extends Model
 {{casts}}
 {{hidden}}
 {{appends}}
-{{dictionaries}}
-{{get_txt_attribute}}
-{{get_intval_attribute}}
+
 }
