@@ -70,7 +70,7 @@ class CreateMigrationCommand extends Command
             ],
         ];
     }
-    
+
     /**
      * Execute the console command.
      *
@@ -79,27 +79,27 @@ class CreateMigrationCommand extends Command
     public function handle()
     {
         $this->alert($this->title);
-    
+
         $schema_name = $this->argument('schema_name');
         if (empty($schema_name))
         {
             $file_names  = $this->utility->getSchemaNames();
             $schema_name = $this->choice('What is schema name?', $file_names);
         }
-        
+
         $migrate     = $this->option('migrate') === null;
         $fresh       = $this->option('fresh') === null;
         if ($fresh)
         {
             $this->tipCallCommand('scaffold:fresh');
             $result = (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
-    
+
             $this->tipCallCommand('scaffold:migration');
         }
-        
+
         $result = (new CreateMigrationGenerator($this, $this->filesystem, $this->utility))
             ->start($schema_name);
-        
+
         if ($migrate)
         {
             $this->tipCallCommand('migrate');
@@ -113,7 +113,7 @@ class CreateMigrationCommand extends Command
                 $this->call('migrate');
             }
         }
-    
-        $this->tipDone();
+
+        $this->tipDone($result);
     }
 }

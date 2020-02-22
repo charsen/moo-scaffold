@@ -15,8 +15,12 @@ return [
      * 授权设置
      */
     'authorization' => [
-        // 是否通过 md5 多语别名 key
-        'md5'       => TRUE,
+        // 在 app_path() 下需要排除的目录，不生成权限验证 actions 的
+        'exclude_forder' => ['App'],
+        // 是否在 app_path() 下生成 ACL.php ，用于人工核对数据
+        'make_acl'  => FALSE,
+        // 是否通过 md5 加密别名 key
+        'md5'       => FALSE,
         // 是否用 16位 md5 算法
         'short_md5' => TRUE,
         // todo: 根据不同的目录指定不同的 Auth::guard()
@@ -27,6 +31,15 @@ return [
      *  多语言设定
      */
     'languages' => ['en', 'zh-CN'],
+
+    /**
+     * App 路由文件设定
+      */
+    'routes' => [
+        'prefix' => 'admin',
+        'admin'  => 'routes/admin.php',
+        'api'    => 'routes/api.php',
+    ],
 
     /**
      * 数据库相关文件的路径
@@ -58,7 +71,7 @@ return [
     ],
 
     /**
-     * 路由设置
+     * Scaffold 路由设置
      * todo: 待完成中间件
      */
     'route'      => [
@@ -68,6 +81,11 @@ return [
             ? explode(',', env('LARAVEL_SCAFFOLD_MIDDLEWARE'))
             : null,
     ],
+<<<<<<< HEAD
     
     'version' => '0.1.2'
+=======
+
+    'version' => '1.0.0'
+>>>>>>> 1.0
 ];

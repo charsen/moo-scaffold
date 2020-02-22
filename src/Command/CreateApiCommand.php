@@ -86,7 +86,7 @@ class CreateApiCommand extends Command
     public function handle()
     {
         $this->alert($this->title);
-    
+
         $namespace = $this->argument('namespace');
         if (empty($namespace))
         {
@@ -97,7 +97,7 @@ class CreateApiCommand extends Command
         {
             $namespace  = ucfirst($namespace);
         }
-        
+
         $force          = $this->option('force') === null;
         $ignore         = $this->option('ignore') === null;
         $fresh          = $this->option('fresh') === null;
@@ -105,13 +105,13 @@ class CreateApiCommand extends Command
         {
             $this->tipCallCommand('scaffold:fresh');
             $result = (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
-    
+
             $this->tipCallCommand('scaffold:api');
         }
 
         $result = (new CreateApiGenerator($this, $this->filesystem, $this->utility))
             ->start($namespace, $ignore, $force);
-    
+
         $this->tipDone();
     }
 }

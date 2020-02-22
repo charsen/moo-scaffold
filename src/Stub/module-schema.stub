@@ -1,17 +1,19 @@
 ###
-#
+# {{schame_name}}
 #
 # @author {{author}}
 # @date   {{date}}
 ##
-package_name: PackageName
-module_name: ModuleName
+package:
+    name: PackageName
+    folder: PackageFolder
+module:
+    name: ModuleName
+    folder: ModuleFolder
 tables:
     table_name1:
         model:
             class: ModelClassName
-        repository:
-            class: RepositoryClassName
         controller:
             class: ControllerClassName
         attrs:
@@ -33,4 +35,3 @@ tables:
             status:
                 online: [1, online, 上架 ]
                 offline: [2, offline, 下架 ]
-

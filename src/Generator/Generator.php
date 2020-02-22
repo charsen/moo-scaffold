@@ -24,7 +24,7 @@ class Generator
      * @var mixed
      */
     protected $utility;
-    
+
     /**
      * Create a new command instance.
      *
@@ -38,34 +38,6 @@ class Generator
         $this->command    = $command;
         $this->filesystem = $filesystem;
         $this->utility    = $utility;
-    }
-
-    /**
-     * 处理命名空间 及 创建对应的目录
-     *
-     * @param  [type] $path
-     * @param  [type] $folder
-     * @param  [type] &$class
-     * @return string
-     */
-    protected function dealNameSpaceAndPath($path, $folder, &$class)
-    {
-        // 目录及 namespace 处理
-        $namespace = str_replace('/', '\\', trim($folder, '/'));
-        if (strstr($class, '/') || strstr($class, '\\'))
-        {
-            $class   = str_replace('\\', '/', trim($class, '/'));
-            $folders = explode('/', $class);
-            $class   = array_pop($folders);
-            $namespace .= '\\' . implode('\\', $folders);
-
-            if (!$this->filesystem->isDirectory($path . implode('/', $folders)))
-            {
-                $this->filesystem->makeDirectory($path . implode('/', $folders), 0777, true, true);
-            }
-        }
-
-        return $namespace;
     }
 
     /**
@@ -104,9 +76,9 @@ class Generator
      */
     protected function getStubPath()
     {
-        return substr(__DIR__, 0, -9) . 'Stub/';
+        return __DIR__ . '/../Stub/';
     }
-    
+
     /**
      * 获取模板
      *
@@ -119,5 +91,5 @@ class Generator
     {
         return $this->filesystem->get($this->getStubPath() . "{$file_name}.stub");
     }
-    
+
 }

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Libs\Authorization;
+namespace Charsen\Scaffold\Foundation;
 
 /**
  * Actions
@@ -12,12 +12,12 @@ namespace App\Libs\Authorization;
 class Actions
 {
     private $data = NULL;
-    
+
     function __construct()
     {
         $this->data = config('actions.actions');
     }
-    
+
     /**
      * 获取所有数据
      *
@@ -26,10 +26,10 @@ class Actions
     public function get()
     {
         $result = $this->recursion($this->data);
-        
+
         return collect($result);
     }
-    
+
     /**
      * 检查并移除不存在的键值
      *
@@ -47,10 +47,10 @@ class Actions
                 unset($data[$k]);
             }
         }
-        
+
         return $data;
     }
-    
+
     /**
      * 获取所有键值
      *
@@ -59,16 +59,15 @@ class Actions
     public function getKeys()
     {
         $result = $this->recursionKeys($this->data);
-    
+
         return collect($result);
     }
-    
+
     /**
      * 递归获取键值
      *
-     * @param       $data
+     * @param array $data
      * @param array $all_keys
-     *
      * @return array
      */
     private function recursionKeys($data, &$all_keys = [])
@@ -100,10 +99,10 @@ class Actions
                 $this->recursionKeys($val, $all_keys);
             }
         }
-        
+
         return $all_keys;
     }
-    
+
     /**
      * 递归处理数据
      *
@@ -122,7 +121,7 @@ class Actions
                 unset($data[$key]);
                 continue;
             }
-            
+
             if (preg_match("/[\w]+Controller$/", $key))
             {
                 $temp           = [];
@@ -135,10 +134,10 @@ class Actions
                         $temp[$action] = $action_lang;
                     }
                 }
-          
+
                 $data[$key] = [
-                    'name'   => $lang,
-                    'action' => $temp,
+                    'name'    => $lang,
+                    'actions' => $temp,
                 ];
             }
             else
@@ -149,7 +148,7 @@ class Actions
                 ];
             }
         }
-        
+
         return $data;
     }
 

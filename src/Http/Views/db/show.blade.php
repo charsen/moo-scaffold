@@ -71,7 +71,7 @@
                             <em class="font-orange">unsigned</em>
                         @endif
                         {{ $v['type'] }}
-                        @if (! empty($v['size']))
+                        @if (isset($v['size']))
                             ({{ $v['size'] }})
                         @endif
                     </td>
@@ -82,7 +82,11 @@
                             no
                         @endif
                     </td>
-                    <td>{{ $v['default'] }}</td>
+                    <td>
+                        @if (array_key_exists('default', $v))
+                            {{ is_null($v['default']) ? 'null' : $v['default'] }}
+                        @endif
+                    </td>
                     <td>{{ $v['desc'] }}</td>
                 </tr>
                 @endforeach

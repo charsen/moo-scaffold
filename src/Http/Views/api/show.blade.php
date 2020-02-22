@@ -39,6 +39,14 @@
                     <td>application/json</td>
                     <td></td>
                 </tr>
+                @if (isset($header_params['token']))
+                <tr>
+                    <td><em class="font-red">*</em> Authorization</td>
+                    <td></td>
+                    <td>Bearer {Token}</td>
+                    <td></td>
+                </tr>
+                @endif
             </table>
         </div>
     </div>

@@ -8,7 +8,7 @@ namespace Charsen\Scaffold\Generator;
  */
 class CreateSchemaGenerator extends Generator
 {
-    
+
     /**
      * @param      $schema_name
      * @param bool $force
@@ -19,21 +19,26 @@ class CreateSchemaGenerator extends Generator
     {
         $schema_relative_file = $this->utility->getSchemaPatch("{$schema_name}.yaml", true);
         $schema_file          = $this->utility->getSchemaPatch("{$schema_name}.yaml");
-        
-        if (!$this->filesystem->exists($schema_file) || $force)
+
+        if ( ! $this->filesystem->exists($schema_file) || $force)
         {
             $meta = [
-                'author'   => $this->utility->getConfig('author'),
-                'date'     => date('Y-m-d H:i:s')
+                'schame_name' => $schema_name,
+                'author'      => $this->utility->getConfig('author'),
+                'date'        => date('Y-m-d H:i:s')
             ];
             $this->filesystem->put($schema_file, $this->compileStub($meta));
 
-            return $this->command->info("+ $schema_relative_file" . ($force ? ' (Overwrited)' : ''));
+            $this->command->info("+ $schema_relative_file" . ($force ? ' (Overwrited)' : ''));
+
+            return true;
         }
 
-        return $this->command->warn("x $schema_relative_file" . ' (Skipped)');
+        $this->command->warn("x $schema_relative_file" . ' (Skipped)');
+
+        return false;
     }
-    
+
     /**
      * @param array $meta
      *

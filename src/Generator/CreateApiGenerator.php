@@ -14,7 +14,7 @@ class CreateApiGenerator extends Generator
     protected $api_path;
     protected $api_relative_path;
     protected $files_path;
-    
+
     /**
      * @param      $namespace
      * @param bool $ignore_controller
@@ -34,26 +34,27 @@ class CreateApiGenerator extends Generator
         {
             return $this->command->error(' x Routes are not found.');
         }
-        
+
         // 创建目录
         if (!$this->filesystem->isDirectory($this->files_path))
         {
             $this->filesystem->makeDirectory($this->files_path, 0777, true, true);
         }
-        
+
         foreach ($routes as $controller_name => $actions)
         {
             $controller       = 'App\Http\Controllers\\' . str_replace('/', '\\', $namespace) . "\\{$controller_name}Controller";
             $reflection_class = new \ReflectionClass($controller);
-    
+
             // 过滤掉当前控制器 - 路由里多余的 action
-            if (! $ignore_controller)
+            // 由于用了 `Route::resources`，实际controller中可能没那么多action
+            if ( ! $ignore_controller)
             {
                 $methods    = get_class_methods($controller);
                 if (empty($methods)) {
                     return $this->command->error(' x Controller\'s action  are not found.');
                 }
-    
+
                 $real_actions  = array_intersect(array_keys($actions), $methods);
                 $unset_actions = array_diff(array_keys($actions), $real_actions);
                 foreach ($unset_actions as $key) {
@@ -72,8 +73,10 @@ class CreateApiGenerator extends Generator
                 $this->create($api_yaml, $api_relative_yaml, $controller_name, $actions, $reflection_class);
             }
         }
+
+        return true;
     }
-    
+
     /**
      * 获取默认的 action 用于排序输出
      *
@@ -81,9 +84,9 @@ class CreateApiGenerator extends Generator
      */
     private function getDefaultActions()
     {
-        return ['create', 'edit', 'index', 'trashed', 'store', 'update', 'show', 'destroy', 'destroyBatch', 'restoreBatch'];
+        return ['create', 'edit', 'index', 'trashed', 'store', 'update', 'show', 'destroy', 'destroyBatch', 'restore'];
     }
-    
+
     /**
      * @param $api_yaml
      * @param $api_relative_yaml
@@ -98,11 +101,11 @@ class CreateApiGenerator extends Generator
         $old_data         = $yaml::parseFile($api_yaml);
         $old_actions_keys = array_keys($old_data['actions']);
         $old_actions_keys = $this->utility->removeActionNameMethod($old_actions_keys);
-        
+
         $actions_keys     = array_keys($actions);
         $reduce_data      = array_merge(array_diff($old_actions_keys, $actions_keys));
         $add_data         = array_merge(array_diff($actions_keys, $old_actions_keys));
- 
+
         if (empty($reduce_data) && empty($add_data))
         {
             return $this->command->warn('+ ' . $api_relative_yaml . ' (Nothing Changed)');
@@ -134,7 +137,7 @@ class CreateApiGenerator extends Generator
 
         return $this->command->error('+ ' . $api_relative_yaml . '(Update Failed)');
     }
-    
+
     /**
      * 创建一个新的接口 schema 文件
      *
@@ -150,9 +153,9 @@ class CreateApiGenerator extends Generator
     {
         $names = $this->utility->parsePMCNames($reflection_class);
         $name  = empty($names['controller']['name']) ? '' : $names['controller']['name']['zh-CN'];
-        
+
         $code   = ['###'];
-        $code[] = '# 一个 controller 一个 api yaml 文件';
+        $code[] = "# {$controller_name} Api";
         $code[] = '#';
         $code[] = '# @author ' . $this->utility->getConfig('author');
         $code[] = '# @data ' . date('Y-m-d H:i:s');
@@ -163,7 +166,7 @@ class CreateApiGenerator extends Generator
         $code[] = $this->getTabs(1) . 'name: ' . $name;
         $code[] = $this->getTabs(1) . 'desc: []';
         $code[] = 'actions:';
-        
+
         // todo: 用排序解决优先生成问题
         $default_actions = $this->getDefaultActions();
         foreach ($default_actions as $action_name)
@@ -180,7 +183,7 @@ class CreateApiGenerator extends Generator
                 unset($actions[$action_name]);
             }
         }
-        
+
         if ( ! empty($actions))
         {
             foreach ($actions as $action_name => $attr)
@@ -198,7 +201,7 @@ class CreateApiGenerator extends Generator
 
         return $this->command->error('+ ' . $api_relative_yaml . ' (Create Failed)');
     }
-    
+
     /**
      * @param $code
      * @param $reflection_class
@@ -210,8 +213,8 @@ class CreateApiGenerator extends Generator
      */
     private function buildOneRequest(&$code, $reflection_class, $action_name, $methods, $uri)
     {
-        $method_txt     = ['PUT' => 'POST', 'DELETE' => 'POST', 'GET' => 'GET', 'POST' => 'POST'];
-        
+        $method_txt     = ['PATCH' => 'POST', 'PUT' => 'POST', 'DELETE' => 'POST', 'GET' => 'GET', 'POST' => 'POST'];
+
         foreach ($methods as $method)
         {
             $code[] = $this->getTabs(1) . "{$action_name}_" . strtolower($method) . ":";
@@ -225,7 +228,7 @@ class CreateApiGenerator extends Generator
 
         return $code;
     }
-    
+
     /**
      * 获取 动作名
      *
@@ -236,8 +239,8 @@ class CreateApiGenerator extends Generator
      */
     private function getActionName($reflection_class, $action_name)
     {
-        $default_names  = ['create' => '创建', 'edit' => '编辑'];
-    
+        $default_names  = ['create' => '创建表单', 'edit' => '编辑表单'];
+
         if (isset($default_names[$action_name]))
         {
             $name       = $default_names[$action_name];
@@ -254,10 +257,10 @@ class CreateApiGenerator extends Generator
                 $name       = $name['name']['zh-CN'];
             }
         }
-        
+
         return empty($name) ? $action_name : $name;
     }
-    
+
     /**
      * 从 laravel 路由列表中解析出当前模块的控制器和动作
      *
@@ -273,11 +276,12 @@ class CreateApiGenerator extends Generator
         foreach ($routes as $route)
         {
             // 过滤掉不是 api 的
-            if ( ! preg_match('/^api\/(.*)/', $route->uri()))
+            $url_prefix = $this->utility->getConfig('routes.prefix');
+            if ( ! preg_match('/^'. $url_prefix . '\/(.*)/', $route->uri()))
             {
                 continue;
             }
-    
+
             $namespace   = str_replace('/', '\\\\', $namespace);    // 多级目录时，需要转换一下
             $pre_pattern = 'App\\\\Http\\\\Controllers\\\\' . $namespace . '\\\\';
             // 过滤掉不是指定 namespace 的
@@ -289,10 +293,7 @@ class CreateApiGenerator extends Generator
 
             // 正则匹配出 controller 和 action 名称
             preg_match('/^' . $pre_pattern . '([a-zA-Z]+)Controller@([a-zA-Z]+)/', $action_name, $result);
-            
-            //$method                       = implode('|', $route->methods());
-            //$method                       = ($method == 'GET|HEAD') ? 'GET' : $method;
-            //$method                       = ($method == 'PUT|PATCH') ? 'PUT' : $method;
+
             $methods = $route->methods();
             $delete_keys = ['HEAD', 'PATCH'];
             foreach ($delete_keys as $val)
@@ -303,11 +304,10 @@ class CreateApiGenerator extends Generator
                     unset($methods[$key]);
                 }
             }
-            
+
             $data[$result[1]][$result[2]] = [
                 'name'   => $route->getName(),
-                'uri'    => str_replace('api/', '', $route->uri()),
-                //'method' => $method,
+                'uri'    => $route->uri(),
                 'methods' => $methods,
             ];
         }

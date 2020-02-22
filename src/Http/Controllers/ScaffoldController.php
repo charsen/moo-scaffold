@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
  */
 class ScaffoldController extends Controller
 {
-    
+
     /**
      * Show the dashboard.
      *
@@ -22,6 +22,9 @@ class ScaffoldController extends Controller
      */
     public function index(Request $req)
     {
-        return $this->view('dashboard');
+        $data = [];
+        $data['uri']                = $req->getPathInfo();
+
+        return $this->view('dashboard', $data);
     }
 }

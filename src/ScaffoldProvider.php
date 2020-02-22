@@ -7,7 +7,6 @@ use Charsen\Scaffold\Command\UpdateAuthorizationCommand;
 use Charsen\Scaffold\Command\UpdateMultilingualCommand;
 use Charsen\Scaffold\Command\CreateMigrationCommand;
 use Charsen\Scaffold\Command\CreateModelCommand;
-use Charsen\Scaffold\Command\CreateRepositoryCommand;
 use Charsen\Scaffold\Command\CreateSchemaCommand;
 use Charsen\Scaffold\Command\CreateControllerCommand;
 use Charsen\Scaffold\Command\FreshStorageCommand;
@@ -29,6 +28,7 @@ class ScaffoldProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole())
         {
+<<<<<<< HEAD
             $this->publishes([
                 __DIR__ . '/../config/config.php' => config_path('scaffold.php'),
             ], 'config');
@@ -36,6 +36,11 @@ class ScaffoldProvider extends ServiceProvider
             $this->publishes([
                 __DIR__ . '/../public' => public_path('scaffold'),
             ], 'public');
+=======
+            $this->publishes([__DIR__ . '/../config/config.php' => config_path('scaffold.php')], 'config');
+
+            $this->publishes([__DIR__ . '/../public' => public_path('vendor/scaffold')], 'public');
+>>>>>>> 1.0
         }
     }
 
@@ -50,16 +55,15 @@ class ScaffoldProvider extends ServiceProvider
         {
             $this->commands([
                 InitCommand::class,
-                FreeCommand::class,
                 CreateSchemaCommand::class,
-                CreateModelCommand::class,
-                CreateRepositoryCommand::class,
                 FreshStorageCommand::class,
                 CreateMigrationCommand::class,
+                CreateModelCommand::class,
                 CreateControllerCommand::class,
                 UpdateMultilingualCommand::class,
                 CreateApiCommand::class,
                 UpdateAuthorizationCommand::class,
+                FreeCommand::class,
             ]);
         }
 
