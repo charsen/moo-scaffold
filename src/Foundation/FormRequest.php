@@ -23,9 +23,8 @@ class FormRequest extends BaseFormRequest
      */
     public function rules(): array
     {
-        //list($class, $action) = explode('@', \Route::current()->getActionName());
-        list($class, $action) = explode('@', \Route::currentRouteAction());
-
+        //list($class, $action) = explode('@', \Route::currentRouteAction());
+        $action = $this->route()->getActionMethod();
         return $this->getActionRules($action);
     }
 
