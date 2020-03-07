@@ -62,12 +62,27 @@ class UpdateMultilingualGenerator extends Generator
         $old_alias = array_keys($data);
         $new_alias = array_diff($all_dictionary_alias, $old_alias);
 
-        foreach ($new_alias as $alias) {
+        // 添加增量
+        foreach ($new_alias as $alias)
+        {
             $data[$alias] = $all_dictionaries[$alias][$lang];
             $data[$alias] = str_replace("'", "&apos;", $data[$alias]);
 
             if ($lang == 'en') {
                 $data[$alias] = ucwords($data[$alias]);
+            }
+        }
+
+        // 去掉已删除，及更新旧的值
+        foreach ($old_alias as $alias)
+        {
+            if (in_array($alias, $all_dictionary_alias))
+            {
+                $data[$alias] = $all_dictionaries[$alias][$lang];
+            }
+            else
+            {
+                unset($data[$alias]);
             }
         }
 
@@ -90,12 +105,27 @@ class UpdateMultilingualGenerator extends Generator
         $old_key = array_keys($data);
         $new_key = array_diff($all_field_keys, $old_key);
 
-        foreach ($new_key as $alias) {
-            $data[$alias] = $all_fields[$alias][$lang];
-            $data[$alias] = str_replace("'", "&apos;", $data[$alias]);
+        // 增量
+        foreach ($new_key as $key)
+        {
+            $data[$key] = $all_fields[$key][$lang];
+            $data[$key] = str_replace("'", "&apos;", $data[$key]);
 
             if ($lang == 'en') {
-                $data[$alias] = ucwords($data[$alias]);
+                $data[$key] = ucwords($data[$key]);
+            }
+        }
+
+        // 去掉已删除，及更新旧的值
+        foreach ($old_key as $key)
+        {
+            if (in_array($key, $all_field_keys))
+            {
+                $data[$key] = $all_fields[$key][$lang];
+            }
+            else
+            {
+                unset($data[$key]);
             }
         }
 
@@ -130,6 +160,7 @@ class UpdateMultilingualGenerator extends Generator
         $old_keys       = isset($file_data['attributes']) ? array_keys($file_data['attributes']) : [];
         $new_keys       = array_diff($all_field_keys, $old_keys);
 
+        // 增量
         $rebuild_data   = $file_data['attributes'] ?? [];
         foreach ($new_keys as $key)
         {
@@ -140,8 +171,20 @@ class UpdateMultilingualGenerator extends Generator
             }
         }
 
-        $code = ["'attributes' => ["];
+        // 去掉已删除，及更新旧的值
+        foreach ($old_keys as $key)
+        {
+            if (in_array($key, $all_field_keys))
+            {
+                $rebuild_data[$key] = $all_fields[$key][($lang == 'zh-CN' ? 'zh-CN' : $lang)];
+            }
+            else
+            {
+                unset($rebuild_data[$key]);
+            }
+        }
 
+        $code = ["'attributes' => ["];
         foreach ($rebuild_data as $key => $val)
         {
             $val    = str_replace("'", "&apos;", $val);
