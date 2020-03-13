@@ -38,7 +38,7 @@ class FreeCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Create Controllers, Models, Repositories, Migrations ...';
+    protected $description = 'Create Controllers, Models, Migrations ...';
 
     /**
      * Get the console command arguments.

@@ -75,17 +75,22 @@ class Controller extends BaseController
 
     /**
      * 获取数据库字段的文字
-     *
+     * @param  \Illuminate\Database\Eloquent\Model $model
      * @param  array $fields  数据库字段
      * @param  array $append  附加的字段（不是已存在的数据库字段，需要额外添加多语言配置）
      * @return array
      */
-    public function getDBFieldsTxt(array $fields, array $append = [])
+    public function getDBFieldsTxt($model, array $fields, array $append = [])
     {
         $result = [];
         $fields = \array_merge($fields, $append);
         foreach ($fields as $key) {
-            $result[$key] = __('db.' . $key); // __('validation.attributes.' . $key)
+            //$result[$key] = __('db.' . $key); // __('validation.attributes.' . $key)
+            $column = property_exists($model, 'init_' . $key) ? $key . '_txt' : $key;
+            $result[] = [
+                'key'   => $column,
+                'name'  => __('db.' . $key)
+            ];
         }
 
         return $result;
