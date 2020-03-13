@@ -367,7 +367,7 @@ class CreateControllerGenerator extends Generator
     /**
      * 获取 创建/编辑 表单的控件代码
      *
-     * @param       $repository_class
+     * @param       $all_rules
      * @param array $fields
      * @param array $dictionaries
      *

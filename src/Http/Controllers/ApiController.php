@@ -302,7 +302,7 @@ class ApiController extends Controller
             $action_data['header_params']['token'] = $param;
         }
 
-        // controllers, 从 repository 中获取验证规则的字段名，作为接口参数
+        // controllers, 从 form request 中获取验证规则的字段名，作为接口参数
         $controller        = 'App\Http\Controllers\\' . trim($folder_path . '\\' . $controller_class . 'Controller', '/');
         $controller        = str_replace(['/', '\\\\'], ['\\', '\\'], $controller);
         $reflection_class  = new \ReflectionClass($controller);
