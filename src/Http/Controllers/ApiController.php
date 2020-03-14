@@ -336,10 +336,11 @@ class ApiController extends Controller
         else
         {
             $method_rest = [
-                'update'       => 'PATCH',
-                'destroy'      => 'DELETE',
-                'destroyBatch' => 'DELETE',
-                'restore'      => 'PATCH',
+                'update'         => 'PUT',
+                'destroy'        => 'DELETE',
+                'forceDestroy'   => 'DELETE',
+                'destroyBatch'   => 'DELETE',
+                'restore'        => 'PATCH',
             ];
             // dump($action_name);
             // dump($method_rest[$action_name]);

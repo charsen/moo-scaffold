@@ -149,6 +149,21 @@ class {{class}} extends Controller
     }
 
     /**
+     * 永久删除
+     *
+     * @acl {zh-CN: 永久删除{{entity_name}} | en: Destroy Forever {{entity_en_name}}}
+     * @param  int $id
+     * @return \App\Http\Resources\BaseResource
+     */
+    public function forceDestroy($id)
+    {
+        $result = $this->model->onlyTrashed()->findOrFail($id);
+        $result->forceDelete();
+
+        return new BaseResource($result);
+    }
+
+    /**
      * 批量删除
      *
      * @acl {zh-CN: 批量删除{{entity_name}} | en: Destroy Batch {{entity_en_name}}}
@@ -159,17 +174,10 @@ class {{class}} extends Controller
     public function destroyBatch({{request_name}} $request)
     {
         $validated  = $request->validated();
-        $force      = isset($validated['force']) ?? FALSE;
 
-        $data       = $force ? $this->model->onlyTrashed() : $this->model;
-        $data       = $data->whereIn($this->model->getKeyName(), $validated['ids'])->get();
-        $result     = $data->map(function ($item) use ($force) {
-            if ($force) {
-                if ($item->forceDelete()) return $item;
-            }
-            else {
-                if ($item->delete()) return $item;
-            }
+        $data       = $this->model->whereIn($this->model->getKeyName(), $validated['ids'])->get();
+        $result     = $data->map(function ($item) {
+            if ($item->delete()) return $item;
         });
 
         if (count($result) < 1) {
