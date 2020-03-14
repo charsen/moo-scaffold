@@ -45,6 +45,11 @@ class {{request_name}} extends FormRequest
         return [];
     }
 
+    public function forceDestroyRules()
+    {
+        return [];
+    }
+
     public function destroyBatchRules()
     {
         return [
