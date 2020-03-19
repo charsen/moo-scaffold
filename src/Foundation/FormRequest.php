@@ -72,7 +72,7 @@ class FormRequest extends BaseFormRequest
         $result = [];
         foreach ($all_rules as $field_name => $rules) {
             $tmp = [
-                'id'        => $field_name,
+                'name'      => $field_name,
                 'required'  => ! (in_array('sometimes', $rules) OR in_array('nullable',  $rules)),
                 'rules'     => $frontend_rules[$field_name] ?? [],
             ];
