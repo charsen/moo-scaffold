@@ -82,7 +82,7 @@ class Actions
                 continue;
             }
             $all_keys[] = $key;
-            if (preg_match("/[\w]+Controller$/", $key))
+            if (preg_match("/[\w\-]+Controller$/", $key))
             {
                 foreach ($val as $action)
                 {
@@ -122,7 +122,7 @@ class Actions
                 continue;
             }
 
-            if (preg_match("/[\w]+Controller$/", $key))
+            if (preg_match("/[\w\-]+Controller$/", $key))
             {
                 $temp           = [];
                 foreach ($val as $action)
