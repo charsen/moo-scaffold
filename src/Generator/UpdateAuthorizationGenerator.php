@@ -20,26 +20,21 @@ class UpdateAuthorizationGenerator extends Generator
     {
         $route_actions = $this->getActions();
 
-        $gates_code         = '';
         $config_actions     = [];
         $whitelist          = [];
         $lang_actions       = [];
         // dump($route_actions);
         foreach ($route_actions as $controller => $actions)
         {
-            foreach ($actions as $action)
-            {
-                $gates_code .= $this->getOneGate($controller, $action);
-            }
+            $reflection_class   = new \ReflectionClass($controller);
+            $PMCNames           = $this->utility->parsePMCNames($reflection_class);
 
-            $new_actions     = $this->formatActions($controller, $actions, $lang_actions, $whitelist);
+            $new_actions     = $this->formatActions($reflection_class, $PMCNames, $controller, $actions, $lang_actions, $whitelist);
             if ( ! empty($new_actions))
             {
-                $this->formatControllerActions($config_actions, $new_actions, $controller, $lang_actions);
+                $this->formatControllerActions($PMCNames, $config_actions, $new_actions, $controller, $lang_actions);
             }
         }
-
-        $this->buildAcl($gates_code);
         $this->buildActions($config_actions, $whitelist);
         $this->buildLangFiles($lang_actions);
     }
@@ -84,9 +79,10 @@ class UpdateAuthorizationGenerator extends Generator
      * @return array
      * @throws \ReflectionException
      */
-    private function formatActions($controller, $actions, &$lang_actions, &$whitelist)
+    private function formatActions($reflection_class, $PMCNames, $controller, $actions, &$lang_actions, &$whitelist)
     {
-        $reflection_class  = new \ReflectionClass($controller);
+        $package_key       = $this->getMd5($PMCNames['package']['name']['en']);
+
         $new_actions       = [];
         foreach ($actions as $key => $val)
         {
@@ -96,7 +92,8 @@ class UpdateAuthorizationGenerator extends Generator
                 continue;
             }
 
-            $action_key  = $this->getMd5($controller . '@' . $val);
+            $action_key  = $this->getActionKey($package_key, $controller, $val);
+            $action_key  = $this->getMd5($action_key);
             $acl_info    = $this->utility->parseActionNames($val, $reflection_class);
 
             if ( ! isset($acl_info['whitelist']))
@@ -106,7 +103,6 @@ class UpdateAuthorizationGenerator extends Generator
             }
             else
             {
-                // App\Http\Controllers\Enterprise\Personnels\DepartmentController@index
                 $whitelist[] = "'" . $action_key . "'";
             }
         }
@@ -125,16 +121,9 @@ class UpdateAuthorizationGenerator extends Generator
      * @return mixed
      * @throws \ReflectionException
      */
-    private function formatControllerActions(&$config_actions, $actions, $controller, &$lang_actions)
+    private function formatControllerActions($PMCNames, &$config_actions, $actions, $controller, &$lang_actions)
     {
-        $reflection_class   = new \ReflectionClass($controller);
-        $PMCNames           = $this->utility->parsePMCNames($reflection_class);
-        //dump($controller, $PMCNames);
-
-        //$package_key    = $this->getMd5($paths[0]);
         $package_key        = $this->getMd5($PMCNames['package']['name']['en']);
-        //dump($package_key);
-        //exit;
 
         // 用 namespace 来解析目录深度，只支持 `app/Http/Controllers/` 往下**两级**，
         // todo: 用递归来处理
@@ -149,7 +138,7 @@ class UpdateAuthorizationGenerator extends Generator
         for ($i = 0; $i < count($paths); $i++)
         {
             // App/Http/Controllers/TestController.php
-            // App/Http/Controllers/Authorization/AuthController.php
+            // App/Http/Controllers/Folder1/AuthController.php
             // App/Http/Controllers/{$Path[0]}
             if ($i == 0)
             {
@@ -165,26 +154,25 @@ class UpdateAuthorizationGenerator extends Generator
                 else
                 {
                     // $module_key = $package_key . $paths[0];
-                    $tmp_key = $this->getMd5("$package_key.$paths[0]");
+                    $tmp_key = $this->getMd5("$package_key-$paths[0]");
                     if ( ! isset($config_actions[$package_key][$tmp_key]))
                     {
                         $config_actions[$package_key][$tmp_key] = [];
                     }
-                    // 如果下一级不是一个 Controller , App/Http/Controllers/App/Authorization/AuthController.php
                     // $tmp_key = {package_key}.App
-                    if ( ! preg_match("/[\w]+Controller$/", "$paths[0].$paths[1]")) {
+                    if ( ! preg_match("/[\w]+Controller$/", "$paths[0]-$paths[1]")) {
                         $lang_actions[$tmp_key]     = $PMCNames['package'];
                     } else {
                         $lang_actions[$tmp_key]     = $PMCNames['module'];
                     }
                 }
             }
-            // App/Http/Controllers/Authorization/AuthController.php
-            // App/Http/Controllers/App/Authorization/AuthController.php
+            // App/Http/Controllers/Folder1/AuthController.php
+            // App/Http/Controllers/Folder1/Folder2/AuthController.php
             // App/Http/Controllers/{$Path[0]}/{$Path[1]}
             elseif ($i == 1)
             {
-                $controller_key = "$paths[0].$paths[1]";
+                $controller_key = "$package_key-$paths[0]-$paths[1]";
                 $is_controller  = preg_match("/[\w]+Controller$/", $controller_key);
 
                 $controller_key = $this->getMd5($controller_key);
@@ -192,14 +180,14 @@ class UpdateAuthorizationGenerator extends Generator
 
                 if ($is_controller)
                 {
-                    $tmp_key                                                 = $this->getMd5("$package_key.$paths[0]");
+                    $tmp_key                                                 = $this->getMd5("$package_key-$paths[0]");
                     $config_actions[$package_key][$tmp_key][$controller_key] = $actions;
                     $lang_actions[$controller_key]                           = $PMCNames['controller'];
                 }
                 else
                 {
                     // $tmp_key = {package_key}.App/Authorization/
-                    $tmp_key = $this->getMd5("$package_key.$paths[0].$paths[1]");
+                    $tmp_key = $this->getMd5("$package_key-$paths[0]-$paths[1]");
                     if ( ! isset($config_actions[$package_key][$tmp_key]))
                     {
                         $config_actions[$package_key][$tmp_key] = [];
@@ -207,12 +195,12 @@ class UpdateAuthorizationGenerator extends Generator
                     $lang_actions[$tmp_key]     = $PMCNames['module'];
                 }
             }
-            // App/Http/Controllers/App/Authorization/AuthController.php
+            // App/Http/Controllers/App/Folder1/Folder2/Folder3/AuthController.php
             // App/Http/Controllers/{$Path[0]}/{$Path[1]}/{$Path[2]}
             elseif ($i == 2)
             {
-                $controller_key                 = "$paths[0].$paths[1].$paths[2]";
-                $module_key                     = $this->getMd5("$package_key.$paths[0].$paths[1]");
+                $controller_key                 = "$package_key-$paths[0]-$paths[1]-$paths[2]";
+                $module_key                     = $this->getMd5("$package_key-$paths[0]-$paths[1]");
                 $controller_key                 = $this->getMd5($controller_key) . 'Controller';
                 $lang_actions[$controller_key]  = $PMCNames['controller'];
                 $config_actions[$package_key][$module_key][$controller_key] = $actions;
@@ -248,55 +236,17 @@ class UpdateAuthorizationGenerator extends Generator
     }
 
     /**
-     * 生成 ACL.php
+     * 获取 action key 值
      *
-     * @param $code
-     */
-    private function buildAcl($code)
-    {
-        if ( ! $this->utility->getConfig('authorization.make_acl')) {
-            return $this->filesystem->delete(app_path('ACL.php'));
-        }
-
-        $header_code  = "<?php";
-        $header_code .= PHP_EOL;
-        $header_code .= "use Illuminate\Support\Facades\Gate;\n";
-        $header_code .= "use Illuminate\Support\Facades\Auth;\n";
-        $header_code .= PHP_EOL;
-        $header_code .= "# !!!不需要用到，只是用于核对生成的数据是否正确!!!";
-        $header_code .= PHP_EOL . PHP_EOL;
-
-        $put  = $this->filesystem->put(app_path('ACL.php'), $header_code . $code);
-        if ($put)
-        {
-            return $this->command->info('+ ./app/ACL.php (Updated)');
-        }
-
-        return $this->command->error('x ./app/ACL.php (Failed)');
-    }
-
-    /**
-     * 获取一个 action 的代码
-     *
-     * @param $controller
-     * @param $action
-     *
+     * @param string $controller
+     * @param string  $action
      * @return string
      */
-    private function getOneGate($controller, $action)
+    private function getActionKey($package_key, $controller, $action)
     {
-        //$controller = str_replace(['App\\Http\\Controllers\\', '\\', 'Controller'], ['', '.', ''], $controller);
-        $gate_action = $this->getMd5($controller . '@' . $action);
+        $controller  = str_replace(['\\', 'App-Http-Controllers-', 'Controller'], ['-', '', ''], $controller);
 
-        $code        = [
-            "# " . $controller . '@' . $action,
-            "Gate::define('{$gate_action}', function() {",
-            $this->getTabs(1) . "return Auth::user()->hasAction('{$gate_action}');",
-            "});",
-            "",
-        ];
-
-        return implode("\n", $code);
+        return $package_key . '-' . $controller . '-' . $action;
     }
 
     /**
@@ -350,6 +300,7 @@ class UpdateAuthorizationGenerator extends Generator
      */
     private function getMd5($str)
     {
+        $str = str_replace('Controller', '', $str);
         if ($this->utility->getConfig('authorization.md5'))
         {
             if ($this->utility->getConfig('authorization.short_md5'))
@@ -362,6 +313,6 @@ class UpdateAuthorizationGenerator extends Generator
             }
         }
 
-        return $str;
+        return strtolower($str);
     }
 }
