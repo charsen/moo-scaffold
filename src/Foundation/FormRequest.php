@@ -49,12 +49,12 @@ class FormRequest extends BaseFormRequest
      * @param  array  $reset
      * @return array
      */
-    public function getFormWidgets($method, array $reset = [])
+    public function getFormWidgets($method, array $reset = [], $excute = [])
     {
         $all_rules      = $this->getActionRules($method);
         $frontend_rules = []; //$this->getFrontendRules($all_rules);
 
-        return $this->transformFormWidgets($all_rules, $frontend_rules, $reset);
+        return $this->transformFormWidgets($all_rules, $frontend_rules, $reset, $excute);
     }
 
     /**
@@ -65,12 +65,14 @@ class FormRequest extends BaseFormRequest
      * @param  array $reset
      * @return array
      */
-    private function transformFormWidgets(array $all_rules, array $frontend_rules, array $reset = [])
+    private function transformFormWidgets(array $all_rules, array $frontend_rules, array $reset = [], $excute = [])
     {
         if (empty($all_rules)) return [];
 
         $result = [];
         foreach ($all_rules as $field_name => $rules) {
+            if (in_array($field_name, $excute)) continue;
+
             $tmp = [
                 'name'      => $field_name,
                 'required'  => ! (in_array('sometimes', $rules) OR in_array('nullable',  $rules)),
