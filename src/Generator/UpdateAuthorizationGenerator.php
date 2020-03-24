@@ -301,7 +301,7 @@ class UpdateAuthorizationGenerator extends Generator
      */
     private function getMd5($str)
     {
-        $str = str_replace('Controller', '', $str);
+        $str = strtolower(str_replace('Controller', '', $str));
         if ($this->utility->getConfig('authorization.md5'))
         {
             if ($this->utility->getConfig('authorization.short_md5'))
@@ -314,6 +314,6 @@ class UpdateAuthorizationGenerator extends Generator
             }
         }
 
-        return strtolower($str);
+        return $str;
     }
 }
