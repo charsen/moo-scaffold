@@ -29,7 +29,7 @@ class UpdateAuthorizationGenerator extends Generator
             $reflection_class   = new \ReflectionClass($controller);
             $PMCNames           = $this->utility->parsePMCNames($reflection_class);
 
-            $new_actions     = $this->formatActions($reflection_class, $PMCNames, $controller, $actions, $lang_actions, $whitelist);
+            $new_actions     = $this->formatActions($reflection_class, $controller, $actions, $lang_actions, $whitelist);
             if ( ! empty($new_actions))
             {
                 $this->formatControllerActions($PMCNames, $config_actions, $new_actions, $controller, $lang_actions);
@@ -79,10 +79,8 @@ class UpdateAuthorizationGenerator extends Generator
      * @return array
      * @throws \ReflectionException
      */
-    private function formatActions($reflection_class, $PMCNames, $controller, $actions, &$lang_actions, &$whitelist)
+    private function formatActions($reflection_class, $controller, $actions, &$lang_actions, &$whitelist)
     {
-        $package_key       = $this->getMd5($PMCNames['package']['name']['en']);
-
         $new_actions       = [];
         foreach ($actions as $key => $val)
         {
@@ -92,7 +90,7 @@ class UpdateAuthorizationGenerator extends Generator
                 continue;
             }
 
-            $action_key  = $this->getActionKey($package_key, $controller, $val);
+            $action_key  = $this->getActionKey($controller, $val);
             $action_key  = $this->getMd5($action_key);
             $acl_info    = $this->utility->parseActionNames($val, $reflection_class);
 
@@ -123,9 +121,10 @@ class UpdateAuthorizationGenerator extends Generator
      */
     private function formatControllerActions($PMCNames, &$config_actions, $actions, $controller, &$lang_actions)
     {
-        $package_key        = $this->getMd5($PMCNames['package']['name']['en']);
+        $package_key                = $this->getMd5($PMCNames['package']['name']['en']);
+        $lang_actions[$package_key] = $PMCNames['package'];
 
-        // 用 namespace 来解析目录深度，只支持 `app/Http/Controllers/` 往下**两级**，
+        // 用 namespace 来解析目录深度，只支持 `app/Http/Controllers/` 往下两级目录，
         // todo: 用递归来处理
         $paths              = str_replace('App\\Http\\Controllers\\', '', $controller);
         $paths              = explode('\\', $paths);
@@ -142,28 +141,24 @@ class UpdateAuthorizationGenerator extends Generator
             // App/Http/Controllers/{$Path[0]}
             if ($i == 0)
             {
-                $lang_actions[$package_key] = $PMCNames['package'];
-
+                $controller_key             = $this->getMd5($paths[0]);
                 $is_controller              = preg_match("/[\w]+Controller$/", $paths[0]);
                 if ($is_controller)
                 {
-                    $controller_key                  = $this->getMd5($paths[0]);
-                    $lang_actions[$controller_key]   = $PMCNames['controller'];
-                    $config_actions[$package_key][$controller_key] = $actions;
+                    $controller_key                                .= 'Controller';
+                    $lang_actions[$controller_key]                  = $PMCNames['controller'];
+                    $config_actions[$package_key][$controller_key]  = $actions;
                 }
                 else
                 {
-                    // $module_key = $package_key . $paths[0];
-                    $tmp_key = $this->getMd5("$package_key-$paths[0]");
-                    if ( ! isset($config_actions[$package_key][$tmp_key]))
+                    if ( ! isset($config_actions[$package_key][$controller_key]))
                     {
-                        $config_actions[$package_key][$tmp_key] = [];
+                        $config_actions[$package_key][$controller_key] = [];
                     }
-                    // $tmp_key = {package_key}.App
-                    if ( ! preg_match("/[\w]+Controller$/", "$paths[0]-$paths[1]")) {
-                        $lang_actions[$tmp_key]     = $PMCNames['package'];
-                    } else {
-                        $lang_actions[$tmp_key]     = $PMCNames['module'];
+
+                    if (preg_match("/[\w]+Controller$/", "$paths[0]-$paths[1]"))
+                    {
+                        $lang_actions[$controller_key]     = $PMCNames['module'];
                     }
                 }
             }
@@ -172,38 +167,44 @@ class UpdateAuthorizationGenerator extends Generator
             // App/Http/Controllers/{$Path[0]}/{$Path[1]}
             elseif ($i == 1)
             {
-                $controller_key = "$package_key-$paths[0]-$paths[1]";
+                $controller_key = "$paths[0]-$paths[1]";
                 $is_controller  = preg_match("/[\w]+Controller$/", $controller_key);
 
                 $controller_key = $this->getMd5($controller_key);
-                $controller_key = $is_controller ? $controller_key . 'Controller' : $controller_key;
+                $tmp_key        = $this->getMd5("$paths[0]");
 
                 if ($is_controller)
                 {
-                    $tmp_key                                                 = $this->getMd5("$package_key-$paths[0]");
+                    $controller_key                                         .= 'Controller';
                     $config_actions[$package_key][$tmp_key][$controller_key] = $actions;
                     $lang_actions[$controller_key]                           = $PMCNames['controller'];
                 }
                 else
                 {
-                    // $tmp_key = {package_key}.App/Authorization/
-                    $tmp_key = $this->getMd5("$package_key-$paths[0]-$paths[1]");
-                    if ( ! isset($config_actions[$package_key][$tmp_key]))
+                    if ( ! isset($config_actions[$package_key][$tmp_key][$controller_key]))
                     {
-                        $config_actions[$package_key][$tmp_key] = [];
+                        $config_actions[$package_key][$tmp_key][$controller_key] = [];
                     }
-                    $lang_actions[$tmp_key]     = $PMCNames['module'];
+                    $lang_actions[$controller_key]     = $PMCNames['module'];
                 }
             }
-            // App/Http/Controllers/App/Folder1/Folder2/Folder3/AuthController.php
+            // App/Http/Controllers/App/Folder1/Folder2/AuthController.php
             // App/Http/Controllers/{$Path[0]}/{$Path[1]}/{$Path[2]}
             elseif ($i == 2)
             {
-                $controller_key                 = "$package_key-$paths[0]-$paths[1]-$paths[2]";
-                $module_key                     = $this->getMd5("$package_key-$paths[0]-$paths[1]");
-                $controller_key                 = $this->getMd5($controller_key) . 'Controller';
-                $lang_actions[$controller_key]  = $PMCNames['controller'];
-                $config_actions[$package_key][$module_key][$controller_key] = $actions;
+                $controller_key                 = "$paths[0]-$paths[1]-$paths[2]";
+                $is_controller                  = preg_match("/[\w]+Controller$/", $controller_key);
+                $controller_key                 = $this->getMd5($controller_key);
+                $tmp_key                        = $this->getMd5("$paths[0]");
+                $tmp_key2                       = $this->getMd5("$paths[0]-$paths[1]");
+
+                if ($is_controller )
+                {
+                    $controller_key                                                    .= 'Controller';
+                    $config_actions[$package_key][$tmp_key][$tmp_key2][$controller_key] = $actions;
+                    $lang_actions[$controller_key]                                      = $PMCNames['controller'];
+                }
+                // 第三级目录不支持了！！
             }
         }
 
@@ -242,11 +243,11 @@ class UpdateAuthorizationGenerator extends Generator
      * @param string  $action
      * @return string
      */
-    private function getActionKey($package_key, $controller, $action)
+    private function getActionKey($controller, $action)
     {
         $controller  = str_replace(['\\', 'App-Http-Controllers-', 'Controller'], ['-', '', ''], $controller);
 
-        return $package_key . '-' . $controller . '-' . $action;
+        return $controller . '-' . $action;
     }
 
     /**

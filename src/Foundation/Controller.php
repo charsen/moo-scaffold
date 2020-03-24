@@ -43,10 +43,33 @@ class Controller extends BaseController
     protected function checkAuthorization()
     {
         $method     = $this->transform_methods[$this->method] ?? $this->method;
-        // App\Http\Controllers\Enterprise\Personnels\DepartmentController@index
-        // dump($controller . '@' . $action, substr(md5($controller . '@' . $action), 8, 16));
-        $acl_name   = substr(md5(static::class . '@' . $method), 8, 16);
-        $this->authorize('acl_authentication', $acl_name);
+
+        $this->authorize('acl_authentication', $this->getAclName(static::class . '-' . $method));
+    }
+
+    /**
+     * 根据配置获取 action 的 acl name
+     *
+     * @param $str
+     *
+     * @return bool|string
+     */
+    private function getAclName($str)
+    {
+        $str  = str_replace(['\\', 'App-Http-Controllers-', 'Controller'], ['-', '', ''], $str);
+        if (config('scaffold.authorization.md5'))
+        {
+            if (config('scaffold.authorization.short_md5'))
+            {
+                return substr(md5($str), 8, 16);
+            }
+            else
+            {
+                return md5($str);
+            }
+        }
+
+        return strtolower($str);
     }
 
     /**
