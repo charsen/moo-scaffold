@@ -7,7 +7,7 @@
             <i class="icon-file"></i>
         </a>
     </div>
-    <i class="icon-wordbook"></i> {{ $name }}
+    <i class="icon-wordbook"></i> {{ $name }}  「 {{ $check_action }} 」
 </h2>
 <div class="panel">
     <div class="bd">

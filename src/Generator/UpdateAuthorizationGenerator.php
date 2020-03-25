@@ -90,7 +90,7 @@ class UpdateAuthorizationGenerator extends Generator
                 continue;
             }
 
-            $action_key  = $this->getActionKey($controller, $val);
+            $action_key  = $this->utility->getActionKey($controller, $val);
             $action_key  = $this->getMd5($action_key);
             $acl_info    = $this->utility->parseActionNames($val, $reflection_class);
 
@@ -234,20 +234,6 @@ class UpdateAuthorizationGenerator extends Generator
         }
 
         return $this->command->error('x ./config/actions.php (Failed)');
-    }
-
-    /**
-     * 获取 action key 值
-     *
-     * @param string $controller
-     * @param string  $action
-     * @return string
-     */
-    private function getActionKey($controller, $action)
-    {
-        $controller  = str_replace(['\\', 'App-Http-Controllers-', 'Controller'], ['-', '', ''], $controller);
-
-        return $controller . '-' . $action;
     }
 
     /**

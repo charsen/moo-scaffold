@@ -112,7 +112,6 @@ class ApiController extends Controller
     public function param(Request $req)
     {
         $data                = $this->getOneApi($req, 'request');
-        //$data['request_url'] = str_replace($req->path(), $this->config('routes.prefix'), $req->url());
         $data['request_url'] = str_replace($req->path(), '', $req->url());
         $data['request_url'] = trim($data['request_url'], '/');
 
@@ -268,6 +267,7 @@ class ApiController extends Controller
         {
             throw new InvalidArgumentException('Invalid Action Argument (Not Found).');
         }
+
         $action_data                       = $data['actions'][$action_name];
         $action_data['request']            = $this->formatRequest($action_data['request']);
         $action_data['current_action']     = $action_name;
@@ -306,15 +306,13 @@ class ApiController extends Controller
         $controller        = 'App\Http\Controllers\\' . trim($folder_path . '\\' . $controller_class . 'Controller', '/');
         $controller        = str_replace(['/', '\\\\'], ['\\', '\\'], $controller);
         $reflection_class  = new \ReflectionClass($controller);
-        //dump($reflection_class);
+
         // 因为出现了同一个 url 多个 method，导致真实的动作未知，可通过 rule_action 指定
         // 比如 一个控制器中有 GET createPersonnels 又有 POST storePersonnels，为了简化授权，只要 createPersonnels ，
         // 再从 createPersonnels 判断 isMethod('POST') 跳转到 storePersonnels
         $rule_action       = isset($action_data['rule_action']) ? $action_data['rule_action'] : $action_name;
         $request_object    = $this->utility->getActionRequestClass($rule_action, $reflection_class);
 
-        // dump($rule_action);
-        // dump($request_object->getActionRules($rule_action));
         $rule_params     = [];
         if ( $request_object != null && ! empty($request_object->getActionRules($rule_action)))
         {
@@ -327,7 +325,7 @@ class ApiController extends Controller
 
         $body_params    = ! isset($action_data['body_params'])
                         ? []
-                        :$this->formatParams($action_data['body_params'], $dictionaries, $fields, $lang_fields);
+                        : $this->formatParams($action_data['body_params'], $dictionaries, $fields, $lang_fields);
 
         if ($action_data['request'][0] == 'GET')
         {
@@ -350,13 +348,16 @@ class ApiController extends Controller
 
             $body_params   = array_merge($method_param, $rule_params, $body_params);
         }
-        //dump($body_params);
+
+        // 前端写权限验证时明文动作名称，todo: 其它动态的转换处理
+        $transfrom = ['create' => 'store', 'edit' => 'update'];
+        $action_data['check_action'] =  $this->utility->getActionKey($controller, $transfrom[$action_name] ?? $action_name);
+
         // 伪造数据
         $faker = Faker::create('zh_CN');
         $action_data['url_params']  = $this->formatToFaker($faker, $url_params);
         $action_data['body_params'] = $this->formatToFaker($faker, $body_params);
-        // dump($action_data['url_params']);
-        // dump($action_data['body_params']);
+
         return $action_data;
     }
 
