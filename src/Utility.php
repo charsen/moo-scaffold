@@ -66,6 +66,20 @@ class Utility
         return $data;
     }
 
+     /**
+     * 获取 action key 值
+     *
+     * @param string $controller
+     * @param string  $action
+     * @return string
+     */
+    public function getActionKey($controller, $action)
+    {
+        $controller  = str_replace(['\\', 'App-Http-Controllers-', 'Controller'], ['-', '', ''], $controller);
+
+        return strtolower($controller . '-' . $action);
+    }
+
     /**
      * 解析 包名、模块名、控制器名
      *
