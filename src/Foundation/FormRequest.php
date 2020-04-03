@@ -75,16 +75,25 @@ class FormRequest extends BaseFormRequest
 
             $tmp = [
                 'name'      => $field_name,
-                'required'  => ! (in_array('sometimes', $rules) OR in_array('nullable',  $rules)),
+                'required'  => ! in_array('nullable',  $rules), //! (in_array('sometimes', $rules) OR in_array('nullable',  $rules)),
                 'rules'     => $frontend_rules[$field_name] ?? [],
             ];
 
             // 通过字段类型指定 控件类型, todo: datetime?
-            if (in_array('data', $rules)) {
+            if (in_array('date', $rules))
+            {
                 $tmp['type'] = 'date-picker';
             }
-
-            if (strstr($field_name, 'password')) {
+            elseif (in_array('time', $rules))
+            {
+                $tmp['type'] = 'time-picker';
+            }
+            elseif (in_array('date-time', $rules))
+            {
+                $tmp['type'] = 'date-time-picker';
+            }
+            elseif (strstr($field_name, 'password'))
+            {
                 $tmp['type'] = 'password';
             }
 
