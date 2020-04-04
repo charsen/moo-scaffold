@@ -2,10 +2,10 @@
 namespace {{trait_namespace}};
 
 /**
- * Model 与 Request 共用 (会被生成直接覆盖)
+ * Model 与 Request 共用
  *
- * 主要：1. 用于验证，生成表单控件，生成接口参数
- *      2. Model Options 操作处理
+ * - 会被生成直接覆盖，所以不要在这里写代码
+ * - 用于验证，生成表单控件，生成接口参数
  */
 trait {{trait_class}}
 {
@@ -16,26 +16,5 @@ trait {{trait_class}}
 {{dictionaries}}
 {{get_txt_attribute}}
 {{get_intval_attribute}}
-    /**
-     * 获取单个 model 可操作的动作
-     * @return array
-     */
-    public function getOptionsAttribute()
-    {
-        $res = [];
-        if ($this->deleted_at === null) {
-            $res[] = ['type' => 'edit'];
-            $res[] = ['type' => 'destory'];
-        } else {
-            $res[] = ['type' => 'force-destory'];
-        }
 
-        // 合并自定义的 options 数组
-        if (property_exists($this, 'options'))
-        {
-            $res = array_merge($res, $this->options);
-        }
-
-        return $res;
-    }
 }
