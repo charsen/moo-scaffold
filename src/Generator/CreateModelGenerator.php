@@ -40,6 +40,8 @@ class CreateModelGenerator extends Generator
             return false;
         }
 
+        $this->checkOptionsTrait();
+
         foreach ($all[$schema_name] as $class => $attr)
         {
             $model_path = $this->model_path . $attr['module']['folder'];
@@ -94,6 +96,8 @@ class CreateModelGenerator extends Generator
 
             // Model Trait
             $use_trait[]   = "{$trait_class}";
+            $use_trait[]   = "OptionsTrait";
+            $use_class[]   = "use " . ucfirst(str_replace('/', '\\', $this->utility->getConfig('model.path'))) . "Traits\OptionsTrait;";
             $use_class[]   = "use {$trait_namespace}\\{$trait_class};";
 
             // 软删除
@@ -133,6 +137,28 @@ class CreateModelGenerator extends Generator
                 $this->buildFactory($this->factory_path, $attr['module']['folder'], $attr['table_name'], $class,
                                     $meta['namespace'], $fields, $dictionaries, $force);
             }
+        }
+    }
+
+    private function checkOptionsTrait()
+    {
+        $path = $this->model_path . 'Traits/';
+        if ( ! $this->filesystem->isDirectory($path))
+        {
+            $this->filesystem->makeDirectory($path, 0777, true, true);
+        }
+
+        $file = $path . 'OptionsTrait.php';
+        if ( ! $this->filesystem->isFile($file))
+        {
+            $namespace = $this->utility->getConfig('model.path') . 'Traits';
+            $namespace = ucfirst(str_replace('/', '\\', $namespace));
+            $meta = [
+                'namespace' => $namespace
+            ];
+
+            $this->filesystem->put($file, $this->buildStub($meta, $this->getStub('options-trait')));
+            $this->command->info('+ ' . $this->model_relative_path . 'Traits/OptionsTrait.php');
         }
     }
 
