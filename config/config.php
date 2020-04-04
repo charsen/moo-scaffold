@@ -15,6 +15,8 @@ return [
      * 授权设置
      */
     'authorization' => [
+        // 是否开启 验证验证
+        'check' => TRUE,
         // 在 app_path() 下需要排除的目录，不生成权限验证 actions 的
         'exclude_forder' => ['App'],
         // 是否通过 md5 加密别名 key
@@ -61,6 +63,21 @@ return [
     ],
 
     /**
+     * 生成时 资源 及  对应的类，可以自定义、及修改类的位置
+     *
+     */
+    'class' => [
+        'resources' => [
+            'base'          => 'Charsen\Scaffold\Http\Resources\BaseResource',
+            'form'          => 'Charsen\Scaffold\Http\Resources\FormWidgetCollection',
+            'colums'        => 'Charsen\Scaffold\Http\Resources\TableColumsCollection'
+        ],
+        'actions'           => 'Charsen\Scaffold\Foundation\Actions',
+        'controller'        => 'Charsen\Scaffold\Foundation\Controller',
+        'form_request'      => 'Charsen\Scaffold\Foundation\FormRequest',
+    ],
+
+    /**
      * Scaffold 路由设置
      * todo: 待完成中间件
      */
@@ -70,7 +87,5 @@ return [
         'middleware' => env('LARAVEL_SCAFFOLD_MIDDLEWARE')
             ? explode(',', env('LARAVEL_SCAFFOLD_MIDDLEWARE'))
             : null,
-    ],
-
-    'version' => '1.0.0'
+    ]
 ];

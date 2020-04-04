@@ -92,4 +92,15 @@ class Generator
         return $this->filesystem->get($this->getStubPath() . "{$file_name}.stub");
     }
 
+    /**
+     * Helper to get the config values.
+     *
+     * @param  string  $key
+     *
+     * @return mixed
+     */
+    protected function config($key)
+    {
+        return $this->utility->getConfig($key);
+    }
 }

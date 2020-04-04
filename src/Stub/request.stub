@@ -2,7 +2,7 @@
 namespace {{namespace}};
 
 use {{model_trait}};
-use Charsen\Scaffold\Foundation\FormRequest;
+use {{use_base_request}};
 
 class {{request_name}} extends FormRequest
 {
@@ -54,7 +54,6 @@ class {{request_name}} extends FormRequest
     {
         return [
             'ids'       => ['required', 'array'],
-            'force'     => ['sometimes', 'boolean'],
         ];
     }
 

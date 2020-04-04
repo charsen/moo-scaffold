@@ -28,7 +28,7 @@ class CreateApiGenerator extends Generator
         $this->api_relative_path        = $this->utility->getApiPath('schema', true);
         $this->files_path               = $this->api_path . $namespace . '/';
 
-        // 获取路由列表，但 create 和 edit 两个动作，不一定有，
+        // 获取路由列表，但 create 和 edit 两个动作，不一定有
         $routes = $this->getRoutes($namespace);
         if (empty($routes))
         {
@@ -36,7 +36,7 @@ class CreateApiGenerator extends Generator
         }
 
         // 创建目录
-        if (!$this->filesystem->isDirectory($this->files_path))
+        if ( ! $this->filesystem->isDirectory($this->files_path))
         {
             $this->filesystem->makeDirectory($this->files_path, 0777, true, true);
         }
@@ -47,12 +47,12 @@ class CreateApiGenerator extends Generator
             $reflection_class = new \ReflectionClass($controller);
 
             // 过滤掉当前控制器 - 路由里多余的 action
-            // 由于用了 `Route::resources`，实际controller中可能没那么多action
+            // 由于用了 `Route::resources`，实际 controller 中可能没那么多 action
             if ( ! $ignore_controller)
             {
                 $methods    = get_class_methods($controller);
                 if (empty($methods)) {
-                    return $this->command->error(' x Controller\'s action  are not found.');
+                    return $this->command->error(' x Controller\'s action are not found.');
                 }
 
                 $real_actions  = array_intersect(array_keys($actions), $methods);

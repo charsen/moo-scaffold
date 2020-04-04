@@ -58,6 +58,8 @@ class CreateMigrationGenerator extends Generator
             $this->filesystem->put($migration_file, $this->compileStub($meta));
             $this->command->info('+ ' . $this->migration_relative_path . $migration_name);
         }
+
+        return true;
     }
 
     /**

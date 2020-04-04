@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
 use Symfony\Component\Yaml\Yaml;
+use Illuminate\Support\Arr;
 
 /**
  * Class     ApiController
@@ -446,7 +447,7 @@ class ApiController extends Controller
             }
             elseif ($field_name == 'real_name')
             {
-                $attr['value'] = $faker->name(array_random(['male', 'female']));
+                $attr['value'] = $faker->name(Arr::random(['male', 'female']));
             }
             elseif (strstr($field_name, '_code'))
             {
@@ -526,8 +527,8 @@ class ApiController extends Controller
 
             if (isset($dictionaries[$key]))
             {
-                $data[$key]['value']   = array_random(array_pluck($dictionaries[$key], 0));
-                $data[$key]['options'] = array_pluck($dictionaries[$key], 2, 0);
+                $data[$key]['value']   = Arr::random(Arr::pluck($dictionaries[$key], 0));
+                $data[$key]['options'] = Arr::pluck($dictionaries[$key], 2, 0);
                 $fields[$key]['type']  = 'radio';
             }
 
@@ -579,7 +580,7 @@ class ApiController extends Controller
 
             if (isset($dictionaries[$key]))
             {
-                $data[$key]['value']   = array_random(array_pluck($dictionaries[$key], 0));
+                $data[$key]['value']   = Arr::random(array_pluck($dictionaries[$key], 0));
                 $data[$key]['options'] = array_pluck($dictionaries[$key], 2, 0);
                 $fields[$key]['type']  = 'radio';
             }

@@ -2,12 +2,13 @@
 
 namespace {{namespace}};
 
-use {{model_class}};
 use App\Exceptions\BatchActionException;
-use App\Http\Resources\BaseResource;
-use App\Http\Resources\FormWidgetCollection;
 use {{request_class}};
-use Charsen\Scaffold\Foundation\Controller;
+use {{model_class}};
+use {{use_base_resources}};
+use {{use_form_widgets}};
+use {{use_colums}};
+use {{use_base_controller}};
 
 /**
  * {{entity_name}}控制器
@@ -53,12 +54,19 @@ class {{class}} extends Controller
      */
     public function index({{request_name}} $request)
     {
-        $validated = $request->validated();
+        $validated    = $request->validated();
 
-        $fields    = [{{index_fields}}];
-        $result    = $this->model->paginate(($validated['page_limit'] ?? NULL), $fields);
+        $result       = $this->model->paginate(($validated['page_limit'] ?? NULL));
 
-        return BaseResource::collection($result);
+        $columns      = [{{index_fields}}];
+
+        $default      = [];
+        $form_widgets = $request->getFormWidgets($this->getMethod(), $default, ['page', 'page_limit']);
+
+        return BaseResource::collection($result)->additional([
+                'columns'      => new TableColumsCollection($columns),
+                'form_widgets' => new FormWidgetCollection(collect($form_widgets))
+            ]);
     }
 
     /**
@@ -71,12 +79,19 @@ class {{class}} extends Controller
      */
     public function trashed({{request_name}} $request)
     {
-        $validated = $request->validated();
+        $validated    = $request->validated();
 
-        $fields    = [{{trashed_fields}}];
-        $result    = $this->model->onlyTrashed()->paginate(($validated['page_limit'] ?? NULL), $fields);
+        $result       = $this->model->onlyTrashed()->paginate(($validated['page_limit'] ?? NULL));
 
-        return BaseResource::collection($result);
+        $columns      = [{{trashed_fields}}];
+
+        $default      = [];
+        $form_widgets = $request->getFormWidgets($this->getMethod(), $default, ['page', 'page_limit']);
+
+        return BaseResource::collection($result)->additional([
+                'columns'      => new TableColumsCollection($columns),
+                'form_widgets' => new FormWidgetCollection(collect($form_widgets))
+            ]);
     }
 
     /**
@@ -225,8 +240,8 @@ class {{class}} extends Controller
      */
     public function create({{request_name}} $request)
     {
-        $default        = [];
-        $form_widgets   = $request->getFormWidgets($this->getMethod(), $default);
+        $default      = [];
+        $form_widgets = $request->getFormWidgets($this->getMethod(), $default);
 
         return new FormWidgetCollection(collect($form_widgets));
     }
@@ -242,11 +257,8 @@ class {{class}} extends Controller
     {
         $result = $this->model->findOrFail($id);
 
-        $default        = [];
-        $form_widgets   = $request->getFormWidgets($this->getMethod(), $default);
-
         return (new BaseResource($result))->additional([
-            'form_widgets' => $form_widgets
+            'form_widgets' => $this->create($request)
         ]);
     }
 

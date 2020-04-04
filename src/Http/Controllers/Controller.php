@@ -16,7 +16,7 @@ class Controller extends BaseController
 {
     protected $utility;
     protected $filesystem;
-    
+
     /**
      * Controller constructor.
      *
@@ -52,8 +52,6 @@ class Controller extends BaseController
      */
     protected function view($view, $data = [], $mergeData = [])
     {
-        $mergeData['version'] = $this->config('version');
-        
         return view()->make("scaffold::{$view}", $data, $mergeData);
     }
 }
