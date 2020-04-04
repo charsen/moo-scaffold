@@ -188,14 +188,8 @@ php artisan scaffold:model `schema_file_name`
 - 默认生成 Trait 文件
 - 添加 `-t` 重新生成 Trait 文件（若 model 存在时需要覆盖更新）
 - 添加 `-f` 覆盖已存在文件
-- 添加 `--factory` 同时生成 Factory 文件，并添加到 `database/seeds/DatabaseSeeder.php` 中
+- 添加 `--factory` 同时生成对应的 `factory` 文件，并更新到 `database/seeds/DatabaseSeeder.php`
 - 添加 `--fresh` 刷新缓存数据，会先执行 `artisan scaffold:fresh`
-- 添加 `--factory` 同时生成 model 对应的 factory 文件，并更新 `DatabaseSeeder`
-
-**Example:**
-```
-php artisan scaffold:model personnels
-```
 
 
 ### 4.7 创建控制器

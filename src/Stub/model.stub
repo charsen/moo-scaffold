@@ -15,25 +15,26 @@ class {{class}} extends Model
 {
     {{use_trait}}
 
+    /**
+     * 表格名称
+     * @var string
+     */
     protected $table = '{{table_name}}';
 
     /**
-     * 给定字段默认值。
-     *
+     * 指定字段默认值
      * @var array
      */
     protected $attributes = [];
 
      /**
      * 可以被批量赋值的属性
-     *
      * @var array
      */
     protected $fillable = [{{fillable}}];
 
     /**
      * 需要转换成日期的属性
-     *
      * @var array
      */
     protected $dates = [{{dates}}];

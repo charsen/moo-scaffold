@@ -42,6 +42,8 @@ class Controller extends BaseController
      */
     protected function checkAuthorization()
     {
+        if ( ! config('scaffold.authorization.check')) return true;
+
         $method     = $this->transform_methods[$this->method] ?? $this->method;
 
         $this->authorize('acl_authentication', $this->getAclName(static::class . '-' . $method));
@@ -97,7 +99,10 @@ class Controller extends BaseController
     }
 
     /**
+     * todo: remove
+     *
      * 获取数据库字段的文字
+     *
      * @param  \Illuminate\Database\Eloquent\Model $model
      * @param  array $fields  数据库字段
      * @param  array $append  附加的字段（不是已存在的数据库字段，需要额外添加多语言配置）

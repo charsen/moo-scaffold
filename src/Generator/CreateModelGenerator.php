@@ -493,7 +493,7 @@ class CreateModelGenerator extends Generator
     private function buildDictionaries(array $dictionaries, array $fields)
     {
         $data_code     = ['']; // 先空一行
-        $appends_code  = [];
+        $appends_code  = ["'options'"];
         $function_code = [];
 
         foreach ($dictionaries as $field_name => $attr)

@@ -92,7 +92,7 @@ class CreateMigrationCommand extends Command
         if ($fresh)
         {
             $this->tipCallCommand('scaffold:fresh');
-            $result = (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
+            (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
 
             $this->tipCallCommand('scaffold:migration');
         }

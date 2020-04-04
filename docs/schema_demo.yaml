@@ -22,18 +22,17 @@
 # @date   2018-11-11 11:50
 ##
 package:
-    name: 企业端
-    en: Enterprise
+    name: 管理后台
+    folder: /
 module:
     name: 人事模块
     en: Personnels
 tables:
     departments:
         model:   # 不生成时，可删除此项
-            class: Department                # Eloquent 名称，可带目录，如：Personnels/Department
+            class: Department # Eloquent 名称，可带目录，如：Personnels/Department
         controller:  # 不生成时，可删除此项
-            admin: Personnels/DepartmentController  # 路由规则在 routes/admin.php 中
-            api: Api/DepartmentController           # 路由规则在 routes/api.php 中
+            class: DataController
         attrs:
             name: 部门
             desc: 树状结构存储企业的组织构架（行政实体）
@@ -67,8 +66,6 @@ tables:
 
     personnels:
         model:
-            class: Personnels/Personnel
-        repository:
             class: Personnels/Personnel
         controller:
             class: Personnels/Personnel

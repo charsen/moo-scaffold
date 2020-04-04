@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="Scaffold">
     <title>@yield('title', 'Charsen/Scaffold')</title>
-    <link rel="stylesheet" href="/vendor/scaffold/css/index.css?v={{$version}}" />
+    <link rel="stylesheet" href="/vendor/scaffold/css/index.css" />
     <meta name="robots" content="none" />
     @yield('styles')
 </head>
@@ -30,7 +30,7 @@
 
     <script src="/vendor/scaffold/javascript/jquery-1.11.3.min.js"></script>
     <script src="/vendor/scaffold/javascript/jquery.cookie.min.js"></script>
-    <script src="/vendor/scaffold/javascript/main.js?v={{$version}}"></script>
+    <script src="/vendor/scaffold/javascript/main.js?"></script>
     @yield('scripts')
 </body>
 </html>

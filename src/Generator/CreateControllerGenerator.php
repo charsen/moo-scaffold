@@ -2,6 +2,7 @@
 
 namespace Charsen\Scaffold\Generator;
 
+use Illuminate\Support\Arr;
 /**
  * Create Controller
  *
@@ -69,24 +70,28 @@ class CreateControllerGenerator extends Generator
             $rules            = $this->rebuildFieldsRules($fields, $dictionaries);
 
             $meta               = [
-                'author'            => $this->utility->getConfig('author'),
-                'date'              => date('Y-m-d H:i:s'),
-                'package_name'      => $attr['package']['name'],
-                'package_en_name'   => $attr['package']['folder'],
-                'module_name'       => $attr['module']['name'],
-                'module_en_name'    => $attr['module']['folder'],
-                'entity_name'       => $attr['entity_name'],
-                'entity_en_name'    => str_replace('Controller', '', $class),
-                'namespace'         => ucfirst($namespace),
-                'class'             => $class,
-                'index_fields'      => $this->getListFields($fields),
-                'trashed_fields'    => $this->getListFields($fields, true),
-                'route_key'         => strtolower($attr['model_class']),
-                'model_class'       => ucfirst(str_replace('/', '\\', $model_class)),
-                'model_name'        => $attr['model_class'],
-                'request_class'     => $request_class,
-                'request_name'      => $request_name,
-                'form_widgets'      => $this->getFormWidgets($rules, $fields, $dictionaries)
+                'author'              => $this->utility->getConfig('author'),
+                'date'                => date('Y-m-d H:i:s'),
+                'package_name'        => $attr['package']['name'],
+                'package_en_name'     => $attr['package']['folder'],
+                'module_name'         => $attr['module']['name'],
+                'module_en_name'      => $attr['module']['folder'],
+                'entity_name'         => $attr['entity_name'],
+                'entity_en_name'      => str_replace('Controller', '', $class),
+                'namespace'           => ucfirst($namespace),
+                'use_base_controller' => $this->config('class.controller'),
+                'use_base_resources'  => $this->config('class.resources.base'),
+                'use_form_widgets'    => $this->config('class.resources.form'),
+                'use_colums'          => $this->config('class.resources.colums'),
+                'class'               => $class,
+                'index_fields'        => $this->getListFields($fields),
+                'trashed_fields'      => $this->getListFields($fields, true),
+                'route_key'           => strtolower($attr['model_class']),
+                'model_class'         => ucfirst(str_replace('/', '\\', $model_class)),
+                'model_name'          => $attr['model_class'],
+                'request_class'       => $request_class,
+                'request_name'        => $request_name,
+                'form_widgets'        => $this->getFormWidgets($rules, $fields, $dictionaries)
             ];
 
             $this->filesystem->put($controller_file, $this->compileStub($meta));
@@ -195,9 +200,10 @@ class CreateControllerGenerator extends Generator
 
         $meta = [
             'namespace'        => str_replace('\\' . $request_name, '', $request_class),
+            'use_base_request' => $this->config('class.form_request'),
             'request_name'     => $request_name,
             'model_trait'      => ucfirst(str_replace('/', '\\', $trait_class)),
-            'model_trait_name' => str_replace('Request', 'Trait', $request_name),
+            'model_trait_name' => Arr::last(explode('/', $trait_class)),
             'store_rules'      => implode(PHP_EOL, $create_code),
             'update_rules'     => implode(PHP_EOL, $update_code),
         ];
@@ -336,7 +342,7 @@ class CreateControllerGenerator extends Generator
         else
         {
             $file_txt      = '<?php' . PHP_EOL
-                           . 'use Illuminate\Http\Request;' . PHP_EOL . PHP_EOL
+                           . 'use Illuminate\Support\Facades\Route;' . PHP_EOL . PHP_EOL
                            . '//:insert_code_here:do_not_delete';
         }
 
