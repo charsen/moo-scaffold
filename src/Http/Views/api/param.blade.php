@@ -59,6 +59,16 @@
                         <td><input type="text" class="txt key" value="X-Requested-With"></td>
                         <td><input type="text" class="txt value" value="XMLHttpRequest"></td>
                     </tr>-->
+
+                    @if (isset($header_params['XSRF-TOKEN']))
+                    <tr>
+                        <td><input type="checkbox" class="checkbox" checked /></td>
+                        <td><input type="text" class="txt" value="X-XSRF-TOKEN"></td>
+                        <td><input type="text" class="txt key" value="X-XSRF-TOKEN"></td>
+                        <td><input type="text" class="txt value" value="{{ $header_params['XSRF-TOKEN'] }}"></td>
+                    </tr>
+                    @endif
+
                     @if (isset($header_params['token']))
                     <tr>
                         <td><input type="checkbox" class="checkbox" checked /></td>
