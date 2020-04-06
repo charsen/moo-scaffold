@@ -4,10 +4,10 @@ namespace {{namespace}};
 
 use App\Exceptions\BatchActionException;
 use {{request_class}};
-use {{model_class}};
 use {{use_base_resources}};
 use {{use_form_widgets}};
 use {{use_colums}};
+use {{model_class}};
 use {{use_base_controller}};
 
 /**

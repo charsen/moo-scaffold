@@ -303,8 +303,8 @@ class ApiController extends Controller
 
         if (! empty($req->cookie('XSRF-TOKEN')))
         {
-            $param = $from_action == 'request' ? $req->cookie('XSRF-TOKEN') : '';
-            $action_data['header_params']['XSRF-TOKEN'] = $param;
+            // $param = $from_action == 'request' ? $req->cookie('XSRF-TOKEN') : '';
+            // $action_data['header_params']['XSRF-TOKEN'] = $param;
         }
 
         // controllers, 从 form request 中获取验证规则的字段名，作为接口参数
