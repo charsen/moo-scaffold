@@ -276,11 +276,12 @@ class CreateApiGenerator extends Generator
         foreach ($routes as $route)
         {
             // 过滤掉不是 api 的
-            $url_prefix = $this->utility->getConfig('routes.prefix');
-            if ( ! preg_match('/^'. $url_prefix . '\/(.*)/', $route->uri()))
-            {
-                continue;
-            }
+            // 2020.04.06 暂时屏蔽掉，可支持多个路由配置文件里的内容
+            // $url_prefix = $this->utility->getConfig('routes.prefix');
+            // if ( ! preg_match('/^'. $url_prefix . '\/(.*)/', $route->uri()))
+            // {
+            //     continue;
+            // }
 
             $namespace   = str_replace('/', '\\\\', $namespace);    // 多级目录时，需要转换一下
             $pre_pattern = 'App\\\\Http\\\\Controllers\\\\' . $namespace . '\\\\';
