@@ -134,7 +134,7 @@
                 $('#header').html('');
                 $("#result_method").html($("#send_method").val());
 
-                var check = new RegExp(/^(index|authenticate|logout)$/);
+                var check = new RegExp(/^(index|authenticate|logout)[\_\w]+$/);
                 if (check.test(action) || method == 'GET')
                 {
                     $('#send').trigger('click');
