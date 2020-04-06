@@ -146,6 +146,9 @@ class CreateControllerGenerator extends Generator
             $value = "'{$value}'";
         }
 
+        // 加入操作列
+        $fields[] = "'options'";
+
         return implode(', ', $fields);
     }
 
