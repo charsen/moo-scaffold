@@ -33,12 +33,11 @@ return [
     'languages' => ['en', 'zh-CN'],
 
     /**
-     * App 路由文件设定
-      */
+     * App 路由文件设定，在生成 controller 时，更新路由文件用到
+     */
     'routes' => [
-        'prefix' => 'admin',
+        // 'prefix' => 'admin',
         'admin'  => 'routes/admin.php',
-        'api'    => 'routes/api.php',
     ],
 
     /**
@@ -64,7 +63,7 @@ return [
 
     /**
      * 生成时 资源 及  对应的类，可以自定义、及修改类的位置
-     *
+     * 建议：复制文件，自定义于业务系统中，减低业务系统与本工具耦合性
      */
     'class' => [
         'resources' => [

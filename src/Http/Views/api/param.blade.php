@@ -7,7 +7,7 @@
             <i class="icon-file"></i>
         </a>
     </div>
-    <i class="icon-wordbook"></i> {{ $name }}  「 {{ $check_action }} 」
+    <i class="icon-wordbook"></i> {{ $name }}
 </h2>
 <div class="panel">
     <div class="bd">
@@ -21,6 +21,12 @@
             <input type="hidden" id="host" value="{{ $request_url }}" />
             <input class="txt" id="uri" value="/{{ $request[1] }}" />
         </div>
+    </div>
+    <div class="hd" style="padding: 10px 0 0 35px">
+        <h3>
+            <i class="icon-code"></i>
+            {{ $check_action }}
+        </h3>
     </div>
 </div>
 
