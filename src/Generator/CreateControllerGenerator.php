@@ -185,7 +185,7 @@ class CreateControllerGenerator extends Generator
             $tmp_create     = "'{$field_name}' => [" . implode(', ', $this->addQuotation($rules)) ."],";
 
             if ( ! \in_array('nullable', $rules)) {
-                array_unshift($rules, 'sometimes');
+                array_unshift($rules, 'required');
             }
 
             foreach ($rules as $k => $v) {
