@@ -72,6 +72,8 @@ class Actions
      */
     private function recursionKeys($data, &$all_keys = [])
     {
+        if (empty($data)) return [];
+
         foreach ($data as $key => $val)
         {
             $lang = __('actions.' . $key);
@@ -112,6 +114,8 @@ class Actions
      */
     private function recursion($data)
     {
+        if (empty($data)) return [];
+
         foreach ($data as $key => &$val)
         {
             $lang = __('actions.' . $key);
