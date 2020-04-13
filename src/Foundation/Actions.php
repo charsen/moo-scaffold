@@ -64,6 +64,51 @@ class Actions
     }
 
     /**
+     * 获取所有 Actions 键值
+     *
+     * @return array
+     */
+    public function getActions()
+    {
+        $result = $this->recursionActions($this->data);
+
+        return $result;
+    }
+
+    /**
+     * 递归获取 Actions 键值
+     *
+     * @param array $data
+     * @param array $all_actions
+     * @return array
+     */
+    private function recursionActions($data, &$all_actions = [])
+    {
+        if (empty($data)) return [];
+
+        foreach ($data as $key => $val)
+        {
+            if (preg_match("/[\w\-]+Controller$/", $key))
+            {
+                foreach ($val as $action)
+                {
+                    // 只保留有多语言的功能
+                    if (__('actions.' . $action) != 'actions.' . $action)
+                    {
+                        $all_actions[] = $action;
+                    }
+                }
+            }
+            else
+            {
+                $this->recursionActions($val, $all_actions);
+            }
+        }
+
+        return $all_actions;
+    }
+
+    /**
      * 递归获取键值
      *
      * @param array $data
@@ -72,23 +117,17 @@ class Actions
      */
     private function recursionKeys($data, &$all_keys = [])
     {
+        if (empty($data)) return [];
+
         foreach ($data as $key => $val)
         {
-            $lang = __('actions.' . $key);
-            if ($lang == 'actions.' . $key)
-            {
-                // 移除没多语言的项目
-                unset($data[$key]);
-                continue;
-            }
             $all_keys[] = $key;
             if (preg_match("/[\w\-]+Controller$/", $key))
             {
                 foreach ($val as $action)
                 {
-                    $action_lang = __('actions.' . $action);
                     // 只保留有多语言的功能
-                    if ($action_lang != 'actions.' . $action)
+                    if (__('actions.' . $action) != 'actions.' . $action)
                     {
                         $all_keys[] = $action;
                     }
@@ -112,6 +151,8 @@ class Actions
      */
     private function recursion($data)
     {
+        if (empty($data)) return [];
+
         foreach ($data as $key => &$val)
         {
             $lang = __('actions.' . $key);
@@ -131,13 +172,13 @@ class Actions
                     // 只保留有多语言的功能
                     if ($action_lang != 'actions.' . $action)
                     {
-                        $temp[$action] = $action_lang;
+                        $temp[$action] = ['name' => $action_lang];
                     }
                 }
 
                 $data[$key] = [
-                    'name'    => $lang,
-                    'actions' => $temp,
+                    'name'      => $lang,
+                    'children'   => $temp,
                 ];
             }
             else
