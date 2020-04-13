@@ -191,7 +191,6 @@ class FormRequest extends BaseFormRequest
     /**
      * 获取 Uniquue 的规则
      *
-     * @param  $model
      * @param  $field           // 当是编辑动作时，要排除自己，必传
      * @param  $route_key       // 当是编辑动作时，要排除自己，必传
      * @return string
