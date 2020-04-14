@@ -58,20 +58,22 @@ class Controller extends BaseController
      */
     private function getAclName($str)
     {
-        $str  = str_replace(['\\', 'App-Http-Controllers-', 'Controller'], ['-', '', ''], $str);
+        $str = str_replace(['\\', 'App-Http-Controllers-', 'Controller'], ['-', '', ''], $str);
+        $str = strtolower($str);
         if (config('scaffold.authorization.md5'))
         {
-            if (config('scaffold.authorization.short_md5'))
-            {
-                return substr(md5($str), 8, 16);
-            }
-            else
-            {
-                return md5($str);
-            }
+            return substr(md5($str), 8, 16);
+            // if (config('scaffold.authorization.short_md5'))
+            // {
+            //     return substr(md5($str), 8, 16);
+            // }
+            // else
+            // {
+            //     return md5($str);
+            // }
         }
 
-        return strtolower($str);
+        return $str;
     }
 
     /**
