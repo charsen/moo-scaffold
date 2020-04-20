@@ -44,10 +44,19 @@ class FormWidgetCollection extends ResourceCollection
                 $item['placeholder'] = $item['placeholder'] ?? '请选择' . $item['label'];
             }
 
-            // 在创建时返回默认值，让 vue 组件获取到的是一个 vm 对象，确保 element 组件绑定 v-model 成功
+            // 在创建时返回默认值，让 vue 组件获取到的是一个 vm 对象，确保 element 组件绑定 v-model 成功!
+            // 不能去掉，在 多选时 ，选择完，输入其它文本框时，原选择的内容会被清空
             if ($item['type'] == 'cascader' && ! isset($item['default']))
             {
                 $item['default'] = [];
+            }
+
+            // 对 级联选择器 的属性设置
+            if ($item['type'] == 'cascader')
+            {
+                $item['strictly'] = $item['strictly'] ?? FALSE;
+                $item['multiple'] = $item['multiple'] ?? FALSE;
+                $item['array']    = $item['array'] ?? FALSE;
             }
 
             // model dictionary 处理
@@ -60,6 +69,8 @@ class FormWidgetCollection extends ResourceCollection
                         'value' => $key
                     ];
                 })->toArray();
+                //$item['default'] = $item['options']->first()['value'];
+                //$item['options'] = $item['options']->toArray();
             }
 
             if ( ! empty($item['filter']))
@@ -93,11 +104,13 @@ class FormWidgetCollection extends ResourceCollection
         foreach ($data as $one) {
             $tmp = ['value' => $one[$key_field], 'label' => $one[$label_field]];
 
-            if ($count_field != '') {
+            if ($count_field != '')
+            {
                 $tmp['count'] = $one[$count_field];
             }
 
-            if (!empty($one['children'])) {
+            if (!empty($one['children']))
+            {
                 $tmp['children'] = $this->toLableValue($one['children'], $key_field, $label_field, $count_field);
             }
 

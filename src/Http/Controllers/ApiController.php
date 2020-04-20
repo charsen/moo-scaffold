@@ -345,8 +345,12 @@ class ApiController extends Controller
                 'destroyBatch'   => 'DELETE',
                 'restore'        => 'PATCH',
             ];
-            // dump($action_name);
-            // dump($method_rest[$action_name]);
+            // 指定 POST 外的其它运作
+            if ($action_data['request'][0] != 'POST')
+            {
+                $method_rest[$action_name] = strtoupper($action_data['request'][0]);
+            }
+
             $method_param = isset($method_rest[$action_name])
                 ? ['_method' => ['require' => true, 'name' => '', 'value' => $method_rest[$action_name], 'desc' => '']]
                 : [];
@@ -375,7 +379,8 @@ class ApiController extends Controller
      */
     private function formatRequest($request)
     {
-        $method = strtoupper($request[0]) == 'GET' ? 'GET' : 'POST';
+        //$method = strtoupper($request[0]) == 'GET' ? 'GET' : 'POST';
+        $method = strtoupper($request[0]);
         $url    = $request[1];
 
         // 把 model 对象 转换为整数 1
