@@ -176,14 +176,15 @@ class CreateMigrationGenerator extends Generator
             }
             else
             {
-                if (in_array($attr['type'], ['tinyint', 'int', 'bigint']))
-                {
-                    $one .= isset($attr['default']) ? "->default({$attr['default']})" : '';
-                }
-                elseif (in_array($attr['type'], ['char', 'varchar', 'text']))
-                {
-                    $one .= isset($attr['default']) ? "->default('{$attr['default']}')" : '';
-                }
+                // if (in_array($attr['type'], ['tinyint', 'int', 'bigint', 'decimal']))
+                // {
+                //     $one .= isset($attr['default']) ? "->default({$attr['default']})" : '';
+                // }
+                // elseif (in_array($attr['type'], ['char', 'varchar', 'text']))
+                // {
+                //     $one .= isset($attr['default']) ? "->default('{$attr['default']}')" : '';
+                // }
+                $one .= isset($attr['default']) ? "->default({$attr['default']})" : '';
             }
 
             $one .= "->comment('{$attr['name']}');";
