@@ -41,6 +41,7 @@ class CreateModelGenerator extends Generator
         }
 
         $this->checkOptionsTrait();
+        $this->buildExcetions();
 
         foreach ($all[$schema_name] as $class => $attr)
         {
@@ -544,7 +545,7 @@ class CreateModelGenerator extends Generator
             $function_name   = str_replace(' ', '', ucwords(str_replace('_', ' ', $field_name)));
             $function_code[] = $this->getTabs(1) . '/**';
             $function_code[] = $this->getTabs(1) . " * 获取 {$fields[$field_name]['name']} TXT";
-            $function_code[] = $this->getTabs(1) . ' * @return array|null|string';
+            $function_code[] = $this->getTabs(1) . ' * @return string';
             $function_code[] = $this->getTabs(1) . ' */';
             $function_code[] = $this->getTabs(1) . "public function get{$function_name}TxtAttribute()";
             $function_code[] = $this->getTabs(1) . '{';
@@ -554,6 +555,24 @@ class CreateModelGenerator extends Generator
             $function_code[] = $this->getTabs(2) . '}';
             $function_code[] = '';
             $function_code[] = $this->getTabs(2) . "return '';";
+            $function_code[] = $this->getTabs(1) . '}';
+            $function_code[] = ''; //空一行
+
+            $function_code[] = $this->getTabs(1) . '/**';
+            $function_code[] = $this->getTabs(1) . " * 获取 {$fields[$field_name]['name']} INTEGEL";
+            $function_code[] = $this->getTabs(1) . ' * @param string $key';
+            $function_code[] = $this->getTabs(1) . ' * @return int';
+            $function_code[] = $this->getTabs(1) . ' */';
+            $function_code[] = $this->getTabs(1) . "protected function get{$function_name}Int(\$key)";
+            $function_code[] = $this->getTabs(1) . '{';
+            $function_code[] = $this->getTabs(2) . "\$data = array_flip(\$this->init_{$field_name});";
+            $function_code[] = '';
+            $function_code[] = $this->getTabs(2) . "if ( ! isset(\$data[\$key]))";
+            $function_code[] = $this->getTabs(2) . '{';
+            $function_code[] = $this->getTabs(3) . "throw new ModelDictionaryException(\"The [init_{$field_name}] key name [{\$key}] does not exist.\");";
+            $function_code[] = $this->getTabs(2) . '}';
+            $function_code[] = '';
+            $function_code[] = $this->getTabs(2) . "return \$data[\$key];";
             $function_code[] = $this->getTabs(1) . '}';
             $function_code[] = ''; //空一行
         }
@@ -589,5 +608,22 @@ class CreateModelGenerator extends Generator
     private function compileTraitStub($meta)
     {
         return $this->buildStub($meta, $this->getStub('model-trait'));
+    }
+
+    /**
+     * 编译 模型字典异常模板
+     *
+     * @return void
+     */
+    private function buildExcetions()
+    {
+        $dictionary = app_path() . '/Exceptions/ModelDictionaryException.php';
+        if ( ! $this->filesystem->isFile($dictionary))
+        {
+            $content = $this->buildStub([], $this->getStub('model-dictinary-exception'));
+            $this->filesystem->put($dictionary, $content);
+        }
+
+        return true;
     }
 }

@@ -70,7 +70,9 @@ class FormRequest extends BaseFormRequest
         if (empty($all_rules)) return [];
 
         $result = [];
-        foreach ($all_rules as $field_name => $rules) {
+        foreach ($all_rules as $field_name => $rules)
+        {
+            // 排除指定的字段
             if (in_array($field_name, $excute)) continue;
 
             $tmp = [
@@ -97,15 +99,19 @@ class FormRequest extends BaseFormRequest
                 $tmp['type'] = 'password';
             }
 
-            foreach ($rules as $r) {
+            foreach ($rules as $r)
+            {
                 // 闭包函数
-                if ( ! is_string($r)) {
+                if ( ! is_string($r))
+                {
                     continue;
                 }
 
-                if (preg_match('/^in\:[0-9\,]+$/i', $r)) {
+                if (preg_match('/^in\:[0-9\,]+$/i', $r))
+                {
                     // 判断 model 的字典字段
-                    if (property_exists($this, "init_" . $field_name)) {
+                    if (property_exists($this, "init_" . $field_name))
+                    {
                         $tmp['type']        = 'radio';
                         $tmp['dictionary']  = true;
                         $tmp['options']     = $this->{"init_{$field_name}"};
@@ -114,7 +120,8 @@ class FormRequest extends BaseFormRequest
             }
 
             // 直接替换，合并
-            if (isset($reset[$field_name])) {
+            if (isset($reset[$field_name]))
+            {
                 $tmp = array_merge($tmp, $reset[$field_name]);
                 unset($reset[$field_name]);
             }
@@ -142,10 +149,6 @@ class FormRequest extends BaseFormRequest
         foreach ($all_rules as $field => $rules) {
             foreach ($rules as $k => $r) {
                 if ( ! is_string($r)) {
-                    continue;
-                }
-
-                if (strstr($r, 'unique:')) {
                     continue;
                 }
 
