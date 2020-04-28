@@ -1,189 +1,115 @@
 # Laravel Scaffold
 
-## 1. 关于（未完，待续）
 “约定大于配置” 、“以机械化代替手工化作业”
 
 支持多语言，默认 {en, zh-CN}
 
-## 2. 功能（未完，待续）
+待补充... (可先按下面流程操作体验)
 
-### 2.1 migration
-- 单个数据表的 migration
+## create new laravel
 
-### 2.2 controller 部分
-- create: 创建表单
-- edit: 编辑表单
-- index: 列表
-- trashed: 回收站
-- store: 创建
-- update: 编辑
-- show: 查看详情
-- destroy: 删除
-- destroyBath: 批量删除
-- restore: 恢复（可批量）
-
-#### 2.2.1 关于目录结构
-1. `app_path()` 路径下的优先理解为管理后台。
-每个 controller 头部注释格式如下（在生成 `actions.php` 时需要用到，`zh-cn|en` 是为了做多语言）：
-```php
-/**
- * 授权管理控制器
- *
- * @package_name {zh-CN: 后台管理 | en: Admin}
- * @module_name {zh-CN: 授权管理 | en: Authorizations}
- * @controller_name {zh-CN: 授权管理 | en: Authorziation Role}
- *
- */
+```sh
+composer create-project --prefer-dist laravel/laravel "name"
 ```
 
-2. 若需要归集某个端的功能，如 App，可在 `app_path()` 下创建 App 目录
-```php
-/**
- * 部门控制器
- *
- * @package_name {zh-CN: App | en: App}
- * @module_name {zh-CN: 人事管理 | en: Personnels}
- * @controller_name {zh-CN: 部门管理 | en: Management Department}
- *
- * @package App\Http\Controllers\Personnels;
- * @author  Charsen <https://github.com/charsen>
- * @date    2019-08-20 20:39:48
- */
-```
+## 修改配置 `.env`
 
-注：在 controller 头部不写这块注释代码，`scaffold:auth` command 时不会生成到 `actions.php` 中。
+1. 开发域名
+2. 数据库配置 (需要手动先创建数据库)
 
-#### 2.2.2 controller 对应的 FormRequest 对象
-`scaffold:controleer` 时会同步生成 `FormRequest`，一个 action 对应一个 actionRules。
+## 通过 composer 安装
 
-
-### 2.3 Routes 部分
-若存在同一 url 有多种 `request method` 时，分开写，以对应不同的 `controller action`。
-
-```php
-Route::get('roles/{id}/create-personnels', 'Authorizations\AuthController@createPersonnels');
-Route::post('roles/{id}/create-personnels', 'Authorizations\AuthController@storePersonnels');
-```
-
-在权限设置时，可以在 `controller boot()` 中做转换，达到同一个关联权限设置；
-默认转换的有，在 `src/Foundation/Controller.php` 中：
-
-```php
-$transform_methods  = ['create' => 'store', 'edit' => 'update'];
-```
-
-定制转换，如：
-
-```php
-public function boot()
-{
-    // 将保存到数据库的运作 转换成 编辑的运作，这样只用做一个授权达到关联的作用
-    $transform = [
-        'updateActions'     => 'editActions',
-        'storePersonnels'   => 'createPersonnels'
-    ];
-    $this->setTransformMethods($transform);
-    $this->checkAuthorization();
-}
-```
-
-
-### 2.4 model 部分
-- boolean 自动转换
-- 整形 转 浮点数 (repository 的验证规则转换为 numeric ?)
-- 数据字典 添加 appends 及 getAttribute 函数
-
-
-### 2.5 多语言文件
-- 生成数据库表所有字段 及 模型字典字段多语言
-- resources/lang/{en, zh-CN}/model.php
-- resources/lang/{en, zh-CN}/validation.php
-
-
-### 2.6 授权文件
-- app/ACL.php （非必须，仅作为人工核查）
-- config/actions.php (内含白名单)
-- resources/lang/{en, zh-CN}/actions.php
-
-
-## 3. 安装
-通过 [composer](https://laravel-china.org/composer) 安装
 ```sh
 composer require --dev charsen/laravel-scaffold
 ```
 
-- (可选)发布配置文件到，若需要调整配置的话：
+通过命令行看是否安装成功 `Scaffold`
+
+```sh
+php artisan list
+```
+
+看到结果中有 scaffold , scaffold:api ... 等就是已经安装成功
+
+## 初始化开发者信息（自己）及初始化目录
+
+```sh
+php artisan scaffold:init "Charsen <https://github.com/charsen>"
+```
+
+## 发布配置文件 及 前端公共资源包
+
+- 将会发布 `scaffold.php` 到 `config` 目录下.
+
 ```sh
 php artisan vendor:publish --provider=Charsen\\Scaffold\\ScaffoldProvider --tag=config
 ```
-将会发布 `scaffold.php` 到 `config` 目录下.
 
-- 发布前端公共资源包到 public 目录下：
+- 发布前端公共资源包到 public 目录下
+
 ```sh
 php artisan vendor:publish --provider=Charsen\\Scaffold\\ScaffoldProvider --tag=public --force
 ```
 
+## 访问查看结果
 
-## 4. 使用方法
-### 4.1 初始化（记录编码作者及创建目录）
-- 生成的 controller, model, migration 会在注释里加上作者和日期
-```sh
-php artisan scaffold:init "`author`"
+在浏览器中打开 `http://<domain>/scaffold` , 网页正常打开，样式正常显示（因没数据，其它链接进入时均提示出错）
 
-```
+## 创建一个模块的 schema 文件
 
-**Example:**
-```
-php artisan scaffold:init "Charsen <https://github.com/charsen>"
-```
-
-
-### 4.2 创建某模块的 schema 表
-- 数据库设计及对应关系
 ```sh
 php artisan scaffold:schema `module_name`
 ```
+
 - 添加 `-f` 覆盖已存在文件
 - PS1: 暂不支持多级目录！建议：`module_name = schema_file_name`
 - PS2：`controller` 的定义，只支持 `app/Http/Controllers/` 往下 **两级**，更深的层级 **不支持**!!!
 
-**Example:**
-```
-php artisan scaffold:schema Personnels
-```
+将会生成 `schema` 文件 `+ ./scaffold/database/<module_name>.yaml`
 
-### 4.3 刷新/生成 schema 数据缓存
+设计模块下的数据表，- 具体说明详见 demo:
+
+[docs/schema_demo.yaml](https://github.com/charsen/laravel-scaffold/blob/master/docs/schema_demo.yaml)
+
+## 刷新/生成 schema 数据缓存
+
+在每次修改完 `schema` 文件后，均需要执行此命令，刷新缓存数据；
+
 ```sh
 php artisan scaffold:fresh
 ```
+
 - 添加 `-c` 清空数据后重建
-- 具体说明详见 demo [docs/schema_demo.yaml](https://github.com/charsen/laravel-scaffold/blob/master/docs/schema_demo.yaml)
 
+## 查看数据库文档
 
-### 4.4 查看数据库文档
 ```sh
-http://{{url}}}/scaffold/db
+http://<domain>/scaffold/db
 ```
+
 - 字段名称会优先从 `scaffold/database/_fields.yaml` 读取
 
 **PS：**
+
 - 此时是很好的检查表设计的环节，表名、字段、类型等等；
 - 及时调整后 `artisan scaffold:fresh` ，偶尔可以加入 `-c` 会清掉错误的缓存文件。
 
+## 创建数据迁移文件
 
-### 4.5 创建数据迁移文件
 ```sh
 php artisan scaffold:migration `schema_file_name`
 ```
+
 - `schema_file_name` 非必写，若不写会有提示做选择
 - 添加 `-m` 会执行 `php artisan migrate`
 - 添加 `--fresh` 刷新缓存数据，会先执行 `artisan scaffold:fresh`
 
+## 创建模型文件
 
-### 4.6 创建模型文件
 ```sh
 php artisan scaffold:model `schema_file_name`
 ```
+
 - `schema_file_name` 非必写，若不写会有提示做选择
 - 默认生成 Trait 文件
 - 添加 `-t` 重新生成 Trait 文件（若 model 存在时需要覆盖更新）
@@ -191,103 +117,206 @@ php artisan scaffold:model `schema_file_name`
 - 添加 `--factory` 同时生成对应的 `factory` 文件，并更新到 `database/seeds/DatabaseSeeder.php`
 - 添加 `--fresh` 刷新缓存数据，会先执行 `artisan scaffold:fresh`
 
+## 添加 资源类
 
-### 4.7 创建控制器
+创建 `Resources` 文件夹，路径：`app/Http/Resources/`
+
+`BaseResource`、`FormWidgetCollection`、`TableColumnsCollection` 已存在于 `scaffold` 中，支持自定义配置，可修改 `config/scaffold.php` 中的配置，通过自定义路径后减低 `scaffold` 与业务系统的关联性；
+
+### 接口结果基础类 `BaseResource`
+
+代码见 [BaseResource](https://github.com/charsen/laravel-scaffold/blob/master/src/Http/Resources/BaseResource.php)
+
+### 表单组件 `FormWidgetCollection`
+
+代码见 [FormWidgetCollection](https://github.com/charsen/laravel-scaffold/blob/master/src/Http/Resources/FormWidgetCollection.php)
+
+### 表格字段 `TableColumnsCollection`
+
+代码见 [TableColumnsCollection](https://github.com/charsen/laravel-scaffold/blob/master/src/Http/Resources/TableColumnsCollection.php)
+
+### 详情字段 `ColumnsCollection`
+
+代码见 [ColumnsCollection](https://github.com/charsen/laravel-scaffold/blob/master/src/Http/Resources/ColumnsCollection.php)
+
+## 创建控制器
+
+基础控制器支持自定义，可修改 `config/scaffold.php` 中的配置；
+
 ```sh
 php artisan scaffold:controller `schema_file_name`
 ```
+
 - `schema_file_name` 非必写，若不写会有提示做选择
 - 添加 `-f` 覆盖已存在文件（Request 文件不会被覆盖，需要手动删除）
 - 添加 `--fresh` 刷新缓存数据，会先执行 `artisan scaffold:fresh`
-- 同时会生成对应的 `From Request` 对象于 `app/Http/Requests/` 路径下（目录层次与 Controller 的一致）
+- 同时会生成对应的 `From Request` 对象于 `app/Http/Requests/` 路径下（目录层次与 `Controller` 的一致）
+- 若 `routes/admin.php` 不存在，则会自动生成，存在会将此次的路由规则添加进去
 
 _**!!! PS: !!!**_
-- `controller` 里的 `action` 是生成 `接口文档及调试` 的依据，`one action == one api`
+
+- `controller` 里的 `action` 是生成 `接口文档及调试` 的依据，`one action = one api`
 - 请先 **认真** 设置 `From Request` 里的验证规则，因为类里的验证规则是生成 `api` 及 `表单控件` 时的数据来源
 
+## 设置 `cors` 跨域设置
 
-### 4.8 生成接口配置文件
+修改 `config/cors.php` 加入 后台路径
+
+```php
+    //...
+    'paths' => ['admin/*', 'api/*'],
+    //...
+```
+
+## 路由设置
+
+### 注册新方法 `resourceHasTrashes`
+
+添加 `route` 的 `resourceHasTrashes` 方法，于 `app/Providers/RouteServiceProvider.php` 文件中：
+
+```php
+    //...
+    public function boot()
+    {
+        //
+        $this->registerMacros();
+
+        parent::boot();
+    }
+    //...
+    protected function registerMacros()
+    {
+        Route::macro('resourceHasTrashes', function($name, $controller) {
+            Route::get($name . '/trashed', $controller . '@trashed')->name($name . '.trashed');
+            Route::delete($name . '/forever/{id}', $controller . '@forceDestroy')->name($name . '.forceDestroy');
+            Route::delete($name . '/batch', $controller . '@destroyBatch')->name($name . '.destroyBatch');
+            Route::patch($name . '/restore', $controller . '@restore')->name($name . '.restore');
+            Route::resource($name, $controller);
+        });
+    }
+    //...
+```
+
+### 注册 `admin` 路由配置文件
+
+于 `app/Providers/RouteServiceProvider.php` 文件中，添加：
+
+```php
+    //...
+    public function map()
+    {
+        $this->mapApiRoutes();
+
+        $this->mapWebRoutes();
+
+        //
+        $this->mapAdminRoutes();
+    }
+
+    //...
+    protected function mapAdminRoutes()
+    {
+        Route::prefix('admin')
+             ->middleware('admin')
+             ->namespace($this->namespace)
+             ->group(base_path('routes/admin.php'));
+    }
+    //...
+```
+
+### 配置 `admin` 路由对应的中件间
+
+在 `app/Http/Kernel.php` 中添加
+
+```php
+    //...
+    protected $middlewareGroups = [
+        //...
+        'admin' => [
+            'throttle:60,1',
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+        ],
+        //...
+    ];
+    //...
+```
+
+## 生成接口配置文件
+
+### 第一次
+
+先手动添加目录转换文件 `scaffold/api/_menus_transform.yaml`
+
+```yaml
+###
+# 转换 api 调试工具菜单
+#
+# 一个目录一行，显示时会按此顺序
+##
+'Index': '根目录'
+'System': '系统管理'
+```
+
+### 执行命令生成接口对应的配置文件
+
+生成接口测试 `yaml` 文件，后续调整 `controller` 时，若有删减会提示需要手动去掉 `yaml` 中对应的 `action` ，若有增加则会自动追加到 `yaml` 文件。
+
 ```sh
 php artisan scaffold:api `namesapce`
 ```
+
 - `namesapce` 非必写，若不写会有提示做选择（`app/controllers` 下的某个目录，或多级目录）
 - 添加 `-f` 覆盖已存在文件
 - 添加 `-i` 忽略用 `controller` 里的 `actions` 求交集 (见下方 PS2)
 - 添加 `--fresh` 刷新缓存数据，会先执行 `artisan scaffold:fresh`
 
 **PS1:**
+
 - api 里的参数 默认通过 `From Request` 对象 `验证规则` 里读取
 - 可在 `api` 的 `yaml` 配置文件中重写 `url_params` 及 `body_params` 来覆盖默认的参数设置
 - 默认的接口名称通过 `"反射"` 控制器中动作的注释来获取
 - api demo [docs/api_demo.yaml](https://github.com/charsen/laravel-scaffold/blob/master/docs/api_demo.yaml)
 
 **PS2:**
+
 ```php
 Route::resourceHasTrashes('departments', 'Admin\\Personnels\\DepartmentController');
 ```
-- 要先设置好路由规则，程序通过 `Route::getRoutes()` 获取接口地址（但由于用了 `Route::resources`，实际可能没那么多）
+
+- 要先设置好路由规则，程序通过 `Route::getRoutes()` 获取接口地址（但由于用了 `Route::resources`，实际 `action` 可能没那么多）
 - 用路由与控制器的 `actions` 求交集，得出真实的接口
 - 生成时：默认附加新的 `action` 到对应的接口 `yaml` 文件，
-- 生成时：若有 `action` 被删减了会提醒，需要 `手工删除` 接口 `yaml` 文件中的代码
+- 生成时：若有 `action` 被删减会提醒，需要 `手工删除` 接口 `yaml` 文件中的代码
 
+## 更新 i18n 文件
 
-### 4.9 更新 i18n 文件
 ```sh
 php artisan scaffold:i18n
 ```
+
 - 添加 `--fresh` 刷新缓存数据，会先执行 `artisan scaffold:fresh`
 - 目前支持 `英文` 、`中文` 两个语种
 - 可先润色 `scaffold/database/_fields.yaml` 里的内容，此文件会自动根据数据表的字段，添加或删掉项目
 
+## 查看接口文档
 
-### 4.10 查看接口文档
+先关闭权限验证，`config/scaffold.php` 中
+
+```php
+    //...
+    'authorization' => [
+        // 是否开启 验证验证
+        'check' => FALSE,
+    //...
 ```
-http://{{url}}}/scaffold/api
+
+修改本地语言设置，`config/app.php` 中
+
+```php
+    //...
+    'locale' => 'zh-CN',
+    //...
 ```
+
+- 在浏览器中打开 `http://<domain>/scaffold/api`
 - 字段名称会优先从 `scaffold/database/_fields.yaml` 读取
-
-
-### 4.11 更新 Authorization 文件
-```sh
-php artisan scaffold:auth
-```
-- 更新 `./app/ACL.php` （可配置不生成，此文件只为了人工筛选生成的是否有错误）
-- 更新 `./resources/lang/{en, zh-CN}/actions.php`
-- 更新 `./app/config/actions.php`
-
-**PS1:**
-- 需要做授权的 `action` 必须在注释中写 `@acl {zh-CN: 中文 | en: English}` 否则会被加入白名单
-- 维护一处注释，同步多个语言文件
-
-
-### 4.12 Free : “释放双手”
-```sh
-php artisan scaffold:free  `schema_file_name`
-```
-- `schema_file_name` 非必写，若不写会有提示做选择
-- 执行 `artisan scaffold:fresh` 更新缓存数据
-- 生成 `model`, `migration` , `controller`, `api` 相关文件
-- 执行 `artisan scaffold:i18` 更新多语言文件
-- 执行 `artisan scaffold:auth` 更新权限验证文件
-- 询问是否执行 `artisan migrate` 创建数据表？
-
-
-## 5. 文档
-- schema demo [docs/schema_demo.yaml](https://github.com/charsen/laravel-scaffold/blob/master/docs/schema_demo.yaml)
-- api demo [docs/api_demo.yaml](https://github.com/charsen/laravel-scaffold/blob/master/docs/api_demo.yaml)
-
-
-## 6. Changelog
-Please see [CHANGELOG](*CHANGELOG.md*) for more information what has changed recently.
-
-
-## 7. Security
-If you discover any security related issues, please email 780537@gmail.com instead of using the issue tracker.
-
-
-## 8. Thanks
-- [Lamtin](https://github.com/Lamtin)
-
-
-## 9. License
-The MIT License (MIT). Please see [License File](*LICENSE.md*) for more information.
