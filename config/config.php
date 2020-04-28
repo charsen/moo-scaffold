@@ -67,7 +67,8 @@ return [
         'resources' => [
             'base'          => 'Charsen\Scaffold\Http\Resources\BaseResource',
             'form'          => 'Charsen\Scaffold\Http\Resources\FormWidgetCollection',
-            'colums'        => 'Charsen\Scaffold\Http\Resources\TableColumsCollection'
+            'table_columns' => 'Charsen\Scaffold\Http\Resources\TableColumnsCollection',
+            'columns'       => 'Charsen\Scaffold\Http\Resources\ColumnsCollection',
         ],
         'actions'           => 'Charsen\Scaffold\Foundation\Actions',
         'controller'        => 'Charsen\Scaffold\Foundation\Controller',

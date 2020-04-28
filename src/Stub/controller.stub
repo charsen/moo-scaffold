@@ -6,7 +6,8 @@ use App\Exceptions\BatchActionException;
 use {{request_class}};
 use {{use_base_resources}};
 use {{use_form_widgets}};
-use {{use_colums}};
+use {{use_table_columns}};
+use {{use_columns}};
 use {{model_class}};
 use {{use_base_controller}};
 
@@ -64,7 +65,7 @@ class {{class}} extends Controller
         $form_widgets = $request->getFormWidgets($this->getMethod(), $default, ['page', 'page_limit']);
 
         return BaseResource::collection($result)->additional([
-                'columns'      => new TableColumsCollection($columns),
+                'columns'      => new TableColumnsCollection($columns),
                 'form_widgets' => new FormWidgetCollection(collect($form_widgets))
             ]);
     }
@@ -89,7 +90,7 @@ class {{class}} extends Controller
         $form_widgets = $request->getFormWidgets($this->getMethod(), $default, ['page', 'page_limit']);
 
         return BaseResource::collection($result)->additional([
-                'columns'      => new TableColumsCollection($columns),
+                'columns'      => new TableColumnsCollection($columns),
                 'form_widgets' => new FormWidgetCollection(collect($form_widgets))
             ]);
     }
@@ -144,7 +145,11 @@ class {{class}} extends Controller
     {
         $result = $this->model->findOrFail($id);
 
-        return new BaseResource($result);
+        $columns = [{{index_fields}}];
+
+        return (new BaseResource($result))->additional([
+            'columns'  => new ColumnsCollection($columns)
+        ]);
     }
 
     /**
