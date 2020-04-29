@@ -25,7 +25,7 @@ class {{class}} extends Model
      * 指定字段默认值
      * @var array
      */
-    protected $attributes = [];
+    protected $attributes = [{{attributes}}];
 
      /**
      * 可以被批量赋值的属性

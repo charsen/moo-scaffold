@@ -123,6 +123,7 @@ class CreateModelGenerator extends Generator
                 'hidden'                => $this->buildHidden($hidden),
                 'fillable'              => $this->buildFillable($fields),
                 'dates'                 => $this->buildDates($fields),
+                'attributes'            => $this->buildAttributes($fields),
             ];
 
             $this->filesystem->put($model_file, $this->compileStub($meta));
@@ -161,6 +162,38 @@ class CreateModelGenerator extends Generator
             $this->filesystem->put($file, $this->buildStub($meta, $this->getStub('options-trait')));
             $this->command->info('+ ' . $this->model_relative_path . 'Traits/OptionsTrait.php');
         }
+    }
+
+    /**
+     * todo: 生成 字段 默认值
+     *
+     */
+    private function buildAttributes($fields)
+    {
+        $code = [''];
+
+        foreach ($fields as $field => $v)
+        {
+            if (isset($v['default']))
+            {
+                if ($v['default'] === '') {
+                    $default = "''";
+                } else {
+                    $default = $v['default'];
+                }
+
+                $code[] = $this->getTabs(2) . "'{$field}' => {$default},";
+            }
+        }
+
+        if (count($code) <= 1)
+        {
+            return '';
+        }
+
+        $code[] = $this->getTabs(1);
+
+        return implode(PHP_EOL, $code);
     }
 
     /**
