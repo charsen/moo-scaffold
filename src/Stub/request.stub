@@ -40,9 +40,11 @@ class {{request_name}} extends FormRequest
         return [];
     }
 
-    public function destroyRules()
+    public function destroyBatchRules()
     {
-        return [];
+        return [
+            'ids'       => ['required', 'digital_array'],
+        ];
     }
 
     public function forceDestroyRules()
@@ -50,17 +52,10 @@ class {{request_name}} extends FormRequest
         return [];
     }
 
-    public function destroyBatchRules()
-    {
-        return [
-            'ids'       => ['required', 'array'],
-        ];
-    }
-
     public function restoreRules()
     {
         return [
-            'ids'       => ['required'],
+            'ids'       => ['required', 'digital_array'],
         ];
     }
 

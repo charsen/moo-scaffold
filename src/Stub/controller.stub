@@ -157,13 +157,22 @@ class {{class}} extends Controller
      *
      * @acl {zh-CN: 删除{{entity_name}} | en: Destroy {{entity_en_name}}}
      *
-     * @param  int $id
+     * @param  \{{request_class}} $request
      * @return \App\Http\Resources\BaseResource
      */
-    public function destroy($id)
+    public function destroyBatch({{request_name}} $request)
     {
-        $result = $this->model->findOrFail($id);
-        $result->delete();
+        $validated  = $request->validated();
+        $model_ids  = is_array($validated['ids']) ? $validated['ids'] : [$validated['ids']];
+
+        $data       = $this->model->whereIn($this->model->getKeyName(), $model_ids)->get();
+        $result     = $data->map(function ($item) {
+            if ($item->delete()) return $item;
+        });
+
+        if (count($result) < 1) {
+            throw new BatchActionException('No batch operation results.');
+        }
 
         return new BaseResource($result);
     }
@@ -184,30 +193,6 @@ class {{class}} extends Controller
     }
 
     /**
-     * 批量删除
-     *
-     * @acl {zh-CN: 批量删除{{entity_name}} | en: Destroy Batch {{entity_en_name}}}
-     *
-     * @param  \{{request_class}} $request
-     * @return \App\Http\Resources\BaseResource
-     */
-    public function destroyBatch({{request_name}} $request)
-    {
-        $validated  = $request->validated();
-
-        $data       = $this->model->whereIn($this->model->getKeyName(), $validated['ids'])->get();
-        $result     = $data->map(function ($item) {
-            if ($item->delete()) return $item;
-        });
-
-        if (count($result) < 1) {
-            throw new BatchActionException('No batch operation results.');
-        }
-
-        return new BaseResource($result);
-    }
-
-    /**
      * 恢复
      *
      * @acl {zh-CN: 恢复{{entity_name}} | en: Restore {{entity_en_name}}}
@@ -218,12 +203,9 @@ class {{class}} extends Controller
     public function restore({{request_name}} $request)
     {
         $validated  = $request->validated();
+        $model_ids  = is_array($validated['ids']) ? $validated['ids'] : [$validated['ids']];
 
-        if ( ! is_array($validated['ids'])) {
-            $validated['ids'] = [$validated['ids']];
-        }
-
-        $data       = $this->model->onlyTrashed()->whereIn($this->model->getKeyName(), $validated['ids'])->get();
+        $data       = $this->model->onlyTrashed()->whereIn($this->model->getKeyName(), $model_ids)->get();
         $result     = $data->map(function ($item) {
             if ($item->restore()) {
                 return $item;
