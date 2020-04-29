@@ -213,7 +213,7 @@ class CreateApiGenerator extends Generator
      */
     private function buildOneRequest(&$code, $reflection_class, $action_name, $methods, $uri)
     {
-        $method_txt     = ['PATCH' => 'POST', 'PUT' => 'POST', 'DELETE' => 'POST', 'GET' => 'GET', 'POST' => 'POST'];
+        $method_txt     = ['PATCH' => 'PATCH', 'PUT' => 'PUT', 'DELETE' => 'DELETE', 'GET' => 'GET', 'POST' => 'POST'];
 
         foreach ($methods as $method)
         {
@@ -296,6 +296,7 @@ class CreateApiGenerator extends Generator
             preg_match('/^' . $pre_pattern . '([a-zA-Z]+)Controller@([a-zA-Z]+)/', $action_name, $result);
 
             $methods = $route->methods();
+            // 将不用到的 HEAD PATCH 删除，因 HEAD 与 GET 重叠， PATCH 与 PUT 重叠
             $delete_keys = ['HEAD', 'PATCH'];
             foreach ($delete_keys as $val)
             {
