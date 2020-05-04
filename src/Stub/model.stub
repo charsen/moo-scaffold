@@ -27,7 +27,7 @@ class {{class}} extends Model
      */
     protected $attributes = [{{attributes}}];
 
-     /**
+    /**
      * 可以被批量赋值的属性
      * @var array
      */
