@@ -28,7 +28,8 @@ class CreateControllerGenerator extends Generator
         // 从 storage 里获取控制器数据，在修改了 schema 后忘了执行 scaffold:fresh 的话会不准确！！
         $all = $this->utility->getControllers(false);
 
-        if (!isset($all[$schema_name])) {
+        if (!isset($all[$schema_name]))
+        {
             return $this->command->error("Schema File \"{$schema_name}\" could not be found.");
         }
 
@@ -59,7 +60,7 @@ class CreateControllerGenerator extends Generator
             $request_class    = "App\\Http\\Requests\\{$attr['module']['folder']}\\{$request_name}";
 
             //$namespace          = "App\\Http\\Controllers\\{$attr['package']['folder']}\\{$attr['module']['folder']}";
-            $namespace        = "App\\Http\\Controllers\\{$attr['module']['folder']}";
+            //$namespace        = "App\\Http\\Controllers\\{$attr['module']['folder']}";
             $model_class      = $this->utility->getConfig('model.path') . $attr['module']['folder'] . '/' . $attr['model_class'];
             $trait_class      = $this->utility->getConfig('model.path') . $attr['module']['folder'] . '/Traits/' . $attr['model_class'] . 'Trait';
 
@@ -78,7 +79,7 @@ class CreateControllerGenerator extends Generator
                 'module_en_name'      => $attr['module']['folder'],
                 'entity_name'         => $attr['entity_name'],
                 'entity_en_name'      => str_replace('Controller', '', $class),
-                'namespace'           => ucfirst($namespace),
+                'namespace'           => $attr['namespace'],
                 'use_base_controller' => $this->config('class.controller'),
                 'use_base_resources'  => $this->config('class.resources.base'),
                 'use_form_widgets'    => $this->config('class.resources.form'),
@@ -86,6 +87,7 @@ class CreateControllerGenerator extends Generator
                 'use_table_columns'   => $this->config('class.resources.table_columns'),
                 'class'               => $class,
                 'index_fields'        => $this->getListFields($fields),
+                'show_fields'         => $this->getShowFields($fields),
                 'trashed_fields'      => $this->getListFields($fields, true),
                 'route_key'           => strtolower($attr['model_class']),
                 'model_class'         => ucfirst(str_replace('/', '\\', $model_class)),
@@ -149,6 +151,24 @@ class CreateControllerGenerator extends Generator
 
         // 加入操作列
         $fields[] = "'options'";
+
+        return implode(', ', $fields);
+    }
+
+    /**
+     * 获取查看查询字段
+     *
+     * @param array $fields
+     * @return array
+     */
+    private function getShowFields($fields)
+    {
+        $fields = array_keys($fields);
+
+        foreach ($fields as $k => &$value)
+        {
+            $value = "'{$value}'";
+        }
 
         return implode(', ', $fields);
     }
@@ -426,6 +446,53 @@ class CreateControllerGenerator extends Generator
         $code[] = $this->getTabs(2) . "]";
 
         return implode("\n", $code);
+    }
+
+    public function buildTrait($controller, $data, $force)
+    {
+        $model_class      = $this->utility->getConfig('model.path') . $data['module']['folder'] . '/' . $data['model_class'];
+
+        $meta = [
+            'namespace'     => $data['namespace'] . '\\Traits',
+            'controller'    => $controller . '\'s',
+            'trait_class'   => str_replace('Controller', '', $controller) . 'Trait',
+            'model_class'   => str_replace('/', '\\', $model_class),
+            'author'        => $this->utility->getConfig('author'),
+            'date'          => date('Y-m-d H:i:s'),
+        ];
+
+        $folders                   = "{$data['module']['folder']}/";
+        $this->trait_path          = $this->utility->getControllerPath() . $folders . 'Traits/';
+        $this->trait_relative_path = $this->utility->getControllerPath(true) . $folders . 'Traits/';
+
+        // 检查目录是否存在，不存在则创建
+        if (!$this->filesystem->isDirectory($this->trait_path))
+        {
+            $this->filesystem->makeDirectory($this->trait_path, 0777, true, true);
+        }
+
+        $trait_file          = $this->trait_path . "{$meta['trait_class']}.php";
+        $trait_relative_file = $this->trait_relative_path . "{$meta['trait_class']}.php";
+
+        if ($this->filesystem->isFile($trait_file) && ! $force)
+        {
+            return $this->command->error('x Controller\'s Trait is existed (' . $trait_relative_file . ')');
+        }
+
+        $this->filesystem->put($trait_file, $this->compileTraitStub($meta));
+        $this->command->warn('+ ' . $trait_relative_file . ' (' . ($force ? 'Updated' : 'Added') . ')');
+    }
+
+    /**
+     * 编译 Trait 模板
+     *
+     * @param $meta
+     *
+     * @return string
+     */
+    public function compileTraitStub(array $meta)
+    {
+        return $this->buildStub($meta, $this->getStub('controller-trait'));
     }
 
     /**
