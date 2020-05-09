@@ -1,0 +1,16 @@
+<?php
+namespace {{namespace}};
+
+use {{model_class}};
+
+/**
+ * {{controller}} Trait
+ *
+ * @author  {{author}}
+ * @date    {{date}}
+ */
+trait {{trait_class}}
+{
+
+
+}

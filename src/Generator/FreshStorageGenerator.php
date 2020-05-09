@@ -66,6 +66,7 @@ class FreshStorageGenerator extends Generator
                     $controllers[$file_name][$config['controller']['class']] = [
                         'package'           => $data['package'],
                         'module'            => $data['module'],
+                        'namespace'         => "App\\Http\\Controllers\\{$data['module']['folder']}",
                         'entity_name'       => $config['attrs']['name'],
                         'table_name'        => $table_name,
                         'model_class'       => $config['model']['class'] ?? '',

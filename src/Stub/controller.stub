@@ -61,8 +61,7 @@ class {{class}} extends Controller
 
         $columns      = [{{index_fields}}];
 
-        $default      = [];
-        $form_widgets = $request->getFormWidgets($this->getMethod(), $default, ['page', 'page_limit']);
+        $form_widgets = $request->getFormWidgets($this->getMethod(), [], ['page', 'page_limit']);
 
         return BaseResource::collection($result)->additional([
                 'columns'      => new TableColumnsCollection($columns),
@@ -86,8 +85,7 @@ class {{class}} extends Controller
 
         $columns      = [{{trashed_fields}}];
 
-        $default      = [];
-        $form_widgets = $request->getFormWidgets($this->getMethod(), $default, ['page', 'page_limit']);
+        $form_widgets = $request->getFormWidgets($this->getMethod(), [], ['page', 'page_limit']);
 
         return BaseResource::collection($result)->additional([
                 'columns'      => new TableColumnsCollection($columns),
@@ -145,7 +143,7 @@ class {{class}} extends Controller
     {
         $result = $this->model->findOrFail($id);
 
-        $columns = [{{index_fields}}];
+        $columns = [{{show_fields}}];
 
         return (new BaseResource($result))->additional([
             'columns'  => new ColumnsCollection($columns)

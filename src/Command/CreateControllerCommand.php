@@ -55,6 +55,13 @@ class CreateControllerCommand extends Command
     {
         return [
             [
+                'trait',
+                '-t',
+                InputOption::VALUE_OPTIONAL,
+                'Build Trait File.',
+                false,
+            ],
+            [
                 'force',
                 '-f',
                 InputOption::VALUE_OPTIONAL,
@@ -70,7 +77,7 @@ class CreateControllerCommand extends Command
             ],
         ];
     }
-    
+
     /**
      * Execute the console command.
      *
@@ -79,27 +86,39 @@ class CreateControllerCommand extends Command
     public function handle()
     {
         $this->alert($this->title);
-    
+
         $schema_name = $this->argument('schema_name');
         if (empty($schema_name))
         {
             $file_names  = $this->utility->getSchemaNames();
             $schema_name = $this->choice('What is schema name?', $file_names);
         }
-        
+
+        $trait       = $this->option('trait') === null;
         $force       = $this->option('force') === null;
         $fresh       = $this->option('fresh') === null;
+
         if ($fresh)
         {
             $this->tipCallCommand('scaffold:fresh');
             $result = (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
-    
             $this->tipCallCommand('scaffold:controller');
         }
-        
-        $result = (new CreateControllerGenerator($this, $this->filesystem, $this->utility))
-            ->start($schema_name, $force);
-    
+
+        if ($trait)
+        {
+            $contollers = $this->utility->getControllers();
+            $controller_name = $this->choice('What is controller name?', array_keys($contollers));
+            $result = (new CreateControllerGenerator($this, $this->filesystem, $this->utility))
+                        ->buildTrait($controller_name, $contollers[$controller_name], $force);
+        }
+
+        else
+        {
+            $result = (new CreateControllerGenerator($this, $this->filesystem, $this->utility))
+                        ->start($schema_name, $force);
+        }
+
         $this->tipDone();
     }
 }
