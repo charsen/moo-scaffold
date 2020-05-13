@@ -624,6 +624,8 @@ class FreshStorageGenerator extends Generator
             $this->command->error('x clean ' . $this->storage_path_relative . ' failed!');
         }
 
+        $this->utility->addGitIgnore($this->command);
+
         return true;
     }
 }

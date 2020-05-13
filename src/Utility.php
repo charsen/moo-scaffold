@@ -24,6 +24,24 @@ class Utility
     }
 
     /**
+     * 添加 git ignore 文件
+     *
+     * @param $command
+     *
+     * @return mixed
+     */
+    public function addGitIgnore($command)
+    {
+        $file    = storage_path('scaffold/') . '.gitignore';
+        if ( ! $this->filesystem->isFile($file))
+        {
+            $this->filesystem->put($file, '*' . PHP_EOL . '!.gitignore');
+            $relative_file = str_replace(base_path(), '', $file);
+            $command->info('+ .' . $relative_file);
+        }
+    }
+
+    /**
      * 去除接口文档中动作名带有的请示方法后缀
      *
      * @param $action
