@@ -220,18 +220,17 @@ class Utility
         foreach ($dirs as $path)
         {
             $more = $this->filesystem->directories($path);
-            foreach ($more as $k =>$m)
-            {
-                if (stristr($m, 'traits'))
-                {
-                    unset ($more[$k]);
-                }
-            }
             $dirs = array_merge($dirs, $more);
         }
 
-        foreach ($dirs as &$dir)
+        foreach ($dirs as $k => &$dir)
         {
+            if (stristr($dir, 'Traits'))
+            {
+                unset ($dirs[$k]);
+                continue;
+            }
+
             $dir = str_replace($base_path, '', $dir);
         }
 
