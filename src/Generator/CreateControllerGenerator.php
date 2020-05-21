@@ -69,6 +69,7 @@ class CreateControllerGenerator extends Generator
             $fields           = $table_attrs['fields'];
             $dictionaries     = $table_attrs['dictionaries'];
             $rules            = $this->rebuildFieldsRules($fields, $dictionaries);
+            $model_class      = ucfirst(str_replace('/', '\\', $model_class));
 
             $meta               = [
                 'author'              => $this->utility->getConfig('author'),
@@ -90,7 +91,8 @@ class CreateControllerGenerator extends Generator
                 'show_fields'         => $this->getShowFields($fields),
                 'trashed_fields'      => $this->getListFields($fields, true),
                 'route_key'           => strtolower($attr['model_class']),
-                'model_class'         => ucfirst(str_replace('/', '\\', $model_class)),
+                'model_class'         => $model_class,
+                'model_key_name'      => (new $model_class)->getKeyName(),
                 'model_name'          => $attr['model_class'],
                 'request_class'       => $request_class,
                 'request_name'        => $request_name,
