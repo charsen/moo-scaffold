@@ -57,7 +57,7 @@ class {{class}} extends Controller
     {
         $validated    = $request->validated();
 
-        $result       = $this->model->orderBy($this->model->getKeyName(), 'desc')->paginate(($validated['page_limit'] ?? NULL));
+        $result       = $this->model->latest('{{model_key_name}}')->paginate(($validated['page_limit'] ?? NULL));
 
         $columns      = [{{index_fields}}];
 
@@ -81,7 +81,7 @@ class {{class}} extends Controller
     {
         $validated    = $request->validated();
 
-        $result       = $this->model->orderBy($this->model->getKeyName(), 'desc')->onlyTrashed()->paginate(($validated['page_limit'] ?? NULL));
+        $result       = $this->model->latest('{{model_key_name}}')->onlyTrashed()->paginate(($validated['page_limit'] ?? NULL));
 
         $columns      = [{{trashed_fields}}];
 
