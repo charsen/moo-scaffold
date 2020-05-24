@@ -6,7 +6,7 @@ namespace {{namespace}};
  *
  * Model $appends 添加一个键名 'options'
  */
-trait OptionsTrait
+trait Optional
 {
     /**
      * 获取单个 model 可操作的动作

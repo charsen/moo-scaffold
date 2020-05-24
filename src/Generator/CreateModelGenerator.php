@@ -75,10 +75,10 @@ class CreateModelGenerator extends Generator
             {
                 $this->command->error('x Model is existed (' . $model_relative_file . ')');
 
-                // 生成对应的 Trait
+                // 生成对应的 Trait，即使无 'get_txt_attribute' 也生成，因验证时要用到
                 if ($trait) {
                     $this->buildTrait($model_path, $trait_namespace, $trait_class, $attr['table_name'], $dictionaries_code['dictionaries'],
-                                    $dictionaries_code['get_txt_attribute'], $get_intval_attribute);
+                                      $dictionaries_code['get_txt_attribute'], $get_intval_attribute);
                 }
 
                 // 生成对应的 factory 文件并更新 Seeder
@@ -97,8 +97,8 @@ class CreateModelGenerator extends Generator
 
             // Model Trait
             $use_trait[]   = "{$trait_class}";
-            $use_trait[]   = "OptionsTrait";
-            $use_class[]   = "use " . ucfirst(str_replace('/', '\\', $this->utility->getConfig('model.path'))) . "Traits\OptionsTrait;";
+            $use_trait[]   = "Optional";
+            $use_class[]   = "use " . ucfirst(str_replace('/', '\\', $this->utility->getConfig('model.path'))) . "Traits\Optional;";
             $use_class[]   = "use {$trait_namespace}\\{$trait_class};";
 
             // 软删除
@@ -129,9 +129,9 @@ class CreateModelGenerator extends Generator
             $this->filesystem->put($model_file, $this->compileStub($meta));
             $this->command->info('+ ' . $model_relative_file);
 
-            // 生成对应的 Trait
+            // 生成对应的 Trait，即使无 'get_txt_attribute' 也生成，因验证时要用到
             $this->buildTrait($model_path, $trait_namespace, $trait_class, $meta['table_name'], $dictionaries_code['dictionaries'],
-                                $dictionaries_code['get_txt_attribute'], $get_intval_attribute);
+                              $dictionaries_code['get_txt_attribute'], $get_intval_attribute);
 
             // 生成对应的 factory 文件并更新 Seeder
             if ($factory)
@@ -150,7 +150,7 @@ class CreateModelGenerator extends Generator
             $this->filesystem->makeDirectory($path, 0777, true, true);
         }
 
-        $file = $path . 'OptionsTrait.php';
+        $file = $path . 'Optional.php';
         if ( ! $this->filesystem->isFile($file))
         {
             $namespace = $this->utility->getConfig('model.path') . 'Traits';
@@ -160,7 +160,7 @@ class CreateModelGenerator extends Generator
             ];
 
             $this->filesystem->put($file, $this->buildStub($meta, $this->getStub('options-trait')));
-            $this->command->info('+ ' . $this->model_relative_path . 'Traits/OptionsTrait.php');
+            $this->command->info('+ ' . $this->model_relative_path . 'Traits/Optional.php');
         }
     }
 

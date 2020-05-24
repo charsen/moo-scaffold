@@ -58,7 +58,7 @@ class CreateMigrationCommand extends Command
                 'migrate',
                 '-m',
                 InputOption::VALUE_OPTIONAL,
-                'Class the artisan:migrate command.',
+                'Call the artisan:migrate command.',
                 false,
             ],
             [
