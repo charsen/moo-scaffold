@@ -205,7 +205,7 @@ class FreshStorageGenerator extends Generator
     private function formatDefaultFields(&$fields)
     {
         $default_fields = [
-            'id'         => ['name' => '编号', 'type' => 'int'],
+            'id'         => ['name' => '编号', 'type' => 'bigint'], // Laravel 5.8+ use bigIncrements() instead of increments()
             'deleted_at' => ['require' => false, 'name' => '删除于', 'type' => 'timestamp', 'default' => null],
             'created_at' => ['name' => '创建于', 'type' => 'timestamp'],
             'updated_at' => ['name' => '更新于', 'type' => 'timestamp'],
