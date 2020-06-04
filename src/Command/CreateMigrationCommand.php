@@ -60,14 +60,7 @@ class CreateMigrationCommand extends Command
                 InputOption::VALUE_OPTIONAL,
                 'Call the artisan:migrate command.',
                 false,
-            ],
-            [
-                'fresh',
-                '--fresh',
-                InputOption::VALUE_OPTIONAL,
-                'Fresh all cache files.',
-                false,
-            ],
+            ]
         ];
     }
 
@@ -88,17 +81,12 @@ class CreateMigrationCommand extends Command
         }
 
         $migrate     = $this->option('migrate') === null;
-        $fresh       = $this->option('fresh') === null;
-        if ($fresh)
-        {
-            $this->tipCallCommand('scaffold:fresh');
-            (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
 
-            $this->tipCallCommand('scaffold:migration');
-        }
+        $this->tipCallCommand('scaffold:fresh');
+        (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
 
-        $result = (new CreateMigrationGenerator($this, $this->filesystem, $this->utility))
-            ->start($schema_name);
+        $this->tipCallCommand('scaffold:migration');
+        $result = (new CreateMigrationGenerator($this, $this->filesystem, $this->utility))->start($schema_name);
 
         if ($migrate)
         {
