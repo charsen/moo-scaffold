@@ -45,7 +45,8 @@ class FreshStorageGenerator extends Generator
         foreach ($yaml_files as $file)
         {
             $file      = $file->getPathname();
-            echo 'Parse: ' . str_replace(base_path(), '.', $file) . PHP_EOL;
+
+            $this->command->warn('Parse: ' . str_replace(base_path(), '.', $file) );
 
             $file_name = basename($file, '.yaml');
             if ($file_name == '_fields')

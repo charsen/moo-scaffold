@@ -184,7 +184,12 @@ class CreateMigrationGenerator extends Generator
                 // {
                 //     $one .= isset($attr['default']) ? "->default('{$attr['default']}')" : '';
                 // }
-                $one .= isset($attr['default']) ? "->default({$attr['default']})" : '';
+                //$one .= isset($attr['default']) ? "->default({$attr['default']})" : '';
+            }
+
+            if (isset($attr['default']))
+            {
+                $one .= "->default({$attr['default']})";
             }
 
             $one .= "->comment('{$attr['name']}');";
