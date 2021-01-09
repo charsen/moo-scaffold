@@ -183,12 +183,15 @@ class FormRequest extends BaseFormRequest
     /**
      * 获取模型字典字段的 In 验证规则
      *
+     * 例：在列表全部时，手动新增加了一个 0 => 'all'， 这时需要让 $append = '0'
+     *
      * @param string $filed
      * @return string
      */
-    protected function getInDict($filed): string
+    protected function getInDict($filed, $append = ''): string
     {
-        return 'in:' . $this->getDictKeys($filed);
+        $append = ($append == '') ? '' : $append . ',';
+        return 'in:' . $append . $this->getDictKeys($filed);
     }
 
     /**
