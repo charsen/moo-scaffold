@@ -1,6 +1,7 @@
 <?php
 namespace {{trait_namespace}};
 
+use DateTimeInterface;
 use App\Exceptions\ModelDictionaryException;
 
 /**
