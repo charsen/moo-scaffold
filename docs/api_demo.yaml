@@ -9,39 +9,71 @@
 # 4. 非必填、名称、默认值、描述：        field: [false, ID, 2, '描述']
 ##
 controller:
-    code: 001
+    code:
     class: Department
     name: 部门管理
-    desc: [部门管理的 api ]
+    desc: []
 actions:
-    index:
-        name: 部门列表
+    create_get:
+        name: 创建表单
+        desc: []
         prototype: ''
-        desc: []
-        request: [GET, departments]
-        url_params: []
-    store:
-        name: 添加部门
-        desc: []
-        request: [POST, departments]
-        url_params: []
-        body_params:
-            parent_id: [父级ID, '']
-            department_code: [false, 部门编号, '']
-    show:
-        name: 查看部门
-        desc: []
-        request: [GET, departments/{department}]
-        url_params: []
-    update:
-        name: 更新部门
-        desc: []
-        request: [POST, departments/{department}]
+        request: [GET, admin/departments/create]
         url_params: []
         body_params: []
-    destroy:
+    edit_get:
+        name: 编辑表单
+        desc: []
+        prototype: ''
+        request: [GET, admin/departments/{department}/edit]
+        url_params: []
+        body_params: []
+    index_get:
+        name: 部门列表
+        desc: []
+        prototype: ''
+        request: [GET, admin/departments]
+        url_params: []
+        body_params: []
+    trashed_get:
+        name: 部门回收站
+        desc: []
+        prototype: ''
+        request: [GET, admin/departments/trashed]
+        url_params: []
+        body_params: []
+    store_post:
+        name: 创建部门
+        desc: []
+        prototype: ''
+        request: [POST, admin/departments]
+        url_params: []
+        body_params: []
+    update_put:
+        name: 更新部门
+        desc: []
+        prototype: ''
+        request: [POST, admin/departments/{department}]
+        url_params: []
+        body_params: []
+    destroy_delete:
         name: 删除部门
         desc: []
-        request: [POST, departments/{department}]
+        prototype: ''
+        request: [POST, admin/departments/{department}]
+        url_params: []
+        body_params: []
+    forceDestroy_delete:
+        name: 永久删除部门
+        desc: []
+        prototype: ''
+        request: [DELETE, admin/departments/forever/{id}]
+        url_params: []
+        body_params: []
+    restore_patch:
+        name: 恢复部门
+        desc: []
+        prototype: ''
+        request: [POST, admin/departments/restore]
         url_params: []
         body_params: []

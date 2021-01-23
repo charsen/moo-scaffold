@@ -22,53 +22,77 @@
 # @date   2018-11-11 11:50
 ##
 package:
-    name: 管理后台
+    name: 后台管理
     folder: /
 module:
-    name: 人事模块
-    en: Personnels
+    name: 系统管理
+    folder: System
 tables:
-    departments:
-        model:   # 不生成时，可删除此项
-            class: Department # Eloquent 名称，可带目录，如：Personnels/Department
-        controller:  # 不生成时，可删除此项
-            class: DataController
+    system_departments:
+        model:
+            class: Department
+        controller:
+            class: DepartmentController
         attrs:
             name: 部门
-            desc: 树状结构存储企业的组织构架（行政实体）
-            remark: ['标明类型是为了便于在后续的使用中筛选出准确的数据，如：添加小区时 选择公司，选择管理处。',
-                     '1. 在企业注册时，用其公司名称，默认创建一个 department_type = 1 的总公司部分；',
-                     '2. 在后续的操作时， department_type 隐藏 =1 的选项']
+            desc: 树状结构存储企业的组织构架（行政实体），
+            remark: ['1. 系统里默认只有一个 department_type = 1 的总公司；',
+                     '2. 在后续的操作时， department_type 这个选项就没有 ==1 的时候。']
         index:
             id: { type: primary, fields: id }
+            parent_id: { type: index, fields: parent_id }
             department_name: { type: index, fields: department_name }
         fields:
-            id: { }                                                             # 为空时，使用默认配置，递增的 ID (主键)，相当于「UNSIGNED INTEGER」
-            parent_id: { name: 父级ID, type: int, default: NULL }
+            id: { }
+            parent_id: { require: false, name: 父级ID, type: int, default: null }
             _lft: { name: 左边距, type: int, default: 0 }
             _rgt: { name: 右边距, type: int, default: 0 }
-            department_code: { require: false, name: 部门编号, type: varchar }
-            department_type: { name: 部门类型, type: tinyint, default: 3 }
-            department_name: { unique: true, name: 部门名称, type: varchar, size: '2,128' }      # size: 用 | 分割两个数字时，第一个表示最小长度（会生成验证），第二个表示最大长度
-            department_status: { name: 部门状态, type: tinyint, default: 7 }
-            deleted_at: { }                                                     # 为空时，使用默认配置
-            created_at: { }                                                     # 为空时，使用默认配置
-            updated_at: { }                                                     # 为空时，使用默认配置
-        dictionaries:             # 生成 model 时，会在 appends 中添加 status_txt, 同时生成 getStatusTxtAttribute()，支持多语言
+            department_code: { require: false, unique: true, name: 部门编号, type: varchar }
+            department_type: { name: 部门类型, type: tinyint, default: 4 }
+            department_name: { unique: true, name: 部门名称, type: varchar, size: '2,128' }
+            department_abbreviation: { require: false, unique: true, name: 部门简称, type: varchar }
+            deleted_at: { }
+            created_at: { }
+            updated_at: { }
+        dictionaries:
             department_type:
-                head_office: [1, head office, 总公司 ]
-                branch_office: [2, branch office, 分公司 ]
-                department_office: [3, department office, 部门 ]
-            department_status:
-                canceled: [2, canceled, 撤销 ]
-                normal: [7, normal, 正常 ]
+                head_office: [1, head office, 总公司]
+                branch_office: [2, branch office, 分公司]
+                department_office: [3, department office, 部门]
+                team: [4, team, 团队]
 
 
-    personnels:
+    system_positions:
         model:
-            class: Personnels/Personnel
+            class: Position
         controller:
-            class: Personnels/Personnel
+            class: PositionController
+        attrs:
+            name: 岗位
+            desc: 存储岗位基础信息
+        index:
+            id: { type: primary, fields: id }
+            position_name: { type: index, fields: 'position_name' }
+        fields:
+            id: { }
+            department_id: { name: 部门ID, type: int }
+            position_code: { require: false, unique: true, name: 岗位编号, type: varchar, size: '2,32' }
+            position_name: { unique: true, name: 岗位名称, type: varchar, size: '2,64' }
+            position_status: { name: 岗位状态, type: tinyint, default: 7, desc: '{2: 撤销, 7: 正常}' }
+            deleted_at: { }
+            created_at: { }
+            updated_at: { }
+        dictionaries:
+            position_status:
+                canceled: [2, canceled, 撤销]
+                normal: [7, normal, 正常]
+
+
+    system_personnels:
+        model:
+            class: Personnel
+        controller:
+            class: PersonnelController
         attrs:
             name: 人员
             desc: 存储企业的员工信息、员工帐号信息;
@@ -78,48 +102,130 @@ tables:
             real_name: { type: index, fields: real_name }
         fields:
             id: { }
-            real_name: { name: 姓名, type: varchar, size: 32, }
-            id_card_number: { require: false, name: 身份证号码, type: varchar, size: '3,32' }
+            real_name: { name: 姓名, type: varchar, size: '2,128' }
+            avatar: { require: false, name: 头像, type: varchar, size: 192 }
             birthday: { require: false, name: 生日, type: date }
             gender: { name: 姓别, type: tinyint, default: 1 }
-            mobile: { unique: true, name: 手机, type: varchar, size: 16 }
-            email: { require: false, name: 邮箱, type: varchar, size: 128 }
-            wechat_id: { require: false, name: 微信号, type: varchar, size: 128 }
-            staff_code: { require: false, name: 员工编号, type: varchar, size: 32 }
+            mobile: { unique: true, name: 手机, type: varchar, size: '6,32' }
+            email: { require: false, unique: true, name: 邮箱, type: varchar, size: 128 }
+            staff_code: { require: false, unique: true, name: 编号, type: varchar, size: 32 }
             staff_status: { name: 状态, type: tinyint, default: 7 }
             entry_at: { require: false, name: 入职时间, type: date }
             leave_at: { require: false, name: 离职时间, type: date }
             password: { require: false, name: 登陆密码, type: varchar, size: 128 }
+            last_token: { require: false, name: 上次登陆令牌, type: varchar, size: 512 }
             last_logined_at: { require: false, name: 上次登陆时间, type: timestamp }
             last_logined_ip: { require: false, name: 上次登陆IP, type: varchar, size: 128 }
             last_logined_endpoint: { name: 上次登陆端点, type: tinyint, default: 1 }
             login_times: { name: 登陆次数, type: int, default: 0 }
             created_account_at: { require: false, name: 帐号创建于, type: timestamp }
             account_status: { require: false, name: 帐号状态, type: tinyint, default: 3, desc: 当设置了离职时间，帐号状态要更新为：锁定}
-            is_root: { require: false, name: 是否为超级管理员, type: tinyint, default: 0 }
             deleted_at: { }
             created_at: { }
             updated_at: { }
         dictionaries:
-            is_root:
-                is_root: [1, root, 超级管理员 ]
-                is_not_root: [2, is't root, 非超级管理员 ]
             gender:
-                male: [1, male, 男士 ]
-                female: [2, female, 女士 ]
+                secret: [1, secret, 保密]
+                male: [2, male, 男士]
+                female: [3, female, 女士]
             staff_status:
                 leave_office: [3, leave office, 离职]
                 retired: [5, retired, 退修]
-                stored: [6, retired, 后备]
-                on_job: [7, retired, 在职]
+                stored: [6, stored, 后备]
+                on_job: [7, on job, 在职]
             last_logined_endpoint:
-                never_login: [1, never login, 未登陆 ]
-                app: [2, app, App ]
-                wechat: [3, wechat, 微信 ]
-                alipay: [4, alipay, 支付宝 ]
-                web: [5, web, 网站 ]
+                never_login: [1, Never Login, 未登陆]
+                app: [2, App, App]
+                wechat: [3, Wechat, 微信]
+                alipay: [4, Alipay, 支付宝]
+                web: [5, web, 网站]
             account_status:
-                forbidden: [2, forbidden, 禁用 ]
-                initial: [3, initial, 初始化 ]
-                locked: [4, locked, 锁定 ]
-                normal: [7, normal, 正常 ]
+                forbidden: [2, forbidden, 禁用]
+                initial: [3, initial, 初始化]
+                locked: [4, locked, 锁定]
+                normal: [7, normal, 正常]
+
+
+    system_personnel_reset_password:
+        attrs:
+            name: 人员重置密码
+            desc: 通过手机号重置密码
+        index:
+            id: { type: primary, fields: id }
+        fields:
+            id: { }
+            mobile: { name: 手机, type: varchar, size: 16 }
+            captcha: { name: 验证码, type: varchar, size: 16 }
+            expires_in: { name: 有效时间, type: int, default: 600, desc: '单位: 秒'}
+            reset_status: { name: 重置状态, type: tinyint, default: 7 }
+            created_at: { }
+            updated_at: { }
+        dictionaries:
+            reset_status:
+                expired: [3, expired, 已过期]
+                used: [5, used, 已使用]
+                unused: [7, unused, 未使用]
+
+
+    system_personnel_position:
+        model:
+            class: PersonnelPosition
+        attrs:
+            name: 人员部门岗位关系
+            desc: 存储人员与部门、岗位的对应信息
+        index:
+            id: { type: primary, fields: id }
+            department_id: { type: index, fields: department_id }
+            position_id: { type: index, fields: position_id }
+            personnel_id: { type: index, fields: personnel_id }
+        fields:
+            id: { }
+            department_id: { name: 部门ID, type: int}
+            position_id: { name: 岗位ID, type: int}
+            personnel_id: { name: 人员ID, type: int}
+            deleted_at: { }
+            created_at: { }
+            updated_at: { }
+
+
+    system_roles:
+        model:
+            class: Role
+        controller:
+            class: RoleController
+        attrs:
+            name: 角色
+            desc: 存储授权角色信息
+            remark: ['']
+        index:
+            id: { type: primary, fields: id }
+            role_name: { type: index, fields: role_name }
+        fields:
+            id: { }
+            role_name: { unique: true, name: 角色名称, type: varchar, size: '2,32' }
+            role_remark: { require: false, name: 角色备注, type: varchar, size: 192 }
+            role_actions: { require: false, name: 角色动作, type: text }
+            deleted_at: { }
+            created_at: { }
+            updated_at: { }
+
+
+    system_personnel_role:
+        model:
+            class: PersonnelRole
+        controller:
+            class: AuthorizationController
+        attrs:
+            name: 人员角色
+            desc: 存储各位人员所授权的角色
+            remark: [ '一位员工可拥有多个角色，叠加多个角色的动作权限。']
+        index:
+            id: { type: primary, fields: id }
+            personnel_id: { type: index, fields: personnel_id }
+            role_id: { type: index, fields: role_id }
+        fields:
+            id: { }
+            personnel_id: { name: 人员ID, type: int }
+            role_id: { name: 角色ID, type: int }
+            created_at: { }
+            updated_at: { }
