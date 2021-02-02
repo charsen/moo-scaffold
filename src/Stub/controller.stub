@@ -57,7 +57,8 @@ class {{class}} extends Controller
     {
         $validated    = $request->validated();
 
-        $result       = $this->model->latest('{{model_key_name}}')->paginate(($validated['page_limit'] ?? NULL));
+        $fields       = [{{index_fields}}];
+        $result       = $this->model->select($fields)->latest('{{model_key_name}}')->paginate(($validated['page_limit'] ?? NULL));
 
         $columns      = [{{index_fields}}];
 
@@ -81,7 +82,8 @@ class {{class}} extends Controller
     {
         $validated    = $request->validated();
 
-        $result       = $this->model->latest('{{model_key_name}}')->onlyTrashed()->paginate(($validated['page_limit'] ?? NULL));
+        $fields       = [{{index_fields}}];
+        $result       = $this->model->select($fields)->latest('{{model_key_name}}')->onlyTrashed()->paginate(($validated['page_limit'] ?? NULL));
 
         $columns      = [{{trashed_fields}}];
 
@@ -105,8 +107,7 @@ class {{class}} extends Controller
     {
         $validated = $request->validated();
 
-        $result = new $this->model($validated);
-        $result->save();
+        $result    = $this->model->create($validated);
 
         return new BaseResource($result);
     }
@@ -141,7 +142,8 @@ class {{class}} extends Controller
      */
     public function show($id)
     {
-        $result = $this->model->findOrFail($id);
+        $fields  = [{{index_fields}}];
+        $result  = $this->model->select($fields)->findOrFail($id);
 
         $columns = [{{show_fields}}];
 
@@ -155,16 +157,33 @@ class {{class}} extends Controller
      *
      * @acl {zh-CN: 删除{{entity_name}} | en: Destroy {{entity_en_name}}}
      *
+     * @param  int $id
+     * @return \App\Http\Resources\BaseResource
+     */
+    public function destroy($id)
+    {
+        $result = $this->model->findOrFail($id);
+        $result->delete();
+
+        return new BaseResource($result);
+    }
+
+    /**
+     * 批量删除
+     *
+     * @acl {zh-CN: 批量删除{{entity_name}} | en: Destroy Batch {{entity_en_name}}}
+     *
      * @param  \{{request_class}} $request
      * @return \App\Http\Resources\BaseResource
      */
     public function destroyBatch({{request_name}} $request)
     {
-        $validated  = $request->validated();
-        $model_ids  = is_array($validated['ids']) ? $validated['ids'] : [$validated['ids']];
+        $validated   = $request->validated();
+        $model_ids   = is_array($validated['ids']) ? $validated['ids'] : [$validated['ids']];
 
-        $data       = $this->model->whereIn($this->model->getKeyName(), $model_ids)->get();
-        $result     = $data->map(function ($item) {
+        $primary_key = $this->model->getKeyName();
+        $data        = $this->model->select([$primary_key])->whereIn($primary_key, $model_ids)->get();
+        $result      = $data->map(function ($item) {
             if ($item->delete()) return $item;
         });
 
@@ -200,11 +219,12 @@ class {{class}} extends Controller
      */
     public function restore({{request_name}} $request)
     {
-        $validated  = $request->validated();
-        $model_ids  = is_array($validated['ids']) ? $validated['ids'] : [$validated['ids']];
+        $validated   = $request->validated();
+        $model_ids   = is_array($validated['ids']) ? $validated['ids'] : [$validated['ids']];
 
-        $data       = $this->model->onlyTrashed()->whereIn($this->model->getKeyName(), $model_ids)->get();
-        $result     = $data->map(function ($item) {
+        $primary_key = $this->model->getKeyName();
+        $data        = $this->model->select([$primary_key])->onlyTrashed()->whereIn($primary_key, $model_ids)->get();
+        $result      = $data->map(function ($item) {
             if ($item->restore()) {
                 return $item;
             }
