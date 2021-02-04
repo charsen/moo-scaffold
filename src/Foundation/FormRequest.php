@@ -107,7 +107,7 @@ class FormRequest extends BaseFormRequest
                     continue;
                 }
 
-                if (preg_match('/^in\:[0-9\,]+$/i', $r))
+                if (preg_match('/^in\:[a-z0-9\,]+$/i', $r))
                 {
                     // 判断 model 的字典字段
                     if (property_exists($this, "init_" . $field_name))
