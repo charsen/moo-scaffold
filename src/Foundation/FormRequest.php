@@ -77,7 +77,7 @@ class FormRequest extends BaseFormRequest
 
             $tmp = [
                 'name'      => $field_name,
-                'required'  => ! in_array('nullable',  $rules), //! (in_array('sometimes', $rules) OR in_array('nullable',  $rules)),
+                'required'  => in_array('required',  $rules), //! (in_array('sometimes', $rules) OR in_array('nullable',  $rules)),
                 'rules'     => $frontend_rules[$field_name] ?? [],
             ];
 
