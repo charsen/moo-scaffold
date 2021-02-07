@@ -1,0 +1,89 @@
+<?php
+
+namespace App\Http\Controllers\Traits;
+
+use App\Http\Resources\BaseResource;
+use App\Exceptions\BatchActionException;
+
+/**
+ * 基础类
+ *
+ * @package App\Http\Controllers\Traits;
+ * @author  Charsen <https://github.com/charsen>
+ * @date    2021-02-05 90:10:21
+ */
+trait BaseActionTrait
+{
+    /**
+     * 删除
+     *
+     * @param  int $id
+     * @return \App\Http\Resources\BaseResource
+     */
+    private function destroyAction($id)
+    {
+        $result = $this->model->findOrFail($id);
+        $result->delete();
+
+        return new BaseResource($result);
+    }
+
+    /**
+     * 批量删除
+     *
+     * @param  $request
+     * @return \App\Http\Resources\BaseResource
+     */
+    private function destroyBatchAction($request)
+    {
+        $validated  = $request->validated();
+        $model_ids  = is_array($validated['ids']) ? $validated['ids'] : [$validated['ids']];
+
+        $data       = $this->model->whereIn($this->model->getKeyName(), $model_ids)->get();
+        $result     = $data->map(function ($item) {
+            if ($item->delete()) return $item;
+        });
+
+        abort_if((count($result) < 1), 422, 'No batch operation results.');
+
+        return new BaseResource($result);
+    }
+
+    /**
+     * 永久删除
+     *
+     * @param  int $id
+     * @return \App\Http\Resources\BaseResource
+     */
+    private function forceDestroyAction($id)
+    {
+        $result = $this->model->onlyTrashed()->findOrFail($id);
+        $result->forceDelete();
+
+        return new BaseResource($result);
+    }
+
+    /**
+     * 恢复
+     *
+     * @param  $request
+     * @return \App\Http\Resources\BaseResource
+     */
+    private function restoreAction($request)
+    {
+        $validated  = $request->validated();
+        $model_ids  = is_array($validated['ids']) ? $validated['ids'] : [$validated['ids']];
+
+        $data       = $this->model->onlyTrashed()->whereIn($this->model->getKeyName(), $model_ids)->get();
+        $result     = $data->map(function ($item) {
+            if ($item->restore()) {
+                return $item;
+            }
+        });
+
+        abort_if((count($result) < 1), 422, 'No batch operation results.');
+
+        return new BaseResource($result);
+    }
+
+}
