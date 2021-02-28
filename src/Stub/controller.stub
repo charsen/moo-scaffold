@@ -2,13 +2,13 @@
 
 namespace {{namespace}};
 
-use App\Exceptions\BatchActionException;
+use {{model_class}};
+use {{use_columns}};
 use {{request_class}};
-use {{use_base_resources}};
+use {{use_base_action}};
 use {{use_form_widgets}};
 use {{use_table_columns}};
-use {{use_columns}};
-use {{model_class}};
+use {{use_base_resources}};
 use {{use_base_controller}};
 
 /**
@@ -24,6 +24,8 @@ use {{use_base_controller}};
  */
 class {{class}} extends Controller
 {
+    use BaseActionTrait;
+
     protected $model;
 
     /**
@@ -162,10 +164,7 @@ class {{class}} extends Controller
      */
     public function destroy($id)
     {
-        $result = $this->model->findOrFail($id);
-        $result->delete();
-
-        return new BaseResource($result);
+        return $this->destroyAction($id);
     }
 
     /**
@@ -178,20 +177,7 @@ class {{class}} extends Controller
      */
     public function destroyBatch({{request_name}} $request)
     {
-        $validated   = $request->validated();
-        $model_ids   = is_array($validated['ids']) ? $validated['ids'] : [$validated['ids']];
-
-        $primary_key = $this->model->getKeyName();
-        $data        = $this->model->select([$primary_key])->whereIn($primary_key, $model_ids)->get();
-        $result      = $data->map(function ($item) {
-            if ($item->delete()) return $item;
-        });
-
-        if (count($result) < 1) {
-            throw new BatchActionException('No batch operation results.');
-        }
-
-        return new BaseResource($result);
+        return $this->destroyBatchAction($request);
     }
 
     /**
@@ -203,10 +189,7 @@ class {{class}} extends Controller
      */
     public function forceDestroy($id)
     {
-        $result = $this->model->onlyTrashed()->findOrFail($id);
-        $result->forceDelete();
-
-        return new BaseResource($result);
+        return $this->forceDestroyAction($id);
     }
 
     /**
@@ -219,22 +202,7 @@ class {{class}} extends Controller
      */
     public function restore({{request_name}} $request)
     {
-        $validated   = $request->validated();
-        $model_ids   = is_array($validated['ids']) ? $validated['ids'] : [$validated['ids']];
-
-        $primary_key = $this->model->getKeyName();
-        $data        = $this->model->select([$primary_key])->onlyTrashed()->whereIn($primary_key, $model_ids)->get();
-        $result      = $data->map(function ($item) {
-            if ($item->restore()) {
-                return $item;
-            }
-        });
-
-        if (count($result) < 1) {
-            throw new BatchActionException('No batch operation results.');
-        }
-
-        return new BaseResource($result);
+        return $this->restoreAction($request);
     }
 
     /**
