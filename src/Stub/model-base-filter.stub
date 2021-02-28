@@ -1,0 +1,82 @@
+<?php
+namespace {{namespace}};
+
+use EloquentFilter\ModelFilter;
+
+/**
+ * Model Base Filter Class
+ *
+ * @package {{namespace}}
+ * @author  Charsen <https://github.com/charsen>
+ * @date    2021-02-05 08:11:07
+ */
+class BaseFilter extends ModelFilter
+{
+    /**
+     * Drop `_id` from the end of input keys when referencing methods.
+     *
+     * @var bool
+     */
+    protected $drop_id = false;
+
+    /**
+     * Convert input keys to camelCase
+     * Ex: my_awesome_key will be converted to myAwesomeKey($value).
+     *
+     * @var bool
+     */
+    protected $camel_cased_methods = true;
+
+    /**
+     * Overwrite!!!
+     *
+     * Remove empty strings from the input array.
+     *
+     * @param array $input
+     * @return array
+     */
+    public function removeEmptyInput($input)
+    {
+        $filterableInput = [];
+
+        foreach ($input as $key => $val) {
+            // add by charsen
+            if ($key == 'page' OR $key == 'page_limit') {
+                continue;
+            }
+
+            if ($val !== '' && $val !== null) {
+                $filterableInput[$key] = $val;
+            }
+        }
+
+        return $filterableInput;
+    }
+
+    /**
+     * Overwrite!!!
+     *
+     * Filters by a relationship that isn't joined by using that relation's ModelFilter.
+     *
+     * @param $related
+     */
+    public function filterUnjoinedRelation($related)
+    {
+        $this->query->whereHasIn($related, function ($q) use ($related) {
+            $this->callRelatedLocalSetup($related, $q);
+
+            // If we defined it locally then we're running the closure on the related model here right.
+            foreach ($this->getLocalRelation($related) as $closure) {
+                // Run in context of the related model locally
+                $closure($q);
+            }
+
+            if (count($filterableRelated = $this->getRelatedFilterInput($related)) > 0) {
+                $q->filter($filterableRelated);
+            }
+
+            return $q;
+        });
+    }
+
+}

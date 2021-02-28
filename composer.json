@@ -17,8 +17,10 @@
     ],
     "require": {
         "php": "^7.2",
+        "dcat/laravel-wherehasin": "^0.5.0",
         "illuminate/console": "~5.8.0|^6.0|^7.0",
         "illuminate/support": "~5.8.0|^6.0|^7.0",
+        "tucker-eric/eloquentfilter": "^2.4",
         "symfony/yaml": "^5.0"
     },
     "require-dev": {
