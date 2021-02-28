@@ -1,10 +1,10 @@
 <?php
 namespace Charsen\Scaffold\Command;
 
-use Charsen\Scaffold\Generator\CreateControllerGenerator;
-use Charsen\Scaffold\Generator\FreshStorageGenerator;
-use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Input\InputArgument;
+use Charsen\Scaffold\Generator\FreshStorageGenerator;
+use Charsen\Scaffold\Generator\CreateControllerGenerator;
 
 /**
  * Create Controller Command
@@ -87,6 +87,9 @@ class CreateControllerCommand extends Command
     {
         $this->alert($this->title);
 
+        // 创建 BaseActionTriat
+        (new CreateControllerGenerator($this, $this->filesystem, $this->utility))->buildBaseAction();
+
         $schema_name = $this->argument('schema_name');
         if (empty($schema_name))
         {
@@ -112,7 +115,6 @@ class CreateControllerCommand extends Command
             $result = (new CreateControllerGenerator($this, $this->filesystem, $this->utility))
                         ->buildTrait($controller_name, $contollers[$controller_name], $force);
         }
-
         else
         {
             $result = (new CreateControllerGenerator($this, $this->filesystem, $this->utility))

@@ -42,14 +42,16 @@ class CreateControllerGenerator extends Generator
             $folders                 = "{$attr['module']['folder']}/";
 
             // 检查目录是否存在，不存在则创建
-            if (!$this->filesystem->isDirectory($this->controller_path . $folders)) {
+            if (!$this->filesystem->isDirectory($this->controller_path . $folders))
+            {
                 $this->filesystem->makeDirectory($this->controller_path . $folders, 0777, true, true);
             }
 
             $controller_file          = $this->controller_path . $folders . "{$class}.php";
             $controller_relative_file = $this->controller_relative_path . "{$class}.php";
 
-            if ($this->filesystem->isFile($controller_file) && ! $force) {
+            if ($this->filesystem->isFile($controller_file) && ! $force)
+            {
                 $this->command->error('x Controller is existed (' . $controller_relative_file . ')');
                 continue;
             }
@@ -81,6 +83,7 @@ class CreateControllerGenerator extends Generator
                 'entity_name'         => $attr['entity_name'],
                 'entity_en_name'      => str_replace('Controller', '', $class),
                 'namespace'           => $attr['namespace'],
+                'use_base_action'     => 'App\\Http\\Controllers\\Traits\\BaseActionTrait',     // TODO: 下个大版本优化！
                 'use_base_controller' => $this->config('class.controller'),
                 'use_base_resources'  => $this->config('class.resources.base'),
                 'use_form_widgets'    => $this->config('class.resources.form'),
@@ -483,6 +486,37 @@ class CreateControllerGenerator extends Generator
 
         $this->filesystem->put($trait_file, $this->compileTraitStub($meta));
         $this->command->warn('+ ' . $trait_relative_file . ' (' . ($force ? 'Updated' : 'Added') . ')');
+    }
+
+    /**
+     * 检查 BaseAction 是否存在，不存在则创建
+     * @return void
+     */
+    public function buildBaseAction()
+    {
+        $path       = $this->utility->getControllerPath() . 'Traits/';
+        $base_file  = $path . 'BaseActionTrait.php';
+
+        // 检查目录是否存在，不存在则创建
+        if (!$this->filesystem->isDirectory($path))
+        {
+            $this->filesystem->makeDirectory($path, 0777, true, true);
+        }
+
+        // 检查文件是否存在，不存在则创建
+        if ( ! $this->filesystem->isFile($base_file))
+        {
+            $data      = [
+                'namespace' => str_replace('/', '\\', 'App/Http/Controllers/Traits')
+            ];
+
+            $content = $this->buildStub($data, $this->getStub('base-action-trait'));
+            $this->filesystem->put($base_file, $content);
+
+            $this->command->info('+ ' . $this->utility->getControllerPath(true) . '/Traits/BaseActionTrait.php');
+        }
+
+        return true;
     }
 
     /**

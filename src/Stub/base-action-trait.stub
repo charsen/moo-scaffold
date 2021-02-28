@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Traits;
 
+use InvalidArgumentException;
 use App\Http\Resources\BaseResource;
-use App\Exceptions\BatchActionException;
 
 /**
  * 基础类
@@ -39,7 +39,8 @@ trait BaseActionTrait
         $validated  = $request->validated();
         $model_ids  = is_array($validated['ids']) ? $validated['ids'] : [$validated['ids']];
 
-        $data       = $this->model->whereIn($this->model->getKeyName(), $model_ids)->get();
+        // $data       = $this->model->whereIn($this->model->getKeyName(), $model_ids)->get();
+        $data       = $this->model->whereKey($model_ids)->get();
         $result     = $data->map(function ($item) {
             if ($item->delete()) return $item;
         });
@@ -74,7 +75,7 @@ trait BaseActionTrait
         $validated  = $request->validated();
         $model_ids  = is_array($validated['ids']) ? $validated['ids'] : [$validated['ids']];
 
-        $data       = $this->model->onlyTrashed()->whereIn($this->model->getKeyName(), $model_ids)->get();
+        $data       = $this->model->onlyTrashed()->whereKey($model_ids)->get();
         $result     = $data->map(function ($item) {
             if ($item->restore()) {
                 return $item;
