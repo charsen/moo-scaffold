@@ -1,17 +1,18 @@
 <?php
 namespace Charsen\Scaffold;
 
+use Illuminate\Support\ServiceProvider;
 use Charsen\Scaffold\Command\FreeCommand;
 use Charsen\Scaffold\Command\InitCommand;
-use Charsen\Scaffold\Command\UpdateAuthorizationCommand;
-use Charsen\Scaffold\Command\UpdateMultilingualCommand;
-use Charsen\Scaffold\Command\CreateMigrationCommand;
+use Charsen\Scaffold\Command\CreateApiCommand;
 use Charsen\Scaffold\Command\CreateModelCommand;
 use Charsen\Scaffold\Command\CreateSchemaCommand;
-use Charsen\Scaffold\Command\CreateControllerCommand;
 use Charsen\Scaffold\Command\FreshStorageCommand;
-use Charsen\Scaffold\Command\CreateApiCommand;
-use Illuminate\Support\ServiceProvider;
+use Charsen\Scaffold\Command\CreateMigrationCommand;
+use Charsen\Scaffold\Command\CreateControllerCommand;
+use Charsen\Scaffold\Command\CreateModelFilterCommand;
+use Charsen\Scaffold\Command\UpdateMultilingualCommand;
+use Charsen\Scaffold\Command\UpdateAuthorizationCommand;
 
 /**
  * Laravel Scaffold Service Provider
@@ -49,6 +50,7 @@ class ScaffoldProvider extends ServiceProvider
                 FreshStorageCommand::class,
                 CreateMigrationCommand::class,
                 CreateModelCommand::class,
+                CreateModelFilterCommand::class,
                 CreateControllerCommand::class,
                 UpdateMultilingualCommand::class,
                 CreateApiCommand::class,

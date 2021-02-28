@@ -1,9 +1,9 @@
 <?php
 namespace Charsen\Scaffold;
 
-use Illuminate\Filesystem\Filesystem;
 use InvalidArgumentException;
 use Symfony\Component\Yaml\Yaml;
+use Illuminate\Filesystem\Filesystem;
 
 /**
  * Laravel Scaffold Utility
@@ -583,7 +583,6 @@ class Utility
     /**
      * Get App Route Path
      *
-     * @param $folder
      * @param $relative
      *
      * @return string
@@ -591,6 +590,20 @@ class Utility
     public function getRoutePath($relative = false)
     {
         $path = base_path('routes/');
+
+        return $relative ? str_replace(base_path(), '.', $path) : $path;
+    }
+
+    /**
+     * Get App Route Path
+     *
+     * @param $relative
+     *
+     * @return string
+     */
+    public function getFilterPath($relative = false)
+    {
+        $path = base_path($this->getConfig('model.path')) . 'Filters/';
 
         return $relative ? str_replace(base_path(), '.', $path) : $path;
     }
