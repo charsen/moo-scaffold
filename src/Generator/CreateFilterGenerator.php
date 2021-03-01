@@ -83,10 +83,16 @@ class CreateFilterGenerator extends Generator
         // 添加 modelFilter()
         if ( ! strstr($file_code, 'public function modelFilter()'))
         {
-            $is_updated  = true;
-            $file_code                  = \file($model_file);
-            $count_line                 = count($file_code);
-            $file_code[$count_line - 1] = $this->getModelFilterFunction($filter_class) . "\n\n}\n";
+            $is_updated = true;
+            $file_code  = \file($model_file);
+            $count_line = count($file_code);
+
+            $i = 1;
+            while (trim($file_code[$count_line - $i]) != '}')
+            {
+                $i++;
+            }
+            $file_code[$count_line - $i] = $this->getModelFilterFunction($filter_class) . "\n\n}\n";
 
             $this->filesystem->put($model_file, $file_code);
         }
