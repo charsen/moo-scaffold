@@ -34,7 +34,7 @@ class CreateFilterGenerator extends Generator
         $filter_class    = $model_name . 'Filter';
 
         $this->buildFilter($model_path, $folder, $model_name, $namespace, $filter_class);
-        $this->updateModelFile($folder, $model_file, $namespace, $filter_class);
+        $this->updateModelFile($folder, $model_file, $namespace, $model_name, $filter_class);
 
         return true;
     }
@@ -45,15 +45,17 @@ class CreateFilterGenerator extends Generator
      * @param string $model_file
      * @return void
      */
-    public function updateModelFile($folder, $model_file, $namespace, $filter_class)
+    public function updateModelFile($folder, $model_file, $namespace, $model_name, $filter_class)
     {
         $file_code         = $this->filesystem->get($model_file);
 
+        $is_updated        = false;
         $use_filterable    = 'use EloquentFilter\Filterable;';
         $use_filter_classs = 'use ' . $namespace . '\\' . $filter_class . ';';
 
         if ( ! strstr($file_code, $use_filterable))
         {
+            $is_updated  = true;
             $target_code = 'use Illuminate\Database\Eloquent\Model;';
             $append_code =  $target_code . "\n" . $use_filterable . "\n" . $use_filter_classs;
 
@@ -64,37 +66,40 @@ class CreateFilterGenerator extends Generator
         if ( ! strstr($file_code, $use_filter_alias))
         {
             // 要考虑 没有 use trait 的情况
-            // preg_match('/use\s[A-Za-z\,\s]*Filterable[A-Za-z\,\s]*\;/', $file_code, $match);
-            // var_dump($match);
-            preg_match('/extends Model\s*{/', $file_code, $match);
-            $target_code = $match[0];
-            $append_code = $target_code . "\n" . $this->getTabs(1) . $use_filter_alias;
+            if ( ! preg_match('/use\s[A-Za-z\,\s]*Filterable[A-Za-z\,\s]*\;/', $file_code, $match))
+            {
+                $is_updated  = true;
+                preg_match('/extends Model\s*{/', $file_code, $match);
+                $target_code = $match[0];
+                $append_code = $target_code . "\n" . $this->getTabs(1) . $use_filter_alias;
 
-            $file_code   = str_replace($target_code, $append_code, $file_code);
+                $file_code   = str_replace($target_code, $append_code, $file_code);
+            }
         }
 
-        if ( ! strstr($file_code, 'public function modelFilter()'))
-        {
-            // $file_code = trim($file_code, " \t\n\r\0\x0B\}");
-            // 在第一个函数前增加 (TODO: 只能通过反向解析类文件来做！！！)
-            // preg_match('/(public|private|protected)+\s*function\s+[A-Za-z\s]+\(.*?\}/s', $file_code, $match);
-            // var_dump($match);
-            // if (empty($match))
-            // {
-            //     $this->command->warn('Can not append modelFilter function!! ');
-            // }
-            // else
-            // {
-            //     $target_code = $match[0];
-            //     $append_code = $target_code . "\n" . $this->getTabs(1) . $this->getModelFilterFunction($filter_class);
-            //     //$file_code   = str_replace($target_code, $append_code, $file_code);
-            // }
-        }
-
+        // 先写入文件，再用 file() 方法添加 modelFilter 到倒数第二行
         $this->filesystem->put($model_file, $file_code);
 
+        // 添加 modelFilter()
+        if ( ! strstr($file_code, 'public function modelFilter()'))
+        {
+            $is_updated  = true;
+            $file_code                  = \file($model_file);
+            $count_line                 = count($file_code);
+            $file_code[$count_line - 1] = $this->getModelFilterFunction($filter_class) . "\n\n}\n";
+
+            $this->filesystem->put($model_file, $file_code);
+        }
+
         $relative_file = str_replace(base_path(), '', $model_file);
-        $this->command->info('+ .' . $relative_file . ' is updated!');
+        if ($is_updated)
+        {
+            $this->command->info('+ .' . $relative_file . ' is updated!');
+        }
+        else
+        {
+            $this->command->warn('.' . $relative_file . ' is nothing changed!');
+        }
     }
 
     /**
@@ -104,6 +109,7 @@ class CreateFilterGenerator extends Generator
      */
     private function getModelFilterFunction($filter_class)
     {
+        $data_code[] = "\n";
         $data_code[] = $this->getTabs(1) . '/**';
         $data_code[] = $this->getTabs(1) . " * 指定 Filter";
         $data_code[] = $this->getTabs(1) . ' */';
