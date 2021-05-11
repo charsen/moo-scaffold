@@ -107,8 +107,10 @@
                         //
                     },
                     success: function(json, status, xhr) {
-                        if (json.hasOwnProperty("data") && json.data.hasOwnProperty("token")) {
-                            $.cookie("api_token", json.data.token);
+                        if ((json.hasOwnProperty("data") && json.data.hasOwnProperty("token")) || json.hasOwnProperty("token")) {
+                            var token = json.hasOwnProperty("token") ? json.token : json.data.token;
+
+                            $.cookie("api_token", token);
                         }
 
                         if (xhr.getResponseHeader('authorization') != null) {
