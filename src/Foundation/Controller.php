@@ -30,8 +30,10 @@ class Controller extends BaseController
         if (method_exists($this, 'boot')) {
             $this->boot();
         }
-
-        return call_user_func_array([$this, $method], $parameters);
+        // var_dump($parameters);
+        // die();
+        // return call_user_func_array([$this, $method], $parameters);
+        return $this->{$method}(...array_values($parameters));
     }
 
     /**
