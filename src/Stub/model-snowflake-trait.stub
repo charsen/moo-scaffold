@@ -1,0 +1,47 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models\Traits;
+
+use Exception;
+use Godruoyi\Snowflake\LaravelSequenceResolver;
+use Godruoyi\Snowflake\Snowflake;
+
+/**
+ * 雪花算法 ID
+ */
+trait UsingSnowFlakePrimaryKey
+{
+    /**
+     * @throws Exception
+     */
+    public static function bootUsingSnowFlakePrimaryKey(): void
+    {
+        static::creating(function (self $model): void {
+            if (empty($model->{$model->getKeyName()})) {
+                $snow_flake = new Snowflake(config('SNOW_FLAKE_DATA_CENTER_ID', 1), config('SNOW_FLAKE_WORKER_ID', 1));
+                $snow_flake->setStartTimeStamp(strtotime(config('SNOW_FLAKE_START_TIME', '2021-10-10')) * 1000)
+                           ->setSequenceResolver(new LaravelSequenceResolver(app('cache')->store()));
+
+                $model->{$model->getKeyName()} = $snow_flake->id();
+            }
+        });
+    }
+
+    /**
+     * Get the value indicating whether the IDs are incrementing.
+     */
+    public function getIncrementing(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Get the auto-incrementing key type.
+     */
+    public function getKeyType(): string
+    {
+        return 'int';
+    }
+}

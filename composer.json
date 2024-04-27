@@ -1,9 +1,9 @@
 {
-    "name": "charsen/laravel-scaffold",
-    "description": "Scaffold for Laravel",
+    "name": "charsen/moo-scaffold",
+    "description": "mooeen Scaffold for Laravel",
     "keywords": [
-        "charsen",
-        "laravel-scaffold"
+        "mooeen",
+        "scaffold"
     ],
     "homepage": "https://github.com/charsen/laravel-scaffold",
     "license": "MIT",
@@ -16,34 +16,24 @@
         }
     ],
     "require": {
-        "laravel/framework": "^7.0 || ^8.0",
-        "dcat/laravel-wherehasin": "^0.5.0",
-        "illuminate/console": "~5.8.0|^6.0|^7.0",
-        "illuminate/support": "~5.8.0|^6.0|^7.0",
-        "tucker-eric/eloquentfilter": "^2.4",
-        "symfony/yaml": "^5.0"
-    },
-    "require-dev": {
-        "phpunit/phpunit": "^8.0"
+        "laravel/framework": "^10.10",
+        "symfony/yaml": "^6.4"
     },
     "autoload": {
         "psr-4": {
-            "Charsen\\Scaffold\\": "src"
+            "Mooeen\\Scaffold\\": "src"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Charsen\\Scaffold\\Tests\\": "tests"
+            "Mooeen\\Scaffold\\Tests\\": "tests"
         }
     },
-    "scripts": {
-        "test": "vendor/bin/phpunit",
-        "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
-    },
+    "scripts": {},
     "extra": {
         "laravel": {
             "providers": [
-                "Charsen\\Scaffold\\ScaffoldProvider"
+                "Mooeen\\Scaffold\\ScaffoldProvider"
             ]
         }
     }

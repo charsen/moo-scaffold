@@ -1,0 +1,61 @@
+<?php
+
+namespace App\Models\Traits;
+
+/**
+ * Model 枚举扩展 Trait
+ *
+ * @author Charsen <https://www.github.com/charsen>
+ *
+ * @date 2024-02-27
+ */
+trait EnumExtend
+{
+    // 对应的 label
+    public function label(): string
+    {
+        return self::getLabel($this);
+    }
+
+    // 以array返回枚举的value
+    public static function values(): array
+    {
+        return array_map(static fn ($item) => $item->value, self::cases());
+    }
+
+    // value 对应的 label 数组
+    public static function valueLabels(): array
+    {
+        $result = [];
+        foreach (self::cases() as $item) {
+            $result[$item->value] = self::getLabel(self::from($item->value));
+        }
+
+        return $result;
+    }
+
+    // 判断持久层返回的是否相同
+    public function equal(string $value): bool
+    {
+        return self::tryFrom($value) === $this;
+    }
+
+    // 判断 value 是否包含在枚举里面
+    public static function include(string $value): bool
+    {
+        return in_array($value, self::values(), true);
+    }
+
+    // 判读多个 value 是否全部包含在枚举里面
+    public static function includeAll(array $names): bool
+    {
+        $keys = self::values();
+        foreach ($names as $name) {
+            if (! in_array($name, $keys, true)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}

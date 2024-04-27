@@ -1,0 +1,86 @@
+<?php
+namespace {{namespace}};
+
+use Illuminate\Validation\ValidationException;
+use {{base_resources}};
+
+/**
+ * 基础类
+ *
+ * @author  Charsen <https://github.com/charsen>
+ * @date    2021-02-05 90:10:21
+ */
+trait BaseActionTrait
+{
+    /**
+     * 删除
+     */
+    private function destroyAction(int $id): BaseResource
+    {
+        $result = $this->model->findOrFail($id);
+        $result->delete();
+
+        return new BaseResource($result);
+    }
+
+    /**
+     * 批量删除
+     *
+     * @throws ValidationException
+     */
+    private function destroyBatchAction($request): BaseResource
+    {
+        $validated = $request->validated();
+        $model_ids = is_array($validated['ids']) ? $validated['ids'] : [$validated['ids']];
+
+        // $data       = $this->model->whereIn($this->model->getKeyName(), $model_ids)->get();
+        $data   = $this->model->whereKey($model_ids)->get();
+        $result = $data->map(function ($item) {
+            if ($item->delete()) {
+                return $item;
+            }
+        });
+
+        if (count($result) < 1) {
+            throw ValidationException::withMessages(['ids' => ['No batch operation results.']]);
+        }
+
+        return new BaseResource($result);
+    }
+
+    /**
+     * 永久删除
+     */
+    private function forceDestroyAction(int $id): BaseResource
+    {
+        $result = $this->model->onlyTrashed()->findOrFail($id);
+        $result->forceDelete();
+
+        return new BaseResource($result);
+    }
+
+    /**
+     * 恢复
+     *
+     * @throws ValidationException
+     */
+    private function restoreAction($request): BaseResource
+    {
+        $validated = $request->validated();
+        $model_ids = is_array($validated['ids']) ? $validated['ids'] : [$validated['ids']];
+
+        $data   = $this->model->onlyTrashed()->whereKey($model_ids)->get();
+        $result = $data->map(function ($item) {
+            if ($item->restore()) {
+                return $item;
+            }
+        });
+
+        if (count($result) < 1) {
+            throw ValidationException::withMessages(['ids' => ['No batch operation results.']]);
+        }
+
+        return new BaseResource($result);
+    }
+
+}

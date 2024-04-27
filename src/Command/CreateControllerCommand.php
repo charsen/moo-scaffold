@@ -1,10 +1,11 @@
 <?php
-namespace Charsen\Scaffold\Command;
 
-use Symfony\Component\Console\Input\InputOption;
+namespace Mooeen\Scaffold\Command;
+
+use Mooeen\Scaffold\Generator\CreateControllerGenerator;
+use Mooeen\Scaffold\Generator\FreshStorageGenerator;
 use Symfony\Component\Console\Input\InputArgument;
-use Charsen\Scaffold\Generator\FreshStorageGenerator;
-use Charsen\Scaffold\Generator\CreateControllerGenerator;
+use Symfony\Component\Console\Input\InputOption;
 
 /**
  * Create Controller Command
@@ -15,17 +16,15 @@ class CreateControllerCommand extends Command
 {
     /**
      * The console command title.
-     *
-     * @var string
      */
-    protected $title = 'Create Controller Command';
+    protected string $title = 'Create Controller Command';
 
     /**
      * The console command name.
      *
      * @var string
      */
-    protected $name = 'scaffold:controller';
+    protected $name = 'moo:controller';
 
     /**
      * The console command description.
@@ -68,13 +67,6 @@ class CreateControllerCommand extends Command
                 'Overwrite Controller File.',
                 false,
             ],
-            [
-                'fresh',
-                '--fresh',
-                InputOption::VALUE_OPTIONAL,
-                'Fresh all cache files.',
-                false,
-            ],
         ];
     }
 
@@ -87,40 +79,31 @@ class CreateControllerCommand extends Command
     {
         $this->alert($this->title);
 
-        // 创建 BaseActionTriat
-        (new CreateControllerGenerator($this, $this->filesystem, $this->utility))->buildBaseAction();
+        // 创建 Admin 的 BaseActionTrait
+        (new CreateControllerGenerator($this, $this->filesystem, $this->utility))->checkAdminBaseAction();
 
         $schema_name = $this->argument('schema_name');
-        if (empty($schema_name))
-        {
+        if (empty($schema_name)) {
             $file_names  = $this->utility->getSchemaNames();
-            $schema_name = $this->choice('What is schema name?', $file_names);
+            $schema_name = $this->choice('Which  schema?', $file_names);
         }
 
-        $trait       = $this->option('trait') === null;
-        $force       = $this->option('force') === null;
-        $fresh       = $this->option('fresh') === null;
+        $this->tipCallCommand('moo:fresh');
+        (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
+        $this->tipCallCommand('moo:controller');
 
-        if ($fresh)
-        {
-            $this->tipCallCommand('scaffold:fresh');
-            $result = (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
-            $this->tipCallCommand('scaffold:controller');
-        }
+        $trait = $this->option('trait') === null;
+        $force = $this->option('force') === null;
 
-        if ($trait)
-        {
-            $contollers = $this->utility->getControllers();
-            $controller_name = $this->choice('What is controller name?', array_keys($contollers));
-            $result = (new CreateControllerGenerator($this, $this->filesystem, $this->utility))
-                        ->buildTrait($controller_name, $contollers[$controller_name], $force);
-        }
-        else
-        {
+        if ($trait) {
+            $controllers     = $this->utility->getControllers();
+            $controller_name = $this->choice('Which controller ?', array_keys($controllers));
+            (new CreateControllerGenerator($this, $this->filesystem, $this->utility))
+                                ->buildTrait($controller_name, $controllers[$controller_name], $force);
+        } else {
             $result = (new CreateControllerGenerator($this, $this->filesystem, $this->utility))
                         ->start($schema_name, $force);
+            $this->tipDone($result);
         }
-
-        $this->tipDone();
     }
 }

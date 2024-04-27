@@ -1,7 +1,9 @@
 <?php
-namespace Charsen\Scaffold\Generator;
 
-use Route;
+namespace Mooeen\Scaffold\Generator;
+
+use Brick\VarExporter\VarExporter;
+use Illuminate\Support\Str;
 
 /**
  * Update Authorization Files
@@ -10,297 +12,192 @@ use Route;
  */
 class UpdateAuthorizationGenerator extends Generator
 {
+    private array $controllers;
 
     /**
      * 只做增量，不做替换，因为可能会有手工润色
-     *
-     * @throws \ReflectionException
      */
-    public function start()
+    public function start(string $app, array $routes): bool
     {
-        $route_actions = $this->getActions();
+        $config         = $this->utility->getConfig('controller.' . $app);
+        $base_namespace = ucfirst(str_replace('/', '', $config['path']));
+        $base_namespace = Str::snake($base_namespace, '-');
+        // dump($base_namespace);
 
-        $config_actions     = [];
-        $whitelist          = [];
-        $lang_actions       = [];
-        // dump($route_actions);
-        foreach ($route_actions as $controller => $actions)
-        {
-            $reflection_class   = new \ReflectionClass($controller);
-            $PMCNames           = $this->utility->parsePMCNames($reflection_class);
+        $original_actions = [];
+        $config_actions   = [];
+        $whitelist        = [];
+        $controllers      = [];
+        $modules          = [];
 
-            $new_actions     = $this->formatActions($reflection_class, $controller, $actions, $lang_actions, $whitelist);
-            if ( ! empty($new_actions))
-            {
-                $this->formatControllerActions($PMCNames, $config_actions, $new_actions, $controller, $lang_actions);
+        foreach ($routes as $route) {
+            [$controller, $action] = explode('@', $route['action']);
+            $PMC_names             = $this->utility->parsePMCNames($this->getController($controller));
+            $module_key            = $app . '-' . Str::snake($PMC_names['module']['name']['en'], '-');
+            $module_key            = $this->getMd5($module_key);
+            $modules[$module_key]  = $PMC_names['module']['name'];
+
+            $controller_key               = str_replace(['\\', '-controllers-', '-controller', 'app-'], ['', '-', '', ''], Str::snake($controller, '-'));
+            $controller_key               = $this->getMd5($controller_key);
+            $controllers[$controller_key] = $PMC_names['controller']['name'];
+
+            $action_info = $this->utility->parseActionInfo($this->getMethod($controller, $action));
+            $action_name = $this->utility->parseActionName($this->getMethod($controller, $action));
+            $action_key  = str_replace(['\\', '@', '-controllers-', '-controller-', 'app-'], ['', '-', '-', '-', ''], Str::snake($route['action'], '-'));
+
+            $meta = [
+                'module_key'       => 'module-' . $module_key,
+                'controller'       => $controller,
+                'controller_key'   => 'controller-' . $controller_key,
+                'action'           => $action,
+                'action_plain_key' => $action_key,
+                'action_key'       => $this->getMd5($action_key),
+                'name'             => $action_name,
+                'lang'             => $action_info['name'],
+                'desc'             => $action_info['desc'],
+                'whitelist'        => $action_info['whitelist'],
+            ];
+
+            if ($action_info['whitelist']) {
+                $whitelist[] = $meta['action_key'];
+            } else {
+                $config_actions[$meta['module_key']][$meta['controller_key']][] = $meta['action_key'];
+            }
+
+            $original_actions[] = $meta;
+        }
+
+        $this->buildActions($app, $config_actions, $whitelist);
+        $this->buildLangFiles($app, $config, $modules, $controllers, $original_actions);
+        $this->buildACLViewer($app, $base_namespace, $original_actions);
+
+        return true;
+    }
+
+    /**
+     * 配置文件生成
+     */
+    private function buildActions(string $app, array $actions, array $whitelist): void
+    {
+        $apps   = $this->utility->getApps();
+        $config = config('actions', []);
+
+        foreach ($apps as $item => $name) {
+            if ($item === $app) {
+                $config[$app] = [
+                    'whitelist' => $whitelist,
+                    'actions'   => $actions,
+                ];
             }
         }
-        $this->buildActions($config_actions, $whitelist);
-        $this->buildLangFiles($lang_actions);
+
+        $php_code = '<?php' . PHP_EOL
+            . 'return ' . VarExporter::export($config) . ';'
+            . PHP_EOL;
+
+        $this->filesystem->put(config_path('actions.php'), $php_code);
+        $this->command->info('+ ./config/actions.php');
     }
 
     /**
      * 生成多语言文件
-     *
-     * @param $lang_actions
      */
-    private function buildLangFiles($lang_actions)
+    private function buildLangFiles(string $app, array $controller, array $modules, array $controllers, array $actions): void
     {
         $languages = $this->utility->getConfig('languages');
-        foreach ($languages as $lang)
-        {
+        foreach ($languages as $lang) {
             $code = [
-                "<?php",
-                "",
-                "return ["
+                '<?php',
+                '',
+                'return [',
             ];
-            foreach ($lang_actions as $key => $attr)
-            {
-                $annotation = ($attr['name'][$lang]== '') ? '//' : '';
-                $attr['name'][$lang] = str_replace("'", "&apos;", $attr['name'][$lang]);
-                $code[]     = $this->getTabs(1) . "{$annotation}'{$key}' => '{$attr['name'][$lang]}',";
-            }
-            $code[] = "];";
-            $code[] = "";
 
-            $this->filesystem->put(resource_path('lang/' . $lang . '/actions.php'), implode("\n", $code));
-            $this->command->info('+ ./resources/lang/' . $lang . '/actions.php (Updated)');
+            $code[] = $this->getTabs(1) . "'app-{$app}' => '{$controller['name'][$lang]}',";
+
+            foreach ($modules as $key => $val) {
+                $code[] = $this->getTabs(1) . "'module-{$key}' => '{$val[$lang]}',";
+            }
+
+            foreach ($controllers as $key => $val) {
+                $code[] = $this->getTabs(1) . "'controller-{$key}' => '{$val[$lang]}',";
+            }
+
+            foreach ($actions as $attr) {
+                if ($attr['whitelist']) {
+                    continue;
+                }
+                $attr['lang'][$lang] = str_replace("'", '&apos;', $attr['lang'][$lang]);
+                $attr['desc']        = str_replace("'", '&apos;', $attr['desc']);
+                $code[]              = $this->getTabs(1) . "'{$attr['action_key']}' => '{$attr['lang'][$lang]}',";
+                $code[]              = $this->getTabs(1) . "'{$attr['action_key']}-desc' => '{$attr['desc']}',";
+            }
+            $code[] = '];';
+            $code[] = '';
+
+            $this->filesystem->put(lang_path($lang . '/actions.php'), implode("\n", $code));
+            $this->command->info('+ ./lang/' . $lang . '/actions.php (Updated)');
         }
     }
 
     /**
-     * 格式化单个控制器的动作，若没有 @acl 的添加到白名单
-     *
-     * @param $controller
-     * @param $actions
-     * @param $lang_actions
-     * @param $whitelist
-     *
-     * @return array
-     * @throws \ReflectionException
+     * 生成 acl 可视化文件，用于检查对比
      */
-    private function formatActions($reflection_class, $controller, $actions, &$lang_actions, &$whitelist)
+    private function buildACLViewer(string $app, string $namespace, array $actions): void
     {
-        $new_actions       = [];
-        foreach ($actions as $key => $val)
-        {
-            // 去掉 创建及编辑 表单
-            if (in_array($key, ['create', 'edit']))
-            {
-                continue;
+        $code       = ['# ACL'];
+        $controller = '';
+        foreach ($actions as $item) {
+            if ($controller !== $item['controller']) {
+                $controller = $item['controller'];
+                $code[]     = '';
+                $code[]     = '## ' . $item['controller'] . ' - ' . $item['controller_key'];
             }
 
-            $action_key  = $this->utility->getActionKey($controller, $val);
-            $action_key  = $this->getMd5($action_key);
-            $acl_info    = $this->utility->parseActionNames($val, $reflection_class);
-
-            if ( ! isset($acl_info['whitelist']))
-            {
-                $lang_actions[$action_key]  = $acl_info;
-                $new_actions[]              = $action_key;
-            }
-            else
-            {
-                $whitelist[] = "'" . $action_key . "'";
-            }
+            $code[] = "- {$item['action_plain_key']} - `{$item['action_key']}` - " . ($item['whitelist'] ? '`whitelist`' : $item['name']);
         }
 
-        return $new_actions;
+        $this->filesystem->put(app_path($app . '-acl.md'), implode("\n", $code));
+        $this->command->info('+ ./app/acl.md (Updated)');
     }
 
     /**
-     * 格式化一个控件器的动作
-     *
-     * @param $config_actions
-     * @param $controller
-     * @param $actions
-     * @param $lang_actions
-     *
-     * @return mixed
-     * @throws \ReflectionException
+     * 8 位 m5 加密
      */
-    private function formatControllerActions($PMCNames, &$config_actions, $actions, $controller, &$lang_actions)
+    private function getMd5($str): string
     {
-        $package_key                = $this->getMd5($PMCNames['package']['name']['en']);
-        $lang_actions[$package_key] = $PMCNames['package'];
-
-        // 用 namespace 来解析目录深度，只支持 `app/Http/Controllers/` 往下两级目录，
-        // todo: 用递归来处理
-        $paths              = str_replace('App\\Http\\Controllers\\', '', $controller);
-        $paths              = explode('\\', $paths);
-
-        // 需要忽略的目录
-        if (in_array($paths[0], $this->utility->getConfig('authorization.exclude_forder'))) {
-            return $config_actions;
-        }
-
-        for ($i = 0; $i < count($paths); $i++)
-        {
-            // App/Http/Controllers/TestController.php
-            // App/Http/Controllers/Folder1/AuthController.php
-            // App/Http/Controllers/{$Path[0]}
-            if ($i == 0)
-            {
-                $controller_key             = $this->getMd5($paths[0]);
-                $is_controller              = preg_match("/[\w]+Controller$/", $paths[0]);
-                if ($is_controller)
-                {
-                    $controller_key                                .= 'Controller';
-                    $lang_actions[$controller_key]                  = $PMCNames['controller'];
-                    $config_actions[$package_key][$controller_key]  = $actions;
-                }
-                else
-                {
-                    if ( ! isset($config_actions[$package_key][$controller_key]))
-                    {
-                        $config_actions[$package_key][$controller_key] = [];
-                    }
-
-                    if (preg_match("/[\w]+Controller$/", "$paths[0]-$paths[1]"))
-                    {
-                        $lang_actions[$controller_key]     = $PMCNames['module'];
-                    }
-                }
-            }
-            // App/Http/Controllers/Folder1/AuthController.php
-            // App/Http/Controllers/Folder1/Folder2/AuthController.php
-            // App/Http/Controllers/{$Path[0]}/{$Path[1]}
-            elseif ($i == 1)
-            {
-                $controller_key = "$paths[0]-$paths[1]";
-                $is_controller  = preg_match("/[\w]+Controller$/", $controller_key);
-
-                $controller_key = $this->getMd5($controller_key);
-                $tmp_key        = $this->getMd5("$paths[0]");
-
-                if ($is_controller)
-                {
-                    $controller_key                                         .= 'Controller';
-                    $config_actions[$package_key][$tmp_key][$controller_key] = $actions;
-                    $lang_actions[$controller_key]                           = $PMCNames['controller'];
-                }
-                else
-                {
-                    if ( ! isset($config_actions[$package_key][$tmp_key][$controller_key]))
-                    {
-                        $config_actions[$package_key][$tmp_key][$controller_key] = [];
-                    }
-                    $lang_actions[$controller_key]     = $PMCNames['module'];
-                }
-            }
-            // App/Http/Controllers/App/Folder1/Folder2/AuthController.php
-            // App/Http/Controllers/{$Path[0]}/{$Path[1]}/{$Path[2]}
-            elseif ($i == 2)
-            {
-                $controller_key                 = "$paths[0]-$paths[1]-$paths[2]";
-                $is_controller                  = preg_match("/[\w]+Controller$/", $controller_key);
-                $controller_key                 = $this->getMd5($controller_key);
-                $tmp_key                        = $this->getMd5("$paths[0]");
-                $tmp_key2                       = $this->getMd5("$paths[0]-$paths[1]");
-
-                if ($is_controller )
-                {
-                    $controller_key                                                    .= 'Controller';
-                    $config_actions[$package_key][$tmp_key][$tmp_key2][$controller_key] = $actions;
-                    $lang_actions[$controller_key]                                      = $PMCNames['controller'];
-                }
-                // 第三级目录不支持了！！
-            }
-        }
-
-        return $config_actions;
-    }
-
-    /**
-     * @param $actions
-     * @param $whitelist
-     */
-    private function buildActions($actions, $whitelist)
-    {
-        /** 数据首页生成，列表 */
-        $php_code   = '<?php' . PHP_EOL . PHP_EOL
-                    . 'return [' . PHP_EOL
-                    . $this->getTabs(1) . "'whitelist' => [" . implode(",\n", $whitelist) . "]," . PHP_EOL
-                    . $this->getTabs(1) . "'actions' => "
-                    . var_export($actions, true) . ','. PHP_EOL
-                    . '];'
-                    . PHP_EOL;
-
-        $put        = $this->filesystem->put(config_path('actions.php'), $php_code);
-
-        if ($put)
-        {
-            return $this->command->info('+ ./config/actions.php (Updated)');
-        }
-
-        return $this->command->error('x ./config/actions.php (Failed)');
-    }
-
-    /**
-     * 获取 动作
-     *
-     * @return array
-     */
-    private function getActions()
-    {
-        $routes          = Route::getRoutes();
-        $controllers     = [];
-        foreach ($routes as $route)
-        {
-            $action_name = ltrim($route->getActionName(), '\\');
-            if ( ! strstr($action_name, 'App\\Http\\Controllers\\'))
-            {
-                continue;
-            }
-            list($controller, $action)          = explode('@', $action_name);
-
-            $controllers[$controller][$action]  = $action;
-        }
-
-        // 与 controller 里的 actions 求交集，以保证精准
-        foreach ($controllers as $controller => &$actions)
-        {
-            $methods    = get_class_methods($controller);
-            if (empty($methods))
-            {
-                unset($controllers[$controller]);
-                continue;
-            }
-
-            $real_actions  = array_intersect($actions, $methods);
-            $unset_actions = array_diff($actions, $real_actions);
-            foreach ($unset_actions as $key)
-            {
-                unset($controllers[$controller][$key]);
-            }
-        }
-
-        return $controllers;
-    }
-
-    /**
-     * 16位 m5 加密
-     *
-     * @param $str
-     *
-     * @return bool|string
-     */
-    private function getMd5($str)
-    {
-        $str = strtolower(str_replace('Controller', '', $str));
-        if ($this->utility->getConfig('authorization.md5'))
-        {
+        if ($this->utility->getConfig('authorization.md5')) {
             return substr(md5($str), 8, 16);
-            // if ($this->utility->getConfig('authorization.short_md5'))
-            // {
-            //     return substr(md5($str), 8, 16);
-            // }
-            // else
-            // {
-            //     return md5($str);
-            // }
         }
 
         return $str;
+    }
+
+    /**
+     * 获取并缓存 控制器 的反向解析结果
+     */
+    private function getController(string $name)
+    {
+        if (isset($this->controllers[$name])) {
+            return $this->controllers[$name];
+        }
+
+        $this->controllers[$name] = new \ReflectionClass($name);
+
+        return $this->controllers[$name];
+    }
+
+    /**
+     * 获取并缓存 控制器 方法函数 的反向解析结果
+     */
+    private function getMethod($controller, $action)
+    {
+        $key = $controller . '_' . $action;
+        if (isset($this->controllers[$key])) {
+            return $this->controllers[$key];
+        }
+
+        $this->controllers[$key] = new \ReflectionMethod($controller, $action);
+
+        return $this->controllers[$key];
     }
 }

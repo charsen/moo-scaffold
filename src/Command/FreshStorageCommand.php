@@ -1,8 +1,8 @@
 <?php
-namespace Charsen\Scaffold\Command;
 
-use Charsen\Scaffold\Generator\FreshStorageGenerator;
-use Symfony\Component\Console\Input\InputArgument;
+namespace Mooeen\Scaffold\Command;
+
+use Mooeen\Scaffold\Generator\FreshStorageGenerator;
 use Symfony\Component\Console\Input\InputOption;
 
 /**
@@ -17,28 +17,26 @@ class FreshStorageCommand extends Command
      *
      * @var string
      */
-    protected $title = 'Fresh Sechma Storage Command';
+    protected $title = 'Fresh Schema Storage Command';
 
     /**
      * The console command name.
      *
      * @var string
      */
-    protected $name = 'scaffold:fresh';
+    protected $name = 'moo:fresh';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Fresh Sechma Storage Command';
+    protected $description = 'Fresh Schema Storage Command';
 
     /**
      * Get the console command options.
-     *
-     * @return array
      */
-    protected function getOptions()
+    protected function getOptions(): array
     {
         return [
             [
@@ -53,10 +51,8 @@ class FreshStorageCommand extends Command
 
     /**
      * Execute the console command.
-     *
-     * @return void
      */
-    public function handle()
+    public function handle(): void
     {
         $this->alert($this->title);
 

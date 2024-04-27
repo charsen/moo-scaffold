@@ -1,0 +1,42 @@
+<?php
+
+namespace {{namespace}};
+
+use {{model_class}};
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
+
+/**
+ * {{class}} Factory
+ *
+ * @author  {{author}}
+ * @date    {{date}}
+ */
+class {{class}}Factory extends Factory
+{
+
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+{{fields}}
+        ];
+    }
+
+    /**
+     * 配置模型工厂。
+     */
+    public function configure(): static
+    {
+        return $this->afterMaking(function ({{class}} $user) {
+            // ...
+        })->afterCreating(function ({{class}} $user) {
+            // ...
+        });
+    }
+}

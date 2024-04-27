@@ -7,7 +7,7 @@
     <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no, width=device-width">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="Scaffold">
-    <title>@yield('title', 'Charsen/Scaffold')</title>
+    <title>@yield('title', 'Mooeen/Scaffold')</title>
     <link rel="stylesheet" href="/vendor/scaffold/css/index.css" />
     <meta name="robots" content="none" />
     @yield('styles')

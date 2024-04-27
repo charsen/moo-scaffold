@@ -1,13 +1,13 @@
 <?php
 
-namespace Charsen\Scaffold\Http\Controllers;
+namespace Mooeen\Scaffold\Http\Controllers;
 
 use Illuminate\Http\Request;
 
 /**
  * Class     ScaffoldController
  *
- * @package  Charsen\Scaffold\Http\Controllers
+ * @package  Mooeen\Scaffold\Http\Controllers
  * @author Charsen https://github.com/charsen
  */
 class ScaffoldController extends Controller

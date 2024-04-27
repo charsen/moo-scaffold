@@ -1,15 +1,15 @@
 <?php
 
-namespace Charsen\Scaffold\Http\Controllers;
+namespace Mooeen\Scaffold\Http\Controllers;
 
-use Charsen\Scaffold\Utility;
+use Mooeen\Scaffold\Utility;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Routing\Controller as BaseController;
 
 /**
  * Class     Controller
  *
- * @package  Charsen\Scaffold\Http\Controllers
+ * @package  Mooeen\Scaffold\Http\Controllers
  * @author Charsen https://github.com/charsen
  */
 class Controller extends BaseController
@@ -20,7 +20,7 @@ class Controller extends BaseController
     /**
      * Controller constructor.
      *
-     * @param \Charsen\Scaffold\Utility         $utility
+     * @param \Mooeen\Scaffold\Utility         $utility
      * @param \Illuminate\Filesystem\Filesystem $filesystem
      */
     public function __construct(Utility $utility, Filesystem $filesystem)
