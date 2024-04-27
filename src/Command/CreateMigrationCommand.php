@@ -1,10 +1,10 @@
 <?php
-namespace Charsen\Scaffold\Command;
 
-use Charsen\Scaffold\Generator\CreateMigrationGenerator;
-use Charsen\Scaffold\Generator\FreshStorageGenerator;
+namespace Mooeen\Scaffold\Command;
+
+use Mooeen\Scaffold\Generator\CreateMigrationGenerator;
+use Mooeen\Scaffold\Generator\FreshStorageGenerator;
 use Symfony\Component\Console\Input\InputArgument;
-use Symfony\Component\Console\Input\InputOption;
 
 /**
  * Create Database Migration Command
@@ -15,17 +15,15 @@ class CreateMigrationCommand extends Command
 {
     /**
      * The console command title.
-     *
-     * @var string
      */
-    protected $title = 'Create Database Migration Command';
+    protected string $title = 'Create Database Migration Command';
 
     /**
      * The console command name.
      *
      * @var string
      */
-    protected $name = 'scaffold:migration';
+    protected $name = 'moo:migration';
 
     /**
      * The console command description.
@@ -36,72 +34,38 @@ class CreateMigrationCommand extends Command
 
     /**
      * Get the console command arguments.
-     *
-     * @return array
      */
-    protected function getArguments()
+    protected function getArguments(): array
     {
         return [
-            ['schema_name', InputArgument::OPTIONAL, 'The name of the schema. (Ex: Personnels)'],
-        ];
-    }
-
-    /**
-     * Get the console command options.
-     *
-     * @return array
-     */
-    protected function getOptions()
-    {
-        return [
-            [
-                'migrate',
-                '-m',
-                InputOption::VALUE_OPTIONAL,
-                'Call the artisan:migrate command.',
-                false,
-            ]
+            ['schema_name', InputArgument::OPTIONAL, 'The name of the schema. (Ex: System)'],
         ];
     }
 
     /**
      * Execute the console command.
-     *
-     * @return void
      */
-    public function handle()
+    public function handle(): bool
     {
         $this->alert($this->title);
 
         $schema_name = $this->argument('schema_name');
-        if (empty($schema_name))
-        {
+        if (empty($schema_name)) {
             $file_names  = $this->utility->getSchemaNames();
-            $schema_name = $this->choice('What is schema name?', $file_names);
+            $schema_name = $this->choice('Which schema?', $file_names);
         }
 
-        $migrate     = $this->option('migrate') === null;
-
-        $this->tipCallCommand('scaffold:fresh');
+        $this->tipCallCommand('moo:fresh');
         (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
 
-        $this->tipCallCommand('scaffold:migration');
+        $this->tipCallCommand('moo:migration ' . $schema_name);
         $result = (new CreateMigrationGenerator($this, $this->filesystem, $this->utility))->start($schema_name);
 
-        if ($migrate)
-        {
+        if ($this->confirm("Do you want to Execute 'artisan migrate' ?", 'yes')) {
             $this->tipCallCommand('migrate');
             $this->call('migrate');
         }
-        else
-        {
-            if ($this->confirm("Do you want to Execute 'artisan migrate' ?", 'yes'))
-            {
-                $this->tipCallCommand('migrate');
-                $this->call('migrate');
-            }
-        }
 
-        $this->tipDone($result);
+        return $this->tipDone($result);
     }
 }

@@ -1,216 +1,144 @@
 <?php
 
-namespace Charsen\Scaffold\Foundation;
+namespace Mooeen\Scaffold\Foundation;
 
 use Illuminate\Foundation\Http\FormRequest as BaseFormRequest;
+use Illuminate\Validation\Rule;
 
 class FormRequest extends BaseFormRequest
 {
+    protected string $action = '';
+
     /**
      * Determine if the user is authorized to make this request.
-     *
-     * @return bool
      */
-    public function authorize()
+    public function authorize(): bool
     {
         return true;
     }
 
     /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array
+     * 获取模型枚举字段的 In 验证规则
+     * 例：在列表全部时，手动新增加了一个 0 => 'all'， 这时需要让 $append = '0'
      */
-    public function rules(): array
+    protected function getInEnums(array $values, string $append = ''): string
     {
-        //list($class, $action) = explode('@', \Route::currentRouteAction());
-        $action = $this->route()->getActionMethod();
-        return $this->getActionRules($action);
+        $append = ($append === '') ? '' : $append . ',';
+
+        return 'in:' . $append . implode(',', $values);
     }
 
-    /**
-     *  获取指定 action 的验证规则
-     *
-     * @param  $action
-     * @return array
-     */
-    public function getActionRules($action = NULL): array
+    protected function allInEnums(array $values, string $append = ''): string
     {
-        if ($action === NULL) return [];
-
-        $result = \method_exists($this, $action . "Rules") ? $this->{$action . "Rules"}() : [];
-
-        return $result;
-    }
-
-    /**
-     * 获取通过某动作的验证规则转换的表单控件
-     *
-     * @param  array  $reset
-     * @return array
-     */
-    public function getFormWidgets($method, array $reset = [], $excute = [])
-    {
-        $all_rules      = $this->getActionRules($method);
-        $frontend_rules = []; //$this->getFrontendRules($all_rules);
-
-        return $this->transformFormWidgets($all_rules, $frontend_rules, $reset, $excute);
-    }
-
-    /**
-     * 根据验证规则转换成表单控件
-     *
-     * @param  array $all_rules
-     * @param  array $frontend_rules
-     * @param  array $reset
-     * @return array
-     */
-    private function transformFormWidgets(array $all_rules, array $frontend_rules, array $reset = [], $excute = [])
-    {
-        if (empty($all_rules)) return [];
-
-        $result = [];
-        foreach ($all_rules as $field_name => $rules)
-        {
-            // 排除指定的字段
-            if (in_array($field_name, $excute)) continue;
-
-            $tmp = [
-                'name'      => $field_name,
-                'required'  => in_array('required',  $rules), //! (in_array('sometimes', $rules) OR in_array('nullable',  $rules)),
-                'rules'     => $frontend_rules[$field_name] ?? [],
-            ];
-
-            // 通过字段类型指定 控件类型, todo: datetime?
-            if (in_array('date', $rules))
-            {
-                $tmp['type'] = 'date-picker';
-            }
-            elseif (in_array('time', $rules))
-            {
-                $tmp['type'] = 'time-picker';
-            }
-            elseif (in_array('date-time', $rules))
-            {
-                $tmp['type'] = 'date-time-picker';
-            }
-            elseif (strstr($field_name, 'password'))
-            {
-                $tmp['type'] = 'password';
-            }
-
-            foreach ($rules as $r)
-            {
-                // 闭包函数
-                if ( ! is_string($r))
-                {
-                    continue;
-                }
-
-                if (preg_match('/^in\:[a-z0-9\,]+$/i', $r))
-                {
-                    // 判断 model 的字典字段
-                    if (property_exists($this, "init_" . $field_name))
-                    {
-                        $tmp['type']        = 'radio';
-                        $tmp['dictionary']  = true;
-                        $tmp['options']     = $this->{"init_{$field_name}"};
-                    }
-                }
-            }
-
-            // 直接替换，合并
-            if (isset($reset[$field_name]))
-            {
-                $tmp = array_merge($tmp, $reset[$field_name]);
-                unset($reset[$field_name]);
-            }
-
-            $result[$field_name] = $tmp;
+        if ($append !== '') {
+            array_unshift($values, $append);
         }
 
-        // 若 reset 还存在数据，则是新增的，直接附加进去
-        return \array_merge($result, $reset);
+        return Rule::in($values);
     }
 
     /**
-     * 转换成前端验证规则
+     * 获取 Unique 的规则
      *
-     * @param  array $all_rules
-     * @return array
+     * @param  $field  // 当是编辑动作时，要排除自己，必传
+     * @param  $route_key  // 当是编辑动作时，要排除自己，必传
      */
-    private function getFrontendRules(array $all_rules): array
+    protected function getUnique(string $model_table, $field = null, $route_key = null): string
     {
-        if (empty($all_rules)) return [];
+        $rule = 'unique:' . $model_table;
 
-        // 若是给提前端提供验证规则，去掉 unique 规则
-        $frontend_rules = [];
-
-        foreach ($all_rules as $field => $rules) {
-            foreach ($rules as $k => $r) {
-                if ( ! is_string($r)) {
-                    continue;
-                }
-
-                if (in_array($r, ['sometimes', 'nullable'])) {
-                    $frontend_rules[$field][$r] = '';
-                    continue;
-                }
-
-                $key        = preg_replace('/\:.+/i', '', $r);
-                $message    = __('validation.' . $key);
-                //$message    = str_replace(':attribute', __('validation.attributes.' . $field), $message);
-
-                $frontend_rules[$field][$r] = is_array($message) ? $message['string'] : $message;
-            }
-        }
-
-        return $frontend_rules;
-    }
-
-    /**
-     * 获取模型某字典字段的键值
-     *
-     * @param  $filed
-     * @return string
-     */
-    private function getDictKeys($filed): string
-    {
-        //return implode(',', array_keys($this->{"init_{$filed}"}));
-        return implode(',', array_keys($this->{"init_{$filed}"}));
-    }
-
-    /**
-     * 获取模型字典字段的 In 验证规则
-     *
-     * 例：在列表全部时，手动新增加了一个 0 => 'all'， 这时需要让 $append = '0'
-     *
-     * @param string $filed
-     * @return string
-     */
-    protected function getInDict($filed, $append = ''): string
-    {
-        $append = ($append == '') ? '' : $append . ',';
-        return 'in:' . $append . $this->getDictKeys($filed);
-    }
-
-    /**
-     * 获取 Uniquue 的规则
-     *
-     * @param  $field           // 当是编辑动作时，要排除自己，必传
-     * @param  $route_key       // 当是编辑动作时，要排除自己，必传
-     * @return string
-     */
-    protected function getUnique($field = null, $route_key = null): string
-    {
-        $rule = 'unique:' . $this->model_table;
-
-        if ($field != null && $route_key != null)
-        {
+        if ($field !== null && $route_key !== null) {
             $rule .= ",{$field}," . $this->route($route_key);
         }
 
         return $rule;
     }
 
+    /**
+     * 获取 模型主键 是否存在的规则
+     */
+    protected function getExistId(string $model): string
+    {
+        return 'exists:' . $model . ',id';
+    }
+
+    /**
+     * 获取通过某动作的验证规则转换的表单控件
+     */
+    public function getFormWidgets(FormRequest $request, array $reset = [], array $exclude = [], bool $with_default = false): array
+    {
+        $rules          = $request->rules();
+        $frontend_rules = [];
+
+        // 创建表单，默认要带上 options 的默认值，比如：model 的 enum
+        $with_default = ($this->route()->getActionMethod() === 'create' && ! $with_default) ? true : $with_default;
+
+        return $this->transformFormWidgets($request, $rules, $frontend_rules, $reset, $exclude, $with_default);
+    }
+
+    public function options(string $field): array
+    {
+        return [];
+    }
+
+    /**
+     * 根据验证规则转换成表单控件
+     */
+    private function transformFormWidgets($request, array $all_rules, array $frontend_rules, array $reset, array $exclude, bool $with_default): array
+    {
+        if (empty($all_rules)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($all_rules as $field_name => $rules) {
+            // 对 .* 规则的特殊处理
+            $new_field_name = str_contains($field_name, '.*') ? str_replace('.*', '', $field_name) : $field_name;
+
+            // 排除指定的字段
+            if (in_array($new_field_name, $exclude, true)) {
+                continue;
+            }
+
+            $tmp = [
+                'field'    => $new_field_name,
+                'required' => in_array('required', $rules, true),
+                //! (in_array('sometimes', $rules) OR in_array('nullable',  $rules)),
+                'rules' => $frontend_rules[$new_field_name] ?? [],
+            ];
+
+            // 通过字段类型指定 控件类型
+            // https://learnku.com/docs/laravel/8.5/validation/10378#189a36
+            if (in_array('date', $rules, true)) {
+                $tmp['type'] = 'date-picker';
+            } elseif (str_contains($new_field_name, 'password')) {
+                $tmp['type'] = 'password';
+            }
+
+            // model enum 字段处理
+            if (method_exists($request, 'options') && ! empty($options = $request->options($new_field_name))) {
+                $tmp['type']       = 'radio';
+                $tmp['dictionary'] = true;
+                $tmp['options']    = $options;
+
+                if (str_contains($field_name, '.*')) {
+                    $tmp['multiple'] = true;
+                }
+                if ($with_default) {
+                    $tmp['default'] = array_key_first($options);
+                }
+            }
+
+            // 直接替换，合并
+            if (isset($reset[$new_field_name])) {
+                $tmp = [...$tmp, ...$reset[$new_field_name]];
+                unset($reset[$new_field_name]);
+            }
+
+            $result[$new_field_name] = $tmp;
+        }
+
+        // 若 reset 还存在数据，则是新增的，直接附加进去
+        return array_merge($result, $reset);
+    }
 }

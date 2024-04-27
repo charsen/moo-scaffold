@@ -1,0 +1,34 @@
+<?php
+declare(strict_types = 1);
+
+namespace {{namespace}};
+
+/**
+ * Model Options 操作处理
+ *
+ * Model $appends 添加一个键名 'options'
+ */
+trait Optional
+{
+    /**
+     * 获取单个 model 可操作的动作
+     */
+    public function getOptionsAttribute(): array
+    {
+        $res = [];
+        if ($this->deleted_at === null) {
+            $res[] = ['type' => 'edit'];
+            $res[] = ['type' => 'destroy'];
+        } else {
+            $res[] = ['type' => 'force-destroy'];
+        }
+
+        // 合并自定义的 options 数组
+        if (method_exists($this, 'getOptions'))
+        {
+            $res = array_merge($res, $this->getOptions());
+        }
+
+        return $res;
+    }
+}

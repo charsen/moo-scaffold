@@ -1,72 +1,19 @@
 <?php
+declare(strict_types = 1);
+
 namespace {{namespace}};
 
-use {{model_trait}};
 use {{use_base_request}};
 
 class {{request_name}} extends FormRequest
 {
-    // Model Trait 用于 unique, in: 等规则，减少冗余
-    use {{model_trait_name}};
+    use {{trait_name}};
 
-    public function indexRules()
+    /**
+     * Get the validation rules that apply to the request.
+     */
+    public function rules(): array
     {
-        return [
-            'page'       => ['required', 'integer', 'min:1'],
-            'page_limit' => ['nullable', 'integer', 'min:1'],
-        ];
+        return {{rules}};
     }
-
-    public function trashedRules()
-    {
-        return [
-            'page'       => ['required', 'integer', 'min:1'],
-            'page_limit' => ['nullable', 'integer', 'min:5'],
-        ];
-    }
-
-    public function storeRules()
-    {
-        return {{store_rules}};
-    }
-
-    public function updateRules()
-    {
-        return {{update_rules}};
-    }
-
-    public function showRules()
-    {
-        return [];
-    }
-
-    public function destroyBatchRules()
-    {
-        return [
-            'ids'       => ['required', 'digital_array'],
-        ];
-    }
-
-    public function forceDestroyRules()
-    {
-        return [];
-    }
-
-    public function restoreRules()
-    {
-        return [
-            'ids'       => ['required', 'digital_array'],
-        ];
-    }
-
-    public function createRules()
-    {
-        return [];
-    }
-
-    public function editRules()
-    {
-        return [];
-    }
-
 }

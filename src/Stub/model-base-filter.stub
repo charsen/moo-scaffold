@@ -1,4 +1,6 @@
 <?php
+declare(strict_types = 1);
+
 namespace {{namespace}};
 
 use EloquentFilter\ModelFilter;
@@ -25,7 +27,7 @@ class BaseFilter extends ModelFilter
      *
      * @var bool
      */
-    protected $camel_cased_methods = true;
+    protected $camel_cased_methods = false;
 
     /**
      * Overwrite!!!
@@ -60,7 +62,7 @@ class BaseFilter extends ModelFilter
      *
      * @param $related
      */
-    public function filterUnjoinedRelation($related)
+    public function filterUnJoinedRelation($related)
     {
         $this->query->whereHasIn($related, function ($q) use ($related) {
             $this->callRelatedLocalSetup($related, $q);

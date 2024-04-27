@@ -1,0 +1,215 @@
+<?php
+declare(strict_types = 1);
+
+namespace {{namespace}};
+
+use {{model_class}};
+use {{use_base_action}};
+{{use_requests}}
+use {{use_columns}};
+use {{use_form_widgets}};
+use {{use_table_columns}};
+use {{use_base_resources}};
+use {{use_base_resources_collection}};
+use {{use_base_controller}};
+
+/**
+ * {{entity_name}}控制器
+ *
+ * @package_name {zh-CN: {{package_name}} | en: {{package_en_name}}}
+ * @module_name {zh-CN: {{module_name}} | en: {{module_en_name}}}
+ * @controller_name {zh-CN: {{entity_name}}管理 | en: Management {{entity_en_name}}}
+ *
+ * @author  {{author}}
+ * @date    {{date}}
+ */
+class {{controller_name}}Controller extends Controller
+{
+    use BaseActionTrait;
+
+    protected {{model_name}} $model;
+
+    /**
+     * @param \{{model_class}} $model
+     */
+    public function __construct({{model_name}} $model)
+    {
+        $this->model = $model;
+    }
+
+    /**
+     * 执行 action 前先验证权限
+     *
+     * @throws \Illuminate\Auth\Access\AuthorizationException
+     */
+    public function boot(): void
+    {
+        $this->checkAuthorization();
+    }
+
+    /**
+     * {{entity_name}}列表
+     *
+     * @acl {zh-CN: {{entity_name}}列表, en: {{entity_en_name}} List, desc: }
+     */
+    public function index(IndexRequest $request): BaseResourceCollection
+    {
+        $validated    = $request->validated();
+
+        $fields       = [{{index_fields}}];
+        $result       = $this->model->select($fields)
+                                    ->filter($validated)
+                                    ->latest('{{model_key_name}}')
+                                    ->paginate(($validated['page_limit'] ?? NULL));
+        $result->append(['options']);
+
+        $columns      = [{{index_columns}}];
+        $form_widgets = $request->getFormWidgets(request: $request, exclude: ['page', 'page_limit']);
+
+        return BaseResource::collection($result)
+                          ->additional([
+                              'columns'      => new TableColumnsCollection($columns),
+                              'form_widgets' => new FormWidgetCollection($form_widgets),
+                          ]);
+    }
+
+    /**
+     * {{entity_name}}回收站
+     *
+     * @acl {zh-CN: {{entity_name}}回收站, en: {{entity_en_name}} Trashed, desc: }
+     */
+    public function trashed(TrashedRequest $request): BaseResourceCollection
+    {
+        $validated    = $request->validated();
+        $fields       = [{{trashed_fields}}];
+        $result       = $this->model->select($fields)
+                                    ->filter($validated)
+                                    ->latest('deleted_at')
+                                    ->onlyTrashed()
+                                    ->paginate(($validated['page_limit'] ?? NULL));
+        $result->append(['options']);
+
+        $columns      = [{{trashed_columns}}];
+        $form_widgets = $request->getFormWidgets(request: $request, exclude: ['page', 'page_limit']);
+
+        return BaseResource::collection($result)
+                           ->additional([
+                               'columns'      => new TableColumnsCollection($columns),
+                               'form_widgets' => new FormWidgetCollection($form_widgets),
+                           ]);
+    }
+
+    /**
+     * 创建{{entity_name}}
+     *
+     * @acl {zh-CN: 创建{{entity_name}}, en: Create {{entity_en_name}}, desc: }
+     */
+    public function store(StoreRequest $request): BaseResource
+    {
+        $validated = $request->validated();
+        $result    = $this->model->create($validated);
+
+        return BaseResource::make($result);
+    }
+
+    /**
+     * 更新{{entity_name}}
+     *
+     * @acl {zh-CN: 更新{{entity_name}}, en: Update {{entity_en_name}}, desc: }
+     */
+    public function update(UpdateRequest $request, int $id): BaseResource
+    {
+        $validated = $request->validated();
+        $result = $this->model->findOrFail($id);
+        $result->fill($validated);
+        $result->save();
+
+        return BaseResource::make($result);
+    }
+
+    /**
+     * 查看{{entity_name}}
+     *
+     * @acl {zh-CN: 查看{{entity_name}}, en: Show {{entity_en_name}}, desc: }
+     */
+    public function show(int $id): BaseResource
+    {
+        $fields  = [{{index_fields}}];
+        $result  = $this->model->select($fields)->findOrFail($id);
+        $result->append(['options']);
+
+        $columns = [{{show_fields}}];
+
+        return BaseResource::make($result)->additional(['columns' => new ColumnsCollection($columns)]);
+    }
+
+    /**
+     * 删除{{entity_name}}
+     *
+     * @acl {zh-CN: 删除{{entity_name}}, en: Destroy {{entity_en_name}}, desc: }
+     */
+    public function destroy(int $id): BaseResource
+    {
+        return $this->destroyAction($id);
+    }
+
+    /**
+     * 批量删除{{entity_name}}
+     *
+     * @acl {zh-CN: 批量删除{{entity_name}}, en: Batch Destroy {{entity_en_name}}, desc: }
+     */
+    public function destroyBatch(DestroyBatchRequest $request): BaseResource
+    {
+        return $this->destroyBatchAction($request);
+    }
+
+    /**
+     * 永久删除{{entity_name}}
+     *
+     * @acl {zh-CN: 永久删除{{entity_name}}, en: Destroy Forever {{entity_en_name}}, desc: }
+     */
+    public function forceDestroy(int $id): BaseResource
+    {
+        return $this->forceDestroyAction($id);
+    }
+
+    /**
+     * 恢复{{entity_name}}
+     */
+    public function restore(RestoreRequest $request): BaseResource
+    {
+        return $this->restoreAction($request);
+    }
+
+    /**
+     * 创建表单
+     */
+    public function create(CreateRequest $request): FormWidgetCollection
+    {
+        $default      = $this->getFormDefaults('create', $request);
+        $form_widgets = $request->getFormWidgets(request: new StoreRequest(), reset: $default);
+
+        return new FormWidgetCollection($form_widgets);
+    }
+
+    /**
+     * 编辑表单
+     */
+    public function edit(EditRequest $request, int $id): BaseResource
+    {
+        $result       = $this->model->findOrFail($id);
+        $default      = $this->getFormDefaults('edit', $request);
+        $form_widgets = $request->getFormWidgets(request: new UpdateRequest(), reset: $default);
+
+        return BaseResource::make($result)->additional(['form_widgets' => new FormWidgetCollection($form_widgets)]);
+    }
+
+    /**
+     * 表单默认设置
+     */
+    private function getFormDefaults(string $method = 'create', $request): array
+    {
+        return [];
+    }
+
+}

@@ -1,0 +1,18 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models\Traits;
+
+use Illuminate\Support\Carbon;
+
+trait GetUpdatedAtHumanTime
+{
+    /**
+     * 更新时间修改器，人性化时间
+     */
+    public function getUpdatedAtAttribute($value): string
+    {
+        return Carbon::parse($value)->diffForHumans();
+    }
+}

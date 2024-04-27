@@ -1,0 +1,16 @@
+<?php
+namespace {{namespace}};
+
+use Illuminate\Validation\ValidationException;
+use {{base_resources}};
+
+/**
+ * 基础类
+ *
+ * @author  Charsen <https://github.com/charsen>
+ * @date    2021-02-05 90:10:21
+ */
+trait BaseActionTrait
+{
+
+}

@@ -1,25 +1,35 @@
 <?php
 
-namespace Charsen\Scaffold\Foundation;
+namespace Mooeen\Scaffold\Foundation;
 
-use Illuminate\Foundation\Bus\DispatchesJobs;
-use Illuminate\Routing\Controller as BaseController;
-use Illuminate\Foundation\Validation\ValidatesRequests;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\Access\Response;
+use Illuminate\Contracts\Auth\Access\Gate;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Foundation\Bus\DispatchesJobs;
+use Illuminate\Foundation\Validation\ValidatesRequests;
+use Illuminate\Routing\Controller as BaseController;
+use Illuminate\Support\Str;
 
 class Controller extends BaseController
 {
     use AuthorizesRequests, DispatchesJobs, ValidatesRequests;
 
-    protected $method;
-    protected $transform_methods  = ['create' => 'store', 'edit' => 'update'];
+    protected string $method;
+
+    /**
+     * 设置需要转换的动作
+     * - 控制器内的转换 : ['create' => 'index']
+     * - 跨控制器的转换 (完整命名空间): ['index' => 'App\Admin\Controllers\System\DepartmentController::index']
+     * - 跨控制器的转换 (同模块简化写法): ['index' => 'DepartmentController::index']
+     */
+    protected array $transform_methods = [];
 
     /**
      * Execute an action on the controller
      *
-     * @param  string $method
-     * @param  array $parameters
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @param  string  $method
+     * @param  array  $parameters
      */
     public function callAction($method, $parameters)
     {
@@ -30,102 +40,126 @@ class Controller extends BaseController
         if (method_exists($this, 'boot')) {
             $this->boot();
         }
-        // var_dump($parameters);
-        // die();
-        // return call_user_func_array([$this, $method], $parameters);
+
         return $this->{$method}(...array_values($parameters));
     }
 
     /**
      * Check Authorization
      *
-     * @param string $method
-     * @return \Illuminate\Auth\Access\Response
+     * @throws AuthorizationException
      */
-    protected function checkAuthorization()
+    protected function checkAuthorization(): Response|bool
     {
-        if ( ! config('scaffold.authorization.check')) return true;
+        if (! config('scaffold.authorization.check')) {
+            return true;
+        }
 
-        $method     = $this->transform_methods[$this->method] ?? $this->method;
+        $method = $this->getAclMethodName();
+        if (is_string($method)) {
+            return app(Gate::class)->authorize('acl_authentication', $method);
+        }
 
-        $this->authorize('acl_authentication', $this->getAclName(static::class . '-' . $method));
+        $role_actions = getUser()->getActions();
+        // 设置了多个可转移动作
+        foreach ($method as $item) {
+            if (in_array('is_root', $role_actions, true) || in_array($item, $role_actions, true)) {
+                return true;
+            }
+        }
+
+        throw new AuthorizationException();
+    }
+
+    /**
+     * 检查当前用户是否具有制定的能力
+     * 跨控制器的转换 (完整命名空间):  $this->hasAction('App\Admin\Controllers\System\DepartmentController::index')
+     * 跨控制器的转换 (同模块简化写法):  $this->hasAction('DepartmentController::index')
+     */
+    protected function hasAction($ability)
+    {
+        $ability = $this->getOtherControllerAction($ability);
+
+        return app(Gate::class)->check('acl_authentication', $this->formatAclName($ability));
     }
 
     /**
      * 根据配置获取 action 的 acl name
-     *
-     * @param $str
-     *
-     * @return bool|string
      */
-    private function getAclName($str)
+    protected function formatAclName(string $str, bool $plain = false): string
     {
-        $str = str_replace(['\\', 'App-Http-Controllers-', 'Controller'], ['-', '', ''], $str);
-        $str = strtolower($str);
-        if (config('scaffold.authorization.md5'))
-        {
+        $str = Str::snake($str, '-');
+        $str = str_replace(['\\', '-controller::', 'app-', '-controllers-'], ['', '-', '', '-'], $str);
+
+        if (config('scaffold.authorization.md5') && ! $plain) {
             return substr(md5($str), 8, 16);
-            // if (config('scaffold.authorization.short_md5'))
-            // {
-            //     return substr(md5($str), 8, 16);
-            // }
-            // else
-            // {
-            //     return md5($str);
-            // }
         }
 
         return $str;
     }
 
     /**
-     * 设置需要转换的动作
-     *
-     * @param  array $transform
-     * @return void
+     * 获取当前动作对应的权限验证名称
      */
-    protected function setTransformMethods(array $transform)
+    protected function getAclMethodName(): string|array
     {
-        $this->transform_methods = \array_merge($this->transform_methods, $transform);
+        $transform_methods = $this->getTransformMethods();
+        if (! isset($transform_methods[$this->method])) {
+            $method = static::class . '::' . $this->method;
+
+            return $this->formatAclName($method);
+        }
+
+        if (is_string($transform_methods[$this->method])) {
+            if (str_contains($transform_methods[$this->method], '::')) {
+                $method = $this->getOtherControllerAction($transform_methods[$this->method]);
+            } else {
+                $method = static::class . '::' . $transform_methods[$this->method];
+            }
+
+            return $this->formatAclName($method);
+        }
+
+        // 设置了多个可转移动作
+        return array_map(
+            fn ($item) => $this->formatAclName($this->getOtherControllerAction($item)),
+            $transform_methods[$this->method]
+        );
+    }
+
+    /**
+     * 获取另一个控制器的完整动作
+     */
+    private function getOtherControllerAction(string $action): string
+    {
+        if (Str::startsWith($action, 'App\\')) {
+            return $action;
+        }
+
+        // 同模块简化写法 转换
+        $class     = get_called_class();
+        $namespace = substr($class, 0, strrpos($class, '\\'));
+
+        return $namespace . '\\' . $action;
     }
 
     /**
      * 获取当前动作名称，默认情况下优先获取需要转换的名称（便于做权限验证）
-     *
-     * @param boolean $real
-     * @return string
      */
-    protected function getMethod($real = false)
+    protected function getMethod(bool $real = false): string
     {
-        if ($real) return $this->method;
+        if ($real) {
+            return $this->method;
+        }
 
-        return $this->transform_methods[$this->method] ?? $this->method;
+        return $this->getTransformMethods()[$this->method] ?? $this->method;
     }
 
     /**
-     * todo: remove
-     *
-     * 获取数据库字段的文字
-     *
-     * @param  \Illuminate\Database\Eloquent\Model $model
-     * @param  array $fields  数据库字段
-     * @param  array $append  附加的字段（不是已存在的数据库字段，需要额外添加多语言配置）
-     * @return array
+     * 获取所有转换动作
      */
-    public function getDBFieldsTxt($model, array $fields, array $append = [])
+    protected function getTransformMethods(): array
     {
-        $result = [];
-        $fields = \array_merge($fields, $append);
-        foreach ($fields as $key) {
-            //$result[$key] = __('db.' . $key); // __('validation.attributes.' . $key)
-            $column = property_exists($model, 'init_' . $key) ? $key . '_txt' : $key;
-            $result[] = [
-                'key'   => $column,
-                'name'  => __('db.' . $key)
-            ];
-        }
-
-        return $result;
+        return array_merge(['create' => 'store', 'edit' => 'update', 'restore' => 'trashed'], $this->transform_methods);
     }
-
 }

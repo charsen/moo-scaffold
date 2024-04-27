@@ -1,7 +1,8 @@
 <?php
-namespace Charsen\Scaffold\Command;
 
-use Charsen\Scaffold\Generator\CreateSchemaGenerator;
+namespace Mooeen\Scaffold\Command;
+
+use Mooeen\Scaffold\Generator\CreateSchemaGenerator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
@@ -24,7 +25,7 @@ class CreateSchemaCommand extends Command
      *
      * @var string
      */
-    protected $name = 'scaffold:schema';
+    protected $name = 'moo:schema';
 
     /**
      * The console command description.
@@ -35,10 +36,8 @@ class CreateSchemaCommand extends Command
 
     /**
      * Get the console command options.
-     *
-     * @return array
      */
-    protected function getOptions()
+    protected function getOptions(): array
     {
         return [
             [
@@ -53,37 +52,35 @@ class CreateSchemaCommand extends Command
 
     /**
      * Get the console command arguments.
-     *
-     * @return array
      */
-    protected function getArguments()
+    protected function getArguments(): array
     {
         return [
-            ['schema_name', InputArgument::REQUIRED, 'The name of the schema. (Ex: Personnels)'],
+            ['schema_name', InputArgument::REQUIRED, 'The name of the schema. (Ex: System)'],
         ];
     }
 
     /**
      * Execute the console command.
      *
-     * @return void
      * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
-    public function handle()
+    public function handle(): bool
     {
         $this->alert($this->title);
 
         $schema_name = $this->argument('schema_name');
         $force       = $this->option('force') === null;
 
-        if (strstr($schema_name, '/'))
-        {
-            return $this->error('Multi-level directory is not supported at this time.');
+        if (str_contains($schema_name, '/')) {
+            $this->error('Multi-level directory is not supported at this time.');
+
+            return false;
         }
 
         $result = (new CreateSchemaGenerator($this, $this->filesystem, $this->utility))
             ->start($schema_name, $force);
 
-        $this->tipDone($result);
+        return $this->tipDone($result);
     }
 }

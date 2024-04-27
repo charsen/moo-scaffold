@@ -1,5 +1,6 @@
 <?php
-namespace Charsen\Scaffold\Generator;
+
+namespace Mooeen\Scaffold\Generator;
 
 /**
  * Create Schema Generator
@@ -8,28 +9,25 @@ namespace Charsen\Scaffold\Generator;
  */
 class CreateSchemaGenerator extends Generator
 {
-
     /**
-     * @param      $schema_name
-     * @param bool $force
-     *
      * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
-    public function start($schema_name, $force = false)
+    public function start(string $schema_name, bool $force = false): bool
     {
         $schema_relative_file = $this->utility->getSchemaPatch("{$schema_name}.yaml", true);
         $schema_file          = $this->utility->getSchemaPatch("{$schema_name}.yaml");
 
-        if ( ! $this->filesystem->exists($schema_file) || $force)
-        {
+        if (! $this->filesystem->exists($schema_file) || $force) {
             $meta = [
-                'schame_name' => $schema_name,
-                'author'      => $this->utility->getConfig('author'),
-                'date'        => date('Y-m-d H:i:s')
+                'schema_name'  => $schema_name,
+                'author'       => $this->utility->getConfig('author'),
+                'date'         => date('Y-m-d H:i:s'),
+                'ModuleName'   => $schema_name,
+                'ModuleFolder' => $schema_name,
             ];
             $this->filesystem->put($schema_file, $this->compileStub($meta));
 
-            $this->command->info("+ $schema_relative_file" . ($force ? ' (Overwrited)' : ''));
+            $this->command->info("+ $schema_relative_file" . ($force ? ' (Overwrite)' : ''));
 
             return true;
         }
@@ -40,13 +38,10 @@ class CreateSchemaGenerator extends Generator
     }
 
     /**
-     * @param array $meta
-     *
-     * @return string
      * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
-    protected function compileStub(array $meta)
+    protected function compileStub(array $meta): string
     {
-        return $this->buildStub($meta, $this->getStub('module-schema'));
+        return $this->buildStub($meta, $this->getStub('schema'));
     }
 }

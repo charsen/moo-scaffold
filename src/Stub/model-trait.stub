@@ -1,8 +1,9 @@
 <?php
+declare(strict_types = 1);
+
 namespace {{trait_namespace}};
 
-use DateTimeInterface;
-use App\Exceptions\ModelDictionaryException;
+{{use_class}}
 
 /**
  * Model 与 Request 共用
@@ -12,21 +13,7 @@ use App\Exceptions\ModelDictionaryException;
  */
 trait {{trait_class}}
 {
-    /**
-     * 给 Request 调用，如 uniqure 验证
-     */
-    protected $model_table = '{{table_name}}';
-{{dictionaries}}
-{{get_txt_attribute}}
-{{get_intval_attribute}}
-    /**
-     * 为数组 / JSON 序列化准备日期。
-     *
-     * @param  \DateTimeInterface  $date
-     * @return string
-     */
-    protected function serializeDate(DateTimeInterface $date)
-    {
-        return $date->format($this->dateFormat ?: 'Y-m-d H:i:s');
-    }
+{{get_txt_fn}}
+{{get_float_fn}}
+
 }

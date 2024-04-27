@@ -1,17 +1,17 @@
 <?php
 
-namespace Charsen\Scaffold\Command;
+namespace Mooeen\Scaffold\Command;
 
 use Symfony\Component\Yaml\Yaml;
 use Symfony\Component\Console\Input\InputOption;
-use Charsen\Scaffold\Generator\CreateApiGenerator;
+use Mooeen\Scaffold\Generator\CreateApiGenerator;
 use Symfony\Component\Console\Input\InputArgument;
-use Charsen\Scaffold\Generator\CreateModelGenerator;
-use Charsen\Scaffold\Generator\FreshStorageGenerator;
-use Charsen\Scaffold\Generator\CreateMigrationGenerator;
-use Charsen\Scaffold\Generator\CreateControllerGenerator;
-use Charsen\Scaffold\Generator\UpdateMultilingualGenerator;
-use Charsen\Scaffold\Generator\UpdateAuthorizationGenerator;
+use Mooeen\Scaffold\Generator\CreateModelGenerator;
+use Mooeen\Scaffold\Generator\FreshStorageGenerator;
+use Mooeen\Scaffold\Generator\CreateMigrationGenerator;
+use Mooeen\Scaffold\Generator\CreateControllerGenerator;
+use Mooeen\Scaffold\Generator\UpdateMultilingualGenerator;
+use Mooeen\Scaffold\Generator\UpdateAuthorizationGenerator;
 /**
  * Free : Release your hands
  *
@@ -31,7 +31,7 @@ class FreeCommand extends Command
      *
      * @var string
      */
-    protected $name = 'scaffold:free';
+    protected $name = 'moo:free';
 
     /**
      * The console command description.
@@ -100,27 +100,27 @@ class FreeCommand extends Command
         $yaml          = new Yaml;
         $data          = $yaml::parseFile($schema_path . $schema_name . '.yaml');
 
-        $this->tipCallCommand('scaffold:fresh');
+        $this->tipCallCommand('moo:fresh');
         (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start($clean);
 
-        $this->tipCallCommand('scaffold:model');
+        $this->tipCallCommand('moo:model');
         (new CreateModelGenerator($this, $this->filesystem, $this->utility))->start($schema_name, $force);
 
-        $this->tipCallCommand('scaffold:controller');
+        $this->tipCallCommand('moo:controller');
         (new CreateControllerGenerator($this, $this->filesystem, $this->utility))->start($schema_name, $force);
 
-        $this->tipCallCommand('scaffold:api');
+        $this->tipCallCommand('moo:api');
         //$namespace     = "{$data['package']['folder']}/{$data['module']['folder']}";
         $namespace     = "{$data['module']['folder']}";
         (new CreateApiGenerator($this, $this->filesystem, $this->utility))->start($namespace, false, $force);
 
-        $this->tipCallCommand('scaffold:i18n');
+        $this->tipCallCommand('moo:i18n');
         (new UpdateMultilingualGenerator($this, $this->filesystem, $this->utility))->start();
 
-        $this->tipCallCommand('scaffold:auth');
+        $this->tipCallCommand('moo:auth');
         (new UpdateAuthorizationGenerator($this, $this->filesystem, $this->utility))->start();
 
-        $this->tipCallCommand('scaffold:migration');
+        $this->tipCallCommand('moo:migration');
         (new CreateMigrationGenerator($this, $this->filesystem, $this->utility))->start($schema_name);
 
         if ($this->confirm("Do you want to Execute 'artisan migrate' ?", 'yes'))

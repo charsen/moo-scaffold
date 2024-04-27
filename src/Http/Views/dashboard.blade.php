@@ -1,6 +1,6 @@
 @extends('scaffold::layouts.two_columns')
 
-@section('title', 'Charsen/Laravel-Scaffold')
+@section('title', 'Mooeen/Scaffold')
 
 @section('right')
 <div class="panel">

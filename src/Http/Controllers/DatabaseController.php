@@ -1,13 +1,13 @@
 <?php
 
-namespace Charsen\Scaffold\Http\Controllers;
+namespace Mooeen\Scaffold\Http\Controllers;
 
 use Illuminate\Http\Request;
 
 /**
  * Class     DatabaseController
  *
- * @package  Charsen\Scaffold\Http\Controllers
+ * @package  Mooeen\Scaffold\Http\Controllers
  * @author Charsen https://github.com/charsen
  */
 class DatabaseController extends Controller
@@ -24,8 +24,8 @@ class DatabaseController extends Controller
         $data['current_table']      = $req->input('table', null);
         $data['first_menu_active']  = $data['current_file'] != null;
         $data['first_table_active'] = $data['current_file'] != null;
-    
-    
+
+
         return $this->view('db.index', $data);
     }
 
@@ -40,10 +40,10 @@ class DatabaseController extends Controller
             'uri'   => $req->getPathInfo(),
             'data'  => $this->utility->getDictionaries(false),
         ];
-        
+
         return $this->view('db.dictionaries', $data);
     }
-    
+
     /**
      * table view
      *
@@ -56,7 +56,7 @@ class DatabaseController extends Controller
     {
         $file_name = $req->input('name', null);
         $data      = ['data' => $this->utility->getOneTable($file_name)];
-        
+
         // 从 i18n 里读取字段名称
         $lang_fields = $this->utility->getLangFields();
         foreach ($data['data']['fields'] as $key => &$attr)
@@ -66,7 +66,7 @@ class DatabaseController extends Controller
                 $attr['name'] = $lang_fields[$key]['zh-CN'];
             }
         }
-        
+
         return $this->view('db.show', $data);
     }
 }

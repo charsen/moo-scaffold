@@ -1,5 +1,6 @@
 <?php
-namespace Charsen\Scaffold\Generator;
+
+namespace Mooeen\Scaffold\Generator;
 
 /**
  * Init Scaffold
@@ -8,13 +9,10 @@ namespace Charsen\Scaffold\Generator;
  */
 class InitGenerator extends Generator
 {
-
     /**
-     * @param string $author
-     *
      * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
-    public function start(string $author)
+    public function start(string $author): bool
     {
         $this->createFolder();
 
@@ -26,36 +24,28 @@ class InitGenerator extends Generator
     }
 
     /**
-     * 在 .evn 文件里添加 LARAVEL_SCAFFOLD_AUTHOR 信息
-     *
-     * @param string $author
+     * 在 .evn 文件里添加 SCAFFOLD_AUTHOR 信息
      *
      * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
-    private function updateEnvFile(string $author)
+    private function updateEnvFile(string $author): void
     {
         $file = base_path('.env');
-        if ( ! $this->filesystem->isFile($file))
-        {
-            $this->command->warn('The .evn file is not found. (Can not save your name.)');
-        }
-        else
-        {
+        if (! $this->filesystem->isFile($file)) {
+            $this->command->error('The .evn file is not found. (Can not save your name.)');
+        } else {
             $env_txt = $this->filesystem->get($file);
-            if (preg_match('/LARAVEL_SCAFFOLD_AUTHOR=.*/i', $env_txt))
-            {
+            if (preg_match('/SCAFFOLD_AUTHOR=.*/i', $env_txt)) {
                 $env_txt = preg_replace(
-                    '/LARAVEL_SCAFFOLD_AUTHOR=.*/',
-                    "LARAVEL_SCAFFOLD_AUTHOR=\"{$author}\"",
+                    '/SCAFFOLD_AUTHOR=.*/',
+                    "SCAFFOLD_AUTHOR=\"{$author}\"",
                     $env_txt
                 );
                 $this->filesystem->put($file, $env_txt);
-                $this->command->info(" .env updated LARAVEL_SCAFFOLD_AUTHOR=\"{$author}\"");
-            }
-            else
-            {
-                $this->filesystem->append($file, "\nLARAVEL_SCAFFOLD_AUTHOR=\"{$author}\"");
-                $this->command->info("+ .env added LARAVEL_SCAFFOLD_AUTHOR=\"{$author}\"");
+                $this->command->info(" .env updated SCAFFOLD_AUTHOR=\"{$author}\"");
+            } else {
+                $this->filesystem->append($file, "\nSCAFFOLD_AUTHOR=\"{$author}\"");
+                $this->command->info("+ .env added SCAFFOLD_AUTHOR=\"{$author}\"");
             }
         }
     }
@@ -63,31 +53,18 @@ class InitGenerator extends Generator
     /**
      * 创建目录
      */
-    private function createFolder()
+    private function createFolder(): void
     {
-        $database = [
+        $folders = [
             $this->utility->getDatabasePath('schema'),
-            storage_path('scaffold'),
+            storage_path('scaffold/'),
+            // $this->utility->getApiPath('schema'),
         ];
 
-        $api = [
-            $this->utility->getApiPath('schema'),
-        ];
-
-        $folders = array_merge($database, $api);
-
-        foreach ($folders as $folder)
-        {
+        foreach ($folders as $folder) {
             $relative_path = str_replace(base_path(), '', $folder);
-            if ( ! $this->filesystem->isDirectory($folder))
-            {
-                $this->filesystem->makeDirectory($folder, 0777, true, true);
-                $this->command->info('+ .' . $relative_path);
-            }
-            else
-            {
-                $this->command->warn(' .' . $relative_path . ' (existed)');
-            }
+            $this->checkDirectory($folder);
+            $this->command->info('+ .' . $relative_path);
         }
     }
 }

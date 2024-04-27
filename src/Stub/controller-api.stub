@@ -1,0 +1,76 @@
+<?php
+declare(strict_types = 1);
+
+namespace {{namespace}};
+
+use {{model_class}};
+use {{use_base_action}};
+{{use_requests}}
+use {{use_columns}};
+use {{use_form_widgets}};
+use {{use_table_columns}};
+use {{use_base_resources}};
+use {{use_base_resources_collection}};
+use {{use_base_controller}};
+
+/**
+ * {{entity_name}}控制器
+ *
+ * @package_name {zh-CN: {{package_name}} | en: {{package_en_name}}}
+ * @module_name {zh-CN: {{module_name}} | en: {{module_en_name}}}
+ * @controller_name {zh-CN: {{entity_name}} | en: Management {{entity_en_name}}}
+ *
+ * @author  {{author}}
+ * @date    {{date}}
+ */
+class {{controller_name}}Controller extends Controller
+{
+    use BaseActionTrait;
+
+    protected {{model_name}} $model;
+
+    /**
+     * @param \{{model_class}} $model
+     */
+    public function __construct({{model_name}} $model)
+    {
+        $this->model = $model;
+    }
+
+    /**
+     * {{entity_name}}列表
+     */
+    public function index(IndexRequest $request): BaseResourceCollection
+    {
+        $validated    = $request->validated();
+
+        $fields       = [{{index_fields}}];
+        $result       = $this->model->select($fields)
+                                    ->filter($validated)
+                                    ->latest('{{model_key_name}}')
+                                    ->paginate(($validated['page_limit'] ?? NULL));
+
+        $columns      = [{{index_columns}}];
+        $form_widgets = $request->getFormWidgets(exclude: ['page', 'page_limit']);
+
+        return BaseResource::collection($result)
+                           ->additional([
+                               'columns'      => new TableColumnsCollection($columns),
+                               'form_widgets' => new FormWidgetCollection(collect($form_widgets))
+                           ]);
+    }
+
+    /**
+     * 查看{{entity_name}}
+     */
+    public function show(int $id): BaseResource
+    {
+        $fields  = [{{index_fields}}];
+        $result  = $this->model->select($fields)->findOrFail($id);
+
+        $columns = [{{show_fields}}];
+
+        return BaseResource::make($result)->additional(['columns' => new ColumnsCollection($columns)]);
+    }
+
+}

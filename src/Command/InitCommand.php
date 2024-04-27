@@ -1,9 +1,9 @@
 <?php
-namespace Charsen\Scaffold\Command;
 
-use Charsen\Scaffold\Generator\InitGenerator;
+namespace Mooeen\Scaffold\Command;
+
+use Mooeen\Scaffold\Generator\InitGenerator;
 use Symfony\Component\Console\Input\InputArgument;
-use Symfony\Component\Console\Input\InputOption;
 
 /**
  * Init Laravel Scaffold
@@ -24,7 +24,7 @@ class InitCommand extends Command
      *
      * @var string
      */
-    protected $name = 'scaffold:init';
+    protected $name = 'moo:init';
 
     /**
      * The console command description.
@@ -35,10 +35,8 @@ class InitCommand extends Command
 
     /**
      * Get the console command arguments.
-     *
-     * @return array
      */
-    protected function getArguments()
+    protected function getArguments(): array
     {
         return [
             ['author', InputArgument::REQUIRED, 'Your Name. (Ex: Charsen)'],
@@ -47,10 +45,8 @@ class InitCommand extends Command
 
     /**
      * Execute the console command.
-     *
-     * @return void
      */
-    public function handle()
+    public function handle(): bool
     {
         $this->alert($this->title);
 
@@ -59,6 +55,6 @@ class InitCommand extends Command
         $result = (new InitGenerator($this, $this->filesystem, $this->utility))
             ->start($author);
 
-        $this->tipDone($result);
+        return $this->tipDone($result);
     }
 }

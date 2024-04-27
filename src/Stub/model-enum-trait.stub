@@ -1,0 +1,23 @@
+<?php
+declare(strict_types = 1);
+
+namespace {{namespace}};
+
+use App\Models\Traits\EnumExtend;
+
+/**
+ * {{model_name}} 模型的 {{field_name}} 字段枚举
+ */
+enum {{trait_class}}: int
+{
+    use EnumExtend;
+
+{{case_codes}}
+
+    public static function getLabel(self $value): string
+    {
+        return match ($value) {
+{{case_labels}}
+        };
+    }
+}

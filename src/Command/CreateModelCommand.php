@@ -1,9 +1,9 @@
 <?php
 
-namespace Charsen\Scaffold\Command;
+namespace Mooeen\Scaffold\Command;
 
-use Charsen\Scaffold\Generator\CreateModelGenerator;
-use Charsen\Scaffold\Generator\FreshStorageGenerator;
+use Mooeen\Scaffold\Generator\CreateModelGenerator;
+use Mooeen\Scaffold\Generator\FreshStorageGenerator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
@@ -26,7 +26,7 @@ class CreateModelCommand extends Command
      *
      * @var string
      */
-    protected $name = 'scaffold:model';
+    protected $name = 'moo:model';
 
     /**
      * The console command description.
@@ -37,10 +37,8 @@ class CreateModelCommand extends Command
 
     /**
      * Get the console command arguments.
-     *
-     * @return array
      */
-    protected function getArguments()
+    protected function getArguments(): array
     {
         return [
             ['schema_name', InputArgument::OPTIONAL, 'The name of the schema. (Ex: Personnels)'],
@@ -49,39 +47,22 @@ class CreateModelCommand extends Command
 
     /**
      * Get the console command options.
-     *
-     * @return array
      */
-    protected function getOptions()
+    protected function getOptions(): array
     {
         return [
             [
-                'trait',
-                '-t',
-                InputOption::VALUE_OPTIONAL,
-                'Overwrite Trait File.',
-                false,
-            ],
-
-            [
-                'force',
-                '-f',
-                InputOption::VALUE_OPTIONAL,
-                'Overwrite Model File.',
-                false,
-            ],
-            [
                 'factory',
-                '--factory',
+                '-F',
                 InputOption::VALUE_OPTIONAL,
                 'Build The Factory File & Update DatabaseSeeder.',
                 false,
             ],
             [
-                'fresh',
-                '--fresh',
+                'force',
+                '-f',
                 InputOption::VALUE_OPTIONAL,
-                'Fresh all cache files.',
+                'Overwrite Model File.',
                 false,
             ],
         ];
@@ -90,35 +71,36 @@ class CreateModelCommand extends Command
     /**
      * Execute the console command.
      *
-     * @return void
      * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
-    public function handle()
+    public function handle(): bool
     {
         $this->alert($this->title);
 
         $schema_name = $this->argument('schema_name');
-        if (empty($schema_name))
-        {
+        if (empty($schema_name)) {
             $file_names  = $this->utility->getSchemaNames();
-            $schema_name = $this->choice('What is schema name?', $file_names);
+            $schema_name = $this->choice('Which schema?', $file_names);
         }
 
-        $force       = $this->option('force') === null;
-        $trait       = $this->option('trait') === null;
-        $fresh       = $this->option('fresh') === null;
-        $factory     = $this->option('factory') === null;
-        if ($fresh)
-        {
-            $this->tipCallCommand('scaffold:fresh');
-            $result = (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
+        $this->tipCallCommand('moo:fresh');
+        (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
 
-            $this->tipCallCommand('scaffold:model');
-        }
+        $this->tipCallCommand('moo:model ' . $schema_name);
+
+        $force   = $this->option('force')   !== false;
+        $factory = $this->option('factory') !== false;
 
         $result = (new CreateModelGenerator($this, $this->filesystem, $this->utility))
-            ->start($schema_name, $factory, $force, $trait);
+            ->start($schema_name, $force, $factory);
 
-        $this->tipDone();
+        if ($factory) {
+            if ($this->confirm("Do you want to Execute 'artisan db:seed' ?", 'yes')) {
+                $this->tipCallCommand('db:seed');
+                $this->call('db:seed');
+            }
+        }
+
+        return $this->tipDone($result);
     }
 }

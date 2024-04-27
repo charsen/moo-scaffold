@@ -1,18 +1,18 @@
 <?php
-namespace Charsen\Scaffold;
+
+namespace Mooeen\Scaffold;
 
 use Illuminate\Support\ServiceProvider;
-use Charsen\Scaffold\Command\FreeCommand;
-use Charsen\Scaffold\Command\InitCommand;
-use Charsen\Scaffold\Command\CreateApiCommand;
-use Charsen\Scaffold\Command\CreateModelCommand;
-use Charsen\Scaffold\Command\CreateSchemaCommand;
-use Charsen\Scaffold\Command\FreshStorageCommand;
-use Charsen\Scaffold\Command\CreateMigrationCommand;
-use Charsen\Scaffold\Command\CreateControllerCommand;
-use Charsen\Scaffold\Command\CreateModelFilterCommand;
-use Charsen\Scaffold\Command\UpdateMultilingualCommand;
-use Charsen\Scaffold\Command\UpdateAuthorizationCommand;
+use Mooeen\Scaffold\Command\CreateApiCommand;
+use Mooeen\Scaffold\Command\CreateControllerCommand;
+use Mooeen\Scaffold\Command\CreateMigrationCommand;
+use Mooeen\Scaffold\Command\CreateModelCommand;
+use Mooeen\Scaffold\Command\CreateSchemaCommand;
+use Mooeen\Scaffold\Command\FreeCommand;
+use Mooeen\Scaffold\Command\FreshStorageCommand;
+use Mooeen\Scaffold\Command\InitCommand;
+use Mooeen\Scaffold\Command\UpdateAuthorizationCommand;
+use Mooeen\Scaffold\Command\UpdateMultilingualCommand;
 
 /**
  * Laravel Scaffold Service Provider
@@ -21,17 +21,15 @@ use Charsen\Scaffold\Command\UpdateAuthorizationCommand;
  */
 class ScaffoldProvider extends ServiceProvider
 {
-
     /**
      * Bootstrap the application services.
      */
     public function boot()
     {
-        if ($this->app->runningInConsole())
-        {
+        if ($this->app->runningInConsole()) {
             $this->publishes([__DIR__ . '/../config/config.php' => config_path('scaffold.php')], 'config');
 
-            $this->publishes([__DIR__ . '/../public' => public_path('vendor/scaffold')], 'public');
+            // $this->publishes([__DIR__ . '/../public' => public_path('vendor/scaffold')], 'public');
         }
     }
 
@@ -42,27 +40,28 @@ class ScaffoldProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/config.php', 'scaffold');
 
-        if ($this->app->runningInConsole())
-        {
+        if ($this->app->runningInConsole()) {
             $this->commands([
                 InitCommand::class,
                 CreateSchemaCommand::class,
                 FreshStorageCommand::class,
                 CreateMigrationCommand::class,
                 CreateModelCommand::class,
-                CreateModelFilterCommand::class,
                 CreateControllerCommand::class,
                 UpdateMultilingualCommand::class,
                 CreateApiCommand::class,
                 UpdateAuthorizationCommand::class,
-                FreeCommand::class,
+                //                FreeCommand::class,
             ]);
         }
 
+        // 加载 迁移文件
+        $this->loadMigrationsFrom(__DIR__ . '/migrations');
+
         // 加载 路由
-        $this->loadRoutesFrom(__DIR__ . '/Http/routes.php');
+        // $this->loadRoutesFrom(__DIR__ . '/Http/routes.php');
 
         // 注册扩展包 视图
-        $this->loadViewsFrom(__DIR__ . '/Http/Views', 'scaffold');
+        // $this->loadViewsFrom(__DIR__ . '/Http/Views', 'scaffold');
     }
 }

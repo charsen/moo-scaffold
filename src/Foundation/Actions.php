@@ -1,107 +1,109 @@
 <?php
 
-namespace Charsen\Scaffold\Foundation;
+namespace Mooeen\Scaffold\Foundation;
 
 /**
  * Actions
  *
  * @author : charsen
+ *
  * @date: 2018-12-05 10:48
  */
-
 class Actions
 {
-    private $data = NULL;
+    private array $data;
 
-    function __construct()
+    public function __construct(string $app = 'admin')
     {
-        $this->data = config('actions.actions');
+        $this->data = config('actions.' . $app . '.actions', []);
     }
 
     /**
      * 获取所有数据
-     *
-     * @return \Illuminate\Support\Collection
      */
-    public function get()
+    public function get(): array
     {
-        $result = $this->recursion($this->data);
-
-        return collect($result);
+        return $this->recursion($this->data);
     }
 
     /**
-     * 检查并移除不存在的键值
-     *
-     * @param array $data
-     *
-     * @return array
+     * 获取已选中的权限点
      */
-    public function checkAndRemove(array $data)
+    public static function getCheckedActions(array $data, array &$res = []): array
     {
-        $keys = $this->getKeys()->toArray();
-        foreach ($data as $k => $v)
-        {
-            if (! in_array($v, $keys))
-            {
-                unset($data[$k]);
+        foreach ($data as $key => $v) {
+            if (! empty($v['checked'])) {
+                foreach ($v['checked'] as $c) {
+                    $res[] = $c;
+                }
+            }
+
+            if (! empty($v['children'])) {
+                static::getCheckedActions($v['children'], $res);
             }
         }
 
-        return $data;
+        return $res;
     }
 
     /**
-     * 获取所有键值
-     *
-     * @return \Illuminate\Support\Collection
+     * 给前端格式化权限点
      */
-    public function getKeys()
+    public function formatActions($data, $role_actions, $parent_id = 'app_admin'): array
     {
-        $result = $this->recursionKeys($this->data);
+        $res = [];
 
-        return collect($result);
+        foreach ($data as $key => $v) {
+            $one = ['id' => $key, 'pid' => $parent_id, 'label' => $v['name']];
+
+            if (! empty($v['children'])) {
+                $one['checked']      = [];
+                $one['children_ids'] = [];
+                foreach ($v['children'] as $tmp => $tmp_one) {
+                    $one['children_ids'][] = $tmp;
+                    if (in_array($tmp, $role_actions, true)) {
+                        $one['checked'][]     = $tmp;
+                        $one['indeterminate'] = true;
+                    }
+                }
+                $one['checked_all']   = count($one['checked']) === count($v['children']);
+                $one['indeterminate'] = ! $one['checked_all'] && count($one['checked']) > 0;
+                $one['children']      = static::formatActions($v['children'], $role_actions, $key);
+            }
+
+            $res[] = $one;
+        }
+
+        return $res;
     }
 
     /**
      * 获取所有 Actions 键值
-     *
-     * @return array
      */
-    public function getActions()
+    public function getOnlyActionKeys(): array
     {
-        $result = $this->recursionActions($this->data);
-
-        return $result;
+        return $this->recursionOnlyActions($this->data);
     }
 
     /**
      * 递归获取 Actions 键值
-     *
-     * @param array $data
-     * @param array $all_actions
-     * @return array
      */
-    private function recursionActions($data, &$all_actions = [])
+    private function recursionOnlyActions(array $data, array &$all_actions = []): array
     {
-        if (empty($data)) return [];
+        if (empty($data)) {
+            return [];
+        }
 
-        foreach ($data as $key => $val)
-        {
-            if (preg_match("/[\w\-]+Controller$/", $key))
-            {
-                foreach ($val as $action)
-                {
+        foreach ($data as $key => $val) {
+            if (preg_match('/controller\-[\w\-]+$/', $key)) {
+                foreach ($val as $action) {
                     // 只保留有多语言的功能
-                    if (__('actions.' . $action) != 'actions.' . $action)
-                    {
+                    if (__('actions.' . $action) !== 'actions.' . $action) {
                         $all_actions[] = $action;
                     }
                 }
-            }
-            else
-            {
-                $this->recursionActions($val, $all_actions);
+            } else {
+                $this->recursionOnlyActions($val, $all_actions);
             }
         }
 
@@ -109,80 +111,38 @@ class Actions
     }
 
     /**
-     * 递归获取键值
-     *
-     * @param array $data
-     * @param array $all_keys
-     * @return array
+     * 递归处理数据
      */
-    private function recursionKeys($data, &$all_keys = [])
+    private function recursion(array $data): array
     {
-        if (empty($data)) return [];
-
-        foreach ($data as $key => $val)
-        {
-            $all_keys[] = $key;
-            if (preg_match("/[\w\-]+Controller$/", $key))
-            {
-                foreach ($val as $action)
-                {
-                    // 只保留有多语言的功能
-                    if (__('actions.' . $action) != 'actions.' . $action)
-                    {
-                        $all_keys[] = $action;
-                    }
-                }
-            }
-            else
-            {
-                $this->recursionKeys($val, $all_keys);
-            }
+        if (empty($data)) {
+            return [];
         }
 
-        return $all_keys;
-    }
-
-    /**
-     * 递归处理数据
-     *
-     * @param       $data
-     *
-     * @return mixed
-     */
-    private function recursion($data)
-    {
-        if (empty($data)) return [];
-
-        foreach ($data as $key => &$val)
-        {
+        foreach ($data as $key => &$val) {
             $lang = __('actions.' . $key);
-            if ($lang == 'actions.' . $key)
-            {
+            if ($lang === 'actions.' . $key) {
                 // 移除没多语言的项目
                 unset($data[$key]);
+
                 continue;
             }
 
-            if (preg_match("/[\w\-]+Controller$/", $key))
-            {
-                $temp           = [];
-                foreach ($val as $action)
-                {
+            if (preg_match('/controller\-[\w\-]+$/', $key)) {
+                $temp = [];
+                foreach ($val as $action) {
                     $action_lang = __('actions.' . $action);
                     // 只保留有多语言的功能
-                    if ($action_lang != 'actions.' . $action)
-                    {
+                    if ($action_lang !== 'actions.' . $action) {
                         $temp[$action] = ['name' => $action_lang];
                     }
                 }
 
                 $data[$key] = [
-                    'name'      => $lang,
-                    'children'   => $temp,
+                    'name'     => $lang,
+                    'children' => $temp,
                 ];
-            }
-            else
-            {
+            } else {
                 $data[$key] = [
                     'name'     => $lang,
                     'children' => $this->recursion($val),
@@ -192,5 +152,4 @@ class Actions
 
         return $data;
     }
-
 }

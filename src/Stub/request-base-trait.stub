@@ -1,0 +1,32 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{namespace}};
+
+{{use_enums}}
+
+trait {{trait_name}}
+{
+    public function getTable(): string
+    {
+        return {{table_name}};
+    }
+
+    public function getValues(string $field): array
+    {
+        $values = {{values}};
+
+        return $values[$field] ?? [];
+    }
+
+    /**
+     * 控制器生成前端表单控件时，获取 options 选项数据
+     */
+    public function options(string $field): array
+    {
+        $options = {{options}};
+
+        return $options[$field] ?? [];
+    }
+}

@@ -1,8 +1,10 @@
 <?php
+declare(strict_types = 1);
+
 namespace {{namespace}};
 
-use Illuminate\Database\Eloquent\Model;
 {{use_class}}
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * {{class}} Model
@@ -10,10 +12,13 @@ use Illuminate\Database\Eloquent\Model;
  * @package {{namespace}};
  * @author  {{author}}
  * @date    {{date}}
+{{property_code}}
+ * @method select(string[] $fields)
+ * @method query()
  */
 class {{class}} extends Model
 {
-    {{use_trait}}
+{{use_trait}}
 
     /**
      * 表格名称
@@ -27,19 +32,23 @@ class {{class}} extends Model
      */
     protected $attributes = [{{attributes}}];
 
+{{casts}}
+
     /**
      * 可以被批量赋值的属性
      * @var array
      */
     protected $fillable = [{{fillable}}];
 
-    /**
-     * 需要转换成日期的属性
-     * @var array
-     */
-    protected $dates = [{{dates}}];
-{{casts}}
 {{hidden}}
 {{appends}}
+
+    /**
+     * 指定 Filter
+     */
+    public function modelFilter(): string
+    {
+        return {{filter}}::class;
+    }
 
 }
