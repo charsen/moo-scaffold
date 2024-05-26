@@ -5,6 +5,7 @@ namespace {{namespace}};
 
 use {{model_class}};
 use {{use_base_action}};
+use {{use_controller_trait}};
 {{use_requests}}
 use {{use_columns}};
 use {{use_form_widgets}};
@@ -26,6 +27,7 @@ use {{use_base_controller}};
 class {{controller_name}}Controller extends Controller
 {
     use BaseActionTrait;
+    use {{controller_name}}Trait;
 
     protected {{model_name}} $model;
 
@@ -42,21 +44,17 @@ class {{controller_name}}Controller extends Controller
      */
     public function index(IndexRequest $request): BaseResourceCollection
     {
-        $validated    = $request->validated();
-
-        $fields       = [{{index_fields}}];
-        $result       = $this->model->select($fields)
-                                    ->filter($validated)
-                                    ->latest('{{model_key_name}}')
-                                    ->paginate(($validated['page_limit'] ?? NULL));
-
-        $columns      = [{{index_columns}}];
-        $form_widgets = $request->getFormWidgets(exclude: ['page', 'page_limit']);
+        $validated = $request->validated();
+        $fields    = $this->getListFields();
+        $result    = $this->model->select($fields)
+                                 ->filter($validated)
+                                 ->latest('{{model_key_name}}')
+                                 ->paginate(($validated['page_limit'] ?? NULL));
 
         return BaseResource::collection($result)
                            ->additional([
-                               'columns'      => new TableColumnsCollection($columns),
-                               'form_widgets' => new FormWidgetCollection(collect($form_widgets))
+                               'columns'      => new TableColumnsCollection($this->getListColumns()),
+                               'form_widgets' => new FormWidgetCollection($this->getListFormWidgets($request)),
                            ]);
     }
 
@@ -65,7 +63,7 @@ class {{controller_name}}Controller extends Controller
      */
     public function show(int $id): BaseResource
     {
-        $fields  = [{{index_fields}}];
+        $fields  = [{{show_fields}}];
         $result  = $this->model->select($fields)->findOrFail($id);
 
         $columns = [{{show_fields}}];

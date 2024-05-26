@@ -5,6 +5,7 @@ namespace {{namespace}};
 
 use {{model_class}};
 use {{use_base_action}};
+use {{use_controller_trait}};
 {{use_requests}}
 use {{use_columns}};
 use {{use_form_widgets}};
@@ -26,6 +27,7 @@ use {{use_base_controller}};
 class {{controller_name}}Controller extends Controller
 {
     use BaseActionTrait;
+    use {{controller_name}}Trait;
 
     protected {{model_name}} $model;
 
@@ -39,8 +41,6 @@ class {{controller_name}}Controller extends Controller
 
     /**
      * 执行 action 前先验证权限
-     *
-     * @throws \Illuminate\Auth\Access\AuthorizationException
      */
     public function boot(): void
     {
@@ -54,23 +54,19 @@ class {{controller_name}}Controller extends Controller
      */
     public function index(IndexRequest $request): BaseResourceCollection
     {
-        $validated    = $request->validated();
-
-        $fields       = [{{index_fields}}];
-        $result       = $this->model->select($fields)
-                                    ->filter($validated)
-                                    ->latest('{{model_key_name}}')
-                                    ->paginate(($validated['page_limit'] ?? NULL));
+        $validated = $request->validated();
+        $fields    = $this->getListFields();
+        $result    = $this->model->select($fields)
+                                 ->filter($validated)
+                                 ->latest('{{model_key_name}}')
+                                 ->paginate(($validated['page_limit'] ?? NULL));
         $result->append(['options']);
 
-        $columns      = [{{index_columns}}];
-        $form_widgets = $request->getFormWidgets(request: $request, exclude: ['page', 'page_limit']);
-
         return BaseResource::collection($result)
-                          ->additional([
-                              'columns'      => new TableColumnsCollection($columns),
-                              'form_widgets' => new FormWidgetCollection($form_widgets),
-                          ]);
+                           ->additional([
+                               'columns'      => new TableColumnsCollection($this->getListColumns()),
+                               'form_widgets' => new FormWidgetCollection($this->getListFormWidgets($request)),
+                           ]);
     }
 
     /**
@@ -78,24 +74,21 @@ class {{controller_name}}Controller extends Controller
      *
      * @acl {zh-CN: {{entity_name}}回收站, en: {{entity_en_name}} Trashed, desc: }
      */
-    public function trashed(TrashedRequest $request): BaseResourceCollection
+    public function trashed(IndexRequest $request): BaseResourceCollection
     {
-        $validated    = $request->validated();
-        $fields       = [{{trashed_fields}}];
-        $result       = $this->model->select($fields)
-                                    ->filter($validated)
-                                    ->latest('deleted_at')
-                                    ->onlyTrashed()
-                                    ->paginate(($validated['page_limit'] ?? NULL));
+        $validated = $request->validated();
+        $fields    = $this->getListFields('trashed');
+        $result    = $this->model->select($fields)
+                                 ->filter($validated)
+                                 ->latest('deleted_at')
+                                 ->onlyTrashed()
+                                 ->paginate(($validated['page_limit'] ?? NULL));
         $result->append(['options']);
-
-        $columns      = [{{trashed_columns}}];
-        $form_widgets = $request->getFormWidgets(request: $request, exclude: ['page', 'page_limit']);
 
         return BaseResource::collection($result)
                            ->additional([
-                               'columns'      => new TableColumnsCollection($columns),
-                               'form_widgets' => new FormWidgetCollection($form_widgets),
+                               'columns'      => new TableColumnsCollection($this->getListColumns('trashed')),
+                               'form_widgets' => new FormWidgetCollection($this->getListFormWidgets($request, 'trashed')),
                            ]);
     }
 
@@ -134,7 +127,7 @@ class {{controller_name}}Controller extends Controller
      */
     public function show(int $id): BaseResource
     {
-        $fields  = [{{index_fields}}];
+        $fields  = [{{show_fields}}];
         $result  = $this->model->select($fields)->findOrFail($id);
         $result->append(['options']);
 
@@ -147,16 +140,6 @@ class {{controller_name}}Controller extends Controller
      * 删除{{entity_name}}
      *
      * @acl {zh-CN: 删除{{entity_name}}, en: Destroy {{entity_en_name}}, desc: }
-     */
-    public function destroy(int $id): BaseResource
-    {
-        return $this->destroyAction($id);
-    }
-
-    /**
-     * 批量删除{{entity_name}}
-     *
-     * @acl {zh-CN: 批量删除{{entity_name}}, en: Batch Destroy {{entity_en_name}}, desc: }
      */
     public function destroyBatch(DestroyBatchRequest $request): BaseResource
     {
@@ -203,13 +186,4 @@ class {{controller_name}}Controller extends Controller
 
         return BaseResource::make($result)->additional(['form_widgets' => new FormWidgetCollection($form_widgets)]);
     }
-
-    /**
-     * 表单默认设置
-     */
-    private function getFormDefaults(string $method = 'create', $request): array
-    {
-        return [];
-    }
-
 }

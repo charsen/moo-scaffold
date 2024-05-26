@@ -59,7 +59,7 @@ return [
         'admin' => [
             'name'       => ['zh-CN' => '后台管理', 'en' => 'Admin'],
             'path'       => 'app/Admin/Controllers/',
-            'requests'   => ['index', 'trashed', 'store', 'update', 'destroyBatch', 'restore', 'create', 'edit'], // 默认的 action 对应的 request 定义
+            'requests'   => ['index', 'store', 'update', 'destroyBatch', 'restore', 'create', 'edit'], // 默认的 action 对应的 request 定义
             'stub'       => 'controller-admin',
             'trait_stub' => 'controller-base-action-trait',
             'route'      => 'routes/admin.php',

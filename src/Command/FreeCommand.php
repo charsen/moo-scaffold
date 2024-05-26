@@ -2,16 +2,17 @@
 
 namespace Mooeen\Scaffold\Command;
 
-use Symfony\Component\Yaml\Yaml;
-use Symfony\Component\Console\Input\InputOption;
 use Mooeen\Scaffold\Generator\CreateApiGenerator;
-use Symfony\Component\Console\Input\InputArgument;
+use Mooeen\Scaffold\Generator\CreateControllerGenerator;
+use Mooeen\Scaffold\Generator\CreateMigrationGenerator;
 use Mooeen\Scaffold\Generator\CreateModelGenerator;
 use Mooeen\Scaffold\Generator\FreshStorageGenerator;
-use Mooeen\Scaffold\Generator\CreateMigrationGenerator;
-use Mooeen\Scaffold\Generator\CreateControllerGenerator;
-use Mooeen\Scaffold\Generator\UpdateMultilingualGenerator;
 use Mooeen\Scaffold\Generator\UpdateAuthorizationGenerator;
+use Mooeen\Scaffold\Generator\UpdateMultilingualGenerator;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Yaml\Yaml;
+
 /**
  * Free : Release your hands
  *
@@ -81,6 +82,7 @@ class FreeCommand extends Command
      * Execute the console command.
      *
      * @return void
+     *
      * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
     public function handle()
@@ -93,12 +95,12 @@ class FreeCommand extends Command
             $schema_name = $this->choice('What is schema name?', $file_names);
         }
 
-        $clean         = $this->option('clean') === null;
-        $force         = $this->option('force') === null;
+        $clean = $this->option('clean') === null;
+        $force = $this->option('force') === null;
 
-        $schema_path   = $this->utility->getDatabasePath('schema');
-        $yaml          = new Yaml;
-        $data          = $yaml::parseFile($schema_path . $schema_name . '.yaml');
+        $schema_path = $this->utility->getDatabasePath('schema');
+        $yaml        = new Yaml;
+        $data        = $yaml::parseFile($schema_path . $schema_name . '.yaml');
 
         $this->tipCallCommand('moo:fresh');
         (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start($clean);
@@ -111,7 +113,7 @@ class FreeCommand extends Command
 
         $this->tipCallCommand('moo:api');
         //$namespace     = "{$data['package']['folder']}/{$data['module']['folder']}";
-        $namespace     = "{$data['module']['folder']}";
+        $namespace = "{$data['module']['folder']}";
         (new CreateApiGenerator($this, $this->filesystem, $this->utility))->start($namespace, false, $force);
 
         $this->tipCallCommand('moo:i18n');
@@ -123,8 +125,7 @@ class FreeCommand extends Command
         $this->tipCallCommand('moo:migration');
         (new CreateMigrationGenerator($this, $this->filesystem, $this->utility))->start($schema_name);
 
-        if ($this->confirm("Do you want to Execute 'artisan migrate' ?", 'yes'))
-        {
+        if ($this->confirm("Do you want to Execute 'artisan migrate' ?", 'yes')) {
             $this->tipCallCommand('migrate');
             $this->call('migrate');
         }

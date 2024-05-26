@@ -54,13 +54,6 @@ class CreateControllerCommand extends Command
     {
         return [
             [
-                'trait',
-                '-t',
-                InputOption::VALUE_OPTIONAL,
-                'Build Trait File.',
-                false,
-            ],
-            [
                 'force',
                 '-f',
                 InputOption::VALUE_OPTIONAL,
@@ -92,18 +85,10 @@ class CreateControllerCommand extends Command
         (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
         $this->tipCallCommand('moo:controller');
 
-        $trait = $this->option('trait') === null;
         $force = $this->option('force') === null;
 
-        if ($trait) {
-            $controllers     = $this->utility->getControllers();
-            $controller_name = $this->choice('Which controller ?', array_keys($controllers));
-            (new CreateControllerGenerator($this, $this->filesystem, $this->utility))
-                                ->buildTrait($controller_name, $controllers[$controller_name], $force);
-        } else {
-            $result = (new CreateControllerGenerator($this, $this->filesystem, $this->utility))
-                        ->start($schema_name, $force);
-            $this->tipDone($result);
-        }
+        $result = (new CreateControllerGenerator($this, $this->filesystem, $this->utility))
+                    ->start($schema_name, $force);
+        $this->tipDone($result);
     }
 }
