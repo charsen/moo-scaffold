@@ -47,7 +47,8 @@ class CreateControllerGenerator extends Generator
                 }
 
                 // 检查目录是否存在，不存在则创建
-                $path = $this->base_path . $uc_app_folder . '/Controllers/' . $attr['module']['folder'];
+                $path = $this->utility->getConfig("controller.{$app_folder}.path");
+                $path = base_path($path) . $attr['module']['folder'];
                 if (! $this->filesystem->isDirectory($path)) {
                     $this->filesystem->makeDirectory($path, 0777, true, true);
                 }
@@ -62,9 +63,10 @@ class CreateControllerGenerator extends Generator
                 $model_class = ucfirst(str_replace(['./', '/'], ['', '\\'], $model_class));
 
                 // 表格数据
-                $table_attrs = $this->utility->getOneTable($attr['table_name']);
-                $fields      = $table_attrs['fields'];
-                $enums       = $table_attrs['enums'];
+                $table_attrs     = $this->utility->getOneTable($attr['table_name']);
+                $fields          = $table_attrs['fields'];
+                $enums           = $table_attrs['enums'];
+                $controller_name = Str::replaceLast('Controller', '', $class);
 
                 $meta = [
                     'author'                        => $this->utility->getConfig('author'),
@@ -78,18 +80,17 @@ class CreateControllerGenerator extends Generator
                     'entity_en_name'                => $attr['model_class'],
                     'namespace'                     => "{$namespace_pre}{$attr['module']['folder']}",
                     'use_base_action'               => "{$namespace_pre}Traits\\BaseActionTrait",
+                    'use_controller_trait'          => "{$namespace_pre}{$attr['module']['folder']}\\Traits\\{$controller_name}Trait",
                     'use_base_controller'           => $this->utility->getConfig('class.controller'),
                     'use_base_resources'            => $this->utility->getConfig('class.resources.base'),
                     'use_base_resources_collection' => $this->utility->getConfig('class.resources.collection'),
                     'use_form_widgets'              => $this->utility->getConfig('class.resources.form'),
                     'use_columns'                   => $this->utility->getConfig('class.resources.columns'),
                     'use_table_columns'             => $this->utility->getConfig('class.resources.table_columns'),
-                    'controller_name'               => Str::replaceLast('Controller', '', $class),
-                    'index_fields'                  => $this->getListFields($fields),
-                    'index_columns'                 => $this->getListFields($fields, $app_folder === 'admin'),
+                    'controller_name'               => $controller_name,
+                    'list_fields'                   => $this->getListFields($fields),
+                    'list_columns'                  => $this->getListFields($fields, $app_folder === 'admin'),
                     'show_fields'                   => $this->getShowFields($fields),
-                    'trashed_fields'                => $this->getListFields($fields, false, true),
-                    'trashed_columns'               => $this->getListFields($fields, $app_folder === 'admin', true),
                     'route_key'                     => strtolower(Str::snake($attr['model_class'], '-')),
                     'model_class'                   => $model_class,
                     'model_key_name'                => (new $model_class())->getKeyName(),
@@ -104,6 +105,9 @@ class CreateControllerGenerator extends Generator
                 $meta['use_requests'] = $this->buildRequest($uc_app_folder, $rules, $enums, $table_attrs['index'], $meta, $controller_file, $force);
                 $meta['use_requests'] = implode(PHP_EOL, $meta['use_requests']);
 
+                // build controller trait
+                $this->buildTrait($app_folder, $meta, $force);
+
                 // 生成 controller 文件
                 $controller_relative_file = str_replace(base_path(), '.', $controller_file);
                 if ($this->filesystem->isFile($controller_file) && ! $force) {
@@ -113,6 +117,7 @@ class CreateControllerGenerator extends Generator
                     continue;
                 }
 
+                // build controller
                 $stub    = $this->utility->getConfig('controller.' . $app_folder . '.stub');
                 $content = $this->buildStub($meta, $this->getStub($stub));
                 $this->filesystem->put($controller_file, $content);
@@ -182,7 +187,7 @@ class CreateControllerGenerator extends Generator
         $this->command->info('+ ' . str_replace(base_path(), '.', $trait_file));
 
         // 如果之前已经有 trait 文件了，并且存在 controller 文件，则不再生成 request 文件，避免删除了又重新生成
-        if ($dont_build_request && $this->filesystem->isFile($controller_file)) {
+        if ($dont_build_request && $this->filesystem->isFile($controller_file) && ! $force) {
             return [];
         }
 
@@ -254,27 +259,22 @@ class CreateControllerGenerator extends Generator
     /**
      * 生成 controller 的 trait 代码文件
      */
-    public function buildTrait(string $controller, array $data, bool $force): void
+    public function buildTrait(string $app, array $data, bool $force = false): void
     {
-        $model_class = $this->utility->getConfig('model.path') . $data['module']['folder'] . '/' . $data['model_class'];
-
-        if (count($data['app']) > 1) {
-            $app = $this->command->choice('Which  app?', $data['app']);
-        } else {
-            $app = $data['app'][0];
-        }
-
         $path                = $this->utility->getConfig("controller.{$app}.path");
-        $trait_path          = base_path($path) . $data['module']['folder'] . '/Traits/';
+        $trait_path          = base_path($path) . $data['module_en_name'] . '/Traits/';
         $trait_relative_path = str_replace(base_path(), '.', $trait_path);
 
         $meta = [
-            'namespace'   => ucfirst(str_replace('/', '\\', $path)) . $data['module']['folder'] . '\\Traits',
-            'controller'  => $controller . '\'s',
-            'trait_class' => str_replace('Controller', '', $controller) . 'Trait',
-            'model_class' => ucfirst(str_replace('/', '\\', $model_class)),
-            'author'      => $this->utility->getConfig('author'),
-            'date'        => date('Y-m-d H:i:s'),
+            'namespace'       => $data['namespace'] . '\\Traits',
+            'controller_name' => $data['controller_name'],
+            'trait_class'     => $data['controller_name'] . 'Trait',
+            'model_class'     => $data['model_class'],
+            'model_name'      => $data['model_name'],
+            'list_fields'     => $data['list_fields'],
+            'list_columns'    => $data['list_columns'],
+            'author'          => $data['author'],
+            'date'            => $data['date'],
         ];
 
         // 检查目录是否存在，不存在则创建
@@ -291,9 +291,9 @@ class CreateControllerGenerator extends Generator
             return;
         }
 
-        $content = $this->buildStub($meta, $this->getStub('controller-trait'));
+        $content = $this->buildStub($meta, $this->getStub("controller-{$app}-trait"));
         $this->filesystem->put($trait_file, $content);
-        $this->command->info('+ ' . $trait_relative_file . ' (' . ($force ? 'Updated' : 'Added') . ')');
+        $this->command->info('+ ' . $trait_relative_file);
     }
 
     /**
@@ -414,7 +414,7 @@ class CreateControllerGenerator extends Generator
     /**
      * 获取列表查询字段
      */
-    private function getListFields(array $fields, bool $option = false, bool $trashed = false): string
+    private function getListFields(array $fields, bool $is_columns = false): string
     {
         $fields = array_keys($fields);
 
@@ -426,21 +426,14 @@ class CreateControllerGenerator extends Generator
                 continue;
             }
 
-            if (! $trashed) {
-                if (in_array($value, ['deleted_at'])) {
-                    unset($fields[$k]);
+            // 在 controller 中处理
+            if (in_array($value, ['updated_at', 'deleted_at'])) {
+                unset($fields[$k]);
 
-                    continue;
-                }
-            } else {
-                if (in_array($value, ['updated_at'])) {
-                    unset($fields[$k]);
-
-                    continue;
-                }
+                continue;
             }
 
-            if ($option && in_array($value, ['id', 'created_at'])) { // 列表头，不要 id, created_at 列
+            if ($is_columns && in_array($value, ['id', 'created_at'])) { // 列表头，不要 id, created_at 列
                 unset($fields[$k]);
 
                 continue;
@@ -450,8 +443,8 @@ class CreateControllerGenerator extends Generator
         }
         unset($value);
 
-        if ($option) {  // 列表加入操作列
-            $fields[] = "'options'";
+        if ($is_columns) {  // 一行一个属性
+            return implode(',' . PHP_EOL, $fields);
         }
 
         return implode(', ', $fields);

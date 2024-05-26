@@ -1,0 +1,50 @@
+<?php
+declare(strict_types = 1);
+
+namespace {{namespace}};
+
+use {{model_class}};
+
+/**
+ * {{controller_name}}Controller's Trait
+ *
+ * @author  {{author}}
+ * @date    {{date}}
+ */
+trait {{trait_class}}
+{
+    /**
+     * 列表的查询字段
+     */
+    private function getListFields($action = 'index'): array
+    {
+        $fields = [{{list_fields}}];
+
+        if ($action === 'index') {
+            $append = ['updated_at'];
+        } else {
+            $append = ['deleted_at'];
+        }
+
+        return [...$fields, ...$append];
+    }
+
+
+    /**
+     * 列表的表头
+     */
+    private function getListColumns($action = 'index'): array
+    {
+        $columns = [
+            {{list_columns}}
+        ];
+
+        if ($action === 'index') {
+            $append = ['updated_at', 'options'];
+        } else {
+            $append = ['deleted_at', 'options'];
+        }
+
+        return [...$columns, ...$append];
+    }
+}

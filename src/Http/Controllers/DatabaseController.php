@@ -7,14 +7,12 @@ use Illuminate\Http\Request;
 /**
  * Class     DatabaseController
  *
- * @package  Mooeen\Scaffold\Http\Controllers
  * @author Charsen https://github.com/charsen
  */
 class DatabaseController extends Controller
 {
     /**
      * tables list
-     *
      */
     public function index(Request $req)
     {
@@ -25,13 +23,11 @@ class DatabaseController extends Controller
         $data['first_menu_active']  = $data['current_file'] != null;
         $data['first_table_active'] = $data['current_file'] != null;
 
-
         return $this->view('db.index', $data);
     }
 
     /**
      * dictionaries
-     *
      */
     public function dictionaries(Request $req)
     {
@@ -47,9 +43,9 @@ class DatabaseController extends Controller
     /**
      * table view
      *
-     * @param \Illuminate\Http\Request $req
      *
      * @return \Illuminate\View\View
+     *
      * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
     public function show(Request $req)
@@ -59,10 +55,8 @@ class DatabaseController extends Controller
 
         // 从 i18n 里读取字段名称
         $lang_fields = $this->utility->getLangFields();
-        foreach ($data['data']['fields'] as $key => &$attr)
-        {
-            if (isset($lang_fields[$key]))
-            {
+        foreach ($data['data']['fields'] as $key => &$attr) {
+            if (isset($lang_fields[$key])) {
                 $attr['name'] = $lang_fields[$key]['zh-CN'];
             }
         }
