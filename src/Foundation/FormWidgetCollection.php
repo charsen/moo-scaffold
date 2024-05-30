@@ -26,24 +26,24 @@ class FormWidgetCollection extends ResourceCollection
     {
         $this->collection = $this->collection->map(function ($item, $key) {
             $item['required'] = $item['required'] ?? true;
+            $item['keep_id']  = $item['keep_id']  ?? false;
             $item['label']    = $item['label']    ?? __('validation.attributes.' . $key);
             $item['type']     = $item['type']     ?? 'input';
 
-            // 包含大写 ID 时，做替换处理
-            if (str_contains($item['label'], 'ID')) {
+            // 不保留 ID 字符
+            if ( ! $item['keep_id']) {
                 $item['label'] = trim(str_replace('ID', '', $item['label']));
+
+                if (str_contains($item['label'], ' Ids')) {
+                    $item['label'] = trim(str_replace(' Ids', '', $item['label']));
+                    $item['label'] = Str::plural($item['label']);   // 单数变复数
+                }
             }
 
-            // 包含大写 Ids 时，做替换处理
-            if (str_contains($item['label'], ' Ids')) {
-                $item['label'] = trim(str_replace(' Ids', '', $item['label']));
-                $item['label'] = Str::plural($item['label']);   // 单数变复数
-            }
-
-            $item['placeholder'] = $item['placeholder'] ?? __('validation.attributes.please_enter') . $item['label'];
             if (in_array($item['type'], ['cascader', 'date', 'select', 'radio', 'checkbox'])) {
-                $item['placeholder'] = $item['placeholder'] ?? __('validation.attributes.please_select') . $item['label'];
+                $item['placeholder'] = __('validation.attributes.please_select') . $item['label'];
             }
+            $item['placeholder'] = $item['placeholder'] ?? __('validation.attributes.please_enter') . $item['label'];
 
             // 对 级联选择器 的属性设置
             if ($item['type'] === 'cascader') {
