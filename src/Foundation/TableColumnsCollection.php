@@ -26,7 +26,7 @@ class TableColumnsCollection extends ResourceCollection
     public function toArray($request): array
     {
         $columns = $this->collection->map(function ($item, $index) {
-            $one = ['type' => 'txt', 'align' => 'left', 'key' => null, 'width' => null, 'minWidth' => null, 'fixed' => false];
+            $one = ['type' => 'txt', 'align' => 'left', 'key' => null, 'width' => null, 'minWidth' => null, 'fixed' => false, 'keep_id' => false];
 
             // 覆盖
             if (is_array($item)) {
@@ -53,8 +53,8 @@ class TableColumnsCollection extends ResourceCollection
                 $one['label'] = __('db.' . $label);
             }
 
-            // 包含大写 ID 时，做替换处理
-            if (str_contains($one['label'], 'ID')) {
+            // 不保留 ID 字符
+            if ( ! $one['keep_id']) {
                 $one['label'] = str_replace('ID', '', $one['label']);
             }
 
