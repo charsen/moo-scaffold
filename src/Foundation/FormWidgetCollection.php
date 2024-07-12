@@ -40,10 +40,11 @@ class FormWidgetCollection extends ResourceCollection
                 }
             }
 
-            $item['placeholder'] = $item['placeholder'] ?? __('validation.attributes.please_enter') . $item['label'];
+            // placeholder
             if (in_array($item['type'], ['cascader', 'date', 'select', 'radio', 'checkbox'])) {
-                $item['placeholder'] = $item['placeholder'] ?? __('validation.attributes.please_select') . $item['label'];
+                $item['placeholder'] = __('validation.attributes.please_select') . $item['label'];
             }
+            $item['placeholder'] = $item['placeholder'] ?? __('validation.attributes.please_enter') . $item['label'];
 
             // 对 级联选择器 的属性设置
             if ($item['type'] === 'cascader') {
