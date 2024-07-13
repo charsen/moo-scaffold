@@ -12,6 +12,11 @@ return [
     'author' => env('SCAFFOLD_AUTHOR', ''),
 
     /**
+     * 是否在产品环境生成代码
+     */
+    'enable_in_prod' => false,
+
+    /**
      * 是否使用雪花 ID 主键算法
      */
     'snow_flake_id' => true,

@@ -5,6 +5,8 @@ namespace Mooeen\Scaffold\Command;
 use Illuminate\Console\Command as BaseCommand;
 use Illuminate\Filesystem\Filesystem;
 use Mooeen\Scaffold\Utility;
+use Symfony\Component\Console\Formatter\OutputFormatterStyle;
+use Symfony\Component\Console\Output\ConsoleOutput;
 
 /**
  * Command
@@ -23,6 +25,18 @@ class Command extends BaseCommand
     public function __construct(Filesystem $filesystem, Utility $utility)
     {
         parent::__construct();
+
+        // 在生成环境中关闭命令行功能
+        if ( ! $utility->getConfig('enable_in_prod') && app()->environment('production')) {
+            $output = new ConsoleOutput();
+            $style  = new OutputFormatterStyle('yellow');
+
+            $output->getFormatter()->setStyle('warning', $style);
+            $string = 'Warning: Scaffold is disabled in production environment.';
+
+            $output->writeln("\n<warning>$string</warning>\n");
+            exit;
+        }
 
         $this->filesystem = $filesystem;
         $this->utility    = $utility;
@@ -43,7 +57,8 @@ class Command extends BaseCommand
     {
         if ($result) {
             $this->info("\n √ done!");
-        } else {
+        }
+        else {
             $this->error("\n x failed!");
         }
 
