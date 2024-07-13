@@ -27,7 +27,7 @@ class Command extends BaseCommand
         parent::__construct();
 
         // 在生成环境中关闭命令行功能
-        if ( ! $utility->getConfig('enable_in_prod') && app()->environment('production')) {
+        if ($utility->getConfig('only_in_local') && ! app()->isLocal()) {
             $output = new ConsoleOutput();
             $style  = new OutputFormatterStyle('yellow');
 
