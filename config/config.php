@@ -12,9 +12,9 @@ return [
     'author' => env('SCAFFOLD_AUTHOR', ''),
 
     /**
-     * 是否在产品环境生成代码
+     * 是否只在本地开发环境使用命令行
      */
-    'enable_in_prod' => false,
+    'only_in_local' => true,
 
     /**
      * 是否使用雪花 ID 主键算法
