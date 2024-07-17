@@ -88,14 +88,16 @@ class Controller extends BaseController
      */
     protected function formatAclName(string $str, bool $plain = false): string
     {
-        $str = Str::snake($str, '-');
-        $str = str_replace(['\\', '-controller::', 'app-', '-controllers-'], ['', '-', '', '-'], $str);
+        $str = str_replace('\\', '', Str::snake($str, '-'));
+        list($namespace, $action) = explode('-controllers-', $str);
+        $action = str_replace('app-', '', $namespace) . '-' . $action;
+        $action = str_replace('-controller::', '-', $action);
 
         if (config('scaffold.authorization.md5') && ! $plain) {
-            return substr(md5($str), 8, 16);
+            return substr(md5($action), 8, 16);
         }
 
-        return $str;
+        return $action;
     }
 
     /**
