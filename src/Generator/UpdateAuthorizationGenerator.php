@@ -37,13 +37,13 @@ class UpdateAuthorizationGenerator extends Generator
             $module_key            = $this->getMd5($module_key);
             $modules[$module_key]  = $PMC_names['module']['name'];
 
-            $controller_key               = str_replace(['\\', '-controllers-', '-controller', 'app-'], ['', '-', '', ''], Str::snake($controller, '-'));
+            $controller_key               = str_replace(['\\', $base_namespace, '-controller'], ['', $app, ''], Str::snake($controller, '-'));
             $controller_key               = $this->getMd5($controller_key);
             $controllers[$controller_key] = $PMC_names['controller']['name'];
 
             $action_info = $this->utility->parseActionInfo($this->getMethod($controller, $action));
             $action_name = $this->utility->parseActionName($this->getMethod($controller, $action));
-            $action_key  = str_replace(['\\', '@', '-controllers-', '-controller-', 'app-'], ['', '-', '-', '-', ''], Str::snake($route['action'], '-'));
+            $action_key  = str_replace(['\\', $base_namespace, '-controller@'], ['', $app, '-'], Str::snake($route['action'], '-'));
 
             $meta = [
                 'module_key'       => 'module-' . $module_key,
@@ -145,15 +145,23 @@ class UpdateAuthorizationGenerator extends Generator
     private function buildACLViewer(string $app, string $namespace, array $actions): void
     {
         $code       = ['# ACL'];
-        $controller = '';
-        foreach ($actions as $item) {
-            if ($controller !== $item['controller']) {
-                $controller = $item['controller'];
-                $code[]     = '';
-                $code[]     = '## ' . $item['controller'] . ' - ' . $item['controller_key'];
-            }
+        $current = '';
 
-            $code[] = "- {$item['action_plain_key']} - `{$item['action_key']}` - " . ($item['whitelist'] ? '`whitelist`' : $item['name']);
+        $format_actions = [];
+        foreach ($actions as $item) {
+            $format_actions[$item['controller_key']][] = $item;
+        }
+
+        foreach ($format_actions as $tmp_actions) {
+            foreach ($tmp_actions as $item) {
+                if ($current != $item['controller_key']) {
+                    $current = $item['controller_key'];
+                    $code[] = '';
+                    $code[] = '## ' . $item['controller'] . ' - ' . $item['controller_key'];
+                }
+
+                $code[] = "- {$item['action_plain_key']} - `{$item['action_key']}` - " . ($item['whitelist'] ? '`whitelist`' : $item['name']);
+            }
         }
 
         $this->filesystem->put(app_path($app . '-acl.md'), implode("\n", $code));
