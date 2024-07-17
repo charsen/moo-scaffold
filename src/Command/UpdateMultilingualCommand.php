@@ -40,6 +40,8 @@ class UpdateMultilingualCommand extends Command
     {
         $this->alert($this->title);
 
+        $this->checkRunning();
+
         $this->tipCallCommand('moo:fresh');
         (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start();
 

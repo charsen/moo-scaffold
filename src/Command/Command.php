@@ -26,20 +26,25 @@ class Command extends BaseCommand
     {
         parent::__construct();
 
-        // 在生成环境中关闭命令行功能
-        if ($utility->getConfig('only_in_local') && ! app()->isLocal()) {
+        $this->filesystem = $filesystem;
+        $this->utility    = $utility;
+    }
+
+    /**
+     * 是否在非正式环境中关闭命令行功能
+     */
+    protected function checkRunning(): void
+    {
+        if ($this->utility->getConfig('only_in_local') && ! app()->isLocal()) {
             $output = new ConsoleOutput();
             $style  = new OutputFormatterStyle('yellow');
 
             $output->getFormatter()->setStyle('warning', $style);
-            $string = 'Warning: Scaffold is disabled in production environment.';
+            $string = 'Warning: moo-scaffold command model is closed.';
 
             $output->writeln("\n<warning>$string</warning>\n");
             exit;
         }
-
-        $this->filesystem = $filesystem;
-        $this->utility    = $utility;
     }
 
     /**

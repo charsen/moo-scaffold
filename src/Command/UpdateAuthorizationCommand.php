@@ -123,6 +123,8 @@ class UpdateAuthorizationCommand extends Command
     {
         $this->alert($this->title);
 
+        $this->checkRunning();
+
         $this->app = $this->argument('app');
         $apps      = $this->utility->getConfig('controller');
         if (! isset($apps[$this->app])) {
