@@ -69,6 +69,8 @@ class CreateSchemaCommand extends Command
     {
         $this->alert($this->title);
 
+        $this->checkRunning();
+
         $schema_name = $this->argument('schema_name');
         $force       = $this->option('force') === null;
 

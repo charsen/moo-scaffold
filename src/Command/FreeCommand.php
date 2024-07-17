@@ -89,6 +89,8 @@ class FreeCommand extends Command
     {
         $this->alert($this->title);
 
+        $this->checkRunning();
+
         $schema_name = $this->argument('schema_name');
         if (empty($schema_name)) {
             $file_names  = $this->utility->getSchemaNames();

@@ -72,6 +72,8 @@ class CreateControllerCommand extends Command
     {
         $this->alert($this->title);
 
+        $this->checkRunning();
+
         // 创建 Admin 的 BaseActionTrait
         (new CreateControllerGenerator($this, $this->filesystem, $this->utility))->checkAdminBaseAction();
 
