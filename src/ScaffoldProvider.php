@@ -51,7 +51,7 @@ class ScaffoldProvider extends ServiceProvider
                 UpdateMultilingualCommand::class,
                 CreateApiCommand::class,
                 UpdateAuthorizationCommand::class,
-                //                FreeCommand::class,
+                FreeCommand::class,
             ]);
         }
 

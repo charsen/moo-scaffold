@@ -21,8 +21,11 @@ class FreshStorageGenerator extends Generator
 
     protected string $storage_path_relative;
 
-    public function start($clean = false): bool
+    protected bool $silence = false;
+
+    public function start($clean = false, $silence = false): bool
     {
+        $this->silence = $silence;
         $this->db_schema_path          = $this->utility->getDatabasePath('schema');
         $this->db_relative_schema_path = $this->utility->getDatabasePath('schema', true);
 
@@ -51,7 +54,9 @@ class FreshStorageGenerator extends Generator
                 continue;
             }
 
-            $this->command->warn('+ Parse: ' . str_replace(base_path(), '.', $file));
+            if ( ! $this->silence) {
+                $this->command->warn('+ Parse: ' . str_replace(base_path(), '.', $file));
+            }
 
             $data              = $yaml::parseFile($file);
             $menus[$file_name] = [
@@ -330,10 +335,14 @@ class FreshStorageGenerator extends Generator
 
         // 生成可手动修改，用于多语言的，不能被清空覆盖的
         $put = $this->filesystem->put($yaml_file, implode("\n", $code));
-        if ($put) {
-            $this->command->info('+ ' . $yaml_relative_file);
-        } else {
-            $this->command->error('x ' . $yaml_relative_file);
+
+        if ( ! $this->silence) {
+            if ($put) {
+                $this->command->info('+ ' . $yaml_relative_file);
+            }
+            else {
+                $this->command->error('x ' . $yaml_relative_file);
+            }
         }
     }
 
@@ -387,10 +396,14 @@ class FreshStorageGenerator extends Generator
                     . PHP_EOL;
 
         $put = $this->filesystem->put($this->storage_path . 'fields.php', $php_code);
-        if ($put) {
-            $this->command->info('+ ' . $this->storage_path_relative . 'fields.php');
-        } else {
-            $this->command->error('x ' . $this->storage_path_relative . 'fields.php');
+
+        if ( ! $this->silence) {
+            if ($put) {
+                $this->command->info('+ ' . $this->storage_path_relative . 'fields.php');
+            }
+            else {
+                $this->command->error('x ' . $this->storage_path_relative . 'fields.php');
+            }
         }
     }
 
@@ -406,10 +419,14 @@ class FreshStorageGenerator extends Generator
                         . PHP_EOL;
 
             $put = $this->filesystem->put($this->storage_path . "{$name}.php", $php_code);
-            if ($put) {
-                $this->command->info('+ ' . $this->storage_path_relative . "{$name}.php");
-            } else {
-                $this->command->error('x ' . $this->storage_path_relative . "{$name}.php");
+
+            if ( ! $this->silence) {
+                if ($put) {
+                    $this->command->info('+ ' . $this->storage_path_relative . "{$name}.php");
+                }
+                else {
+                    $this->command->error('x ' . $this->storage_path_relative . "{$name}.php");
+                }
             }
         }
     }
@@ -426,10 +443,13 @@ class FreshStorageGenerator extends Generator
 
         $put = $this->filesystem->put($this->storage_path . 'enums.php', $php_code);
 
-        if ($put) {
-            $this->command->info('+ ' . $this->storage_path_relative . 'enums.php');
-        } else {
-            $this->command->error('x ' . $this->storage_path_relative . 'enums.php');
+        if ( ! $this->silence) {
+            if ($put) {
+                $this->command->info('+ ' . $this->storage_path_relative . 'enums.php');
+            }
+            else {
+                $this->command->error('x ' . $this->storage_path_relative . 'enums.php');
+            }
         }
     }
 
@@ -445,10 +465,13 @@ class FreshStorageGenerator extends Generator
 
         $put = $this->filesystem->put($this->storage_path . 'controllers.php', $php_code);
 
-        if ($put) {
-            $this->command->info('+ ' . $this->storage_path_relative . 'controllers.php');
-        } else {
-            $this->command->error('x ' . $this->storage_path . 'controllers.php');
+        if ( ! $this->silence) {
+            if ($put) {
+                $this->command->info('+ ' . $this->storage_path_relative . 'controllers.php');
+            }
+            else {
+                $this->command->error('x ' . $this->storage_path . 'controllers.php');
+            }
         }
     }
 
@@ -464,10 +487,13 @@ class FreshStorageGenerator extends Generator
 
         $put = $this->filesystem->put($this->storage_path . 'models.php', $php_code);
 
-        if ($put) {
-            $this->command->info('+ ' . $this->storage_path_relative . 'models.php');
-        } else {
-            $this->command->error('x ' . $this->storage_path . 'models.php');
+        if ( ! $this->silence) {
+            if ($put) {
+                $this->command->info('+ ' . $this->storage_path_relative . 'models.php');
+            }
+            else {
+                $this->command->error('x ' . $this->storage_path . 'models.php');
+            }
         }
     }
 
@@ -499,10 +525,13 @@ class FreshStorageGenerator extends Generator
 
         $put = $this->filesystem->put($this->storage_path . 'model_ids.php', $php_code);
 
-        if ($put) {
-            $this->command->info('+ ' . $this->storage_path_relative . 'model_ids.php');
-        } else {
-            $this->command->error('x ' . $this->storage_path . 'model_ids.php');
+        if ( ! $this->silence) {
+            if ($put) {
+                $this->command->info('+ ' . $this->storage_path_relative . 'model_ids.php');
+            }
+            else {
+                $this->command->error('x ' . $this->storage_path . 'model_ids.php');
+            }
         }
     }
 
@@ -518,10 +547,13 @@ class FreshStorageGenerator extends Generator
 
         $put = $this->filesystem->put($this->storage_path . 'tables.php', $php_code);
 
-        if ($put) {
-            $this->command->info('+ ' . $this->storage_path_relative . 'tables.php');
-        } else {
-            $this->command->error('x ' . $this->storage_path . 'tables.php');
+        if ( ! $this->silence) {
+            if ($put) {
+                $this->command->info('+ ' . $this->storage_path_relative . 'tables.php');
+            }
+            else {
+                $this->command->error('x ' . $this->storage_path . 'tables.php');
+            }
         }
     }
 
@@ -530,7 +562,7 @@ class FreshStorageGenerator extends Generator
      */
     private function cleanAll(): void
     {
-        $this->command->warn("\n******************     clean caches     ******************");
+        $this->command->warn("\n## clean caches");
         $clean = $this->filesystem->cleanDirectory($this->storage_path);
         if ($clean) {
             $this->command->info('√ clean ' . $this->storage_path_relative . ' successes!');
@@ -539,7 +571,5 @@ class FreshStorageGenerator extends Generator
         }
 
         $this->utility->addGitIgnore($this->command);
-
-        $this->command->warn("\n******************     moo:fresh     ******************");
     }
 }
