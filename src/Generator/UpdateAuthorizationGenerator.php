@@ -104,38 +104,43 @@ class UpdateAuthorizationGenerator extends Generator
      */
     private function buildLangFiles(string $app, array $controller, array $modules, array $controllers, array $actions): void
     {
+        $apps      = $this->utility->getApps();
         $languages = $this->utility->getConfig('languages');
         foreach ($languages as $lang) {
-            $code = [
-                '<?php',
-                '',
-                'return [',
-            ];
+            $file_path = lang_path($lang . '/actions.php');
+            $data      = $this->filesystem->getRequire($file_path);
 
-            $code[] = $this->getTabs(1) . "'app-{$app}' => '{$controller['name'][$lang]}',";
+            foreach ($apps as $item => $name) {
+                if ($item === $app) {
+                    $data[$app]               = [];
+                    $data[$app]["app-{$app}"] = $controller['name'][$lang];
 
-            foreach ($modules as $key => $val) {
-                $code[] = $this->getTabs(1) . "'module-{$key}' => '{$val[$lang]}',";
-            }
+                    foreach ($modules as $key => $val) {
+                        $data[$app]["module-{$key}"] = $val[$lang];
+                    }
 
-            foreach ($controllers as $key => $val) {
-                $code[] = $this->getTabs(1) . "'controller-{$key}' => '{$val[$lang]}',";
-            }
+                    foreach ($controllers as $key => $val) {
+                        $data[$app]["controller-{$key}"] = $val[$lang];
+                    }
 
-            foreach ($actions as $attr) {
-                if ($attr['whitelist']) {
-                    continue;
+                    foreach ($actions as $attr) {
+                        if ($attr['whitelist']) {
+                            continue;
+                        }
+                        $attr['lang'][$lang]                      = str_replace("'", '&apos;', $attr['lang'][$lang]);
+                        $attr['desc']                             = str_replace("'", '&apos;', $attr['desc']);
+                        $data[$app][$attr['action_key']]          = $attr['lang'][$lang];
+                        $data[$app]["{$attr['action_key']}-desc"] = $attr['desc'];
+                    }
+
+                    $php_code = '<?php' . PHP_EOL
+                        . 'return ' . VarExporter::export($data) . ';'
+                        . PHP_EOL;
+
+                    $this->filesystem->put($file_path, $php_code);
+                    $this->command->info('+ ./lang/' . $lang . '/actions.php (Updated)');
                 }
-                $attr['lang'][$lang] = str_replace("'", '&apos;', $attr['lang'][$lang]);
-                $attr['desc']        = str_replace("'", '&apos;', $attr['desc']);
-                $code[]              = $this->getTabs(1) . "'{$attr['action_key']}' => '{$attr['lang'][$lang]}',";
-                $code[]              = $this->getTabs(1) . "'{$attr['action_key']}-desc' => '{$attr['desc']}',";
             }
-            $code[] = '];';
-            $code[] = '';
-
-            $this->filesystem->put(lang_path($lang . '/actions.php'), implode("\n", $code));
-            $this->command->info('+ ./lang/' . $lang . '/actions.php (Updated)');
         }
     }
 
@@ -144,7 +149,7 @@ class UpdateAuthorizationGenerator extends Generator
      */
     private function buildACLViewer(string $app, string $namespace, array $actions): void
     {
-        $code       = ['# ACL'];
+        $code    = ['# ACL'];
         $current = '';
 
         $format_actions = [];
@@ -156,8 +161,8 @@ class UpdateAuthorizationGenerator extends Generator
             foreach ($tmp_actions as $item) {
                 if ($current != $item['controller_key']) {
                     $current = $item['controller_key'];
-                    $code[] = '';
-                    $code[] = '## ' . $item['controller'] . ' - ' . $item['controller_key'];
+                    $code[]  = '';
+                    $code[]  = '## ' . $item['controller'] . ' - ' . $item['controller_key'];
                 }
 
                 $code[] = "- {$item['action_plain_key']} - `{$item['action_key']}` - " . ($item['whitelist'] ? '`whitelist`' : $item['name']);

@@ -54,7 +54,7 @@ class TableColumnsCollection extends ResourceCollection
             }
 
             // 不保留 ID 字符
-            if ( ! $one['keep_id']) {
+            if (! $one['keep_id']) {
                 $one['label'] = str_replace('ID', '', $one['label']);
             }
 

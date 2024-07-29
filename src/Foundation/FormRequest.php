@@ -71,7 +71,9 @@ class FormRequest extends BaseFormRequest
         $frontend_rules = [];
 
         // 创建表单，默认要带上 options 的默认值，比如：model 的 enum
-        $with_default = ($this->route()->getActionMethod() === 'create' && ! $with_default) ? true : $with_default;
+        if (method_exists($this, 'route')) {
+            $with_default = ($this->route()->getActionMethod() === 'create' && ! $with_default) ? true : $with_default;
+        }
 
         return $this->transformFormWidgets($request, $rules, $frontend_rules, $reset, $exclude, $with_default);
     }

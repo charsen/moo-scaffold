@@ -83,13 +83,8 @@ class FreeCommand extends Command
     protected function getOptions()
     {
         return [
-            [
-                'force',
-                '-f',
-                InputOption::VALUE_OPTIONAL,
-                'Overwrite Models/Controllers Files.',
-                false,
-            ],
+            ['force', '-f', InputOption::VALUE_OPTIONAL, 'Overwrite Models/Controllers Files.', false],
+            ['api', '-a', InputOption::VALUE_OPTIONAL, 'Post/Update Api to debugging tool.', false],
         ];
     }
 
@@ -107,21 +102,23 @@ class FreeCommand extends Command
         $this->checkRunning();
 
         $force = $this->option('force') === null;
+        $api   = $this->option('api')   === null;
 
-        $apps      = $this->utility->getConfig('controller');
+        $apps = $this->utility->getConfig('controller');
         if (empty($this->argument('app'))) {
             $app_keys = array_keys($apps);
-            $app  = $this->choice('which app?', $app_keys);
+            $app      = $this->choice('which app?', $app_keys);
         } else {
             $app = $this->argument('app');
         }
 
         if (! isset($apps[$app])) {
             $this->components->error("The '{$app}' is not configured, Please check again.");
+
             return;
         }
 
-        $file_names  = $this->utility->getSchemaNames();
+        $file_names = $this->utility->getSchemaNames();
         if (empty($this->argument('schema'))) {
             $schema_name = $this->choice('What schema?', $file_names);
         } else {
@@ -130,6 +127,7 @@ class FreeCommand extends Command
 
         if (! in_array($schema_name, $file_names)) {
             $this->components->error("The '{$schema_name}' is not exists, Please check again.");
+
             return;
         }
 
@@ -146,15 +144,18 @@ class FreeCommand extends Command
         $this->tipCallCommand('moo:controller');
         (new CreateControllerGenerator($this, $this->filesystem, $this->utility))->start($schema_name, $force);
 
-        $this->tipCallCommand('moo:api');
-        $routes = (new RouterTool($app, $schema_name, 'uri', $this->utility, $this->router))->init();
-        (new CreateApiGenerator($this, $this->filesystem, $this->utility))->start($app, $schema_name, $routes);
+        // 附加 -a 选项时再执行
+        if ($api) {
+            $this->tipCallCommand('moo:api');
+            $routes = (new RouterTool($app, $schema_name, 'uri', $this->utility, $this->router))->init();
+            (new CreateApiGenerator($this, $this->filesystem, $this->utility))->start($app, $schema_name, $routes);
+        }
 
         $this->tipCallCommand('moo:i18n');
         (new UpdateMultilingualGenerator($this, $this->filesystem, $this->utility))->start();
 
         $this->tipCallCommand('moo:auth');
-        $tool = new RouterTool($app, '', 'action', $this->utility, $this->router);
+        $tool   = new RouterTool($app, '', 'action', $this->utility, $this->router);
         $routes = $tool->init();
         $routes = $tool->stortActions($routes);
         (new UpdateAuthorizationGenerator($this, $this->filesystem, $this->utility))->start($app, $routes);

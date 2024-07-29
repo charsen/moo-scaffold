@@ -31,7 +31,7 @@ class FormWidgetCollection extends ResourceCollection
             $item['type']     = $item['type']     ?? 'input';
 
             // 不保留 ID 字符
-            if ( ! $item['keep_id']) {
+            if (! $item['keep_id']) {
                 $item['label'] = trim(str_replace('ID', '', $item['label']));
 
                 if (str_contains($item['label'], ' Ids')) {

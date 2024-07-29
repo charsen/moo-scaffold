@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
  * @author  {{author}}
  * @date    {{date}}
 {{property_code}}
- * @method select(string[] $fields)
+ * @method select(array $fields)
  * @method query()
  */
 class {{class}} extends Model

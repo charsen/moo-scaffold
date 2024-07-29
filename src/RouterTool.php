@@ -9,10 +9,10 @@ use Illuminate\Routing\ViewController;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use Symfony\Component\Console\Output\ConsoleOutput;
-use Symfony\Component\Console\Terminal;
 use ReflectionClass;
 use ReflectionFunction;
+use Symfony\Component\Console\Output\ConsoleOutput;
+use Symfony\Component\Console\Terminal;
 
 /**
  * Laravel Scaffold Utility
@@ -88,21 +88,21 @@ class RouterTool
      * moo:api 时，$folder != ''，只获取指定目录下的控制器
      * moo:auth 时，$folder = '' $app 下的所有控制器都需要
      */
-    public function __construct(string $app = 'admin', $folder = '', string $sort = 'uri', Utility $utility,  Router $router)
+    public function __construct(string $app, $folder, string $sort, Utility $utility, Router $router)
     {
-        $this->app = $app;
-        $this->folder = $folder;
-        $this->router = $router;
-        $this->sort = $sort;
+        $this->app     = $app;
+        $this->folder  = $folder;
+        $this->router  = $router;
+        $this->sort    = $sort;
         $this->utility = $utility;
-        $this->output = new ConsoleOutput();
+        $this->output  = new ConsoleOutput();
     }
 
     public function init()
     {
-        $apps      = $this->utility->getConfig('controller');
+        $apps = $this->utility->getConfig('controller');
 
-        $this->filter_folder  = ucfirst(rtrim($apps[$this->app]['path'] . $this->folder, '/'));
+        $this->filter_folder = ucfirst(rtrim($apps[$this->app]['path'] . $this->folder, '/'));
         // moo:api 时，$folder != ''，只获取指定目录下的控制器
         if ($this->folder != '') {
             $this->filter_folder  = str_replace(['/<ROOT_PATH>', '/'], ['', '\\'], $this->filter_folder);
@@ -130,7 +130,7 @@ class RouterTool
 
     /**
      * 按指定的键名进行排序
-     * @param $routes
+     *
      * @return mixed
      */
     public function stortActions($routes)
@@ -180,7 +180,6 @@ class RouterTool
         return $this->pluckColumns($routes);
     }
 
-
     /**
      * Get the route information for a given route.
      */
@@ -218,7 +217,7 @@ class RouterTool
         // dump($action_name);
 
         // 当指定的是 控制器的根目录时，目录层级大于 4 的都不要
-        if($this->folder != '') {
+        if ($this->folder != '') {
             $count_path = explode('\\', $action_name);
             if ($this->base_namespace === $this->filter_folder && count($count_path) > 4) {
                 return [];
@@ -255,7 +254,6 @@ class RouterTool
             'action' => $action_name,
         ];
     }
-
 
     /**
      * Determine if the route has been defined outside of the application.
@@ -352,13 +350,13 @@ class RouterTool
             )->implode('<fg=#6C7280>|</>');
 
             return [sprintf(
-                        '  <fg=white;options=bold>%s</> %s<fg=white>%s</><fg=#6C7280>%s %s</>',
-                        $method,
-                        $spaces,
-                        preg_replace('#({[^}]+})#', '<fg=yellow>$1</>', $uri),
-                        $dots,
-                        str_replace('   ', ' › ', $action ?? ''),
-                    )];
+                '  <fg=white;options=bold>%s</> %s<fg=white>%s</><fg=#6C7280>%s %s</>',
+                $method,
+                $spaces,
+                preg_replace('#({[^}]+})#', '<fg=yellow>$1</>', $uri),
+                $dots,
+                str_replace('   ', ' › ', $action ?? ''),
+            )];
         })
                       ->flatten()
                       ->filter()

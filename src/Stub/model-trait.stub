@@ -6,10 +6,9 @@ namespace {{trait_namespace}};
 {{use_class}}
 
 /**
- * Model 与 Request 共用
+ * {{trait_class}}
  *
  * - 会被生成直接覆盖，所以不要在这里写代码
- * - 用于验证，生成表单控件，生成接口参数
  */
 trait {{trait_class}}
 {

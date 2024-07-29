@@ -62,8 +62,7 @@ class Command extends BaseCommand
     {
         if ($result) {
             $this->info("\n √ done!");
-        }
-        else {
+        } else {
             $this->error("\n x failed!");
         }
 

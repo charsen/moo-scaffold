@@ -13,9 +13,12 @@ class Actions
 {
     private array $data;
 
+    private string $app;
+
     public function __construct(string $app = 'admin')
     {
-        $this->data = config('actions.' . $app . '.actions', []);
+        $this->app  = $app;
+        $this->data = config('actions.' . $this->app . '.actions', []);
     }
 
     /**
@@ -49,9 +52,10 @@ class Actions
     /**
      * 给前端格式化权限点
      */
-    public function formatActions($data, $role_actions, $parent_id = 'app_admin'): array
+    public function formatActions($data, $role_actions, $parent_id = ''): array
     {
-        $res = [];
+        $parent_id = $parent_id === '' ? "app_{$this->app}" : $parent_id;
+        $res       = [];
 
         foreach ($data as $key => $v) {
             $one = ['id' => $key, 'pid' => $parent_id, 'label' => $v['name']];
@@ -98,7 +102,7 @@ class Actions
             if (preg_match('/controller\-[\w\-]+$/', $key)) {
                 foreach ($val as $action) {
                     // 只保留有多语言的功能
-                    if (__('actions.' . $action) !== 'actions.' . $action) {
+                    if (__("actions.{$this->app}.{$action}") !== "actions.{$this->app}.{$action}") {
                         $all_actions[] = $action;
                     }
                 }
@@ -120,8 +124,8 @@ class Actions
         }
 
         foreach ($data as $key => &$val) {
-            $lang = __('actions.' . $key);
-            if ($lang === 'actions.' . $key) {
+            $lang = __("actions.{$this->app}.{$key}");
+            if ($lang === "actions.{$this->app}.{$key}") {
                 // 移除没多语言的项目
                 unset($data[$key]);
 
@@ -131,9 +135,9 @@ class Actions
             if (preg_match('/controller\-[\w\-]+$/', $key)) {
                 $temp = [];
                 foreach ($val as $action) {
-                    $action_lang = __('actions.' . $action);
+                    $action_lang = __("actions.{$this->app}.{$action}");
                     // 只保留有多语言的功能
-                    if ($action_lang !== 'actions.' . $action) {
+                    if ($action_lang !== "actions.{$this->app}.{$action}") {
                         $temp[$action] = ['name' => $action_lang];
                     }
                 }

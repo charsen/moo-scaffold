@@ -10,7 +10,6 @@ use Mooeen\Scaffold\RouterTool;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
-use Symfony\Component\Console\Terminal;
 
 /**
  * Create Api Command
@@ -86,10 +85,10 @@ class CreateApiCommand extends Command
 
         $this->checkRunning();
 
-        $apps      = $this->utility->getConfig('controller');
+        $apps = $this->utility->getConfig('controller');
         if (empty($this->argument('app'))) {
             $app_keys = array_keys($apps);
-            $app  = $this->choice('which app?', $app_keys);
+            $app      = $this->choice('which app?', $app_keys);
         } else {
             $app = $this->argument('app');
 
@@ -113,7 +112,7 @@ class CreateApiCommand extends Command
 
         $this->tipCallCommand('moo:api');
 
-        $tool = new RouterTool($app, $namespace, 'uri', $this->utility, $this->router);
+        $tool   = new RouterTool($app, $namespace, 'uri', $this->utility, $this->router);
         $routes = $tool->init();
 
         $result = (new CreateApiGenerator($this->components, $this->filesystem, $this->utility))

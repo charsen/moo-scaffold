@@ -68,14 +68,14 @@ class CreateModelGenerator extends Generator
             if ($this->filesystem->isFile($model_file) && ! $force) {
                 $this->command->error('x Model is existed (' . $relative_file . ')');
 
+                // 生成对应的 Filter
+                $this->buildFilter($model_path, $namespace, $filter_class, $table_attr['index'], $table_attr['enums'], $force);
+
                 // 生成对应的 Trait，即使无 'get_txt_fn' 也生成，因验证时要用到
                 $this->buildTrait($model_path, $trait_namespace, $trait_class, $attr['table_name'], $field_codes, $get_float_fn);
 
                 // 生成对应的 Enum
                 $this->buildEnum($table_attr['name'], $model_path, $namespace, $table_attr['enums'], $table_attr['fields']);
-
-                // 生成对应的 Filter
-                $this->buildFilter($model_path, $namespace, $filter_class, $table_attr['index'], $table_attr['enums'], $force);
 
                 // 生成对应的 factory 文件并更新 Seeder
                 if ($factory) {
@@ -90,14 +90,14 @@ class CreateModelGenerator extends Generator
             // 生成 model
             $this->buildModel($model_path, $class, $namespace, $attr, $table_attr, $field_codes, $factory);
 
+            // 生成对应的 Filter
+            $this->buildFilter($model_path, $namespace, $filter_class, $table_attr['index'], $table_attr['enums'], $force);
+
             // 生成对应的 Trait，即使无 'get_txt_fn' 也生成，因验证时要用到
             $this->buildTrait($model_path, $trait_namespace, $trait_class, $attr['table_name'], $field_codes, $get_float_fn);
 
             // 生成对应的 Enum
             $this->buildEnum($table_attr['name'], $model_path, $namespace, $table_attr['enums'], $table_attr['fields']);
-
-            // 生成对应的 Filter
-            $this->buildFilter($model_path, $namespace, $filter_class, $table_attr['index'], $table_attr['enums'], $force);
 
             // 生成对应的 factory 文件并更新 Seeder
             if ($factory) {

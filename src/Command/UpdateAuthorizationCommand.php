@@ -2,23 +2,14 @@
 
 namespace Mooeen\Scaffold\Command;
 
-use Closure;
-use Illuminate\Contracts\Routing\UrlGenerator;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
-use Illuminate\Routing\ViewController;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use Mooeen\Scaffold\Generator\UpdateAuthorizationGenerator;
 use Mooeen\Scaffold\RouterTool;
 use Mooeen\Scaffold\Utility;
-use ReflectionClass;
-use ReflectionFunction;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
-use Symfony\Component\Console\Terminal;
 
 /**
  * Update ACL Command
@@ -73,7 +64,6 @@ class UpdateAuthorizationCommand extends Command
         ];
     }
 
-
     /**
      * Get the console command options.
      *
@@ -97,10 +87,10 @@ class UpdateAuthorizationCommand extends Command
 
         $this->checkRunning();
 
-        $apps      = $this->utility->getConfig('controller');
+        $apps = $this->utility->getConfig('controller');
         if (empty($this->argument('app'))) {
             $app_keys = array_keys($apps);
-            $app  = $this->choice('which app?', $app_keys);
+            $app      = $this->choice('which app?', $app_keys);
         } else {
             $app = $this->argument('app');
         }
@@ -111,7 +101,7 @@ class UpdateAuthorizationCommand extends Command
             return;
         }
 
-        $tool = new RouterTool($app, '', 'action', $this->utility, $this->router);
+        $tool   = new RouterTool($app, '', 'action', $this->utility, $this->router);
         $routes = $tool->init();
         $routes = $tool->stortActions($routes);
 
