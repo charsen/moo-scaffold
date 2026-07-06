@@ -1,0 +1,2357 @@
+// ==============================================================================
+// Page: 数据库设计器 (db/designer/{index,show})
+// Plan 19 v2 落地：把 show.blade.php 的 100+ 处 inline style 抽到这里
+// 命名规则：BEM .p-designer__<block>__<element>--<modifier>
+// ==============================================================================
+
+@use "../base/mixins" as *;   // focus-ring mixin（@use 非传递,逐文件取）
+
+// -------- 概览页（index）卡片网格 --------
+.p-designer-grid {
+  display: grid;
+  // min 240 → 300px:宽屏 5 列 → 4 列,卡内 4 行内容呼吸感更稳(2026-05-22 user 拍板加宽)
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-3);
+
+  // plan-53 出身分块:多块时相邻网格之间留段距(块标题自带上间距,首块标题贴 module-head)
+  + .p-designer-grid__group-title {
+    margin-top: var(--space-5);
+  }
+}
+
+// plan-53 出身分块标题:host / 各扩展包各一块(仅存在扩展包 schema 时才渲染)
+.p-designer-grid__group-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-desc);
+}
+
+.p-designer-grid__group-tag {
+  font-size: var(--font-xs);
+  font-weight: var(--weight-regular);
+  color: var(--text-light);
+}
+
+.p-designer-card {
+  display: block;
+  padding: var(--space-4);
+  border: 1px solid var(--border-light);
+  border-radius: var(--shell-control-radius);  // plan-22: 与 .table 统一 radius,消除 designer index 卡片与其它位置卡片风格脱节
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);              // plan-22: 与 .table 同款浮起,不再"扁平贴页"
+  text-decoration: none;
+  color: inherit;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: var(--accent-hover-border);
+    box-shadow: var(--shadow-modal);
+  }
+
+  // plan-22 修订二:is-locked 保持白底 + 实线 border(用户明确要求),只用 opacity 微降表达"已锁";hover 仍高亮 border
+  &.is-locked {
+    opacity: .85;
+    // border-style 保持实线,background 保持 var(--bg-card) 白底
+
+    &:hover {
+      transform: translateY(-1px);
+      border-color: var(--accent-hover-border);
+      box-shadow: var(--shadow-modal);
+
+      // 2026-05-26 R-8:hover 时 lock-hint 略加深(替代原 badge 反馈)
+      .p-designer-card__lock-hint { color: var(--text-body); }
+    }
+  }
+
+  // P1 #4:onboarding 引导卡(虚线 ghost),无 link
+  &--ghost {
+    border-style: dashed;
+    border-color: var(--border-light);
+    background: transparent;
+    box-shadow: none;
+    cursor: default;
+    color: var(--text-desc);
+
+    &:hover {
+      transform: none;
+      border-color: var(--accent-hover-border);
+      box-shadow: none;
+      color: var(--text-body);
+    }
+
+    .p-designer-card__head h4 {
+      color: var(--text-desc);
+    }
+  }
+
+  // v9 F2:ghost 升级为可点击 action variant(<button>),reset 浏览器默认 + 加 pointer
+  &--action {
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+    width: 100%;
+
+    &:hover {
+      transform: translateY(-1px);
+      border-style: solid;
+      background: var(--bg-page);
+      box-shadow: var(--shadow-card);
+    }
+  }
+}
+
+.p-designer-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+
+  h4 {
+    margin: 0;
+    font-size: var(--font-base);
+    // 模块名走品牌色 accent-text 高亮 — 跟下方 desc/meta 拉层次,
+    // 一眼能找到目标模块。weight-semibold 让橙色不细瘦看不清
+    color: var(--accent-text);
+    font-weight: var(--weight-semibold);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+}
+
+.p-designer-card__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-1);
+  font-size: var(--font-xs);
+  color: var(--text-desc);
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+
+  &--draft { color: var(--badge-green); }
+}
+
+// 2026-05-26 R-8:已生成 = 常态(17 模块绝大多数),原右上"已生成"badge 改 inline lock icon —
+//                语义还在(hover title 提示),但不抢卡片视觉,user 注意力回到"哪些是草稿"
+.p-designer-card__lock-hint {
+  display: inline-flex;
+  align-items: center;
+  margin-left: var(--space-1);
+  color: var(--text-light);
+  transition: color var(--transition-fast);
+}
+
+// 草稿态 ⋯ 菜单(头部右侧;锁定态不渲染)
+.p-designer-card__menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.p-designer-card__menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-desc);
+  font-size: var(--font-md);
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+
+  &:hover {
+    background: var(--bg-card-alt);
+    color: var(--text-heading);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent-hover-border);
+    outline-offset: 1px;
+  }
+}
+
+.p-designer-card__menu-popover {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: 10;
+  min-width: 120px;
+  padding: var(--space-1);
+  border: 1px solid var(--border-light);
+  border-radius: var(--shell-control-radius);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-popover, var(--shadow-card));
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  button {
+    display: block;
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    border-radius: var(--radius-xs);
+    background: transparent;
+    color: var(--text-body);
+    font-size: var(--font-sm);
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast);
+
+    &:hover {
+      background: var(--bg-card-alt);
+    }
+
+    &.is-danger {
+      color: var(--text-error);
+
+      &:hover {
+        background: var(--bg-danger-soft);
+      }
+    }
+  }
+}
+
+// 2026-05-22 plan-43 Batch A:.p-designer-card__hint 死类清(0 blade 引用)
+
+.p-designer-card__desc {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-sm);
+  color: var(--text-desc);
+}
+
+.p-designer-card__meta {
+  display: flex;
+  gap: var(--space-3);
+  font-size: var(--font-sm);
+  color: var(--text-body);
+}
+
+.p-designer-card__migration {
+  margin-top: var(--space-2);
+  font-size: var(--font-xs);
+  color: var(--text-desc);
+}
+
+// 2026-05-30:designer index 金刚区 — 改用首页同款 <x-scaffold::stat-card>(icon + 数字 + 标签),
+//            7 张小卡片单行平铺。user 拍板:要首页那种"一数据一小卡配图标"的细腻感。
+//            外层只当 grid 容器(卡片 chrome 由各 stat-card 自带,不再套外框 banner)。
+.p-designer-hero {
+  display: grid;
+  // 放一行:auto-flow column 强制单行,等分列;minmax(0,1fr) 允许卡片收窄不溢出。卡数增减不用动这里。
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  margin: 0 0 var(--space-5); // 顶距交给 container 标准 padding(去掉额外 16px,跟其他页齐平)
+
+  // 单行 7 卡:收窄 stat-card 内边距,避免挤(scoped override,不动组件默认值 / 不影响 dashboard)
+  .stat-card {
+    padding: var(--space-3) var(--space-4);
+    min-width: 0;
+  }
+
+  // 这 7 张是纯展示 KPI(非 link),去掉 stat-card 默认的 hover 抬起 —— 别给"可点"的假动作
+  .stat-card:hover {
+    transform: none;
+    border-color: var(--border-light);
+    box-shadow: var(--elevation-1);
+  }
+
+  // user 拍板:数字高亮 — 常态就上品牌橙(stat-card 默认 --text-heading,仅 hover 才橙)。
+  // tabular-nums:7 个数字等宽对齐,更"仪表盘"
+  .stat-card__value {
+    color: var(--accent-text);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// 2026-05-26 R-1:多字段索引行内 type select 收窄(原 full-width 过宽,'unique'/'index' 6 字符不需要)
+.p-designer-indexes__type-select {
+  width: auto;
+  min-width: 90px;
+}
+
+// 2026-05-22 plan-43 Batch A:.p-designer-grid__note 死类清(0 blade 引用)
+
+// -------- 详情页（show）actions toolbar --------
+// 2026-05-22:原 .p-designer-header 整块砍 — schema 信息进 sidebar 顶部
+// 2026-05-26:designer 自己的 sub-nav 砍后,actions 借 .scaffold-subnav-bar 视觉(fixed 紧贴主导航,跟 /scaffold/api/* 同款 bar),
+//            blade 上加 .scaffold-subnav-bar class。本规则只 override:
+//            ① breadcrumb 在最左带 margin-right:auto 推开右侧 actions
+//            ② divider 视觉分主次:Runtimes/删表(次) | 保存/生成 migration(主)
+.p-designer-header__actions {
+  // 返回链 + breadcrumb 在左,breadcrumb 用 margin-right:auto 把后面所有 actions 推到右半
+}
+
+// 2026-05-27:返回链从 sidebar 顶部挪进 subnav bar 最左,跟 breadcrumb 一串
+//             视觉:chevron + "返回"小字,outline chip 风格跟右边 breadcrumb 视觉分组,
+//             hover accent(bd + bg + text 同步走 accent),user 一眼识"可点击 nav"
+.p-designer-header__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px var(--space-2);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-xs);
+  background: var(--bg-card);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+  color: var(--text-desc);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+
+  &:hover {
+    color: var(--accent-text);
+    border-color: var(--accent-text);
+    background: var(--accent-bg);
+  }
+}
+
+// breadcrumb:schema · table · 字段数
+.p-designer-header__crumb {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-right: auto;
+  font-size: var(--font-sm);
+  color: var(--text-desc);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.p-designer-header__crumb-mod {
+  font-weight: var(--weight-semibold);
+  color: var(--accent-text);
+}
+
+.p-designer-header__crumb-sep {
+  color: var(--text-light);
+}
+
+.p-designer-header__crumb-table {
+  font-family: var(--font-family-mono);
+  color: var(--text-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.p-designer-header__crumb-count {
+  font-size: var(--font-xs);
+  color: var(--text-light);
+}
+
+.p-designer-header__crumb-hint {
+  font-size: var(--font-xs);
+  color: var(--text-light);
+  font-style: italic;
+}
+
+// plan-53:包 schema git 归属提醒 — 用户拍板(2026-07-03)从整行蓝 banner 收进 breadcrumb 行内 chip:
+// 信息级(蓝 badge 同款),不拦操作,完整措辞进 title(hover 可见)
+.p-designer-header__origin-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  margin-left: var(--space-2);
+  font-size: var(--font-xs);
+  color: var(--badge-blue);
+  background: var(--badge-blue-bg);
+  border: 1px solid color-mix(in srgb, var(--badge-blue) 18%, transparent);
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+}
+
+// divider 主/次按钮分隔(8px gap + 8px margin = 视觉两段)
+.p-designer-header__divider {
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  background: var(--border-light);
+  margin: 0 var(--space-1);
+}
+
+// plan-35 卡 E:.p-designer-header__danger-btn 已删 — blade 改用 <x-scaffold::btn variant="danger" size="sm">,
+// 视觉走 6-components/_btn.scss 的 .btn--danger,跟其他 modal 底部 confirm 按钮统一。
+
+// v6 持续 saving 状态指示器:不像 toast 飘走,固定在 header 一直可见
+.p-designer-header__save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: var(--font-xs);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-desc);
+  font-weight: var(--weight-medium);
+  user-select: none;
+
+  &::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+
+  &.is-idle   { color: var(--text-light); }
+  &.is-saving { color: var(--accent-text); }
+  &.is-saved  { color: var(--badge-green); }
+  &.is-error  { color: var(--badge-red); }
+}
+
+// plan-35 B3:save 失败时显示的重试按钮,小巧紧贴 save-status pill
+.p-designer-header__save-retry {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px var(--space-2);
+  margin-left: var(--space-1);
+  border: 1px solid var(--badge-red);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--badge-red);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+
+  &:hover {
+    background: var(--badge-red);
+    color: var(--text-inverse);
+  }
+  &:active { transform: translateY(1px); }
+}
+
+// 2026-05-22:.p-db-subnav / __item 块清理 — sub-nav.blade.php markup 已迁
+// .scaffold-app-tabs__list / __tab(_header.scss),复用接口调试同款 segmented 风格。
+
+// 2026-05-22 plan-43 Batch A:.p-designer-quicknav / __item 死类清(plan-22 后已无 quicknav 渲染)
+
+// 锚点跳转时让目标 section 顶部留出 sticky header + sub-nav 的空间(不被盖)
+.p-designer-card-block[id^="sec-"] {
+  scroll-margin-top: calc(var(--shell-header-height) + var(--shell-subnav-height) + 56px);
+}
+
+// -------- 二栏 grid (plan-22: 砍左"模块"栏与 index 重复,模块切换走面包屑) --------
+.p-designer-shell {
+  display: grid;
+  grid-template-columns: 330px minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.p-designer-col-sidebar {
+  position: sticky;
+  // 2026-05-30:悬浮左侧,跟其他 sidebar 一样默认满屏高。top 让出 header+subnav+content-top
+  // (原 12px 滚动时会钻到固定栏下被遮;designer show.blade 恒渲染 .scaffold-subnav-bar,故直接含 subnav)。
+  // height 撑满视口余 gap(原公式漏减 subnav+content-top 导致底部溢出);表一多由内层
+  // __list(flex:1 + min-height:0 + overflow-y:auto)接管内部滚动。
+  top: calc(var(--shell-header-height) + var(--shell-subnav-height) + var(--shell-content-top));
+  height: calc(100vh - var(--shell-header-height) - var(--shell-subnav-height) - var(--shell-content-top) - var(--space-5));
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-light);
+  border-radius: var(--shell-card-radius);
+  background: var(--bg-card);
+  box-shadow: var(--elevation-1);
+  overflow: hidden;
+}
+
+// 2026-05-22:schema 名顶部块(原 .p-designer-header 砍后挪到此)
+// 2026-05-27:返回链挪到 subnav bar 最左(.p-designer-header__back),sidebar 顶部只剩 schema 信息 + 表数/新建
+.p-designer-col-sidebar__schema {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-light);
+}
+
+// 模块名 + 中文 desc(一行,中文挤就 ellipsis)
+.p-designer-col-sidebar__schema-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  margin-bottom: var(--space-1);
+}
+
+.p-designer-col-sidebar__schema-name {
+  font-size: var(--font-base);
+  font-weight: var(--weight-semibold);
+  color: var(--accent-text);     // 跟 schema 卡片 head 同款品牌色
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+.p-designer-col-sidebar__schema-zh {
+  font-size: var(--font-xs);
+  color: var(--text-light);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+// 表数 + 新建按钮(独立行)
+.p-designer-col-sidebar__schema-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.p-designer-col-sidebar__schema-count {
+  font-size: var(--font-xs);
+  color: var(--text-desc);
+}
+
+.p-designer-col-sidebar__list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2) 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;   // 2026-06-11:超长表名走截断(见 item 内 span 规则),不允许横向滚动条
+}
+
+.p-designer-col-sidebar__add-btn {
+  border: none;
+  background: transparent;
+  font-size: var(--font-xs);
+  color: var(--accent-text);
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.p-designer-col-main {
+  min-width: 0;
+}
+
+// plan-32:designer 表列表 inline 化(原 .route-sidebar-item 已随 plan-32 清掉,这里自包含)
+// 维持旧 class 名(blade / JS 不动,designer 暂缓 = 不动功能)
+.p-designer-col-tables {
+  .route-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    // 行高 39px:内容 ~20px + 上下各 9.5px(用户 2026-06-16 定;非 token 整值,精确命中)
+    padding: 9.5px var(--space-4);
+    color: var(--text-secondary);
+    font-size: var(--font-sm);
+    text-decoration: none;
+    transition: background var(--transition-fast), color var(--transition-fast);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--accent-text);
+      background: var(--accent-bg);
+    }
+
+    &.active {
+      color: var(--accent-text);
+      font-weight: var(--weight-semibold);
+      background: var(--accent-bg);
+      border-right: 3px solid var(--accent-hover-border);
+    }
+
+    &.is-mono {
+      font-family: var(--font-family-mono);
+    }
+
+    // 2026-06-11:超长表名(如 finance_in_out_budget_subject_templates)截断省略,
+    // 不撑出横向滚动条;完整名悬停 a[title] 可见。序号 / 计数 pill 不参与压缩。
+    .sidebar-tname {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    // 2026-06-16:表名前序号 — 小号 muted,右对齐 + tabular-nums 让个/十位对齐;
+    // 不跟 is-mono 走 mono(数字用常规字)。
+    .sidebar-index {
+      flex-shrink: 0;
+      min-width: 18px;
+      text-align: right;
+      color: var(--text-light);
+      font-size: 11px;
+      font-family: var(--font-family-base);
+      font-variant-numeric: tabular-nums;
+    }
+
+    // 2026-06-10:字段数 pill — plan-32 清旧 .route-sidebar-item 时把 .sidebar-count 样式弄丢了
+    // (一直裸文本)。补回并跟 .side-tree__count 二级 item 档完全同规格:右缘 + muted badge 底。
+    .sidebar-count {
+      flex-shrink: 0;
+      min-width: 18px;
+      height: 14px;
+      line-height: 14px;
+      padding: 0 5px;
+      font-size: 10px;
+      font-family: var(--font-family-base);     // pill 数字不跟 is-mono 走 mono
+      text-align: center;
+      background: var(--accent-bg);
+      color: var(--text-light);    // 同 .side-tree__count:浅橙底 + 常规灰字(文字不高亮)
+      border-radius: var(--radius-pill);
+      font-weight: var(--weight-bold);
+      margin-left: auto;
+    }
+  }
+}
+
+// -------- 主区卡片（六张同款）--------
+.p-designer-card-block {
+  border: 1px solid var(--border-light);
+  border-radius: var(--shell-card-radius);
+  background: var(--bg-card);
+  box-shadow: var(--elevation-1);
+  overflow: hidden;
+  // 2026-05-28 batch 5:卡间节奏从 12px(space-3) 升 16px(space-4) — 跟卡内 padding(space-3) 拉开 in-card vs section-to-section 层级
+  margin-bottom: var(--space-4);
+}
+
+// v6.1 全站统一:跟 .p-db-doc__section-head 风格对齐(base 字号 / heading 色 / 不 uppercase)
+.p-designer-card-block__hd {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text-heading);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+// 卡片标题栏内的小动作按钮(跟 sidebar add-btn 同款轻量风格,F34)
+.p-designer-card-block__hd-btn {
+  position: relative;           // 给 __hd-btn-dot 红点做 anchor,原 blade inline 上提
+  border: 1px solid var(--accent-text);
+  background: transparent;
+  color: var(--accent-text);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  padding: 4px 10px;            // page-specific:button 紧凑密度,不进 token 阶梯
+  margin-left: var(--space-2);  // plan-35 A2:抽 blade 重复 inline style="margin-left:8px"
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  letter-spacing: 0;
+  text-transform: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+
+  &:hover { background: var(--accent-text); color: var(--text-inverse); }
+  &:active { transform: translateY(1px); }
+  &:disabled { opacity: .5; cursor: not-allowed; }
+}
+
+// 按钮上有未完成草稿时的红点(批量翻译草稿、未来其它"待恢复"场景可复用)
+.p-designer-card-block__hd-btn-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-error);
+  box-shadow: 0 0 0 2px var(--bg-card);
+  pointer-events: none;
+}
+
+.p-designer-card-block__hd-aux {
+  margin-left: auto;             // 推到行尾(原 blade 4 处 inline style 上提)
+  font-size: var(--font-xs);
+  color: var(--text-desc);
+  font-weight: normal;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.p-designer-card-block__bd {
+  padding: var(--space-3) var(--space-4);
+}
+
+.p-designer-card-block__bd--enums {
+  // v12.2:每组 1 个小 table,大屏横排
+  // 2026-06-17:auto-fit→auto-fill + min 取 max(380px,48%):
+  //   ① auto-fill 保留空轨道 → 单组居左只占 ~50%,不再被 auto-fit 拉满 100%(用户反馈太宽)
+  //   ② 48% 下限封顶 2 列(每组 ≤50%);窄屏(48%<380px)退回 380px 下限,自然降 1 列
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(max(380px, 48%), 1fr));
+  gap: var(--space-3) var(--space-5);
+}
+
+// v6 批次 A:字段表卡是主操作区,top border 用 accent 色,hd 字号再提一级
+.p-designer-card-block--primary {
+  border-top: 2px solid var(--accent-text);
+  // plan 19 v10 F10-3:主操作区强调 — accent border + 增强 shadow + hd 背景微 tint
+  box-shadow: var(--shadow-modal);
+
+  > .p-designer-card-block__hd {
+    background: var(--bg-page);
+    border-bottom: 1px solid var(--border-light);
+
+    > span:first-child {
+      font-size: var(--font-md);
+      font-weight: var(--weight-bold);
+      color: var(--accent-text);
+    }
+  }
+}
+
+// v6 批次 A:折叠卡(Migration 历史 / YAML 原文 用)。hd 整块可点,带 chevron
+.p-designer-card-block--collapsible {
+  > .p-designer-card-block__hd {
+    cursor: pointer;
+    user-select: none;
+    transition: background var(--transition-fast);
+
+    &:hover { background: var(--bg-card-alt); }
+  }
+
+  &.is-closed > .p-designer-card-block__bd { display: none; }
+  &.is-closed > .p-designer-card-block__hd { border-bottom-color: transparent; }
+}
+
+.p-designer-card-block__chevron {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  color: var(--text-desc);
+  font-size: 10px;            // page-specific:chevron glyph,非文本 font;14px 容器内不能更大
+  margin-right: var(--space-1);
+  transition: transform var(--transition-fast);
+
+  .is-closed & { transform: rotate(-90deg); }
+}
+
+// 2026-05-22 plan-43 Batch A:.p-designer-card-block__bd--codegen 死类清(plan-22 砍 codegen 卡片后无引用)
+
+// -------- 基础信息表单 --------
+// 默认 2-col grid:label 80px | input 1fr。--inline modifier 用横排紧凑:3 字段 1 行
+.p-designer-base-form {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 4px var(--space-2);
+  align-items: center;
+
+  &--inline {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: var(--space-2) var(--space-3);
+
+    @media (max-width: 900px) {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+}
+
+// v6 inline 模式下每个 input 的"label + input 一组" wrapper
+.p-designer-base-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+
+  // 占满整行(描述/Model/Controller 用)
+  &--full { grid-column: 1 / -1; }
+
+  // v6.1 label 风格统一(去 uppercase / letterspacing,跟全站 form/label 一致)
+  > label {
+    font-size: var(--font-sm);
+    color: var(--text-desc);
+    font-weight: var(--weight-medium);
+  }
+}
+
+// 2026-05-22 plan-43 Batch A:.p-designer-base-form__label / __row 死类清(0 blade 引用)
+
+// page-specific(plan-35 A4 卡 D SOP 验证):独立 input class,**不**走 6-components/_input.scss
+// 的 .input 组件 — blade 不带 class="input",是 designer 表单密度专用紧凑型 input。
+// 改 .input 组件默认值时本块不受影响;若以后要统一,改 blade 加 class="input" + modifier。
+.p-designer-base-form__input {
+  flex: 1;
+  padding: var(--space-1) var(--space-2);     // page-specific 紧凑 padding(.input 默认 0 var(--space-4))
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xs);            // page-specific 小圆角(.input 默认 var(--radius-sm))
+  background: var(--bg-input);                // 暗黑主题修法:UA 默认白底会在 dark 下出戏,显式走 token
+  color: var(--text-primary);
+  font-family: var(--font-family-mono);       // page-specific mono(yaml key 写入用)
+  font-size: var(--font-sm);                  // page-specific 13px(.input 默认 var(--font-base) 14px)
+
+  &::placeholder { color: var(--text-light); }
+
+  &--free {
+    flex: none;
+    width: 100%;
+    font-family: inherit;
+  }
+
+  &.is-locked {
+    background: var(--surface-2);
+    color: var(--text-desc);
+  }
+}
+
+.p-designer-base-form__textarea {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xs);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  resize: vertical;
+
+  &::placeholder { color: var(--text-light); }
+}
+
+// 2026-05-22 plan-43 Batch A:.p-designer-base-form__note 死类清(0 blade 引用)
+
+// schema 元数据 audit(创建/最后修改人 + 日期)— 只读小字,单行展示
+// 2026-05-26:blade 把 datetime 截前 10 位只留日期(时分秒 hover title),视觉占行少一半;
+//            原 border-top dashed 跟整张卡的"分隔"语义重复 → 改 padding-top:space-1,纯靠间距分组
+// 注:复用 __field 时父级 flex-direction 是 column,必须显式 row 覆盖,否则两段会被叠成竖排
+.p-designer-base-form__audit {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+  font-size: var(--font-xs);
+  color: var(--text-light);
+  font-family: var(--font-family-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  > span { white-space: nowrap; }
+}
+
+.p-designer-base-form__audit-label {
+  color: var(--text-light);
+  margin-right: var(--space-1);
+}
+
+// plan 19 v10 F10-2:基础信息卡紧凑化配套
+.p-designer-base-form--compact {
+  gap: var(--space-2) var(--space-3);
+
+  // textarea rows=1 视觉等效 input 高度
+  .p-designer-base-form__textarea { min-height: 28px; }
+}
+
+// 锁 icon inline 到 label 旁(替代独占行的⚠️ hint)
+.p-designer-base-form__lock {
+  display: inline-flex;
+  align-items: center;
+  margin-left: var(--space-1);
+  color: var(--text-desc);
+  vertical-align: middle;
+}
+
+// 表 key「改名」入口(未生成 migration 时显示;走显式 rename popover,非行内编辑)
+.p-designer-base-form__rename-btn {
+  margin-left: var(--space-1);
+  padding: 0 var(--space-1);
+  border: 0;
+  background: transparent;
+  color: var(--accent-text);
+  font-size: var(--font-xs);
+  cursor: pointer;
+  vertical-align: middle;
+
+  &:hover { text-decoration: underline; }
+}
+
+// 2026-05-22 plan-43 Batch A:.p-designer-base-form__chips + .p-designer-chip 一族死类清(plan 19 v11 后被 .p-designer-meta grid 替换)
+
+// plan 19 v11 + 紧凑化:Model / Controller / Resource 编辑区
+// v11.1:从 4 行垂直堆 → 2×2 grid,label 宽 auto(紧凑)
+.p-designer-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2) var(--space-5);
+  padding-top: var(--space-2);
+  margin-top: var(--space-2);
+  border-top: 1px dashed var(--border-light);
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.p-designer-meta__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.p-designer-meta__label {
+  flex: 0 0 auto;
+  font-size: var(--font-sm);
+  color: var(--text-desc);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.p-designer-meta__input {
+  flex: 1;
+  min-width: 0;
+}
+
+// toggle chip 容器
+.p-designer-toggle-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+// toggle chip — inactive(实线 outline 灰)/ active(实色 accent)
+// 2026-05-26:inactive 原 `border: 1px dashed` 视觉等同 disabled,user 误判"不可点"。
+//            改 solid border 跟 secondary 按钮同款视觉,user 一眼看出"可选,目前未选"
+.p-designer-toggle-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px var(--space-2);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-xs);
+  background: var(--bg-card);
+  font-size: var(--font-xs);
+  font-family: var(--font-family-mono);
+  color: var(--text-body);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+
+  &:hover:not(.is-active) {
+    border-color: var(--accent-hover-border);
+    color: var(--accent-text);
+  }
+
+  &.is-active {
+    border-color: var(--accent-text);
+    background: var(--accent-text);
+    color: var(--text-inverse);
+  }
+}
+
+// -------- 字段表 --------
+// 2026-05-20 用户反馈:Chrome macOS 上 modal 打开时,底层字段表/索引表的 native <select>
+// 元素穿透显示(native select 不参与 web stacking context,modal backdrop blur 也盖不住)。
+// 解法:designer root 上 :data-modal-open="_isAnyModalOpen"(Alpine 派生),
+// modal 打开时把外层 select 暂时 visibility:hidden(layout 保住,视觉消失)。
+// 不影响 modal 内部的 select(modal 自己 z-index 高,层级正确)。
+// 2026-05-22 plan-43 Batch A:`.p-designer-index-table` 死类(0 blade 引用),compound selector 只留 `.p-designer-fields select` 半边
+.p-designer[data-modal-open="true"] .p-designer-fields select {
+  visibility: hidden;
+}
+
+.p-designer-fields {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-sm);
+
+  // 2026-05-26 P2-8:thead bg 从 --surface-2(几乎跟 body 无差)升 --bg-card-alt + 顶 + 底 border
+  thead tr { background: var(--bg-card-alt); }
+
+  th {
+    padding: var(--space-2) var(--space-3);   // plan-batch-4:跟 .table--compact 默认对齐,4 套 thead 节奏统一
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-desc);
+    font-weight: var(--weight-medium);
+    font-size: var(--font-xs);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  // v6 批次 B:字段名 / 中文名 给 min-width,避免长字段被压挤
+  //   2026-05-21:col-key 表头跟下面 input 对齐(行 td 内 strip btn ~20px + gap 4px 偏移)
+  //   8px (th 原 padding) + 20px (btn 占位) + 4px (gap) = 32px
+  //   2026-05-21:右侧也补 ⚠ icon 占位(16px + gap 4px = 20px),让 col-key 整列总宽稳定
+  // 2026-06-20 列宽再平衡:字段名 180→230(带前缀长名常被截,文字区 = 列宽 - 60padding,需更宽);
+  //   中文名 140→110(短中文标签宽松,且 col-name 是 input、长值滚动不截);腾出的宽给字段名。
+  th.col-key    { min-width: 242px; padding-left: 32px; padding-right: calc(8px + 20px); }
+  th.col-name   { min-width: 110px; }
+  th.col-type   { width: 96px; }
+  // 2026-05-23 user 反馈:size 列原 70px 显紧凑双值 '6,192' 偏窄;110 后偏宽,实测调到 90
+  th.col-size      { width: 90px; }
+  th.col-precision { width: 70px; }      // 精度小数位单数字,沿用旧宽
+  th.col-default   { width: 90px; }
+  // 2026-05-23 user 反馈:format 列('float:100' / 'datetime:Y-m-d' 等)90 偏窄,调到 110
+  th.col-format    { width: 110px; }
+  th.col-index  { width: 80px; }
+  th.col-null   { width: 50px; text-align: center; }
+  // 注释列原无 class → 退化成剩余宽(~36px),"注释" 表头被挤成单字折行(注/释)。
+  // 给最小宽 56px(≥表头 nowrap 所需 ~48px)吃掉表格剩余 slack,表头单行;列体输入仍偏窄,
+  // 是否进一步加宽/重平衡列宽留作者定。2026-06-06 audit F1。
+  th.col-comment { min-width: 56px; white-space: nowrap; }
+  th.col-act    { width: 40px; text-align: center; }
+  // 2026-06-16:最左「上/下移」列,容 ↑↓ 两按钮(放最左,跟右侧 × 删除分开)
+  th.col-move   { width: 46px; text-align: center; }
+  td.col-move   { text-align: center; white-space: nowrap; }
+
+  td {
+    padding: var(--space-1) var(--space-2);
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  td.col-null { text-align: center; }
+  td.col-act { text-align: center; position: relative; }
+
+  // F38 readonly row 加淡灰底 + 弱化文字,跟可编辑 row 视觉区分(不只 opacity)
+  tr.is-readonly {
+    background: var(--bg-card-alt);
+    td { color: var(--text-desc); }
+    code { color: var(--text-desc); }
+  }
+  // 2026-05-26 P1-5:user/system 段过渡处加强顶部 border,user 一眼识别"上面是用户字段,下面是系统字段"
+  // (id 总在最顶 readonly,中间用户字段,最后 deleted_at/created_at/updated_at 三 readonly 行)
+  tr:not(.is-readonly) + tr.is-readonly > td {
+    border-top: 2px solid var(--border-color);
+  }
+  // v6.2 round 4:hover 反馈加强,跟 GitHub PR row hover 一致 8%
+  tr:not(.is-readonly):hover {
+    background: var(--accent-bg);                   // plan-35 A3:rgba(254,133,0,.08) → token,暗黑自动跟
+  }
+}
+
+// v6.2 round 4:校验失败(size 必填空)inline 红框 + 文字色
+// 2026-05-28 batch 5:抽 --ring-danger token(亮 .2 / 暗 .35 双轨);提选择器特异度(input.is-invalid:focus)去 !important
+.p-designer-fields__input.is-invalid {
+  border-color: var(--badge-red);
+  background: var(--badge-red-bg);                  // plan-35 A3:rgba(248,81,73,.06) → token
+
+  &:focus {
+    border-color: var(--badge-red);
+    box-shadow: var(--ring-danger);
+  }
+}
+
+.p-designer-fields__input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);    // plan-43 B token 收口
+  font-family: var(--font-family-mono);
+  background: transparent;
+  color: var(--text-body);              // 暗黑修法:漏 color → UA 默认黑字在 dark bg 上看不见
+  transition: border-color var(--transition-fast),
+              background var(--transition-fast),
+              box-shadow var(--transition-fast);
+
+  &::placeholder { color: var(--text-light); }
+
+  // F40 可编辑态视觉反馈:hover 显边,focus 高亮(user 一眼知道在编辑)
+  &:hover:not([readonly]) {
+    border-color: var(--border-color);
+    background: var(--bg-input);
+  }
+  &:focus:not([readonly]) {
+    border-color: var(--accent-text);
+    background: var(--bg-input);
+    box-shadow: 0 0 0 2px var(--accent-hover-shadow);
+    outline: none;
+  }
+  &[readonly] { cursor: not-allowed; }
+
+  &--bordered {
+    border-color: var(--border-color);
+    background: var(--bg-input);
+    font-family: inherit;
+  }
+}
+
+.p-designer-fields__select {
+  width: 100%;
+  padding: 4px 22px 4px 6px;   // v12.5.2:右边留 22px 给 chevron 箭头
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xs);    // plan-43 B token 收口
+  font-size: var(--font-xs);
+  background-color: var(--bg-input);
+  color: var(--text-body);     // 暗黑修法:漏 color → 暗 bg + UA 默认黑字看不见
+  // v12.5.2:explicit chevron-down SVG,跟 input 视觉区分(系统默认箭头在某些主题下不可见)
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4 L5 7 L8 4' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  background-size: 10px 10px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+
+  &:hover:not(:disabled) { border-color: var(--accent-text); }
+  &:focus:not(:disabled) {
+    border-color: var(--accent-text);
+    box-shadow: 0 0 0 2px var(--accent-hover-shadow);
+    outline: none;
+  }
+  &:disabled { cursor: not-allowed; opacity: .6; }
+}
+
+// checkbox focus(null / unsigned 列)
+.p-designer-fields tbody input[type="checkbox"] {
+  cursor: pointer;
+  &:focus-visible { @include focus-ring(2px); }   // plan-22 T6: 走统一 mixin(focus → focus-visible 避免 mouse click 也亮)
+  &:disabled { cursor: not-allowed; }
+}
+
+.p-designer-fields__row-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px 6px;
+  color: var(--text-desc);
+
+  // 2026-05-21:行级 AI 重译按钮(enum 行内) — 用 accent 色跟 group 级 ai-btn 视觉呼应
+  &--ai {
+    color: var(--accent-text);
+    font-weight: var(--weight-medium);
+
+    &:hover:not(:disabled) { color: var(--accent-text-hover, var(--accent-text)); }
+    &:disabled { opacity: .4; cursor: not-allowed; }
+  }
+
+  // 2026-05-23:行末直接删除按钮(替代 ⋯ + popover 模式)— hover 转 danger 色,提示破坏性操作
+  &--danger {
+    color: var(--text-desc);
+    font-weight: var(--weight-medium);
+    line-height: 1;
+
+    &:hover:not(:disabled) {
+      color: var(--color-danger-strong);
+      background: var(--bg-danger-soft);
+    }
+    &:disabled { opacity: .4; cursor: not-allowed; }
+  }
+
+  // 2026-06-16:字段行上/下移排序按钮 — desc 色 + hover accent;顶/底业务行边界 disabled 置灰
+  &--move {
+    padding: 2px 4px;
+    line-height: 1;
+    color: var(--text-desc);
+
+    &:hover:not(:disabled) { color: var(--accent-text); }
+    &:disabled { opacity: .3; cursor: not-allowed; }
+  }
+
+  // 2026-05-21:字段 key 前缀 strip 按钮 — desc 色 + hover accent
+  //   非 strippable 行通过 .is-placeholder 走 visibility:hidden(保宽不占焦),所有行 key 列对齐
+  &--strip {
+    flex: 0 0 auto;
+    padding: 0 4px;
+    font-size: var(--font-sm);
+    line-height: 1;
+    color: var(--text-desc);
+
+    &:hover:not(:disabled) { color: var(--accent-text); }
+
+    &.is-placeholder {
+      visibility: hidden;
+      pointer-events: none;
+    }
+  }
+}
+
+// 2026-05-21:字段 key 列 flex 容器(strip btn + input + spell warn 同行)
+.p-designer-fields__key-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  > .p-designer-fields__input { flex: 1 1 auto; min-width: 0; }
+}
+
+// 2026-05-21:拼写疑问就近 popover(锚 ⚠ icon 下方 4px)— absolute 定位由 :style 注入 left/top
+.p-designer-fields__spell-popover {
+  position: absolute;
+  z-index: 100;
+  min-width: 280px;
+  max-width: 360px;
+  padding: 10px 14px 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--badge-yellow);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--elevation-2);
+  font-size: var(--font-sm);
+  color: var(--text-body);
+
+  &__close {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-desc);
+    font-size: var(--font-base);
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 6px;
+    &:hover { color: var(--text-body); }
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    font-weight: var(--weight-semibold);
+    color: var(--badge-yellow);
+  }
+
+  &__icon { font-size: var(--font-base); line-height: 1; }
+
+  &__row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 4px 0;
+  }
+
+  &__label {
+    flex: 0 0 auto;
+    color: var(--text-desc);
+    font-size: var(--font-xs);
+    min-width: 32px;
+  }
+
+  &__current,
+  &__sug {
+    font-family: var(--font-family-mono);
+    font-size: var(--font-sm);
+    padding: 1px 6px;
+    border-radius: var(--radius-xs);
+    background: var(--bg-card-alt);
+  }
+  &__sug { color: var(--accent-text); }
+
+  // 2026-05-21:一键采纳建议(走 rename 流) — accent outlined icon-only ✓ btn,放建议右侧
+  &__accept {
+    margin-left: auto;
+    border: 1px solid var(--accent-text);
+    background: transparent;
+    color: var(--accent-text);
+    font-size: var(--font-sm);
+    font-weight: var(--weight-medium);
+    line-height: 1;
+    padding: 2px 7px;
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast);
+
+    &:hover { background: var(--accent-text); color: var(--text-inverse); }
+    &:active { transform: translateY(1px); }
+  }
+
+  &__reason {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--border-light);
+    color: var(--text-desc);
+    font-size: var(--font-xs);
+    line-height: 1.5;
+  }
+
+  &__hint {
+    margin-top: 8px;
+    color: var(--text-desc);
+    font-size: var(--font-xs);
+    font-style: italic;
+  }
+}
+
+// 2026-05-21:AI 拼写检查 warning icon(行内 input 之后) — amber 警示色,hover 看 reason / click 弹就近 popover
+//   非 warning 行通过 is-placeholder 走 visibility:hidden 占位,所有行 key 列总宽稳定
+.p-designer-fields__spell-warn {
+  flex: 0 0 auto;
+  width: 16px;
+  text-align: center;
+  font-size: var(--font-sm);
+  line-height: 1;
+  color: var(--badge-yellow);
+  cursor: pointer;
+  user-select: none;
+  transition: transform var(--transition-fast);
+
+  &:hover { transform: scale(1.15); }
+
+  &.is-placeholder {
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+
+// 2026-05-24 二轮 audit C3:.p-designer-rowmenu + __item + --danger (27 行) 死类整删 — 0 Blade / JS 引用
+// (ff2a97c 行末 ⋯ + popover 改成直接出删除按钮后遗留)
+
+// -------- 改名 popover --------
+.p-designer-rename-popover__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-modal) - 1);
+  background: var(--popover-backdrop);              // plan-35 A3:rgba(15,23,42,.55) → 新 token,暗黑自动加深 65%
+  backdrop-filter: blur(2px);
+}
+
+.p-designer-rename-popover {
+  position: fixed;
+  left: 50%;
+  top: 30%;
+  transform: translateX(-50%);
+  z-index: var(--z-modal);
+  background: var(--surface-1);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4) var(--space-4) var(--space-4);
+  box-shadow: var(--elevation-3);
+  min-width: 360px;
+
+  h4 { margin: 0 0 var(--space-2); font-size: var(--font-base); padding-right: 32px; }
+  p { margin: 0 0 var(--space-2); font-size: var(--font-sm); color: var(--text-desc); }
+  p.is-note { margin: 0 0 var(--space-3); font-size: var(--font-xs); }
+}
+
+// #1 v6.3:翻译预览 modal 内表格 + 状态标签
+.p-designer-translate-preview {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-sm);
+  margin: 6px 0 var(--space-3);
+  // 2026-05-21 bug:无 col widths → key 列只分到 170px,input 154px,
+  // order_user_position_id(22 char monospace)被截。固化 col widths 让 key 列吃满 280px。
+  table-layout: fixed;
+
+  // 列宽(7 列):checkbox / 原文 / key / 类型 / 大小 / 注释 / 状态
+  th:nth-child(1), td:nth-child(1) { width: 36px;  }
+  th:nth-child(2), td:nth-child(2) { width: 96px;  }
+  th:nth-child(3), td:nth-child(3) { width: 280px; }   // key(重点宽)
+  th:nth-child(4), td:nth-child(4) { width: 120px; }
+  th:nth-child(5), td:nth-child(5) { width: 72px;  }
+  th:nth-child(6), td:nth-child(6) { min-width: 160px; }   // 注释:剩余
+  // 状态:失败文案含长字段 key(如 market_service_business_id,下划线默认不断行),
+  // 在固定 88px 列内 overflow-wrap 断行,不横向溢出 modal(2026-06-16)
+  th:nth-child(7), td:nth-child(7) { width: 88px; overflow-wrap: anywhere; }
+
+  th {
+    text-align: left;
+    padding: var(--space-2) var(--space-3);   // plan-batch-4:跟 .table--compact 默认对齐
+    border-bottom: 1px solid var(--border-color);   // plan-35 卡 E:跟 .p-designer-fields / .p-designer-enums-group__table 齐(原 --border-light)
+    color: var(--text-desc);
+    font-weight: var(--weight-medium);
+    background: var(--surface-2);
+  }
+  td {
+    padding: var(--space-1) var(--space-2);
+    border-bottom: 1px solid var(--border-color);   // plan-35 卡 E:同上
+    vertical-align: middle;
+
+    code { font-family: var(--font-family-mono); font-size: var(--font-xs); color: var(--text-body); }
+
+    // input / select 撑满所在 td(原默认宽度让 input 只 154px,跟 td 留 16px gap 不利)
+    input[type="text"],
+    input[type="number"],
+    select {
+      width: 100%;
+      box-sizing: border-box;
+    }
+  }
+  tbody tr:hover { background: var(--bg-card-alt); }
+
+  .is-ok   { color: var(--badge-green); font-size: var(--font-xs); font-weight: var(--weight-medium); }
+  .is-fail { color: var(--badge-red);   font-size: var(--font-xs); font-weight: var(--weight-medium); }
+}
+
+// 2026-05-24 二轮 audit C3:.p-designer-rename-popover--danger (4 行) 死类整删 — 0 Blade 引用
+// (efb3207 plan-48 F1 destructive popover 改 <x-scaffold::modal tone='danger'> 后遗留)
+
+// v6.2 round 3:modal 顶部 close × 按钮(absolute 定位,不占文档流)
+.p-designer-rename-popover__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-light);
+  font-size: var(--font-xl);
+  line-height: 1;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast), color var(--transition-fast);
+
+  &:hover { background: var(--bg-card-alt); color: var(--text-heading); }
+  &:focus-visible { @include focus-ring(1px); }   // plan-22 T6: 走统一 mixin
+}
+
+.p-designer-rename-popover {
+  // label 间距
+  label {
+    display: block;
+    font-size: var(--font-sm);
+    color: var(--text-desc);
+    margin: 6px 0 4px;
+  }
+  label:first-of-type { margin-top: 0; }
+}
+
+.p-designer-rename-popover__input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-sm);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  margin-bottom: var(--space-2);
+  box-sizing: border-box;
+
+  &::placeholder { color: var(--text-light); }
+  &:focus {
+    // 2026-05-22 plan-43 Batch C:focus ring 全包统一
+    border-color: var(--accent-hover-border);
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-hover-shadow);
+  }
+  // 2026-07-05 user 反馈:原 key 展示 input 虽有 readonly,但视觉跟可编辑的新 key 无差
+  // → 看起来能改。灰底 + 次级字色 + 无 focus ring,affordance 对齐 show 页表 key 的 is-locked。
+  &[readonly] {
+    background: var(--bg-input-readonly);
+    color: var(--text-secondary);
+    cursor: default;
+    &:focus { border-color: var(--border-color); box-shadow: none; }
+  }
+}
+
+// addfield popover 内 "类型 · 大小 · 默认值" 三 input 同行(blade inline style 收口)
+.p-designer-popover__field-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+// row 内 popover input modifier:不要 bottom margin + flex:1 撑列(否则一行三 input 高度跑偏)
+.p-designer-rename-popover__input--row {
+  flex: 1;
+  margin-bottom: 0;
+}
+// size 列窄(72px),override flex:1 不让它撑满
+.p-designer-rename-popover__input--size {
+  flex: 0 0 auto;
+  width: 72px;
+}
+
+// popover 宽度 modifier(blade inline style="min-width:..." 收口)
+.p-designer-rename-popover--md { min-width: 560px; }
+.p-designer-rename-popover--lg { min-width: 680px; max-width: 90vw; }
+
+// AI 翻译 popover 内"宽松翻译"checkbox + 帮助文字 helper
+.p-designer-rename-popover__hint {
+  font-size: var(--font-xs);
+  color: var(--text-desc);
+}
+
+// translate preview footer 的"将追加 N 项"小字,跟 actions row 同行(margin-right:auto 推到左)
+.p-designer-rename-popover__count {
+  margin-right: auto;
+  font-size: var(--font-xs);
+  color: var(--text-desc);
+}
+
+// yaml 折叠卡 hd 的可点击 toggle 区
+.p-designer-card-block__toggle {
+  cursor: pointer;
+  flex: 1;
+}
+
+// hd-aux 带操作按钮(复制等)时:inline-flex + gap,跟纯文本 aux 区别
+.p-designer-card-block__hd-aux--with-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+// addfield popover prefix 提示 paragraph
+.p-designer-rename-popover__prefix-note {
+  margin: 4px 0 10px;
+  font-size: var(--font-xs);
+  color: var(--text-desc);
+
+  code {
+    font-family: var(--font-family-mono);
+    background: var(--surface-2);
+    padding: 1px 6px;
+    border-radius: var(--radius-xs);
+  }
+}
+
+// addfield popover 内 "允许 null" / "unsigned" checkbox 行(blade 长 inline style 收口)
+.p-designer-popover__inline-row {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  margin: var(--space-3) 0;
+}
+
+// inline checkbox + label 组件(scaffold 通用 — popover 内 / form 内 都能复用)
+.p-designer-checkbox-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--text-body);
+  white-space: nowrap;
+  cursor: pointer;
+
+  // <label> 默认 block,这里 override(rename-popover label 那条规则也设 block)
+  &[for] { display: inline-flex; }
+}
+textarea.p-designer-rename-popover__input { resize: vertical; font-family: inherit; }
+
+// popover 内的 select 也要 chevron(浏览器默认箭头在 light/dark 主题下视觉不一致,某些场景几乎不可见)
+// chevron SVG 跟 .p-designer-fields__select 复用一份
+select.p-designer-rename-popover__input {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4 L5 7 L8 4' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 10px 10px;
+  padding-right: 26px;
+}
+
+.p-designer-rename-popover__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+// 2026-05-21:删 migration modal 内 checkbox 行(C+ 选项一次性决定是否清表 baseline)
+.p-designer-rename-popover__checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-1);
+  cursor: pointer;
+  font-size: var(--font-sm);
+  color: var(--text-body);
+  line-height: 1.45;
+
+  input[type="checkbox"] {
+    flex: 0 0 auto;
+    margin-top: 3px;        // 视觉对齐 multiline 文字第一行
+    cursor: pointer;
+  }
+  span { flex: 1; }
+}
+
+// -------- v6.2 round 1:preview drawer 字段/索引变化(git diff 风格)--------
+// 整行染色 + 左 border + monospace,跟 GitHub PR diff 视觉一致
+.p-designer-preview__changes {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 12px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-xs);
+  line-height: 1.55;
+
+  li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    padding: 0;
+    margin: 0;
+    border-left: 3px solid transparent;
+    border-bottom: 1px solid var(--border-light);
+
+    &:last-child { border-bottom: 0; }
+
+    // 颜色:+ 行绿 / - 行红 / R 行蓝 / ~ 行橙(其余 op 兜底)
+    &.is-op-add {
+      background: var(--diff-add-bg);
+      border-left-color: var(--badge-green);
+    }
+    &.is-op-drop {
+      background: var(--diff-drop-bg);
+      border-left-color: var(--badge-red);
+    }
+    &.is-op-rename {
+      background: var(--diff-rename-bg);
+      border-left-color: var(--badge-blue);
+    }
+    &.is-op-modify {
+      background: var(--diff-modify-bg);
+      border-left-color: var(--accent-text);
+    }
+
+    code {
+      background: transparent;
+      padding: 6px 10px 6px 0;
+      font-family: inherit;
+      font-size: inherit;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--text-body);
+    }
+  }
+}
+
+// 行首 prefix 列(固定宽 monospace,跟 GitHub diff line number 风格类似)
+.p-designer-preview__op {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  flex-shrink: 0;
+  padding: 6px 0;
+  font-family: inherit;
+  font-weight: var(--weight-bold);
+  font-size: var(--font-xs);
+  user-select: none;
+
+  .is-op-add &    { color: var(--badge-green); }
+  .is-op-drop &   { color: var(--badge-red); }
+  .is-op-rename & { color: var(--badge-blue); }
+  .is-op-modify & { color: var(--accent-text); }
+}
+
+// 2026-05-22 plan-43 Batch A:.p-designer-batch-form 一族死类整删(plan-40 后批量加字段 / 加单字段 / 新建表 / 加多字段索引 4 处全改用 .p-designer-rename-popover__input + form-grid,batch-form 命名族已弃)
+
+// plan 19 v11.5:索引区合并 1 个 table。
+// 用户反馈"不要灰底"→ 不再用 .is-readonly 行底色区分单字段 / 多字段;
+// 视觉差异由 cell 内容自身表达(单字段 type 文字 / 多字段 select+input editable)。
+// table 视觉沿用 .table--compact 默认风格,无额外覆盖。
+.p-designer-indexes {
+  // 留空 — 用 base .table.table--compact 默认风格即可
+}
+
+// -------- v12.2 枚举组(每组 1 个小 table,grid 横排)
+//          v12.3:加 group 边界(border + 小标题灰底)便于横排时区分 --------
+.p-designer-enums-group {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xs);
+  background: var(--surface-1);
+  overflow: hidden;
+
+  &__hd {
+    display: flex;
+    align-items: center;
+    padding: var(--space-1) var(--space-2);
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border-color);
+    font-family: var(--font-family-mono);
+    color: var(--text-desc);
+    font-size: var(--font-sm);
+    line-height: 1.4;
+
+    strong { color: var(--text-body); margin-right: 6px; }
+  }
+
+  &__count {
+    font-size: var(--font-xs);
+    color: var(--text-desc);
+    margin-right: var(--space-2);
+  }
+
+  // group hd 主操作:+ 加项(outlined accent — group head 第一动作,常用)
+  &__add-btn {
+    border: 1px solid var(--accent-text);
+    background: transparent;
+    color: var(--accent-text);
+    font-size: var(--font-xs);
+    font-weight: var(--weight-medium);
+    line-height: 1;
+    padding: var(--space-1) 10px;   // plan-batch-4:跟 .p-designer-card-block__hd-btn 对齐(10px 无 token 阶梯,page-specific 留字面)
+    cursor: pointer;
+    border-radius: var(--radius-xs);
+    transition: background var(--transition-fast);
+
+    &:hover { background: var(--accent-bg); }
+    &:active { transform: translateY(1px); }
+  }
+
+  // 2026-05-21:enum group AI 翻译按钮(填补 key='' 的 row,从 label_zh 翻译 key + label_en)
+  // 2026-05-26 R-3:扣 token + 发 DeepSeek 请求,语义比"+加项"重,改 secondary outline(灰 border/text),
+  //                user 一眼分主次:加项 = accent 主操作 / AI 翻译 = 次操作
+  &__ai-btn {
+    border: 1px solid var(--border-input);
+    background: transparent;
+    color: var(--text-desc);
+    font-size: var(--font-xs);
+    font-weight: var(--weight-medium);
+    line-height: 1;
+    padding: var(--space-1) 10px;   // plan-batch-4:跟 __add-btn / hd-btn 对齐
+    margin-left: var(--space-1);
+    cursor: pointer;
+    border-radius: var(--radius-xs);
+    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+
+    &:hover:not(:disabled) {
+      border-color: var(--accent-text);
+      color: var(--accent-text);
+      background: var(--accent-bg);
+    }
+    &:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+  }
+
+  // 2026-05-26 R-2:删组 × 跟行末删项 × 视觉分级 — 删组是 destructive(干掉整组 N 项),要更显眼
+  //                改 outline-red rest + hover 填充红,跟 .btn--danger 同套路
+  // 2026-05-28:补全 base 属性(font/padding/radius/transition/bg:transparent)跟 __ai-btn 对齐
+  //            — 之前漏 background:transparent 在暗模拿 UA 默认浅灰底翻车(同类:migration-file--btn)
+  &__del-btn {
+    background: transparent;
+    color: var(--badge-red);
+    border: 1px solid var(--badge-red);
+    font-size: var(--font-xs);
+    font-weight: var(--weight-medium);
+    line-height: 1;
+    padding: var(--space-1) 10px;   // plan-batch-4:跟 __add-btn / hd-btn 对齐
+    margin-left: auto;
+    cursor: pointer;
+    border-radius: var(--radius-xs);
+    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+
+    &:hover:not(:disabled) {
+      background: var(--badge-red);
+      color: var(--text-inverse);
+      border-color: var(--badge-red);
+    }
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: var(--font-sm);
+
+    thead th {
+      padding: 3px 8px;                           // page-specific:enums 嵌套表紧凑高度
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-desc);
+      font-weight: var(--weight-medium);          // plan-35 卡 E:跟 .p-designer-translate-preview th 齐(原 normal)
+
+      &.col-key { width: 24%; }
+      &.col-val { width: 14%; }
+      &.col-en  { width: 28%; }
+      &.col-zh  { width: 22%; }
+      // 2026-05-21:col-ops 容纳 ↻ 重译 + × 删除两个 icon btn,从 32 拓到 56px
+      &.col-ops { width: 56px; }
+    }
+
+    tbody td {
+      padding: 2px 8px;
+      border-bottom: 1px solid var(--border-color);
+      vertical-align: middle;
+
+      &.col-ops {
+        text-align: center;
+        white-space: nowrap;             // ↻ + × 同行不换
+        > .p-designer-fields__row-btn { padding: 2px 4px; }
+      }
+      > .p-designer-fields__input { width: 100%; }
+    }
+  }
+}
+
+// -------- migration 历史表 --------
+.p-designer-migration-file { font-size: var(--font-xs); }
+
+// 文件名按钮:跟 sha 按钮同款 reset(暗黑主题修法 — 没修法时拿 UA 默认浅灰底)
+.p-designer-migration-file--btn {
+  border: none;
+  background: transparent;
+  padding: 2px 4px;
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+  font-family: inherit;
+  text-align: left;
+  transition: background var(--transition-fast);
+
+  code { font-family: var(--font-family-mono); font-size: var(--font-xs); color: var(--text-body); }
+  &:hover { background: var(--accent-bg); }
+  &:hover code { color: var(--accent-text); }
+}
+
+// 执行状态 badge:查 Laravel `migrations` 表得来 — 绿 = 已执行,灰 = 未执行/表不可达
+.p-designer-migration-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-pill, 999px);
+  font-size: var(--font-xs);
+  line-height: 1.4;
+  white-space: nowrap;
+
+  &--ran {
+    color: var(--badge-green);
+    background: var(--badge-green-bg);
+  }
+
+  &--pending {
+    color: var(--badge-slate);
+    background: var(--bg-badge-muted);
+  }
+}
+
+// 列宽 hint:批次 / 状态列紧凑;作者给 min-width;摘要给 min-width 撑视觉
+.p-designer-card-block__bd th.col-batch,
+.p-designer-card-block__bd th.col-status {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.p-designer-card-block__bd th.col-author {
+  width: 1%;
+  min-width: 100px;
+  white-space: nowrap;
+}
+
+// 摘要列:不限 max-width,加 min-width 让短文本(如 "create table")也撑出存在感
+.p-designer-card-block__bd th.col-summary {
+  min-width: 220px;
+}
+
+// batch 单元:mono 数字 + 灰色,跟 git sha 复制按钮以前的视觉同档
+.p-designer-migration-batch {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-xs);
+  color: var(--text-desc);
+  white-space: nowrap;
+}
+
+.p-designer-migration-author {
+  font-size: var(--font-sm);
+  color: var(--text-body);
+  white-space: nowrap;
+}
+
+// 2026-05-21 C 方案:migration 行操作列(删除按钮),仅未执行可见
+.p-designer-card-block__bd th.col-action {
+  width: 1%;
+  min-width: 64px;
+  white-space: nowrap;
+  text-align: center;
+}
+.p-designer-migration-action {
+  text-align: center;
+  white-space: nowrap;
+}
+.p-designer-migration-delete-btn {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--badge-red);
+  font-size: var(--font-xs);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+
+  &:hover {
+    background: var(--bg-danger-soft);
+    border-color: var(--badge-red);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--badge-red);
+    outline-offset: 1px;
+  }
+}
+
+// v6.2 round 6:yaml 原文简易语法染色(纯 server-side regex 包 span,无 lib)
+.p-designer-code--yaml {
+  .yh-key     { color: var(--badge-blue); }
+  .yh-str     { color: var(--badge-green); }
+  .yh-num     { color: var(--accent-text); }
+  .yh-bool    { color: var(--badge-blue); font-weight: var(--weight-semibold); }
+  .yh-comment { color: var(--text-light); font-style: italic; }
+}
+
+// #2 v6.3:PHP 源码 client-side regex 染色(keyword + variable)
+.p-designer-code--php {
+  .ph-kw  { color: var(--badge-blue); font-weight: var(--weight-semibold); }
+  .ph-var { color: var(--badge-orange); }
+}
+
+.p-designer-card-block .col-time { width: 180px; white-space: nowrap; }
+.p-designer-card-block .col-sha { width: 80px; }
+
+// 2026-05-22 plan-43 Batch A:.p-designer-codegen-check 死类清(plan-39 砍 git auto-commit 后无引用)
+
+// -------- compact migrations modal --------
+// 2026-05-28:从 show.blade.php 抽 12 处内联 style → class
+//            (设计师 audit 收口;static-guards 只扫 <style> 块,漏扫 style= 属性)
+.p-designer-compact-modal {
+  &__warn {
+    color: var(--color-danger-strong);
+    font-weight: var(--weight-semibold);
+  }
+
+  // schema drift 用 amber 而不是 red:drift 是"待处理" 不是"已破"
+  &__warn--amber {
+    color: var(--badge-orange);
+    font-weight: var(--weight-semibold);
+  }
+
+  // 已 push 警告 + 人工「未部署」确认框:amber 提示框,push≠部署不再硬拦,需人工勾选放行
+  &__pushed {
+    margin: var(--space-3) 0;
+    padding: var(--space-3) var(--space-4);
+    background: var(--accent-bg);
+    border-left: 3px solid var(--badge-orange);
+    border-radius: var(--radius-sm);
+
+    .p-designer-rename-popover__checkbox-row { margin-bottom: 0; }
+  }
+
+  &__list {
+    margin: var(--space-1) 0 var(--space-3) var(--space-5);
+  }
+
+  &__hint {
+    color: var(--text-desc);
+  }
+
+  &__details {
+    margin: var(--space-3) 0;
+  }
+
+  &__summary {
+    cursor: pointer;
+    color: var(--text-desc);
+  }
+
+  // page-specific:11px 比 token 最小 --font-xs(12px)再小一档,code preview 高密度场景专用
+  &__preview-pre {
+    margin-top: var(--space-2);
+    max-height: 320px;
+    overflow: auto;
+    font-size: 11px;
+    white-space: pre-wrap;
+  }
+}
+
+// -------- preview drawer --------
+.p-designer-preview {
+  padding: 0 var(--space-3);
+}
+
+// Round 2 P2:baseline 缺失提示 banner;blade 引用但 SCSS 一直没定义 — UA 默认无视觉
+.p-designer-preview__banner {
+  margin: var(--space-2) 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-size: var(--font-sm);
+  line-height: 1.55;
+
+  code { font-family: var(--font-family-mono); font-size: var(--font-xs); }
+  strong { font-weight: var(--weight-semibold); }
+
+  &--info {
+    background: var(--badge-blue-bg);
+    border-color: color-mix(in srgb, var(--badge-blue) 18%, transparent);
+    color: var(--badge-blue);
+
+    code, strong { color: var(--badge-blue); }
+  }
+
+  // 2026-05-21:baseline drift / 高风险拦阻态 — red 强警示
+  &--danger {
+    background: var(--badge-red-bg);
+    border-color: color-mix(in srgb, var(--badge-red) 30%, transparent);
+    color: var(--badge-red);
+
+    code, strong { color: var(--badge-red); }
+  }
+}
+
+.p-designer-preview__lead {
+  margin-bottom: var(--space-3);
+  font-size: var(--font-sm);
+  color: var(--text-desc);
+
+  strong { color: var(--text-body); }
+}
+
+.p-designer-preview h4 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-base);
+}
+
+.p-designer-preview ul {
+  margin: 0 0 var(--space-3);
+  padding-left: var(--space-3);
+  font-size: var(--font-sm);
+}
+
+// v6.2 round 1:warning 升级 banner 风格(bg + 左 border + 图标),不再只是文字色
+.p-designer-preview__warnings {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 12px;
+
+  li {
+    position: relative;
+    padding: 8px 12px 8px 36px;
+    margin-bottom: var(--space-1);
+    border-radius: var(--radius-xs);
+    font-size: var(--font-sm);
+    line-height: 1.5;
+    border-left: 3px solid transparent;
+
+    &::before {
+      position: absolute;
+      left: 12px;
+      top: 8px;
+      font-size: var(--font-base);
+      line-height: 1.4;
+    }
+
+    &.is-high {
+      background: var(--diff-drop-bg);
+      border-left-color: var(--badge-red);
+      color: var(--color-danger-strong);
+      font-weight: var(--weight-semibold);
+
+      &::before { content: '⛔'; }
+    }
+    &.is-medium {
+      background: var(--diff-modify-bg);
+      border-left-color: var(--accent-text);
+      color: var(--badge-orange);
+
+      &::before { content: '⚠'; }
+    }
+  }
+}
+
+// plan-41 §三 A:reverse-dep 分组渲染 — MANUAL 突出 / AUTO 折叠
+.p-designer-preview__dep-block {
+  margin: 8px 0 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-xs);
+  border-left: 3px solid transparent;
+
+  &--manual {
+    background: var(--diff-modify-bg);
+    border-left-color: var(--accent-text);
+  }
+  &--auto {
+    background: var(--bg-page);
+    border-left-color: var(--border-color);
+  }
+}
+
+.p-designer-preview__dep-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  h4 {
+    margin: 0;
+    font-size: var(--font-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--badge-orange);
+  }
+}
+
+.p-designer-preview__dep-details {
+  summary {
+    cursor: pointer;
+    font-size: var(--font-sm);
+    color: var(--text-desc);
+    user-select: none;
+    code {
+      font-family: var(--font-family-mono);
+      background: var(--bg-card-alt);
+      padding: 1px 4px;
+      border-radius: var(--radius-xs);
+    }
+  }
+}
+
+.p-designer-preview__dep-list {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+}
+
+.p-designer-preview__dep-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: var(--font-xs);
+  line-height: 1.5;
+  border-top: 1px dashed var(--border-color);
+  &:first-child { border-top: 0; }
+
+  &.is-manual { color: var(--text-body); }
+  &.is-auto { color: var(--text-desc); }
+}
+
+.p-designer-preview__dep-field {
+  font-family: var(--font-family-mono);
+  background: var(--bg-card-alt);
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  font-weight: var(--weight-semibold);
+}
+
+.p-designer-preview__dep-op {
+  color: var(--text-desc);
+}
+
+.p-designer-preview__dep-loc {
+  font-family: var(--font-family-mono);
+  color: var(--accent-text);
+}
+
+.p-designer-preview__dep-snippet {
+  font-family: var(--font-family-mono);
+  color: var(--text-desc);
+  flex-basis: 100%;
+  padding-left: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.p-designer-preview__file-block {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-3);
+}
+
+// v6.2 round 2:文件块 toolbar(toggle + 复制 同一行)
+.p-designer-preview__file-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border-color);
+
+  // 折叠后没有 pre,toolbar 不需要下 border
+  &:last-child { border-bottom: 0; }
+}
+
+.p-designer-preview__file-toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-sm);
+  text-align: left;
+  color: var(--text-body);
+
+  &:hover { background: var(--bg-card-alt); }
+}
+
+// 通用 small "复制"按钮(file toolbar + commit-row 都用)
+.p-designer-preview__copy-btn {
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-desc);
+  font-size: var(--font-xs);
+  padding: 3px 10px;
+  margin-right: var(--space-2);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+
+  &:hover { background: var(--accent-text); color: var(--text-inverse); border-color: var(--accent-text); }
+}
+
+.p-designer-code {
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--surface-1);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-xs);
+  line-height: 1.55;
+  overflow: auto;
+  // 2026-05-20 用户反馈:max-height 480px 太矮,改自适应 viewport
+  // 公式 calc(100vh - 320px) 给上方 sections(变更摘要 / 字段变化 / 索引变化) ~220px + 下方 actions ~100px 留白
+  // 大屏 4K(h=2160) → 1840px;1080p → 760px;小屏 laptop(h=720) → 400px,都能塞 PHP 代码
+  max-height: calc(100vh - 320px);
+  min-height: 280px;     // 防小屏挤压到看不清
+  border-top: 1px solid var(--border-color);
+  white-space: pre;
+
+  // 让代码框高度撑满父容器(drawer body 视口),内容长就 pre 内滚动而不是 drawer 滚
+  // 用 100vh - 头部预算的偏移(drawer header ~60px + lead ~50px + drawer padding 余量)
+  &--fit {
+    max-height: calc(100vh - 140px);
+  }
+}
+
+// 2026-05-22 plan-43 Batch A:.p-designer-preview__commit-row / __commit-input 死类清(plan-39 砍 git auto-commit 后 0 blade 引用)
+
+// v6.2 round 2:footer 内 actions(drawer footer 已 sticky bottom,这里只布局)
+.p-designer-preview__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+// ============================================================================
+// 2026-05-23:生产 / 只读环境视觉守护
+// 后端 EnforceScaffoldWritable 中间件已经把 designer 所有 POST/PUT/DELETE 在
+// production / SCAFFOLD_CONFIG_READONLY=true 下 403,这里是 UI 层提示 — 让 user
+// 进 designer 一眼看出"只能看不能改",所有写按钮 / 表单控件灰化 + pointer-events:none。
+// 双层守护规则:后端中间件兜底 + 前端锁定态置灰。
+// 白名单:.p-designer-no-lock(读类按钮:viewMigration / copyYamlRaw / toggleYamlRaw /
+// runtime-link / sidebar 切表 link / 顶部 badge)。
+// ============================================================================
+// 2026-05-28 phase C-1:rgba 硬编 4 处抽 --locked-banner-bg / --locked-banner-border 双主题 token,
+//                       并把 selector 范围扩到 accounts / config 两个写类页(ship 清单 #11 对齐)。
+.p-designer-locked-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px var(--space-4);
+  background: var(--locked-banner-bg);
+  border: 1px solid var(--locked-banner-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-error);
+  font-size: var(--font-sm);
+  margin: 0 var(--space-4) var(--space-3);
+  // 2026-05-23:sticky 让 user 滚到任何位置都能看到只读状态,免去 header inline badge 视觉冗余
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(2px);
+
+  strong {
+    font-weight: 700;
+  }
+
+  &__hint {
+    margin-left: auto;
+    font-family: var(--font-family-mono);
+    font-size: var(--font-xs);
+    color: var(--text-muted);
+    background: var(--bg-page);
+    padding: 2px 6px;
+    border-radius: var(--radius-xs);
+  }
+}
+
+// 一刀切:lock 容器内所有写控件 disable;白名单 .p-designer-no-lock 豁免
+// 挂 4 个写类 page wrapper:designer show/index + accounts + config
+.p-designer[data-locked="true"],
+.p-db[data-locked="true"],
+.p-acc-shell[data-locked="true"],
+.p-config-shell[data-locked="true"] {
+  // 字段表 / enums / index / table controls 内所有 input/select/textarea 灰锁
+  input:not([type="hidden"]):not(.p-designer-no-lock),
+  select:not(.p-designer-no-lock),
+  textarea:not(.p-designer-no-lock) {
+    pointer-events: none;
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: var(--bg-page) !important;
+  }
+
+  // 所有 button(包括 <x-scaffold::btn> 渲染后的 .scaffold-btn)灰锁,白名单豁免
+  button:not(.p-designer-no-lock),
+  .scaffold-btn:not(.p-designer-no-lock) {
+    pointer-events: none;
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  // 行内 row-btn(× 删字段 / × 删 index / × 删 enum / ✂ strip prefix)整体灰
+  .p-designer-fields__row-btn,
+  .p-designer-card-block__hd-btn,
+  .p-designer-col-sidebar__add-btn,
+  .p-designer-enums-group__add-btn,
+  .p-designer-enums-group__del-btn,
+  .p-designer-enums-group__ai-btn {
+    pointer-events: none;
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  // checkbox/radio 也 disable(yaml 索引选择等场景)
+  input[type="checkbox"]:not(.p-designer-no-lock),
+  input[type="radio"]:not(.p-designer-no-lock) {
+    pointer-events: none;
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  // contenteditable(行内编辑某些自定义控件)也禁
+  [contenteditable]:not(.p-designer-no-lock) {
+    pointer-events: none;
+    opacity: 0.6;
+  }
+}
+
+// 2026-05-26 R-9:"其他工具" section 砍 — 单卡数据字典挪进 modules 网格末尾用 .--entry 弱化,
+//                独立 section 占空间浪费,.p-designer-extras 死类一并清
+// 2026-05-30:数据字典入口卡。原在 .p-designer-grid 末尾(300px 格子,贴某行末不显眼),
+//            user 拍板移出 grid 独占整宽行。.p-designer-card 是 block,出 grid 即撑满整行;
+//            这里只补 margin-top 跟模块网格拉开 + 沿用弱化文字色(不抢模块卡橙色)。
+.p-designer-card--entry {
+  margin-top: var(--space-4);
+
+  .p-designer-card__head h4 {
+    color: var(--text-heading);
+  }
+
+  .p-designer-card__desc {
+    color: var(--text-muted);
+  }
+
+  // 右侧 chevron:纯入口导航暗示,hover 时随卡片高亮 + 右移
+  .p-designer-card__go {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    color: var(--text-desc);
+    transition: transform var(--transition-fast), color var(--transition-fast);
+  }
+
+  &:hover .p-designer-card__go {
+    color: var(--accent-text);
+    transform: translateX(2px);
+  }
+}

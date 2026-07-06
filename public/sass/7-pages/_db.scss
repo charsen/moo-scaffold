@@ -1,0 +1,555 @@
+// ==============================================================================
+// Page: 数据字典 (db/dictionaries) + designer index "模块" section 共享
+// 2026-05-23:数据库文档(db/index + db/show)整功能砍掉,保留数据字典页样式
+// 原 .p-db / .p-db__* / .p-db-doc__* / .p-db__loading / .p-db__retry-btn 一并清除
+//
+// .p-db__module / __module-head / __module-head__group 三个 class 保留 —
+// designer/index.blade.php "模块" section 复用(h3 + count 内联 + 右侧 button)
+// 重构改名到 .p-designer-list-section* 留以后,当前最小改动加回布局
+// ==============================================================================
+
+// dictionaries 空态间距
+.p-dict__empty {
+  margin-top: var(--space-5);
+}
+
+// designer/index 模块 section head 复用(原 db/index 也用,doc 砍后只 designer 用)
+.p-db__module {
+  margin-top: var(--shell-section-gap);
+}
+.p-db__module:first-of-type {
+  margin-top: var(--space-5);
+}
+.p-db__module-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+.p-db__module-head__group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.p-dict {
+  // 之前 margin: var(--space-5) 让 hero 卡片顶部比 sidebar 顶部低 20px；
+  // .route-main 自身贴 .container padding 顶，dict 内容不再加额外 margin
+  margin: 0;
+}
+
+// plan-22 P1-S1:.p-dict__hero / __hero-head 已删,统一走 <x-scaffold::hero card>(见 6-components/_hero.scss)
+
+.p-dict__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.p-dict__list {
+  display: grid;
+  gap: var(--shell-grid-gap);              // plan-24:语义化 alias(等价 --space-5)
+  margin-top: var(--space-5);
+}
+
+.p-dict__card {
+  border: 1px solid var(--border-light);
+  border-radius: var(--shell-card-radius);
+  background: var(--bg-card);
+  box-shadow: var(--elevation-1);
+  overflow: hidden;
+}
+
+.p-dict__card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-row);
+  background: var(--bg-panel-head);
+
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: var(--font-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--text-heading);
+  }
+}
+
+.p-dict__table-name {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
+  background: var(--bg-card-alt);
+  color: var(--text-slate);
+  font-size: var(--font-xs);
+  font-family: var(--font-family-mono);
+}
+
+.p-dict__card-meta {
+  color: var(--text-light);
+  font-size: var(--font-xs);
+}
+
+.p-dict__card-body {
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.p-dict__field {
+  border: 1px solid var(--border-lighter);
+  border-radius: var(--shell-control-radius);
+  overflow: hidden;
+}
+
+.p-dict__field + .p-dict__field {
+  margin-top: var(--space-4);
+}
+
+.p-dict__field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-card-alt);
+
+  strong {
+    font-size: var(--font-base);
+    color: var(--text-heading);
+  }
+}
+
+.p-dict__field-count {
+  color: var(--accent-text);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-semibold);
+}
+
+// -------- 2026-05-14 重构：单栏锚点 + 一模块一大表 --------
+
+.p-dict__module {
+  margin-top: var(--shell-section-gap);     // plan-24:语义化 alias(等价 --space-6,主 section 间距)
+}
+
+.p-dict__module:first-of-type {
+  margin-top: var(--space-5);
+}
+
+.p-dict__module-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: var(--font-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--text-heading);
+  }
+}
+
+.p-dict__module-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--accent-bg);
+  color: var(--accent-text);
+}
+
+.p-dict__module-meta {
+  color: var(--text-desc);
+  font-size: var(--font-xs);
+}
+
+// <x-scaffold::table> 渲染的就是 <table> 本身，.p-dict__table 类直接加在 table 元素上
+// 所以 fixed layout / width 等都直接作用 .p-dict__table（不要再嵌套 table 选择器）
+.p-dict__table {
+  // fixed 布局：列宽严格按第一行 th width 渲染，不依赖内容；保证 rowspan 段间列对齐
+  table-layout: fixed;
+  width: 100%;
+  // 跟 route 表格视觉对齐：边框 + 圆角 + 阴影，包在卡片里
+  border: 1px solid var(--border-light);
+  border-radius: var(--shell-card-radius);
+  background: var(--bg-card);
+  box-shadow: var(--elevation-1);
+  overflow: hidden;
+
+  // 长内容截断，避免撑爆列宽
+  td, th {
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  // 表头垂直 padding：跟其他 panel 表格一致，避免视觉太矮
+  th {
+    padding: var(--space-3) var(--space-2);
+    line-height: 20px;
+  }
+
+  // 说明列允许换行（可能较长的中文/英文描述）
+  td.p-dict__cell-desc {
+    white-space: normal;
+  }
+
+  // 字段列 rowspan 顶部对齐
+  td.p-dict__cell-field {
+    vertical-align: top;
+    // plan-22 T7: rowspan cell 右侧加实色 border,light 主题下分隔可见(原表自身 border 在 cell 跨多行时几乎不可见)
+    border-right: 1px solid var(--border-light);
+  }
+
+  // plan-22 T7: 同一 rowspan 段内 value/en/zh/desc cell 上 border 改实色,加强 light 行间隔
+  td.p-dict__cell-value,
+  td.p-dict__cell-en,
+  td.p-dict__cell-zh,
+  td.p-dict__cell-desc {
+    border-top: 1px solid var(--border-light);
+  }
+  // 段首行(rowspan field cell 同行)不画上 border,避免与 group-row 重叠
+  tr:has(> td.p-dict__cell-field) td.p-dict__cell-value,
+  tr:has(> td.p-dict__cell-field) td.p-dict__cell-en,
+  tr:has(> td.p-dict__cell-field) td.p-dict__cell-zh,
+  tr:has(> td.p-dict__cell-field) td.p-dict__cell-desc {
+    border-top: none;
+  }
+}
+
+// 列宽用固定 px：rowspan 跨段对齐需要稳定布局
+.p-dict__col-field  { width: 240px; }
+.p-dict__col-value  { width: 70px; text-align: center !important; }
+.p-dict__col-en     { width: 180px; }
+.p-dict__col-zh     { width: 140px; }
+.p-dict__col-desc   { width: auto;  }
+
+// 表分组行（参考 route-group-row）：每张表前一行浅橙底分组标题
+// 替代原来的"表"列 rowspan + 浅橙背景方案（视觉太突兀）
+.p-dict__group-row td {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--accent-text);
+  background: var(--accent-bg);
+  border-top: 1px solid var(--accent-hover-border);
+  border-bottom: 1px solid var(--accent-hover-border);
+  letter-spacing: .02em;
+}
+
+.p-dict__group-row strong {
+  font-size: var(--font-base);
+  font-weight: var(--weight-semibold);
+}
+
+.p-dict__group-key {
+  margin-left: var(--space-2);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-xs);
+  color: var(--accent-text);
+  opacity: .65;
+}
+
+// 字段列：白底，mono 加重区分；不再有"表"列，去掉 cell-table 系列
+.p-dict__cell-field {
+  font-family: var(--font-family-mono);
+  font-weight: var(--weight-semibold);
+  color: var(--text-heading);
+}
+
+.p-dict__cell-value {
+  text-align: center !important;
+  font-family: var(--font-family-mono);
+  color: var(--accent-text);
+  font-weight: var(--weight-semibold);
+}
+
+.p-dict__cell-en {
+  font-family: var(--font-family-mono);
+  color: var(--text-body);
+}
+
+.p-dict__cell-zh {
+  color: var(--text-body);
+}
+
+.p-dict__cell-desc {
+  color: var(--text-desc);
+  font-size: var(--font-sm);
+}
+
+// ==============================================================================
+// 数据库文档(只读 doc 视图)db/docs.blade.php —— 2026-06-20 重新引入
+// 3 栏:模块(aside .p-dbdoc-modules)→ 表(middle .p-dbdoc-tables)→ 表详情(right .p-dbdoc-detail)
+// ==============================================================================
+
+// —— 左:模块列表 ——
+.p-dbdoc-modules {
+  padding: 0 var(--space-2) var(--space-2);
+}
+.p-dbdoc-modules__hd {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--text-desc);
+  font-size: var(--font-xs);
+  letter-spacing: .03em;
+}
+// plan-53 出身分块:扩展包小节标题(仅存在包 schema 时渲染;host 块不带标题保持旧观感)
+.p-dbdoc-modules__group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  border-top: 1px solid var(--border-light);
+  color: var(--badge-blue);
+  font-size: var(--font-xs);
+  letter-spacing: .03em;
+}
+.p-dbdoc-module {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 8px var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--text-body);
+  text-decoration: none;
+  transition: background .12s ease, color .12s ease;
+
+  &:hover { background: var(--accent-bg); color: var(--accent-text); }
+  &.is-active { background: var(--accent-bg); color: var(--accent-text); font-weight: var(--weight-semibold); }
+
+  &__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  &__count {
+    flex: 0 0 auto;
+    min-width: 20px;
+    text-align: center;
+    padding: 1px 7px;
+    border-radius: var(--radius-pill);
+    background: var(--bg-card-alt);
+    color: var(--text-desc);
+    font-size: var(--font-xs);
+  }
+}
+.p-dbdoc-module.is-active .p-dbdoc-module__count {
+  background: var(--bg-card);
+  color: var(--accent-text);
+}
+// 数据字典入口:跨模块只读工具,2026-06-22 从 designer 落地页移入。
+// 跟模块项同栏,加分隔线 + wordbook 图标区分「这不是某个模块」。
+.p-dbdoc-module--dict {
+  margin-top: var(--space-2);
+  padding-top: 14px;
+  border-top: 1px solid var(--border-light);
+  color: var(--text-desc);
+
+  .p-dbdoc-module__name {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+}
+
+// —— 中:表列表 ——
+.p-dbdoc-tables {
+  padding: var(--space-5);
+}
+.p-dbdoc-tables__hd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.p-dbdoc-tables__title {
+  margin: 0;
+  font-size: var(--font-lg);
+  color: var(--text-heading);
+}
+// 2026-06-22:中栏头部中文副标(英文 title 为主 + 中文副);跟 __meta 同 muted 语言
+.p-dbdoc-tables__cn {
+  margin-left: var(--space-2);
+  color: var(--text-desc);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-regular);
+}
+.p-dbdoc-tables__meta {
+  color: var(--text-desc);
+  font-size: var(--font-sm);
+}
+.p-dbdoc-tables__idx {
+  width: 44px;
+  color: var(--text-light);
+}
+.p-dbdoc-tlink {
+  text-decoration: none;
+  code { color: var(--accent-text); }
+  &:hover code { text-decoration: underline; }
+}
+.p-dbdoc-trow.is-active {
+  background: var(--accent-bg);
+  .p-dbdoc-tlink code { font-weight: var(--weight-semibold); }
+}
+
+// —— 右:表详情(选中表后从 transparent 空态恢复实心卡片)——
+.container .right.transparent:has(.p-dbdoc-detail) {
+  background: var(--bg-card);
+  border: 0;
+  box-shadow: var(--elevation-2);
+}
+.p-dbdoc-detail {
+  padding: var(--space-6);
+}
+.p-dbdoc-detail__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+.p-dbdoc-detail__title {
+  margin: 0;
+  font-size: var(--font-2xl);
+  color: var(--text-heading);
+}
+.p-dbdoc-detail__key {
+  padding: 2px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--route-bg);
+  color: var(--route-text);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-sm);
+}
+.p-dbdoc-detail__desc {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--accent-solid);
+  border-radius: var(--radius-sm);
+  background: var(--accent-bg);
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+  line-height: var(--line-base);
+}
+.p-dbdoc-detail__remark {
+  margin: 0 0 var(--space-3);
+  color: var(--text-desc);
+  font-size: var(--font-sm);
+}
+
+.p-dbdoc-section {
+  margin-top: var(--space-6);
+}
+.p-dbdoc-section__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 var(--space-3);
+  color: var(--text-heading);
+  font-size: var(--font-md);
+  font-weight: var(--weight-semibold);
+}
+.p-dbdoc-section__count {
+  color: var(--text-light);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+}
+
+.p-dbdoc-fld code { color: var(--text-heading); }
+.p-dbdoc-req {
+  color: var(--badge-red);
+  font-style: normal;
+  font-weight: var(--weight-bold);
+  margin-right: 3px;
+}
+.p-dbdoc-type code { color: var(--accent-text-dark); }
+.p-dbdoc-tag {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: var(--radius-xs);
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  font-size: 11px;
+}
+.p-dbdoc-yes { color: var(--badge-green); }
+.p-dbdoc-no  { color: var(--text-desc); }
+.p-dbdoc-muted { color: var(--text-light); }
+
+.p-dbdoc-enum {
+  margin-top: var(--space-4);
+}
+.p-dbdoc-enum__field {
+  margin-bottom: var(--space-2);
+  code { color: var(--accent-text); font-size: var(--font-sm); }
+}
+
+.p-dbdoc-detail__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-light);
+  color: var(--text-light);
+  font-size: var(--font-xs);
+}
+
+// 字段表列宽:6 列在右栏 auto 布局会把短中文名挤成竖排、说明被切 → fixed + 显式分配
+.p-dbdoc-fields {
+  table-layout: fixed;
+  width: 100%;
+}
+// 优先级:名称(短中文,4字也别折)一行 > 字段(长技术串,20+ 字符折 2 行可接受)
+.p-dbdoc-fields th:nth-child(1), .p-dbdoc-fields td:nth-child(1) { width: 32%; }  // 字段
+.p-dbdoc-fields th:nth-child(2), .p-dbdoc-fields td:nth-child(2) { width: 16%; }  // 名称(保一行)
+.p-dbdoc-fields th:nth-child(3), .p-dbdoc-fields td:nth-child(3) { width: 19%; }  // 类型
+.p-dbdoc-fields th:nth-child(4), .p-dbdoc-fields td:nth-child(4) { width: 8%;  }  // 允许空
+.p-dbdoc-fields th:nth-child(5), .p-dbdoc-fields td:nth-child(5) { width: 10%; }  // 默认值
+// 说明 = 剩余 ~15%(清理后多为空,窄无妨)
+.p-dbdoc-fields .p-dbdoc-fld code { word-break: break-all; }   // 超长 key 在格内换行,不溢出
+
+// 数据库文档:中栏(表列表,3 列)收窄、右栏(表详情,6 列字段表)加宽 —— 默认 1 : 1.25 让字段表挤
+.container.is-dbdoc .left  { flex: 1.0; }
+.container.is-dbdoc .right { flex: 1.5; }
+
+// 中栏表列表也固定列宽:长表 key 占满把中文名挤竖排 → fixed + key 格内换行
+.p-dbdoc-tables__table {
+  table-layout: fixed;
+  width: 100%;
+}
+.p-dbdoc-tables__table th:nth-child(1), .p-dbdoc-tables__table td:nth-child(1) { width: 40px; }
+.p-dbdoc-tables__table th:nth-child(2), .p-dbdoc-tables__table td:nth-child(2) { width: 54%; }
+// 名称 = 剩余 ~42%
+.p-dbdoc-tlink code { word-break: break-all; }
+
+// 中栏(表列表)+ 右栏(详情)固定不随页面滚:外框 fit 视口高、内部各自滚 —— 像左侧 aside 一样
+// 钉住(同 is-api-request 套路)。本页无 subnav/topBar,高度只减 header。
+.container.is-dbdoc {
+  height: calc(100vh - var(--shell-header-height));
+  min-height: 0;
+  overflow: hidden;
+}
+.container.is-dbdoc > .left,
+.container.is-dbdoc > .right {
+  overflow-y: auto;
+  min-height: 0;
+}

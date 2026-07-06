@@ -1,0 +1,38 @@
+###
+# {{schema_name}}
+#
+# @author {{author}}
+# @date   {{date}}
+##
+module:
+    name: {{ModuleName}}
+    folder: {{ModuleFolder}}
+tables:
+    table_name1:
+        model:
+            class: {{ModelClassName}}
+        controller:
+            app: ['admin']
+            class: {{ControllerClassName}}
+        attrs:
+            name: 表名称
+            desc: 表描述
+            remark: ['line 1', 'line 2']
+        index:
+            id: { type: primary, fields: id }
+            # plan-51:带 deleted_at 表默认**不**写 type:unique(那会生成 DB 强约束,
+            # 跟"软删后允许同名重建"的业务语义冲突)。改用 fields 里 `unique: true` sugar
+            # 表达 app-level + soft-aware 唯一性检查;若真要 DB 强约束(跨软删唯一),
+            # 写 `db_unique: true`,会自动派生进 index 块 type:unique。详 plan-51。
+        fields:
+            id: { }
+            name: { name: 名称, type: varchar, default: 'scaffold', unique: true }
+            #...
+            status: { required: false, name: 状态, type: tinyint, default: 1 }
+            deleted_at: { }
+            created_at: { }
+            updated_at: { }
+        enums:
+            status:
+                online: [1, online, 上架 ]
+                offline: [2, offline, 下架 ]

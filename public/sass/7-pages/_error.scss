@@ -1,0 +1,75 @@
+// ==============================================================================
+// Page: Error (plan-22 · 404/419/500/403)
+// 跟随 light/dark 主题(Laravel 默认 errors 强制 dark,这套替换)
+// ==============================================================================
+
+.p-error {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  // 2026-06-19:flat 灰底 → 主题感知暖角晕,呼应登录/首页品牌氛围(token,明暗自适应)
+  background:
+    radial-gradient(circle at top left, var(--accent-bg-hover), transparent 32%),
+    radial-gradient(circle at bottom right, var(--bg-card-alt), transparent 28%),
+    var(--bg-page);
+}
+
+.p-error__mark {
+  display: block;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto var(--space-5);
+}
+
+.p-error__card {
+  max-width: 480px;
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-8) var(--space-6);
+  text-align: center;
+}
+
+.p-error__code {
+  font-size: 72px;
+  font-weight: var(--weight-bold);
+  color: var(--accent-text);
+  line-height: 1;
+  margin: 0 0 var(--space-4);
+  letter-spacing: -2px;
+  font-feature-settings: 'tnum';
+}
+
+.p-error__title {
+  font-size: var(--font-xl);
+  font-weight: var(--weight-semibold);
+  margin: 0 0 var(--space-3);
+  color: var(--text-heading);
+}
+
+.p-error__desc {
+  color: var(--text-desc);
+  margin: 0 0 var(--space-6);
+  font-size: var(--font-base);
+  line-height: var(--line-base);
+}
+
+.p-error__actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.p-error__hint {
+  margin: var(--space-5) 0 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-light);
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+  line-height: var(--line-base);
+}

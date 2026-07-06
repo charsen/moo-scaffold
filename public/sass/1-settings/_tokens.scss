@@ -1,0 +1,137 @@
+// ==============================================================================
+// Design Tokens — Scaffold UI
+// 唯一令牌源；颜色 token 见 _theme.scss
+// 视图层禁止硬编码颜色 / 间距 / 圆角 / 字号 / 控件高度，全部走以下变量
+//
+// 命名策略：
+//   - 通用 token: --space-* / --radius-* / --control-* / --font-* （可复用）
+//   - 语义别名:  --shell-*  （对齐《设计规范》提及的语义命名，便于查阅 / 与车检云规范对照）
+// 视图可任选其一，但同一语义不要混用。
+// ==============================================================================
+
+:root {
+  // -------- 字体栈（对齐《设计规范》§1.2） --------
+  --font-family-base: 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family-mono: ui-monospace, SFMono-Regular, 'Menlo', 'Consolas', monospace;
+
+  // -------- 间距（4 的倍数） --------
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-14: 56px;
+  --space-16: 64px;
+
+  // 语义别名：主内容区距离顶部 header 的留白
+  // 依据《设计规范》§7.1 页面内容 padding=20px 为基准，header 下留白 ≈1.2×base = 24px
+  // （之前 48px 被设计 review 评为偏大，halve 到 24px 更贴近内容卡片自身的 20px padding 节奏）
+  --shell-content-top: var(--space-6);  // 24px
+
+  // -------- 圆角（语义命名 + 对齐规范） --------
+  --radius-xs: 4px;     // chip / tag
+  --radius-sm: 8px;     // input / button（对齐规范 --shell-control-radius）
+  --radius-md: 12px;    // card / panel（对齐规范 --shell-card-radius）
+  --radius-lg: 14px;    // shell / large card
+  --radius-pill: 999px;
+
+  // -------- 字号（对齐规范 §1.2） --------
+  // plan-24 字号阶梯 14/16/18/24/32(plan-22 V4):中段拉开,卡片头/分组头/正文层级清晰
+  --font-xs: 12px;      // 小标签 / 提示
+  --font-sm: 13px;      // 辅助文字(保留,18 处历史在用)
+  --font-base: 14px;    // 正文 + 侧栏分组标题/菜单项(2026-06-10:side-tree 分组头从 --font-md 再降一档,层级靠 weight/色/缩进)
+  --font-md: 16px;      // 卡片标题(分组小节标题 2026-05-21 从 --font-lg 迁入;2026-06-10 side-tree 场景再迁 --font-base)
+  --font-lg: 18px;      // 大区块标题 / 强调标题(2026-05-21:分组小节标题已迁 --font-md)
+  --font-xl: 20px;      // 过渡档,不进主阶梯
+  --font-2xl: 24px;     // section 主标题
+  --font-3xl: 32px;     // 登录页 / 页面主标题 hero
+
+  // -------- 字重 --------
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  // -------- 行高 --------
+  --line-tight: 1.18;   // 大标题（规范 h1: 1.18）
+  --line-snug: 1.3;
+  --line-base: 1.55;
+  --line-loose: 1.75;
+
+  // -------- 控件高度（对齐规范 §3.3 控件最小高度 40px） --------
+  --control-sm: 28px;
+  --control-md: 40px;   // 默认按钮 / 输入框（规范最小高度）
+  --control-lg: 44px;   // 主操作 / 工具栏
+  --control-xl: 50px;   // 登录 hero 输入 / 按钮（规范 §4.3）
+
+  // -------- 阴影（沿用 _theme.scss 的具体值，按层级语义化） --------
+  --elevation-0: none;
+  --elevation-1: var(--shadow-sm);       // 卡片默认
+  --elevation-2: var(--shadow-card);     // 浮起卡片 / 抽屉 / dropdown
+  --elevation-3: var(--shadow-modal);    // modal / confirm dialog
+  --elevation-strip: var(--shadow-header); // 顶部固定栏（特殊薄阴影，不走 1/2/3 体系）
+
+  // -------- 过渡（对齐规范 §5 通用 180ms） --------
+  --transition-fast: 120ms ease;
+  --transition-base: 180ms ease;
+  --transition-slow: 320ms ease;
+  --transition-spin: 620ms linear;       // 规范刷新图标旋转
+
+  // -------- 断点（仅供参考；CSS @media 仍需写字面量） --------
+  // 桌面端开发工具，无 mobile 支持，最小宽度 1024px
+  --bp-md: 1024px;
+  --bp-lg: 1280px;
+  --bp-xl: 1800px;
+
+  // 注：当前 @media 中实际使用的字面量值（按页面内容密度独立调校，未统一）：
+  //   - 768px:  mobile 折叠（_shell / _dashboard / _api-request）
+  //   - 960px:  acl 卡片网格 + debug 工具栏（_acl / _api-request）
+  //   - 1100px: dashboard 中等宽度（_dashboard）
+  //   - 1200px: debug 表单展开（_api-request）
+  // TODO: 等 visual regression 基线就绪后再统一到 --bp-md/lg/xl 上。
+
+  // -------- Z-index 序列 --------
+  // 工业惯例:toast 永远在最顶层(否则 modal 内触发的 toast 被遮就完全看不到了)
+  --z-header: 100;
+  --z-aside: 90;
+  --z-dropdown: 200;
+  --z-drawer: 300;
+  --z-modal: 500;
+  --z-toast: 600;
+
+  // ==========================================================================
+  // 语义别名（对齐《设计规范》--shell-* 命名）
+  // 用法等价：以下两种写法都正确，按可读性选择
+  //   padding: var(--space-5);             // 通用刻度
+  //   padding: var(--shell-card-padding);  // 语义清晰
+  // ==========================================================================
+  --shell-card-radius: var(--radius-md);
+  --shell-control-radius: var(--radius-sm);
+  --shell-page-gutter: var(--space-5);
+  --shell-card-padding: var(--space-5);
+  --shell-card-padding-large: var(--space-6) var(--space-7);
+  --shell-header-height: 64px;
+  --shell-subnav-height: 48px;     // 2026-05-21:header 下方 app 切换 sub-nav 高度(仅 api.list/request + route.list 3 页用)
+  --shell-tabs-height: 44px;
+  --shell-sider-width: 220px;
+  --shell-sider-collapsed-width: 64px;
+  --shell-form-field-gap: var(--space-4);      // 字段间距（规范 14×18，取近似）
+  --shell-form-section-gap: var(--space-4);    // 区块间距
+
+  // plan-24 间距语义 alias(plan-22 V5):card/section/grid 三类常用间距收口
+  --shell-card-gap: var(--space-5);            // 20px,卡片之间(如 stat-card grid 间距)
+  --shell-section-gap: var(--space-6);         // 24px,主 section 之间
+  --shell-grid-gap: var(--space-5);            // 20px,grid 容器内卡片
+
+  // -------- Surface 语义层（卡片 / 浮层背景） --------
+  // surface-1 = 主要 surface（卡片、弹窗本体）
+  // surface-2 = 次级 surface（表头、嵌套块、锁定行）
+  // 走 --bg-card / --bg-card-alt 别名，自动跟随浅/暗模
+  --surface-1: var(--bg-card);
+  --surface-2: var(--bg-card-alt);
+}

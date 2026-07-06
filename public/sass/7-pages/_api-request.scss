@@ -1,0 +1,1796 @@
+// ==============================================================================
+// Page: 接口调试 (api/request)
+// 阶段 3 #6: 将原 view 内联 <style> 整体迁出（仍保留 partials 内联 includes 在 view 中）
+// 全部 class 名沿用旧版以保护 JS 选择器
+// ==============================================================================
+
+@use "../base/mixins" as *;   // focus-ring + text-overflow mixin（@use 非传递,逐文件取）
+
+
+    .api-debug-action {
+        margin: 3px 0;
+    }
+
+    .api-debug-link {
+        position: relative;
+        display: block;
+        min-height: 40px;
+        line-height: 40px;
+    }
+
+    // 调试侧栏加载/错误占位（替代旧的 inline style="color:var(--text-error)"）
+    // 由 api-request-index.js 动态注入 #left_container，命名加 api-debug- 前缀避免污染
+    .api-debug-loading {
+        margin: var(--space-10) auto 0;
+        text-align: center;
+        font-size: var(--font-md);
+        color: var(--text-light);
+    }
+
+    .api-debug-loading.is-error {
+        color: var(--text-error);
+    }
+
+    // 2026-06-20:加载失败态 —— 图标 + 文案 + 重试按钮(替代旧的纯红字「加载失败,请重试」:
+    //   只甩一行字却没重试入口)。两页共用(#left_container 接口调试 / #right_container 接口文档),
+    //   由 api-request-index.js / api-index.js 动态注入;根级选择器,全局可用。
+    .api-load-fail {
+        margin: var(--space-10) auto 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-3);
+
+        &__icon {
+            color: var(--text-error);
+        }
+
+        &__text {
+            margin: 0;
+            font-size: var(--font-md);
+            color: var(--text-secondary);
+        }
+
+        &__retry {
+            padding: 6px 16px;
+            border: 1px solid var(--border-input);
+            border-radius: var(--radius-sm);
+            background: var(--bg-card);
+            color: var(--text-body);
+            font-size: var(--font-sm);
+            cursor: pointer;
+            transition: border-color .15s ease, color .15s ease;
+
+            &:hover {
+                border-color: var(--accent-text);
+                color: var(--accent-text);
+            }
+            &:focus-visible { @include focus-ring(2px); }
+        }
+    }
+
+    .link_li.api-debug-action .api-debug-link {
+        padding-left: 95px;
+    }
+
+    .aside .sub li .api-debug-link:before {
+        content: none;
+    }
+
+    .api-debug-link-status {
+        position: absolute;
+        left: 68px;
+        top: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        transform: translateY(-50%);
+        color: var(--text-light);
+    }
+
+    .api-debug-link-status svg {
+        width: 18px;
+        height: 18px;
+        display: block;
+    }
+
+    .api-debug-link-status .icon-complete {
+        display: none;
+        color: var(--badge-green);
+    }
+
+    .api-debug-link-status.is-complete .icon-incomplete {
+        display: none;
+    }
+
+    .api-debug-link-status.is-complete .icon-complete {
+        display: block;
+    }
+
+    .api-debug-method {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+        border-radius: var(--radius-pill);
+        min-width: 52px;
+        padding: var(--space-1) var(--space-2);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .03em;
+        color: var(--method-default-text);
+        background: var(--method-default-bg);
+    }
+
+    .api-debug-method.is-get {
+        color: var(--method-get-text);
+        background: var(--method-get-bg);
+    }
+
+    .api-debug-method.is-post {
+        color: var(--method-post-text);
+        background: var(--method-post-bg);
+    }
+
+    .api-debug-method.is-put,
+    .api-debug-method.is-patch {
+        color: var(--method-put-text);
+        background: var(--method-put-bg);
+    }
+
+    .api-debug-method.is-delete {
+        color: var(--method-delete-text);
+        background: var(--method-delete-bg);
+    }
+
+    .api-debug-method.is-any {
+        color: var(--method-any-text);
+        background: var(--method-any-bg);
+    }
+
+    .api-debug-link-text {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        line-height: 40px;
+        vertical-align: middle;
+    }
+
+    .api-debug-link-badge {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius-pill);
+        height: 14px;
+        padding: 0 5px;
+        font-size: 9px;
+        font-weight: 600;
+        letter-spacing: .02em;
+        color: var(--accent-text);
+        background: var(--accent-bg);
+        box-shadow: inset 0 0 0 1px var(--accent-inset-shadow);
+        white-space: nowrap;
+    }
+
+    .api-debug-link-text.is-deprecated {
+        color: var(--text-light);
+        text-decoration: line-through;
+        text-decoration-thickness: 1px;
+        text-decoration-color: rgba(180, 83, 9, .45);
+    }
+
+    .link_li.active .api-debug-link {
+        color: var(--accent-text);
+        font-weight: var(--weight-semibold);
+        background: var(--accent-bg);
+        border-right: 3px solid var(--accent-hover-border);
+    }
+
+    .link_li.active .api-debug-method {
+        box-shadow: inset 0 0 0 1px var(--accent-inset-shadow);
+    }
+
+    // plan-50 后续 v5:左部 260px = sidebar 宽,select 铺满整个左部(去 border-right,
+    // 视觉跟下方 aside 整体融合)— user 反馈
+    .api-debug-top-bar__left {
+        flex: 0 0 260px;
+        display: flex;
+        align-items: center;
+        // 左 20 对齐 aside 卡片左缘;右 8 对齐 side-tree 内容右缘(原右也 20 让 select 短 ~13px、没撑满 sidebar)
+        padding: 0 var(--space-2) 0 var(--space-5);
+    }
+
+    // app 切换 select(单 app 时简化为只读 chip)
+    .api-debug-app-switcher__current {
+        color: var(--text-desc);
+        font-size: var(--font-sm);
+        padding: 4px 8px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-xs);
+    }
+
+    .api-debug-app-switcher {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        width: 100%;     // 让 select flex:1 撑满整个左部
+
+        label {
+            color: var(--text-desc);
+            font-size: var(--font-xs);
+            white-space: nowrap;
+        }
+
+        select {
+            flex: 1;
+            min-width: 0;
+            padding: 4px 22px 4px 8px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-xs);
+            background-color: var(--bg-input);
+            color: var(--text-body);
+            font-size: var(--font-sm);
+            line-height: 1.4;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4 L5 7 L8 4' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 6px center;
+            background-size: 10px 10px;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            cursor: pointer;
+
+            &:hover { border-color: var(--accent-text); }
+            &:focus-visible { @include focus-ring(2px); }
+        }
+    }
+
+    // plan-50 ScaffoldDebugTabs:多接口 tabs bar(top-bar 内右部,对齐 middle+right 整行)
+    .api-debug-tabs {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        // 左右各 20:tabs bar 从 260(app-switcher 右沿)起,首 tab 需 +20 才落到中间栏左缘 280
+        // (原 12 让首 tab 卡在 272、戳出中间栏左边);右 20 同步对齐右栏右缘
+        padding: 0 var(--space-5);
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+
+        &__empty {
+            color: var(--text-desc);
+            font-size: var(--font-sm);
+            padding: 8px 4px;
+            font-style: italic;
+            align-self: center;
+        }
+
+        &__item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 8px 5px 10px;
+            max-width: 220px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--bg-card);
+            color: var(--text-desc);
+            font-size: var(--font-xs);
+            font-weight: var(--weight-medium);
+            cursor: pointer;
+            transition: background .15s ease, color .15s ease, border-color .15s ease;
+            flex-shrink: 0;
+
+            &:hover {
+                background: var(--bg-card-alt);
+                color: var(--text-body);
+                border-color: var(--text-desc);
+            }
+
+            // 2026-05-24 二轮 audit A5:原 border 1px + box-shadow 0 0 0 1px 同色叠加 = 2px 假双线
+            // (全站独此一处违反扁平 1px border 风),砍 box-shadow,border + color 已足够区分
+            // 2026-05-30:active tab 加 accent 软橙底(原白底只有橙框橙字,当前 tab 不够跳),
+            // 跟全站 active = --accent-bg + --accent-text 一致(如 header 齿轮 is-active)
+            &.is-active {
+                background: var(--accent-bg);
+                color: var(--accent-text);
+                border-color: var(--accent-text);
+            }
+        }
+
+        // 2026-05-24 二轮 audit A6:method chip 颜色复用 method-badge token map
+        // (`&__method` 默认色保留作 fallback,JS addClass is-{method} 时叠加色)
+        &__method {
+            display: inline-block;
+            padding: 1px 4px;
+            font-family: var(--font-family-mono);
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1.2;
+            color: var(--text-desc);
+            background: var(--bg-page);
+            border-radius: var(--radius-xs);
+            text-transform: uppercase;
+
+            &.is-get    { color: var(--method-get-text);    background: var(--method-get-bg); }
+            &.is-post   { color: var(--method-post-text);   background: var(--method-post-bg); }
+            &.is-put    { color: var(--method-put-text);    background: var(--method-put-bg); }
+            &.is-patch  { color: var(--method-patch-text);  background: var(--method-patch-bg); }
+            &.is-delete { color: var(--method-delete-text); background: var(--method-delete-bg); }
+            &.is-any    { color: var(--method-any-text);    background: var(--method-any-bg); }
+        }
+
+        &__label {
+            max-width: 140px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        &__close {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: var(--radius-xs);
+            color: var(--text-desc);
+            font-size: 14px;
+            line-height: 1;
+            cursor: pointer;
+
+            &:hover {
+                color: var(--color-danger-strong);
+                background: var(--bg-danger-soft);
+            }
+        }
+    }
+
+    // plan-50 tabs 右键菜单(关闭 / 关闭其他 / 关闭右侧 / 关闭所有)
+    // JS append 到 body + position:fixed 定位到鼠标坐标,规格沿用 header__user-menu dropdown
+    .api-debug-tab-menu {
+        position: fixed;
+        z-index: var(--z-dropdown);
+        min-width: 132px;
+        padding: var(--space-1);
+        background: var(--bg-card);
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-md);
+        box-shadow: var(--elevation-2);
+
+        &__item {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: var(--space-2) var(--space-3);
+            border: 0;
+            border-radius: var(--radius-sm);
+            background: transparent;
+            color: var(--text-body);
+            font-size: var(--font-sm);
+            cursor: pointer;
+            transition: background var(--transition-fast), color var(--transition-fast);
+
+            &:hover {
+                background: var(--bg-card-alt);
+                color: var(--text-heading);
+            }
+
+            &.is-danger:hover {
+                background: var(--bg-danger-soft);
+                color: var(--color-danger-strong);
+            }
+
+            &.is-disabled {
+                opacity: .5;
+                cursor: not-allowed;
+
+                &:hover {
+                    background: transparent;
+                    color: var(--text-body);
+                }
+            }
+        }
+
+        &__divider {
+            margin: var(--space-1) 0;
+            border-top: 1px solid var(--border-light);
+        }
+    }
+
+    .host-bar.api-debug-hostbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 16px 20px 14px;
+        margin: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+    }
+
+    .api-debug-history-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+        border: 1px solid var(--tab-border);
+        border-radius: var(--radius-pill);
+        padding: 6px 12px;
+        font-size: var(--font-xs);
+        font-weight: 600;
+        color: var(--tab-text);
+        background: var(--tab-bg);
+        cursor: pointer;
+        transition: all .18s ease;
+    }
+
+    .api-debug-history-btn:hover {
+        border-color: var(--tab-hover-border);
+        color: var(--tab-hover-text);
+        background: var(--tab-hover-bg);
+    }
+
+    .api-debug-history-btn:focus-visible {
+        outline: 2px solid var(--accent-hover-border);
+        outline-offset: 2px;
+    }
+
+    // 抽屉内容：最近调试记录
+    .api-debug-recent {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+        font-size: var(--font-sm);
+    }
+
+    .api-debug-recent__hint {
+        margin: 0;
+        padding: var(--space-2) var(--space-3);
+        border-radius: var(--radius-sm);
+        background: var(--bg-code);
+        color: var(--text-desc);
+        font-size: var(--font-xs);
+        line-height: 1.5;
+    }
+
+    .api-debug-recent__hint a {
+        color: var(--link-color);
+    }
+
+    .api-debug-recent__top {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-2);
+    }
+
+    .api-debug-recent__top .api-debug-recent__hint {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .api-debug-recent__clear {
+        flex-shrink: 0;
+        padding: 4px 10px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        background: var(--bg-card);
+        color: var(--text-desc);
+        font-size: var(--font-xs);
+        white-space: nowrap;
+        cursor: pointer;
+        transition: background .15s ease, border-color .15s ease, color .15s ease;
+    }
+
+    .api-debug-recent__clear:hover {
+        background: var(--bg-danger-soft);
+        border-color: var(--color-danger);
+        color: var(--color-danger);
+    }
+
+    .api-debug-recent__clear:focus-visible {
+        outline: 2px solid var(--color-danger);
+        outline-offset: 2px;
+    }
+
+    .api-debug-recent__list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .api-debug-recent__item {
+        display: block;
+    }
+
+    .api-debug-recent__row {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        grid-template-rows: auto auto;
+        align-items: center;
+        gap: var(--space-1) var(--space-2);
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid transparent;
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--text-body);
+        text-align: left;
+        font: inherit;
+        cursor: pointer;
+        transition: background .15s ease, border-color .15s ease;
+    }
+
+    .api-debug-recent__row:hover {
+        background: var(--tab-hover-bg);
+        border-color: var(--border-row);
+    }
+
+    .api-debug-recent__row:focus-visible {
+        outline: 2px solid var(--accent-hover-border);
+        outline-offset: -2px;
+    }
+
+    .api-debug-recent__row-method {
+        grid-row: 1;
+        grid-column: 1;
+        flex-shrink: 0;
+        padding: 2px 6px;
+        border-radius: var(--radius-sm);
+        background: var(--bg-code);
+        font-family: var(--font-family-mono);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .03em;
+        text-transform: uppercase;
+        color: var(--text-desc);
+    }
+
+    .api-debug-recent__row-method.method-badge--get    { color: var(--method-get-text);    background: var(--method-get-bg); }
+    .api-debug-recent__row-method.method-badge--post   { color: var(--method-post-text);   background: var(--method-post-bg); }
+    .api-debug-recent__row-method.method-badge--put    { color: var(--method-put-text);    background: var(--method-put-bg); }
+    .api-debug-recent__row-method.method-badge--patch  { color: var(--method-patch-text);  background: var(--method-patch-bg); }
+    .api-debug-recent__row-method.method-badge--delete { color: var(--method-delete-text); background: var(--method-delete-bg); }
+
+    .api-debug-recent__row-url {
+        grid-row: 1;
+        grid-column: 2;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-family: var(--font-family-mono);
+        font-size: var(--font-xs);
+    }
+
+    .api-debug-recent__row-status {
+        grid-row: 1;
+        grid-column: 3;
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-1);
+        flex-shrink: 0;
+        font-size: var(--font-xs);
+        font-weight: var(--weight-semibold);
+    }
+
+    .api-debug-recent__row-status-icon {
+        font-size: 11px;
+        line-height: 1;
+    }
+
+    .api-debug-recent__row-meta {
+        grid-row: 2;
+        grid-column: 1 / -1;
+        color: var(--text-desc);
+        font-size: var(--font-xs);
+    }
+
+    // 同接口同状态合并后的调试次数(仅 >1 时渲染)
+    .api-debug-recent__row-count {
+        display: inline-block;
+        margin-right: var(--space-1);
+        padding: 0 5px;
+        border-radius: var(--radius-sm);
+        background: var(--bg-code);
+        color: var(--text-body);
+        font-family: var(--font-family-mono);
+        font-weight: 700;
+    }
+
+    .api-debug-recent__empty {
+        padding: var(--space-4) var(--space-3);
+        text-align: center;
+        color: var(--text-desc);
+        font-size: var(--font-xs);
+    }
+
+    .api-debug-recent__pager {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-3);
+        padding: var(--space-3) 0 var(--space-2);
+        border-top: 1px solid var(--border-row);
+    }
+
+    .api-debug-recent__pager-btn {
+        padding: 4px 10px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        background: var(--bg-card);
+        color: var(--text-body);
+        font-size: var(--font-xs);
+        cursor: pointer;
+        transition: background .15s ease, border-color .15s ease;
+    }
+
+    .api-debug-recent__pager-btn:hover:not(:disabled) {
+        background: var(--tab-hover-bg);
+        border-color: var(--accent-hover-border);
+    }
+
+    .api-debug-recent__pager-btn:disabled {
+        opacity: .45;
+        cursor: not-allowed;
+    }
+
+    .api-debug-recent__pager-btn:focus-visible {
+        outline: 2px solid var(--accent-hover-border);
+        outline-offset: 2px;
+    }
+
+    .api-debug-recent__pager-info {
+        font-size: var(--font-xs);
+        color: var(--text-desc);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .api-debug-host-main {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .api-debug-hostbar label {
+        margin-right: 0;
+        font-weight: 600;
+        color: var(--text-body);
+    }
+
+    .api-debug-hostbar select {
+        flex: 1 1 auto;
+        width: auto;
+        max-width: none;
+        min-width: 0;
+        height: 40px;
+        border: 1px solid var(--border-input);
+        border-radius: 10px;
+        padding: 0 40px 0 14px;
+        color: var(--text-primary);
+        background-color: var(--bg-input);
+        // 2026-06-18:实心三角(双 linear-gradient)→ 全站统一的描边 SVG chevron,跟 designer / 全局 select 一致
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4 L5 7 L8 4' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+        background-position: right 14px center;
+        background-size: 10px 10px;
+        background-repeat: no-repeat;
+        box-shadow: none;
+    }
+
+    .api-debug-hostbar select:hover,
+    .api-debug-hostbar select:focus {
+        border-color: var(--accent-hover-border);
+    }
+
+    .api-debug-hostbar option {
+        color: var(--text-primary);
+        background: var(--bg-card);
+    }
+
+    .api-debug-hostbar .host-txt {
+        flex: 1 1 auto;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
+    .api-debug-console {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .api-debug-console .hd {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+        padding: 18px 20px 0;
+    }
+
+    .api-debug-console .hd h2 {
+        font-size: var(--font-md);
+        font-weight: 600;
+    }
+
+    .api-debug-console .hd em {
+        margin-left: 0;
+        opacity: 1;
+        font-size: var(--font-xs);
+        color: var(--text-light);
+    }
+
+    .api-debug-console .bd {
+        padding: 18px 20px 20px;
+    }
+
+    .api-debug-result-bar {
+        margin-top: 0;
+        padding: 0 92px 0 94px;
+    }
+
+    .api-debug-result-bar .result-txt {
+        background: var(--bg-code);
+    }
+
+    .api-debug-result-bar .status,
+    .api-debug-result-bar .method-type {
+        font-weight: 600;
+    }
+
+    // 响应摘要 meta：耗时 / 体积 / 时间点
+    .api-debug-result-meta {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-top: var(--space-2);
+        padding-left: var(--space-1);
+        flex-wrap: wrap;
+    }
+
+    .api-debug-result-meta[hidden] {
+        display: none;
+    }
+
+    .api-debug-result-meta-item {
+        display: inline-flex;
+        align-items: baseline;
+        gap: var(--space-1);
+        font-size: var(--font-xs);
+        color: var(--text-light);
+    }
+
+    .api-debug-result-meta-item label {
+        color: var(--text-desc);
+    }
+
+    .api-debug-result-meta-item b {
+        font-weight: 600;
+        color: var(--text-body);
+        font-variant-numeric: tabular-nums;
+    }
+
+    // Response 容器：基础样式继承自 .json-block (6-components/_json.scss)
+    // 这里只覆盖页面级特殊需求（最小高度 / 边距收紧）
+    .api-debug-response-body,
+    .api-debug-response-headers {
+        min-height: 300px;
+        border-radius: var(--radius-sm);
+    }
+
+    .api-debug-response-headers {
+        min-height: 120px;
+        white-space: pre-wrap;
+    }
+
+    // 错误块（替代 JS 中拼接的 inline-style HTML）
+    .api-debug-error {
+        padding: var(--space-3);
+        color: var(--text-error);
+        font-size: var(--font-sm);
+        line-height: var(--line-base);
+    }
+
+    .api-debug-error__title {
+        margin: 0 0 var(--space-3);
+        font-weight: 700;
+        color: var(--text-error);
+    }
+
+    .api-debug-error__list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .api-debug-error__item {
+        padding: 2px 0;
+        color: var(--text-error);
+    }
+
+    .api-debug-error__item--muted {
+        margin-top: var(--space-2);
+        color: var(--text-muted);
+        font-size: var(--font-xs);
+    }
+
+    .api-debug-error__raw {
+        margin-top: var(--space-4);
+    }
+
+    .api-debug-error__raw-toggle {
+        cursor: pointer;
+        color: var(--link-color);
+        font-size: var(--font-xs);
+        user-select: none;
+        list-style: none;
+    }
+
+    .api-debug-error__raw-toggle::-webkit-details-marker {
+        display: none;
+    }
+
+    .api-debug-error__raw-toggle::before {
+        content: "▸";
+        display: inline-block;
+        margin-right: var(--space-1);
+        transition: transform .18s ease;
+    }
+
+    .api-debug-error__raw[open] .api-debug-error__raw-toggle::before {
+        transform: rotate(90deg);
+    }
+
+    .api-debug-error__raw[open] .api-debug-error__raw-toggle {
+        margin-bottom: var(--space-2);
+    }
+
+    .api-debug-error__raw pre {
+        max-height: 320px;
+        overflow: auto;
+    }
+
+    .api-debug-console .api-debug-response-tabs {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+        flex-wrap: wrap;
+        padding: 18px 20px 0;
+    }
+
+    .api-debug-response-tabs-main {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+    }
+
+    .api-debug-response-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        margin-left: auto;
+    }
+
+    .api-debug-copy-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--tab-border);
+        border-radius: var(--radius-pill);
+        padding: 7px 14px;
+        font-size: var(--font-xs);
+        font-weight: 600;
+        color: var(--tab-text);
+        background: var(--tab-bg);
+        cursor: pointer;
+        transition: all .18s ease;
+    }
+
+    .api-debug-copy-btn:hover {
+        border-color: var(--tab-hover-border);
+        color: var(--tab-hover-text);
+        background: var(--tab-hover-bg);
+    }
+
+    .api-debug-copy-btn:focus-visible {
+        outline: 2px solid var(--accent-hover-border);
+        outline-offset: 2px;
+    }
+
+    .api-debug-copy-btn.is-copied {
+        border-color: var(--tab-active-border);
+        color: var(--tab-active-text);
+        background: var(--tab-active-bg);
+    }
+
+    .api-debug-response-tab {
+        border: 1px solid var(--tab-border);
+        border-radius: var(--radius-pill);
+        padding: 7px 14px;
+        font-size: var(--font-xs);
+        font-weight: 600;
+        color: var(--tab-text);
+        background: var(--tab-bg);
+        cursor: pointer;
+        transition: all .18s ease;
+    }
+
+    .api-debug-response-tab:hover {
+        border-color: var(--tab-hover-border);
+        color: var(--tab-hover-text);
+        background: var(--tab-hover-bg);
+    }
+
+    .api-debug-response-tab.is-active {
+        border-color: var(--tab-active-border);
+        color: var(--tab-active-text);
+        background: var(--tab-active-bg);
+    }
+
+    .api-debug-response-pane {
+        display: none;
+    }
+
+    .api-debug-response-pane.is-active {
+        display: block;
+    }
+
+    .debug-request-page {
+        padding-bottom: var(--space-7);
+    }
+
+    .debug-request-head {
+        padding: 24px 20px 0;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .debug-request-title-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 14px;
+        width: 100%;
+    }
+
+    .debug-request-title-main {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    .debug-request-title-wrap .debug-request-title {
+        min-width: 0;
+        justify-content: flex-start;
+    }
+
+    .debug-request-head > .debug-request-title-main {
+        margin-top: 10px;
+        text-align: left;
+    }
+
+    .debug-request-head > .debug-request-title-main .debug-request-acl {
+        margin-top: 0;
+    }
+
+    .debug-request-head > .debug-request-title-main .debug-title-chip {
+        justify-content: flex-start;
+    }
+
+    .debug-request-doc {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        width: 34px;
+        height: 34px;
+        color: var(--accent-hover-border);
+        background: var(--accent-bg-warm);
+    }
+
+    .debug-request-doc i {
+        font-size: 15px;
+    }
+
+    .debug-request-doc:hover {
+        background: var(--accent-bg-hover);
+    }
+
+    .debug-request-overline {
+        color: var(--text-light);
+        font-size: var(--font-xs);
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    .debug-request-title {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 0;
+        font-size: var(--font-2xl);
+        font-weight: 700;
+        line-height: 1.25;
+        text-align: left;
+    }
+
+    .debug-request-title-text.is-deprecated {
+        color: var(--text-desc);
+        text-decoration: line-through;
+        text-decoration-thickness: 1px;
+        text-decoration-color: rgba(180, 83, 9, .5);
+    }
+
+    .debug-title-chip {
+        max-width: 100%;
+        gap: var(--space-2);
+        font-weight: 500;
+        word-break: break-all;
+    }
+
+    .debug-request-acl {
+        margin-top: 10px;
+    }
+
+    .debug-request-deprecated {
+        margin-top: var(--space-2);
+        color: var(--accent-text-dark);
+        background: var(--accent-bg);
+        box-shadow: inset 0 0 0 1px var(--accent-inset-shadow);
+    }
+
+    .debug-title-chip-label {
+        color: var(--accent-text-deep);
+        font-weight: 700;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+
+    .debug-title-chip-value {
+        display: inline-flex;
+        align-items: center;
+        border-radius: var(--radius-pill);
+        padding: 2px 10px;
+        font-family: var(--font-family-mono);
+        font-size: var(--font-xs);
+        color: var(--accent-text);
+        background: var(--accent-bg);
+        box-shadow: inset 0 0 0 1px var(--accent-inset-shadow);
+        word-break: break-all;
+    }
+
+    .debug-request-path {
+        margin-top: var(--space-2);
+        color: var(--text-desc);
+        font-size: var(--font-base);
+        word-break: break-all;
+    }
+
+    .debug-request-meta {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 6px 10px;
+        margin-top: var(--space-3);
+        width: 100%;
+    }
+
+    .debug-request-meta-card {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 4px 0 4px 10px;
+        border: 0;
+        border-left: 2px solid var(--border-lighter);
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .debug-request-meta-label {
+        display: block;
+        margin-bottom: 0;
+        font-size: 11px;
+        line-height: 1.25;
+        color: var(--text-light);
+    }
+
+    .debug-request-meta-value {
+        display: block;
+        font-size: var(--font-sm);
+        font-weight: 500;
+        color: var(--text-desc);
+        line-height: 1.35;
+        word-break: break-all;
+    }
+
+    .debug-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 12px;
+        border-radius: var(--radius-pill);
+        font-size: var(--font-xs);
+        color: var(--text-slate);
+        background: var(--bg-chip);
+    }
+
+    a.debug-chip {
+        text-decoration: none;
+    }
+
+    a.debug-chip:hover {
+        color: var(--accent-text);
+        background: var(--accent-bg-hover);
+    }
+
+    .debug-request-toolbar-panel,
+    .debug-param-panel {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .debug-request-toolbar-panel {
+        position: sticky;
+        // 滚动容器是 .container.is-api-request > .left(overflow-y:auto),不是 body/视口。
+        // .left 顶边已在 fixed header + topBar 之下,sticky 贴 .left 顶 = top:0。
+        // 旧值 var(--shell-header-height) 是「body 原生滚动」旧架构残留,会在 .left 顶部多推 64px
+        // 留空 → 发送栏「没到顶部」,且其后的 Header 面板内容从空隙钻到发送栏上方。
+        top: 0;
+        z-index: 8;
+        background: var(--bg-card);
+    }
+
+    .debug-request-toolbar-panel .bd,
+    .debug-param-panel .bd {
+        padding: 18px 20px 20px;
+    }
+
+    // 三段命令栏：method | URL | send
+    // DOM 顺序与视觉顺序一致（method 在最左，便于键盘 Tab 序）
+    .api-debug-send-box.debug-request-toolbar {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        padding: 0;
+
+        // legacy `.api-debug-send-box select/send-btn` 用 float + negative margin
+        // 把 select/send 拉出 padding 外（result-bar 还在用）；flex 布局下要先把这两
+        // 个属性归零，否则 select 向左溢出 90px、send 向右溢出 80px，整条 toolbar 横
+        // 跨整个 viewport
+        > select,
+        > .txt,
+        > .send-btn {
+            float: none;
+            margin: 0;
+        }
+
+        select.debug-request-method {
+            flex-shrink: 0;
+            width: 108px;
+            height: 44px;
+            border-radius: 10px 0 0 10px;
+            font-weight: 700;
+            font-size: var(--font-sm);
+            letter-spacing: .03em;
+            // 2026-05-28 phase C-5:跟父级 SVG 箭头适配(原 76px 11px 是 PNG 位置,SVG 用 right 12px center 跟内 width:108px 解耦)
+            background-position: right 12px center;
+        }
+
+        .txt.debug-request-uri {
+            flex: 1;
+            min-width: 0;
+            height: 44px;
+            line-height: 42px;
+            border-radius: 0;
+            border-left-width: 0;
+            border-right-width: 0;
+            font-size: var(--font-base);
+            background: var(--bg-panel-head);
+        }
+
+        .send-btn {
+            flex-shrink: 0;
+            width: 84px;
+            height: 44px;
+            line-height: 44px;
+            border-radius: 0 10px 10px 0;
+            font-weight: 600;
+        }
+
+        .send-btn.disabled {
+            opacity: .72;
+            cursor: not-allowed;
+        }
+    }
+
+    // method 着色：按 data-method 给左侧 select 上色，区分请求类型
+    .api-debug-send-box.debug-request-toolbar[data-method="GET"] select.debug-request-method {
+        color: var(--method-get-text);
+        background-color: var(--method-get-bg);
+    }
+    .api-debug-send-box.debug-request-toolbar[data-method="POST"] select.debug-request-method {
+        color: var(--method-post-text);
+        background-color: var(--method-post-bg);
+    }
+    .api-debug-send-box.debug-request-toolbar[data-method="PUT"] select.debug-request-method,
+    .api-debug-send-box.debug-request-toolbar[data-method="PATCH"] select.debug-request-method {
+        color: var(--method-put-text);
+        background-color: var(--method-put-bg);
+    }
+    .api-debug-send-box.debug-request-toolbar[data-method="DELETE"] select.debug-request-method {
+        color: var(--method-delete-text);
+        background-color: var(--method-delete-bg);
+    }
+
+    .debug-request-alert {
+        margin: 0;
+        padding: 18px 20px 8px;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+    }
+
+    .debug-request-alert h3 {
+        margin-bottom: var(--space-2);
+        font-size: var(--font-base);
+        font-weight: 600;
+        color: var(--accent-text-alert);
+    }
+
+    .debug-panel-heading {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .debug-panel-heading h3 {
+        font-size: var(--font-md);
+        font-weight: 600;
+    }
+
+    .debug-panel-heading span {
+        border-radius: var(--radius-pill);
+        padding: 4px 10px;
+        font-size: var(--font-xs);
+        color: var(--text-light);
+        background: var(--bg-card-alt);
+    }
+
+    .debug-param-panel .hd {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+        padding: 18px 20px 0;
+    }
+
+    .debug-param-table {
+        border-color: var(--border-lighter);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+    }
+
+    // 2026-06-20:固定列宽 —— VALUE 占满剩余宽(原 auto 布局被长说明挤窄)。
+    //   th 的 width(checkbox/名称/key/说明)生效为精确列宽,value(无 width)吃剩余。
+    .debug-param-table table {
+        table-layout: fixed;
+        width: 100%;
+    }
+
+    .debug-param-table th {
+        color: var(--text-desc);
+        font-size: var(--font-xs);
+        letter-spacing: .03em;
+        text-transform: uppercase;
+        background: var(--bg-card-alt);
+    }
+
+    .debug-param-table td {
+        padding: 12px 10px;
+        vertical-align: middle;
+    }
+
+    .debug-param-table .checkbox {
+        accent-color: var(--accent-hover-border);
+    }
+
+    .debug-param-table .txt,
+    .debug-param-table .select {
+        border: 1px solid var(--border-input) !important;
+        border-radius: 10px;
+        padding: 0 var(--space-3);
+        height: 32px;
+        color: var(--text-primary);
+        background: var(--bg-input) !important;
+    }
+
+    // 2026-05-23 user 反馈:select 的下拉控件 跟 input 样式不统一(全局 appearance:none
+    // 干掉原生箭头,select 看着像普通框)。跟 designer p-designer-fields__select 同款
+    // chevron SVG,右侧留 22px 给箭头,视觉上一眼能区分 input vs select。
+    // 选择器用 .select.value(3 class)抢过更通用的 .panel .table .select(3 class 但
+    // 同 specificity,本规则 source 在后 → 赢);否则 `.panel .table .select` 的
+    // padding 0 8px 把我们 22px 吃掉。
+    .debug-param-table .select.value {
+        padding-right: 22px !important;
+        // 跟 input height: 32px 对齐时,native <select> 不像 input 那样自动垂直居中
+        // (appearance:none 后 text 顶到上沿)。显式设 line-height = 内容高 30px(32 - 2 borders)
+        line-height: 30px !important;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4 L5 7 L8 4' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>") !important;
+        background-repeat: no-repeat !important;
+        background-position: right 8px center !important;
+        background-size: 10px 10px !important;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+    }
+
+    .debug-param-table .txt[readonly] {
+        color: var(--text-desc);
+        background: var(--bg-input-readonly) !important;
+    }
+
+    .debug-param-table .debug-param-plain,
+    .debug-param-table .debug-param-plain[readonly] {
+        border: 0 !important;
+        box-shadow: none !important;
+        padding-left: 0;
+        padding-right: 0;
+        background: transparent !important;
+    }
+
+    // desc 列长文本截断：input 自身不会 ellipsis，靠 white-space + overflow
+    .debug-param-table .debug-param-desc,
+    .debug-param-table .debug-param-desc[readonly] {
+        margin: 0 var(--space-2);
+        width: calc(100% - 16px);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    // 只读展示列(name/key/desc)改用 <span> 而非 readonly <input>：input 即便只读也在
+    // Tab 序里，Tab 切 value 时会停在这些纯展示框上（2026 user 反馈）。span 不可聚焦、移出
+    // Tab 序。下面把 span 渲染成与原只读框一致：撑满单元格、32px 行高垂直居中、desc 文本色。
+    // 仅作用于 span —— 动态新增行(api-request.js)里仍是可编辑 <input class="debug-param-plain">，不受影响。
+    .debug-param-table span.debug-param-plain {
+        display: block;
+        height: 32px;
+        line-height: 32px;
+        color: var(--text-desc);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    // 新增行按钮：低调的虚线 ghost 风格
+    .api-debug-add-row {
+        margin-top: var(--space-2);
+        width: 100%;
+        padding: 6px 10px;
+        border: 1px dashed var(--border-light);
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--text-desc);
+        font-size: var(--font-xs);
+        cursor: pointer;
+        transition: all .15s ease;
+    }
+
+    .api-debug-add-row:hover {
+        border-color: var(--accent-hover-border);
+        color: var(--accent-text);
+        background: var(--accent-bg);
+    }
+
+    .api-debug-add-row:focus-visible {
+        outline: 2px solid var(--accent-hover-border);
+        outline-offset: 2px;
+    }
+
+    .debug-param-table .value {
+        border-color: var(--accent-value-border) !important;
+        // 2026-05-23:用 background-color 而非 background shorthand,否则 !important shorthand
+        // 把 background-image 重置成 none,select 的 chevron SVG 被吃。
+        background-color: var(--accent-value-bg) !important;
+    }
+
+    #request_header .value {
+        height: 32px;
+        margin-right: var(--space-2);
+        width: calc(100% - 8px);
+    }
+
+    #request_body_params .value {
+        height: 32px;
+    }
+
+    #request_params .value {
+        height: 32px;
+    }
+
+    // 2026-06-20:参数说明 ⓘ —— value 单元格内、贴最右(原说明列位置),hover 弹即时气泡。
+    //   不另起列(否则又挤窄 KEY);输入控件 flex:1 占满、ⓘ 贴右。
+    .debug-value-cell {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        min-width: 0;
+        // value 是最右列且 td 右内边距被全局 .table td 覆成 0 → 给单元格本身留右白,
+        // 否则 ⓘ(及无图标行的输入框)贴死表格右沿。
+        padding-right: var(--space-3);
+    }
+    .debug-value-cell .value {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    // ⓘ 信息图标:feather info(stroke-width 2,线条明显),hover 变 accent
+    .api-debug-hint-icon {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--text-desc);
+        cursor: help;
+        transition: color .15s ease;
+
+        // feather info 默认 stroke-width 2,16px 下偏细 → CSS 加粗到 2.5 让线条明显
+        svg {
+            stroke-width: 2.5;
+        }
+
+        &:hover,
+        &:focus-visible {
+            color: var(--accent-text);
+            outline: none;
+        }
+    }
+
+    // 即时气泡:JS 挂到 <body>、position:fixed —— 不被参数表/面板的 overflow:hidden 裁切。
+    .api-debug-hint-pop {
+        position: fixed;
+        z-index: 300;
+        display: none;
+        max-width: 280px;
+        padding: var(--space-2) var(--space-3);
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-sm);
+        background: var(--bg-card);
+        color: var(--text-primary);
+        font-size: var(--font-xs);
+        line-height: var(--line-base);
+        box-shadow: var(--elevation-2);
+        pointer-events: none;
+        word-break: break-word;
+    }
+
+    @media (max-width: 1200px) {
+        .api-debug-hostbar {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+    }
+
+    @media (max-width: 960px) {
+        .debug-request-meta {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .debug-request-title {
+            flex-wrap: wrap;
+            font-size: var(--font-xl);
+        }
+
+        .api-debug-send-box.debug-request-toolbar,
+        .api-debug-result-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 0;
+        }
+
+        .api-debug-send-box.debug-request-toolbar select,
+        .api-debug-send-box.debug-request-toolbar .send-btn,
+        .api-debug-result-bar .method-type,
+        .api-debug-result-bar .status {
+            float: none;
+            margin: 0;
+            width: auto;
+            min-width: 88px;
+            border-left: 1px solid var(--border-color);
+            border-radius: 10px;
+        }
+
+        .api-debug-send-box.debug-request-toolbar .txt,
+        .api-debug-result-bar .result-txt {
+            float: none;
+            width: 100%;
+            border-left: 1px solid var(--border-color);
+            border-radius: 10px;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .debug-request-meta {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .host-bar.api-debug-hostbar,
+        .api-debug-console,
+        .debug-request-toolbar-panel,
+        .debug-request-alert,
+        .debug-param-panel {
+            margin-left: 0;
+            margin-right: 0;
+        }
+
+        .debug-request-head {
+            padding: 20px 12px 0;
+        }
+
+        .debug-request-toolbar-panel .bd,
+        .debug-param-panel .bd,
+        .api-debug-console .bd {
+            padding: var(--space-4);
+        }
+
+        .api-debug-console .hd,
+        .debug-param-panel .hd {
+            padding: 16px 16px 0;
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .api-debug-console .api-debug-response-tabs {
+            justify-content: space-between;
+        }
+
+        .api-debug-response-tabs-main {
+            flex: 1 1 auto;
+        }
+    }
+
+// ==============================================================================
+// 接口调试器专属（从 _legacy.scss 拆出，仅 api/request + api/param 消费）
+// ==============================================================================
+
+.api-debug-send-box {
+    padding: 0 80px 0 90px;
+
+    // .send-btn 是 api/param 调试器的 #send 按钮，避开新 .btn 组件类的全局规则
+    .send-btn {
+        float: right;
+        display: inline-block;
+        margin-right: -80px;
+        border-radius: var(--radius-xs);
+        width: 70px;
+        line-height: 40px;
+        text-align: center;
+        color: var(--text-inverse);
+        background-color: var(--accent-solid);   // 2026-05-28 phase C-2:_theme.scss:108 明示"实心橙按钮必须 --accent-solid #c2410c";原 --accent-hover-border #fe8500 配白字仅 2.x contrast(WCAG fail)
+        transition: filter var(--transition-fast);
+        cursor: pointer;
+
+        &:hover { filter: brightness(1.05); }
+        &:active { filter: brightness(0.92); }
+    }
+
+    select {
+        float: left;
+        margin-left: -90px;
+        border: var(--border-color) solid 1px;
+        padding: 0 var(--space-2);
+        border-radius: 4px 0 0 4px;
+        width: 90px;
+        height: 40px;
+        color: var(--text-primary);
+        appearance: none;
+        -moz-appearance: none;
+        -webkit-appearance: none;
+        // 2026-05-28 phase C-5:legacy PNG 箭头 → inline SVG(跟 line 1303 同款),hidpi 清晰 + 走 currentColor 暗模自适应
+        background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4 L5 7 L8 4' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat 60px center var(--bg-content);
+        background-size: 10px 10px;
+    }
+
+    option { padding: var(--space-2); }
+
+    .txt,
+    .result-txt {
+        @include text-overflow;
+        border: var(--border-color) solid 1px;
+        border-left: 0;
+        padding: 0 var(--space-2);
+        border-radius: 0 4px 4px 0;
+        width: 100%;
+        height: 40px;
+        line-height: 38px;
+        color: var(--text-primary);
+        background-color: var(--bg-input);
+    }
+
+    .result-txt { border-radius: 0; }
+
+    .method-type {
+        float: left;
+        margin-left: -90px;
+        border: var(--border-color) solid 1px;
+        border-radius: 4px 0 0 4px;
+        width: 90px;
+        height: 40px;
+        line-height: 38px;
+        text-align: center;
+        color: var(--text-desc);
+        background-color: var(--bg-content);
+    }
+
+    .status {
+        float: right;
+        margin-right: -80px;
+        border: var(--border-color) solid 1px;
+        border-left: 0;
+        border-radius: 0 4px 4px 0;
+        width: 80px;
+        height: 40px;
+        line-height: 38px;
+        text-align: center;
+        background-color: var(--bg-content);
+    }
+}
+
+// 参数表 ↔ JSON 视图切换（api/param 专属，加 api-debug- 前缀避免污染）
+// 2026-05-23:有边框 + "JSON" label + code(< >)icon button,_on=1 高亮 accent 提示当前
+// 已切到 JSON 视图。原 chevron-down 是上下展开 icon,跟"切换视图"语义不对;改用 code
+// icon 语义对得上 JSON 编辑(user 反馈)。
+.api-debug-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 4px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-card);
+    color: var(--text-desc);
+    font-size: var(--font-sm);
+    line-height: 1.4;
+    cursor: pointer;
+
+    &:hover {
+        border-color: var(--accent-text);
+        color: var(--accent-text);
+    }
+    &:focus-visible { @include focus-ring(2px); }
+
+    &[_on="1"] {
+        background-color: var(--bg-page);
+        border-color: var(--accent-text);
+        color: var(--accent-text);
+    }
+}
+
+.api-debug-toggle__label {
+    font-weight: var(--weight-medium);
+    letter-spacing: 0.02em;
+}
+
+.api-debug-tab-bd {
+    display: none;
+    &.active { display: block; }
+}
+
+// JSON 编辑视图(2026-05-23:从只读 HTML 预览改为可编辑 textarea,支持粘贴外部 JSON 回填表格)
+.api-debug-edit-param {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    width: 100%;
+}
+
+.api-debug-json-editor {
+    width: 100%;
+    min-height: 240px;
+    padding: var(--space-3) var(--space-4);
+    border: var(--border-color) solid 1px;
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-sm);
+    line-height: 1.5;
+    resize: vertical;
+
+    &:focus-visible { @include focus-ring(2px); outline-color: var(--accent-text); }
+}
+
+// 2026-05-23 粘贴按钮放 panel hd(toggle 左边),跟 toggle 同款尺寸。默认 hidden,只在
+// secure context(HTTPS/localhost)显出来 — HTTP 站点 navigator.clipboard.readText 浏览器
+// 规范不开放,藏掉免出现"不支持" 错误。JS feature-detect 加 body.has-clipboard-read 触发显示。
+.api-debug-json-paste {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    margin-right: var(--space-2);
+    padding: 4px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text-desc);
+    font-size: var(--font-sm);
+    line-height: 1.4;
+    cursor: pointer;
+
+    body.has-clipboard-read & { display: inline-flex; }
+
+    svg { opacity: .85; }
+
+    &:hover {
+        background: var(--bg-page);
+        border-color: var(--accent-text);
+        color: var(--accent-text);
+
+        svg { opacity: 1; }
+    }
+    &:focus-visible { @include focus-ring(2px); }
+}
+
+.api-debug-json-status {
+    flex: 1 1 auto;
+    color: var(--text-desc);
+    font-size: var(--font-sm);
+    line-height: 1.4;
+
+    &.is-ok  { color: var(--badge-green); }
+    &.is-err { color: var(--color-danger-strong); }
+}
+
+// debugger 内嵌 alert（仅 api/param 用，永远配对 .debug-request-alert）
+.api-debug-alert {
+    margin: var(--space-2) var(--space-5);
+    border: var(--alert-border) solid 1px;
+    border-left: var(--alert-left-border) solid 4px;
+    padding: var(--space-3) var(--space-5);
+    border-radius: var(--radius-sm);
+    background-color: var(--alert-bg);
+
+    p {
+        margin-top: 5px;
+        color: var(--text-secondary);
+    }
+}
+
+// 2026-05-21 第二轮:.p-api-request__app-tabs 撤,迁到 layout header 下方通用 sub-nav
+// (.scaffold-subnav-bar / .scaffold-app-tabs,见 _header.scss)。设计师复盘:app 切换是
+// 页面级 navigation,跟主菜单同层级,跨 api.list / api.request / route.list 复用。

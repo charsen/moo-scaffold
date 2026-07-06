@@ -1,20 +1,36 @@
-<?php
+<?php declare(strict_types=1);
+
+/*
+ * @Author: Charsen
+ * @Date: 2024-07-29 16:22
+ * @LastEditors: Charsen
+ * @LastEditTime: 2025-07-29 16:40
+ * @Description: Base Resource
+ */
 
 namespace Mooeen\Scaffold\Foundation;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Http\Resources\MissingValue;
 
 class BaseResource extends JsonResource
 {
-    protected mixed $withoutFields = [];
+    use BaseResourceTrait;
+
+    protected mixed $customFields = [];
+
+    protected bool $hide = true;
+
+    protected bool $trashed = false;
 
     /**
      * Transform the resource into an array.
      *
      * @return array<string, mixed>
      */
-    public function toArray($request): array
+    public function toArray(Request $request): array
     {
         if (is_null($this->resource)) {
             return [];
@@ -28,29 +44,25 @@ class BaseResource extends JsonResource
     /**
      * Create a new resource collection.
      *
-     * @param  mixed  $resource
+     * @param mixed $resource
      */
     public static function collection($resource): BaseResourceCollection
     {
-        return tap(new BaseResourceCollection($resource), function ($collection) {
-            $collection->collects = __CLASS__;
+        return tap(static::newCollection($resource), function ($collection) {
+            if (property_exists(static::class, 'preserveKeys')) {
+                $collection->preserveKeys = (new static([]))->preserveKeys === true;
+            }
         });
     }
 
     /**
-     * @url https://learnku.com/laravel/t/7625/dynamically-hide-the-api-field-in-laravel
-     * Set the keys that are supposed to be filtered out.
+     * Create a new resource collection instance.
+     *
+     * @param mixed $resource
      */
-    public function hide(string|array $fields): self
+    protected static function newCollection($resource): AnonymousResourceCollection
     {
-        if (! is_array($fields)) {
-            $fields = str_replace([', ', ' ,', ' , '], ',', $fields);
-            $fields = explode(',', $fields);
-        }
-
-        $this->withoutFields = $fields;
-
-        return $this;
+        return new AnonymousResourceCollection($resource, static::class);
     }
 
     /**
@@ -58,6 +70,52 @@ class BaseResource extends JsonResource
      */
     protected function filterFields($resource): array
     {
-        return $resource->forget($this->withoutFields)->toArray();
+        return (! $this->hide)
+            ? $resource->only($this->customFields)->toArray()
+            : $resource->forget($this->customFields)->toArray(); // except()
+    }
+
+    /**
+     * Conditionally load the given attribute if the route name contains the specified string.
+     */
+    protected function whenRoute($request, $str, $value)
+    {
+        if (str_contains($request->route()->getName(), $str)) {
+            return value($value);
+        }
+
+        return new MissingValue;
+    }
+
+    protected function whenDate($field, $format = 'Y-m-d H:i')
+    {
+        if (isset($this->resource->getAttributes()[$field])) {
+            // if (array_key_exists($field, $this->resource->getAttributes())) {
+            return $this->{$field}->format($format);
+        }
+
+        return new MissingValue;
+    }
+
+    protected function whenSelf($field)
+    {
+        if (isset($this->resource->getAttributes()[$field])) {
+            // if (array_key_exists($field, $this->resource->getAttributes())) {
+            return $this->{$field};
+        }
+
+        return new MissingValue;
+    }
+
+    /**
+     * Conditionally load the given attribute if set trashed model.
+     */
+    protected function whenTrashed($value)
+    {
+        if ($this->trashed) {
+            return $value;
+        }
+
+        return new MissingValue;
     }
 }

@@ -1,0 +1,11 @@
+/*
+ * @Author: {{author}}
+ * @Date: {{date}}
+ * @LastEditors:
+ * @LastEditTime:
+ * @Description: {{class}} Model
+ */
+
+export interface {{class}} {
+{{fields_code}}
+}

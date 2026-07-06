@@ -1,0 +1,77 @@
+<?php declare(strict_types = 1);
+/*
+ * @Author: {{author}}
+ * @Date: {{date}}
+ * @LastEditors: {{author}}
+ * @LastEditTime: {{date}}
+ * @Description: {{entity_name}}控制器
+ */
+
+namespace {{namespace}};
+
+use {{model_class}};
+use {{use_base_action}};
+use {{use_controller_trait}};
+{{use_requests}}
+use {{use_columns}};
+use {{use_form_widgets}};
+use {{use_model_resource}};
+use {{use_model_collection}};
+use {{use_base_controller}};
+
+/**
+ * ACL
+ *
+ * @package_name {zh-CN: {{package_name}} | en: {{package_en_name}}}
+ * @module_name {zh-CN: {{module_name}} | en: {{module_en_name}}}
+ * @controller_name {zh-CN: {{entity_name}} | en: Management {{entity_en_name}}}
+ */
+class {{controller_name}}Controller extends Controller
+{
+{{use_traits_code}}
+
+    protected {{model_name}} $model;
+
+    /**
+     * @param \{{model_class}} $model
+     */
+    public function __construct({{model_name}} $model)
+    {
+        $this->model = $model;
+    }
+
+    /**
+     * {{entity_name}}列表
+     */
+    public function index(IndexRequest $request): BaseResourceCollection
+    {
+        $validated = $request->validated();
+
+        $result    = $this->model->select($this->getListFields())
+                                 ->filter($validated)
+                                 ->latest('{{model_key_name}}')
+                                 ->paginate(($validated['page_limit'] ?? NULL));
+        $result->append(['options']);
+
+        return {{model_name}}Resource::collection($result)
+                           ->additional([
+                               'columns'      => $this->getListColumns(),
+                               'form_widgets' => $this->getListFormWidgets($request),
+                           ]);
+    }
+
+    /**
+     * 查看{{entity_name}}
+     */
+    public function show(int $id): {{model_name}}Resource
+    {
+        $result  = $this->model->findOrFail($id);
+
+        $columns = [
+            {{show_fields}}
+        ];
+
+        return {{model_name}}Resource::make($result)->additional(['columns' => ColumnsCollection::make($columns)]);
+    }
+
+}

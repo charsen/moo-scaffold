@@ -1,0 +1,167 @@
+// ==============================================================================
+// Component: Button
+// 对应 Blade: <x-scaffold::btn variant="primary|secondary|ghost" size="sm|md|lg">
+// ==============================================================================
+
+@use "../base/mixins" as *;   // focus-ring mixin（@use 非传递,逐文件取）
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--control-md);
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-body);
+  font-family: inherit;
+  font-size: var(--font-base);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  appearance: none;
+  transition: background var(--transition-fast),
+              border-color var(--transition-fast),
+              color var(--transition-fast),
+              box-shadow var(--transition-fast);
+}
+
+// -------- 尺寸 --------
+.btn--sm {
+  height: var(--control-sm);
+  padding: 0 var(--space-3);
+  font-size: var(--font-sm);
+}
+
+.btn--lg {
+  height: var(--control-lg);
+  padding: 0 var(--space-5);
+  font-size: var(--font-md);
+}
+
+.btn--xl {
+  height: var(--control-xl);
+  padding: 0 var(--space-6);
+  font-size: var(--font-md);
+  letter-spacing: 0.28em;   // 规范 §4.3 登录按钮字间距
+}
+
+// -------- 变体 --------
+.btn--primary {
+  // a11y:用 --accent-solid 而非 --accent-hover-border。light 的 #fe8500
+  // on 白只 2.x 对比度,fail WCAG AA;solid 走 #c2410c 保证 ≥ 4.5
+  background: var(--accent-solid);
+  color: var(--text-inverse);
+
+  &:hover {
+    filter: brightness(1.05);
+  }
+
+  &:active {
+    filter: brightness(0.92);
+  }
+}
+
+.btn--secondary {
+  background: var(--bg-card);
+  border-color: var(--border-input);
+  color: var(--text-body);
+
+  &:hover {
+    border-color: var(--accent-hover-border);
+    color: var(--accent-text);
+  }
+
+  &:active {
+    background: var(--accent-bg);
+  }
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--text-body);
+
+  &:hover {
+    background: var(--bg-card-alt);
+    color: var(--text-heading);
+  }
+}
+
+// 语义 success：用于"确认/标记完成/恢复"等正向动作，色相走 badge-green，避开品牌橙
+.btn--success {
+  background: var(--badge-green);
+  border-color: var(--badge-green);
+  color: var(--text-inverse);
+
+  &:hover {
+    filter: brightness(1.05);
+  }
+}
+
+// 语义 danger：用于"删除/彻底删除"等危险动作
+// 2026-05-26:从 ghost(rest 跟 secondary 视觉等同)改 outline-red(rest 已 red bd/text),
+//            破坏性按钮 rest 时也必须能一眼识别,hover 升级填充红
+.btn--danger {
+  background: transparent;
+  color: var(--badge-red);
+  border-color: var(--badge-red);
+
+  &:hover {
+    background: var(--badge-red);
+    border-color: var(--badge-red);
+    color: var(--text-inverse);
+  }
+}
+
+// -------- 状态 --------
+.btn:focus-visible {
+  // plan-22 T6: 走统一 focus-ring mixin(双保险防 overflow:hidden 裁焦点环)
+  @include focus-ring(2px);
+}
+
+.btn:disabled,
+.btn[aria-disabled="true"],
+.btn.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+// -------- 修饰 --------
+.btn--block {
+  width: 100%;
+}
+
+// -------- loading 状态 --------
+// 用法：<x-scaffold::btn loading>...</x-scaffold::btn>
+// 自动 disable 并在文字前插入旋转指示器
+.btn.is-loading {
+  cursor: progress;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.btn__spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -2px;
+  animation: btn-spin .7s linear infinite;
+}
+
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn__spinner { animation: none; }
+}

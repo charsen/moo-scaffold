@@ -1,0 +1,36 @@
+// ==============================================================================
+// Component: HTTP Method Badge
+// 对应 Blade: <x-scaffold::method-badge method="GET|POST|PUT|PATCH|DELETE|ANY" />
+// 颜色对接 _theme.scss 的 --method-* token
+// ==============================================================================
+
+.method-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: var(--method-default-text);
+  background: var(--method-default-bg);
+}
+
+.method-badge--get     { color: var(--method-get-text);    background: var(--method-get-bg); }
+.method-badge--post    { color: var(--method-post-text);   background: var(--method-post-bg); }
+.method-badge--put     { color: var(--method-put-text);    background: var(--method-put-bg); }
+.method-badge--patch   { color: var(--method-put-text);    background: var(--method-put-bg); }
+.method-badge--delete  { color: var(--method-delete-text); background: var(--method-delete-bg); }
+.method-badge--any     { color: var(--method-any-text);    background: var(--method-any-bg); }
+
+// 尺寸
+.method-badge--sm {
+  min-width: 40px;
+  height: 18px;
+  font-size: var(--font-xs);
+}

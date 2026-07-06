@@ -1,0 +1,59 @@
+// ==============================================================================
+// Component: Section header（通用章节标题工具）
+// 对应 docs/ui-card-rules.md 第四节：模块章节标题统一 h3 + icon-box + meta
+//
+// 用法：
+//   <section class="x-yyy__module">
+//       <div class="x-yyy__module-head">
+//           <h3 class="section-title-with-icon">
+//               <span class="section-icon-box" aria-hidden="true">
+//                   <x-scaffold::icon name="xxx" :size="16" />
+//               </span>
+//               {{ $moduleName }}
+//           </h3>
+//           <div class="section-meta-inline">
+//               <span><strong>{{ $count1 }}</strong> 标签</span>
+//           </div>
+//       </div>
+//   </section>
+//
+// ==============================================================================
+
+.section-icon-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border-radius: var(--radius-sm);
+    background: var(--accent-bg);
+    color: var(--accent-text);
+}
+
+.section-title-with-icon {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: var(--font-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--text-heading);
+}
+
+.section-meta-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3) var(--space-4);
+    align-items: baseline;
+    color: var(--text-desc);
+    font-size: var(--font-sm);
+
+    strong {
+        margin-right: var(--space-1);
+        color: var(--text-heading);
+        font-weight: var(--weight-semibold);
+        font-family: var(--font-family-mono);
+        font-size: var(--font-md);
+    }
+}

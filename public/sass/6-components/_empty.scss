@@ -1,0 +1,68 @@
+// ==============================================================================
+// Component: Empty State
+// 对应 Blade: <x-scaffold::empty icon="..." title="..." desc="...">
+//   <x-slot:actions>...</x-slot:actions>
+// </x-scaffold::empty>
+// ==============================================================================
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-10) var(--space-5);
+  text-align: center;
+  color: var(--text-desc);
+}
+
+.empty__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-card-alt);
+  color: var(--text-light);
+  font-size: var(--font-xl);
+}
+
+.empty__icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.empty__title {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: var(--font-md);
+  font-weight: var(--weight-semibold);
+  line-height: var(--line-tight);
+}
+
+.empty__desc {
+  max-width: 480px;
+  margin: 0;
+  color: var(--text-desc);
+  font-size: var(--font-sm);
+  line-height: var(--line-base);
+}
+
+.empty__actions {
+  margin-top: var(--space-3);
+  display: flex;
+  gap: var(--space-2);
+}
+
+// -------- 尺寸 --------
+.empty--compact {
+  padding: var(--space-6) var(--space-4);
+  gap: var(--space-2);
+
+  .empty__icon {
+    width: 36px;
+    height: 36px;
+    font-size: var(--font-lg);
+  }
+}

@@ -1,0 +1,30 @@
+<?php declare(strict_types = 1);
+/*
+ * @Author: {{author}}
+ * @Date: {{date}}
+ * @LastEditors: {{author}}
+ * @LastEditTime: {{date}}
+ * @Description: {{class_name}}
+ */
+
+namespace {{namespace}};
+
+use Illuminate\Http\Request;
+use Mooeen\Scaffold\Foundation\BaseResourceCollection;
+
+class {{class}}Collection extends BaseResourceCollection
+{
+    /**
+     *  将隐藏字段通过 {{class}}Resource 处理集合
+     *
+     * @return array<string, mixed>
+     */
+    protected function processCollection(Request $request): array
+    {
+        return $this->collection->map(function ({{class}}Resource $resource) use ($request) {
+            return (! $this->hide)
+                ? $resource->show($this->customFields)->toArray($request)
+                : $resource->hide($this->customFields)->toArray($request);
+        })->all();
+    }
+}

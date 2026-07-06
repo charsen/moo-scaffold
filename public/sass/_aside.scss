@@ -1,0 +1,26 @@
+// ==============================================================================
+// .aside 左侧 sidebar 容器(layouts.app 用)
+// 2026-05-18 B 收窄:原来 .aside ul/li/a/em/.second/.sub 全裸 selector 污染所有
+// .aside 内嵌组件(side-tree 在 .aside 内时被 display:block + line-height:40 + 旋转
+// chevron 覆盖,plan-26 T0 修过一轮 reset)。本次彻底收窄到 .api-debug-list 锚点。
+// ==============================================================================
+
+.aside {
+    position: fixed;
+    // 卡片化:左/上/下留 gap,跟 .left/.right 视觉一致(route .route-sidebar 同款)
+    // 左边距对齐全局 gutter 20px(2026-05-30);width 同步收 20 保持右缘 = aside-width(260)不变
+    left: var(--space-5);
+    top: calc(var(--shell-header-height) + var(--shell-content-top));
+    bottom: var(--space-5);
+    width: calc(260px - var(--space-5));
+    padding-top: var(--space-2);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--shell-card-radius);
+    box-shadow: var(--elevation-1);
+
+    // 2026-05-22 plan-43 Batch A:.app-switcher 死类清(plan-25 后旧 sidebar 切换 widget,0 引用)
+}
+

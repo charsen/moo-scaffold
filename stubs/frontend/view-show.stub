@@ -1,0 +1,20 @@
+<template>
+  <Content :return-route="getReturnRoute">
+  </Content>
+</template>
+
+<script setup lang="ts">
+  import { useShower } from '@/hooks/useShower'
+
+  const entity = '{{model_class}}'
+
+  defineOptions({
+    name: `${entity}Show`,
+  })
+
+  const { model, fetchData, getReturnRoute } = useShower(entity)
+
+  onMounted(() => {
+    fetchData()
+  })
+</script>

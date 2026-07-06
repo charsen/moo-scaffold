@@ -1,0 +1,388 @@
+// Theme CSS Custom Properties
+// Light theme (default) + Dark theme overrides
+
+:root {
+    // Backgrounds
+    --bg-page: #EEF1F6;            // plan-22 light 三件套: page 下沉一档,与 #fff 卡拉开 14 luma
+    --bg-card: #fff;
+    --bg-card-raised: #ffffff;     // plan-22 新增: 浮起卡(配 shadow-card)语义别名
+    --bg-card-gradient: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+    --bg-card-alt: #F4F6FB;        // plan-22: 244 luma,与 page 真正拉开
+    --bg-content: #f8f8f8;
+    --bg-panel-head: #fcfdff;
+    --bg-input: #fff;
+    --bg-input-readonly: #f8fafc;
+    --bg-hover-row: #FFFBE6;
+    --bg-hover-warm: #fffaf2;
+    --bg-active-orange: #fff7ed;
+    --bg-code: #FBFBFD;
+    --bg-chip: #f4f6fb;
+    --bg-badge-muted: rgba(148, 163, 184, .16);
+    --bg-transparent-state: linear-gradient(180deg, #f8fafc 0%, #f3f6fb 100%);
+
+    // Text
+    --text-primary: #222;
+    --text-secondary: #666;
+    --text-muted: #6b7280;  // a11y: WCAG AA 4.75:1 on #fff（原 #aaa 仅 2.5:1;与 text-light 等深,语义上 muted 不再"更浅"而是同级低对比)
+    --text-heading: #1f2937;
+    --text-body: #344054;
+    --text-desc: #667085;
+    --text-light: #6b7280;  // a11y: WCAG AA 4.75:1 on #fff（原 #98a2b3 仅 2.57:1）
+    --text-sub: #8a94a6;
+    --text-dark-secondary: #6b7280;
+    --text-slate: #475467;
+    --text-dim: #7f8a9f;
+
+    // Borders
+    --border-color: #e5e5e5;
+    --border-light: #E2E6EF;       // plan-22: on #fff 卡对比 1.18(可见),原 #ebeef5 对比 1.07 几乎隐形
+    --border-lighter: #eef2f7;
+    --border-input: #e6eaf0;
+    --border-row: #f1f5f9;
+    --border-tab-hover: #d0d7e2;
+
+    // Shadows（对齐《设计规范》§3.4）
+    --shadow-card: 0 10px 28px rgba(15, 23, 42, .05);                              // 卡片阴影精确值,回退过度强化
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, .04), 0 1px 4px rgba(15, 23, 42, .04); // 回退到设计师原值,与暗黑双层结构对齐
+    --shadow-header: 0 2px 5px rgba(15, 23, 42, .06);
+    --shadow-modal: 0 24px 56px rgba(15, 23, 42, .14);
+
+    // Accent (orange theme)
+    --accent-bg: #fff7ed;
+    --accent-bg-hover: #ffedd5;
+    --accent-bg-warm: #fff4e6;
+    --accent-text: #b45309;
+    --accent-text-dark: #9a3412;
+    --accent-text-deep: #8a5a12;
+    --accent-text-alert: #a15c00;
+    --accent-border: #fed7aa;
+    --accent-value-bg: #fffdf8;
+    --accent-value-border: #f6d7a7;
+    --accent-gradient: linear-gradient(180deg, #fff4e6 0%, #ffe7c2 100%);
+
+    // Alert
+    --alert-bg: #FFFBE6;
+    --alert-border: #FFE58F;
+    --alert-left-border: #FE8500;
+
+    // Remark
+    --remark-bg: #FBFBFD;
+
+    // JSON(light)— v6.3 跟 yaml / PHP 染色对齐到一套配色:
+    //   property=蓝(跟 yh-key/ph-kw 同蓝), string=绿(跟 badge-green 同), number=橙(accent),
+    //   bool/null 蓝粗体, bracket 淡灰
+    --json-expand-bg: #fff;
+    --json-border: #e5e5e5;
+    --json-ctrl-text: #666;
+    --json-property: #0080ff;
+    --json-bracket: #b5bac1;
+    --json-number: #fe8500;
+    --json-string: #2ea043;
+    --json-boolean: #0080ff;
+    --json-null: #c92a2a;
+
+    // Method badges (text + bg variant for request page)
+    --method-default-text: #44516a;
+    --method-default-bg: #eef2f7;
+    --method-get-text: #155eef;
+    --method-get-bg: #dbeafe;
+    --method-post-text: #027a48;
+    --method-post-bg: #d1fadf;
+    --method-put-text: #b54708;
+    --method-put-bg: #ffead5;
+    --method-delete-text: #b42318;
+    --method-delete-bg: #fee4e2;
+    --method-patch-text: #0e7490;
+    --method-patch-bg: #cffafe;
+    --method-any-text: #6941c6;
+    --method-any-bg: #f4ebff;
+
+    // Status badges (solid color) —— WCAG AA on light tint bg(对比 ≥ 4.5)
+    --badge-green: #15803d;     // green-700,on #dcfce7 ≈ 5.5
+    --badge-blue: #1d4ed8;      // blue-700,on #dbeafe ≈ 6.2(原 #2563eb 边界 4.49 lighthouse fail)
+    --badge-orange: #c2410c;    // orange-700,on #ffedd5 ≈ 5.0
+    --badge-slate: #64748b;
+    --badge-purple: #7c3aed;    // violet-600,跟 method-any-text 同系
+    --badge-red: #b91c1c;       // red-700,on #fee2e2 ≈ 5.94(原 #dc2626 边界 4.49 lighthouse fail)
+    --badge-yellow: #d97706;    // 2026-05-22 plan-43 B:designer spell popover / 行内 ⚠ icon 专用 amber-600
+    // accent solid:实心橙色按钮专用(.btn--primary / .sidebar-count active),
+    // 白字 on solid 必须 ≥ 4.5;品牌橙 #fe8500 配白只 2.x。这里加深到 orange-700
+    --accent-solid: #c2410c;
+    // Status badge backgrounds (light tint)
+    --badge-green-bg: #dcfce7;
+    --badge-blue-bg: #dbeafe;
+    --badge-orange-bg: #ffedd5;
+    --badge-red-bg: #fee2e2;
+    --bg-danger-soft: rgba(225, 29, 72, .08);    // 2026-05-22 plan-43 B:field danger hover bg
+    --ring-danger: 0 0 0 2px rgba(248, 81, 73, .2);    // 2026-05-28 batch 5:field input invalid focus ring(light)
+    --locked-banner-bg: rgba(239, 68, 68, .08);    // 2026-05-28 phase C-1:写类页 sticky lock banner
+    --locked-banner-border: rgba(239, 68, 68, .35);
+
+    // Semantic aliases（语义色，便于业务代码按意图引用而非按调色板）
+    --color-primary: #2563eb;
+    --color-danger: #ef4444;
+    --color-danger-strong: #dc2626;
+
+    // Code snippet（暗背景代码块；light/dark 都保持暗底，但 token 化以便统一调整）
+    --code-snippet-bg: #0f172a;
+    --code-snippet-text: #cbd5e1;
+    --code-snippet-error-text: #fecaca;
+
+    // Toast 通知饱和底色（light：原始饱和；dark：降一档避免刺眼）
+    --toast-success-bg: #16a34a;
+    --toast-error-bg: #dc2626;
+    --toast-info-bg: #2563eb;
+    --toast-text: #fff;
+
+    // Enum header
+    --bg-enum-header: #EEE;
+
+    // Tab
+    --tab-bg: #fff;
+    --tab-border: #e6eaf0;
+    --tab-text: #667085;
+    --tab-hover-bg: #f8fafc;
+    --tab-hover-text: #344054;
+    --tab-hover-border: #d0d7e2;
+    --tab-active-bg: #fff7ed;
+    --tab-active-text: #b45309;
+    --tab-active-border: #fed7aa;
+
+    // Scrollbar
+    --scrollbar-thumb: rgba(0, 0, 0, .15);
+    --scrollbar-thumb-hover: rgba(0, 0, 0, .25);
+
+    // Timeline
+    --timeline-dot-glow: rgba(217, 119, 6, .12);
+    --timeline-time: #d97706;
+
+    // Error
+    --text-error: #e11d48;
+
+    // Controller count badge
+    --controller-count-bg: #f4f6fb;
+    --controller-count-text: #667085;
+
+    // Route badge
+    --route-bg: #f8fafc;
+    --route-text: #334155;
+
+    // Accent interactive (hover/active/shadow)
+    --accent-hover-border: #fe8500;
+    --accent-hover-shadow: rgba(254, 133, 0, .12);
+    --accent-inset-shadow: rgba(251, 146, 60, .18);
+    --accent-badge-bg: rgba(245, 158, 11, .16);
+
+    // Text on colored background
+    --text-inverse: #fff;
+
+    // Link
+    --link-color: #3B87FD;
+
+    // JSON function
+    --json-function: #AA6633;
+
+    // History badge shadow
+    --badge-shadow: rgba(15, 23, 42, .08);
+
+    // Modal / popover backdrop overlay (plan-35 A3)
+    --popover-backdrop: rgba(15, 23, 42, .55);
+
+    // Designer schema diff highlight (add / drop / rename / modify)
+    --diff-add-bg: rgba(46, 160, 67, .15);
+    --diff-drop-bg: rgba(248, 81, 73, .15);
+    --diff-rename-bg: rgba(0, 128, 255, .12);
+    --diff-modify-bg: rgba(254, 133, 0, .12);
+}
+
+[data-theme="dark"] {
+    // Backgrounds
+    --bg-page: #0f1117;
+    --bg-card: #1a1d27;
+    --bg-card-gradient: linear-gradient(180deg, #1a1d27 0%, #1e2130 100%);
+    --bg-card-alt: #1e2230;
+    --bg-content: #1e2230;
+    --bg-panel-head: #222638;
+    --bg-input: #1e2230;
+    --bg-input-readonly: #1a1d27;
+    --bg-input-readonly-strong: #2a2f43;  // hover-row 之上再深一档（_panel.scss .value 用）
+    --bg-hover-row: #2d3142;
+    --bg-row-hover-strong: #2a2f43;       // 暗模 table 行 hover 再调深（_table.scss 用）
+    --bg-hover-warm: #2a2418;
+    --bg-active-orange: #2c2012;
+    --bg-code: #1a1d27;
+    --bg-chip: #222638;
+    --bg-badge-muted: rgba(100, 116, 139, .2);
+    --bg-transparent-state: linear-gradient(180deg, #1a1d27 0%, #1e2130 100%);
+
+    // Text
+    --text-primary: #e0e2e8;
+    --text-secondary: #a0a4b0;
+    --text-muted: #6b6f7e;
+    --text-heading: #e8eaef;
+    --text-body: #c5c8d2;
+    --text-desc: #8b90a0;
+    --text-light: #9ca3af;  // a11y: WCAG AA 6.6:1 on #1a1d27（原 #6b6f7e 仅 3.38:1）
+    --text-sub: #7a7f90;
+    --text-dark-secondary: #8b90a0;
+    --text-slate: #a0a4b0;
+    --text-dim: #7a7f90;
+
+    // Borders
+    --border-color: #2d3040;
+    --border-light: #2d3040;
+    --border-lighter: #262938;
+    --border-input: #353848;
+    --border-row: #262938;
+    --border-tab-hover: #3d4258;
+
+    // Shadows（暗黑模式加深，规范 §3.4）
+    --shadow-card: 0 18px 40px rgba(0, 0, 0, .32);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .25), 0 1px 4px rgba(0, 0, 0, .2);
+    --shadow-header: 0 2px 6px rgba(0, 0, 0, .4);
+    --shadow-modal: 0 32px 64px rgba(0, 0, 0, .6);
+
+    // Accent
+    --accent-bg: #2c2012;
+    --accent-bg-hover: #3a2a16;
+    --accent-bg-warm: #332810;
+    --accent-text: #f5a623;
+    --accent-text-dark: #f5a623;
+    --accent-text-deep: #d4941e;
+    --accent-text-alert: #f5a623;
+    --accent-border: #5a3d1a;
+    --accent-value-bg: #252018;
+    --accent-value-border: #5a3d1a;
+    --accent-gradient: linear-gradient(180deg, #332810 0%, #3a2a16 100%);
+
+    // Alert
+    --alert-bg: #2a2520;
+    --alert-border: #5a4520;
+    --alert-left-border: #FE8500;
+
+    // Remark
+    --remark-bg: #1a1d27;
+
+    // JSON(dark)— 同 light:property 蓝 / string 绿 / number 橙 / bool 蓝 / null 红
+    --json-expand-bg: #1a1d27;
+    --json-border: #353848;
+    --json-ctrl-text: #a0a4b0;
+    --json-property: #6eaaff;
+    --json-bracket: #6b6f7e;
+    --json-number: #ffb24f;
+    --json-string: #75dc8f;
+    --json-boolean: #6eaaff;
+    --json-null: #ff7575;
+
+    // Method badges
+    --method-default-text: #a0a4b0;
+    --method-default-bg: #262938;
+    --method-get-text: #6eaaff;
+    --method-get-bg: #1a2744;
+    --method-post-text: #5fd68e;
+    --method-post-bg: #142e1e;
+    --method-put-text: #fba460;
+    --method-put-bg: #2c2012;
+    --method-delete-text: #f87171;
+    --method-delete-bg: #2d1515;
+    --method-patch-text: #67e8f9;
+    --method-patch-bg: #0e3a44;
+    --method-any-text: #c4a5ff;
+    --method-any-bg: #221a38;
+
+    // Status badges
+    --badge-green: #22c55e;
+    --badge-blue: #3b82f6;
+    --badge-orange: #f97316;
+    --badge-slate: #94a3b8;
+    --badge-purple: #a78bfa;     // violet-400,dark 主题更亮
+    --badge-red: #ef4444;
+    --badge-yellow: #fbbf24;     // 2026-05-22 plan-43 B:amber-400,dark 主题更亮
+    // accent solid:dark mode 深 bg 已配 #f5a623 hover-border 文字对比够,沿用
+    --accent-solid: #f5a623;
+    // Status badge backgrounds (dark mode：更高对比度的低透深色)
+    --badge-green-bg: #14321f;
+    --badge-blue-bg: #142a4d;
+    --badge-orange-bg: #3a1f0a;
+    --badge-red-bg: #3a1a1a;
+    --bg-danger-soft: rgba(248, 81, 73, .12);    // 2026-05-22 plan-43 B:dark 抬 alpha 显层次
+    --ring-danger: 0 0 0 2px rgba(248, 81, 73, .35);    // 2026-05-28 batch 5:dark 抬 alpha 比 .2 更显见(暗模卡底色 #1e2230)
+    --locked-banner-bg: rgba(239, 68, 68, .12);    // 2026-05-28 phase C-1:dark 抬 alpha
+    --locked-banner-border: rgba(239, 68, 68, .45);
+
+    // Semantic aliases
+    --color-primary: #3b82f6;
+    --color-danger: #f87171;
+    --color-danger-strong: #ef4444;
+
+    // Code snippet（dark 主题下保持暗底但稍提对比度）
+    --code-snippet-bg: #0a1020;
+    --code-snippet-text: #cbd5e1;
+    --code-snippet-error-text: #fecaca;
+
+    // Toast 通知饱和底色（dark：饱和度降一档不刺眼）
+    --toast-success-bg: #15803d;
+    --toast-error-bg: #b91c1c;
+    --toast-info-bg: #1d4ed8;
+    --toast-text: #f1f5f9;
+
+    // Enum header
+    --bg-enum-header: #222638;
+
+    // Tab
+    --tab-bg: #1a1d27;
+    --tab-border: #2d3040;
+    --tab-text: #8b90a0;
+    --tab-hover-bg: #222638;
+    --tab-hover-text: #c5c8d2;
+    --tab-hover-border: #3d4258;
+    --tab-active-bg: #2c2012;
+    --tab-active-text: #f5a623;
+    --tab-active-border: #5a3d1a;
+
+    // Scrollbar
+    --scrollbar-thumb: rgba(255, 255, 255, .12);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, .2);
+
+    // Timeline
+    --timeline-dot-glow: rgba(245, 166, 35, .2);
+    --timeline-time: #f5a623;
+
+    // Error
+    --text-error: #f87171;
+
+    // Controller count badge
+    --controller-count-bg: #222638;
+    --controller-count-text: #8b90a0;
+
+    // Route badge
+    --route-bg: #222638;
+    --route-text: #a0a4b0;
+
+    // Accent interactive
+    --accent-hover-border: #f5a623;
+    --accent-hover-shadow: rgba(245, 166, 35, .15);
+    --accent-inset-shadow: rgba(245, 166, 35, .22);
+    --accent-badge-bg: rgba(245, 166, 35, .2);
+
+    // Text on colored background
+    --text-inverse: #fff;
+
+    // Link
+    --link-color: #6eaaff;
+
+    // JSON function
+    --json-function: #d4a06a;
+
+    // History badge shadow
+    --badge-shadow: rgba(0, 0, 0, .3);
+
+    // Modal / popover backdrop overlay (plan-35 A3,dark bg 加深防穿透)
+    --popover-backdrop: rgba(0, 0, 0, .65);
+
+    // Designer schema diff highlight (add / drop / rename / modify) — dark alpha 抬 1.5x,色调贴 dark accent 系
+    --diff-add-bg: rgba(63, 185, 80, .22);
+    --diff-drop-bg: rgba(248, 81, 73, .22);
+    --diff-rename-bg: rgba(64, 162, 255, .18);
+    --diff-modify-bg: rgba(245, 166, 35, .18);
+}

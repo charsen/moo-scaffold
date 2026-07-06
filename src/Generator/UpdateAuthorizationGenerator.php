@@ -1,28 +1,45 @@
-<?php
+<?php declare(strict_types=1);
+
+/*
+ * @Author: Charsen
+ * @Date: 2024-07-29 16:22
+ * @LastEditors: Charsen
+ * @LastEditTime: 2025-08-13 10:16
+ * @Description: Update Authorization Files
+ */
 
 namespace Mooeen\Scaffold\Generator;
 
 use Brick\VarExporter\VarExporter;
 use Illuminate\Support\Str;
+use Mooeen\Scaffold\Foundation\Controller;
+use Mooeen\Scaffold\Support\AclActionResolver;
+use Symfony\Component\Yaml\Yaml;
 
-/**
- * Update Authorization Files
- *
- * @author Charsen https://github.com/charsen
- */
 class UpdateAuthorizationGenerator extends Generator
 {
-    private array $controllers;
+    private array $reflectionClasses = [];
+
+    private array $reflectionMethods = [];
+
+    private string $generatedAt = '';
+
+    private string $generatedBy = '';
+
+    private ?AclActionResolver $aclActionResolver = null;
 
     /**
-     * 只做增量，不做替换，因为可能会有手工润色
+     * 全量重建 config/actions.php 和 lang 文件；
+     * ACL YAML 也全量重写，内容完全由路由决定，不支持手动润色
      */
     public function start(string $app, array $routes): bool
     {
+        $this->generatedAt = date('Y-m-d H:i:s');
+        $this->generatedBy = $this->utility->resolveCurrentLoginUser();
+
         $config         = $this->utility->getConfig('controller.' . $app);
         $base_namespace = ucfirst(str_replace('/', '', $config['path']));
         $base_namespace = Str::snake($base_namespace, '-');
-        // dump($base_namespace);
 
         $original_actions = [];
         $config_actions   = [];
@@ -41,27 +58,59 @@ class UpdateAuthorizationGenerator extends Generator
             $controller_key               = $this->getMd5($controller_key);
             $controllers[$controller_key] = $PMC_names['controller']['name'];
 
-            $action_info = $this->utility->parseActionInfo($this->getMethod($controller, $action));
-            $action_name = $this->utility->parseActionName($this->getMethod($controller, $action));
-            $action_key  = str_replace(['\\', $base_namespace, '-controller@'], ['', $app, '-'], Str::snake($route['action'], '-'));
+            $action_info      = $this->utility->parseActionInfo($this->getMethod($controller, $action));
+            $action_name      = $this->utility->parseActionName($this->getMethod($controller, $action));
+            $route_action_key = Controller::aclPlainKey(str_replace('@', '::', $route['action']));
+            $acl              = $this->aclResolver()->resolve($controller, $action);
+            if (($acl['keys'] ?? []) === []) {
+                $acl = [
+                    'keys'        => [$this->getMd5($route_action_key)],
+                    'plain_keys'  => [$route_action_key],
+                    'key'         => $this->getMd5($route_action_key),
+                    'plain_key'   => $route_action_key,
+                    'targets'     => [$controller . '::' . $action],
+                    'target'      => $controller . '::' . $action,
+                    'transformed' => false,
+                ];
+            }
+            $auth_info = $this->resolveAuthorizationInfo($acl, $action_info);
 
             $meta = [
-                'module_key'       => 'module-' . $module_key,
-                'controller'       => $controller,
-                'controller_key'   => 'controller-' . $controller_key,
-                'action'           => $action,
-                'action_plain_key' => $action_key,
-                'action_key'       => $this->getMd5($action_key),
-                'name'             => $action_name,
-                'lang'             => $action_info['name'],
-                'desc'             => $action_info['desc'],
-                'whitelist'        => $action_info['whitelist'],
+                'module_key'        => 'module-' . $module_key,
+                'module_name'       => $PMC_names['module']['name'],
+                'controller'        => $controller,
+                'controller_key'    => 'controller-' . $controller_key,
+                'controller_name'   => $PMC_names['controller']['name'],
+                'action'            => $action,
+                'route_plain_key'   => $route_action_key,
+                'action_plain_key'  => $acl['plain_key'],
+                'action_plain_keys' => $acl['plain_keys'],
+                'action_key'        => $acl['key'],
+                'action_keys'       => $acl['keys'],
+                'acl_targets'       => $acl['targets'],
+                'acl_transformed'   => $acl['transformed'],
+                'name'              => $action_name,
+                'lang'              => $action_info['name'],
+                'auth_lang'         => $auth_info['name'],
+                'desc'              => $action_info['desc'],
+                'auth_desc'         => $auth_info['desc'],
+                'whitelist'         => $auth_info['whitelist'],
             ];
 
-            if ($action_info['whitelist']) {
-                $whitelist[] = $meta['action_key'];
+            if ($meta['whitelist']) {
+                foreach ($meta['action_keys'] as $actionKey) {
+                    $whitelist[] = $actionKey;
+                }
+            } elseif ($this->isCrossControllerTransform($meta)) {
+                // transform_methods 跨 controller 复用 key 表达的是"运行时 ACL 校验复用"，
+                // 不是"该 controller 真有此 action"——若仍写入当前 controller 的 actions 列表，
+                // 权限树渲染时会用全局 key=>label 字典的 label（target controller 的 @acl 文案），
+                // 导致与当前 controller 名错位（如"通知机器人管理 > 个人中心"）。
+                // 同 controller 内部 transform（如 create→store / logins→index）不属于此类，正常展示。
             } else {
-                $config_actions[$meta['module_key']][$meta['controller_key']][] = $meta['action_key'];
+                foreach ($meta['action_keys'] as $actionKey) {
+                    $config_actions[$meta['module_key']][$meta['controller_key']][] = $actionKey;
+                }
             }
 
             $original_actions[] = $meta;
@@ -69,7 +118,7 @@ class UpdateAuthorizationGenerator extends Generator
 
         $this->buildActions($app, $config_actions, $whitelist);
         $this->buildLangFiles($app, $config, $modules, $controllers, $original_actions);
-        $this->buildACLViewer($app, $base_namespace, $original_actions);
+        $this->buildACLViewer($app, $config, $original_actions);
 
         return true;
     }
@@ -79,24 +128,25 @@ class UpdateAuthorizationGenerator extends Generator
      */
     private function buildActions(string $app, array $actions, array $whitelist): void
     {
-        $apps   = $this->utility->getApps();
         $config = config('actions', []);
 
-        foreach ($apps as $item => $name) {
-            if ($item === $app) {
-                $config[$app] = [
-                    'whitelist' => $whitelist,
-                    'actions'   => $actions,
-                ];
+        foreach ($actions as $moduleKey => $controllers) {
+            foreach ($controllers as $controllerKey => $actionKeys) {
+                $actions[$moduleKey][$controllerKey] = array_values(array_unique($actionKeys));
             }
         }
+
+        $config[$app] = [
+            'whitelist' => array_values(array_unique($whitelist)),
+            'actions'   => $actions,
+        ];
 
         $php_code = '<?php' . PHP_EOL
             . 'return ' . VarExporter::export($config) . ';'
             . PHP_EOL;
 
         $this->filesystem->put(config_path('actions.php'), $php_code);
-        $this->command->info('+ ./config/actions.php');
+        $this->console()->updated('./config/actions.php');
     }
 
     /**
@@ -106,66 +156,182 @@ class UpdateAuthorizationGenerator extends Generator
     {
         $languages = $this->utility->getConfig('languages');
         foreach ($languages as $lang) {
-            $code = [
-                '<?php',
-                '',
-                'return [',
-            ];
+            $file_path = lang_path($lang . '/actions.php');
+            if (! $this->filesystem->isFile($file_path)) {
+                $this->filesystem->put($file_path, '<?php return [];');
+            }
 
-            $code[] = $this->getTabs(1) . "'app-{$app}' => '{$controller['name'][$lang]}',";
+            $data                     = $this->filesystem->getRequire($file_path);
+            $data[$app]               = [];
+            $data[$app]["app-{$app}"] = $controller['name'][$lang];
 
             foreach ($modules as $key => $val) {
-                $code[] = $this->getTabs(1) . "'module-{$key}' => '{$val[$lang]}',";
+                $data[$app]["module-{$key}"] = $val[$lang];
             }
 
             foreach ($controllers as $key => $val) {
-                $code[] = $this->getTabs(1) . "'controller-{$key}' => '{$val[$lang]}',";
+                $data[$app]["controller-{$key}"] = $val[$lang];
             }
 
             foreach ($actions as $attr) {
                 if ($attr['whitelist']) {
                     continue;
                 }
-                $attr['lang'][$lang] = str_replace("'", '&apos;', $attr['lang'][$lang]);
-                $attr['desc']        = str_replace("'", '&apos;', $attr['desc']);
-                $code[]              = $this->getTabs(1) . "'{$attr['action_key']}' => '{$attr['lang'][$lang]}',";
-                $code[]              = $this->getTabs(1) . "'{$attr['action_key']}-desc' => '{$attr['desc']}',";
+                foreach ($attr['action_keys'] as $actionKey) {
+                    // 下游走 VarExporter::export(本就正确转义引号和反斜杠),原来这里把撇号替换成
+                    // &apos; 字面量,多此一举且有害:权限树里所有撇号永久变成 &apos;(Tom's→Tom&apos;s)。
+                    // 直接存原始值,转义交给 VarExporter(2026-06-11 修)。
+                    $data[$app][$actionKey]          = $attr['auth_lang'][$lang] ?? $attr['lang'][$lang] ?? '';
+                    $data[$app]["{$actionKey}-desc"] = $attr['auth_desc']        ?? $attr['desc'] ?? '';
+                }
             }
-            $code[] = '];';
-            $code[] = '';
 
-            $this->filesystem->put(lang_path($lang . '/actions.php'), implode("\n", $code));
-            $this->command->info('+ ./lang/' . $lang . '/actions.php (Updated)');
+            $php_code = '<?php' . PHP_EOL
+                . 'return ' . VarExporter::export($data) . ';'
+                . PHP_EOL;
+
+            $this->filesystem->put($file_path, $php_code);
+            $this->console()->updated("./lang/{$lang}/actions.php");
         }
     }
 
     /**
      * 生成 acl 可视化文件，用于检查对比
      */
-    private function buildACLViewer(string $app, string $namespace, array $actions): void
+    private function buildACLViewer(string $app, array $config, array $actions): void
     {
-        $code       = ['# ACL'];
-        $current = '';
-
-        $format_actions = [];
+        $modules         = [];
+        $controllerCount = 0;
+        $whitelistCount  = 0;
         foreach ($actions as $item) {
-            $format_actions[$item['controller_key']][] = $item;
-        }
+            $moduleKey     = $item['module_key'];
+            $controllerKey = $item['controller_key'];
 
-        foreach ($format_actions as $tmp_actions) {
-            foreach ($tmp_actions as $item) {
-                if ($current != $item['controller_key']) {
-                    $current = $item['controller_key'];
-                    $code[] = '';
-                    $code[] = '## ' . $item['controller'] . ' - ' . $item['controller_key'];
-                }
+            if (! isset($modules[$moduleKey])) {
+                $modules[$moduleKey] = [
+                    'key'              => $moduleKey,
+                    'name'             => $item['module_name'],
+                    'controller_count' => 0,
+                    'action_count'     => 0,
+                    'whitelist_count'  => 0,
+                    'controllers'      => [],
+                ];
+            }
 
-                $code[] = "- {$item['action_plain_key']} - `{$item['action_key']}` - " . ($item['whitelist'] ? '`whitelist`' : $item['name']);
+            if (! isset($modules[$moduleKey]['controllers'][$controllerKey])) {
+                $modules[$moduleKey]['controllers'][$controllerKey] = [
+                    'key'             => $controllerKey,
+                    'class'           => $item['controller'],
+                    'name'            => $item['controller_name'],
+                    'action_count'    => 0,
+                    'whitelist_count' => 0,
+                    'actions'         => [],
+                ];
+                $modules[$moduleKey]['controller_count']++;
+                $controllerCount++;
+            }
+
+            $actionPayload = [
+                'key'         => $item['action_key'],
+                'plain_key'   => $item['action_plain_key'],
+                'action'      => $item['action'],
+                'title'       => $item['name'],
+                'name'        => $item['lang'],
+                'desc'        => $item['desc'],
+                'whitelist'   => $item['whitelist'],
+                'acl_targets' => $item['acl_targets'],
+            ];
+
+            if ($item['acl_transformed'] || count($item['action_keys']) > 1) {
+                $actionPayload['keys']            = $item['action_keys'];
+                $actionPayload['plain_keys']      = $item['action_plain_keys'];
+                $actionPayload['route_plain_key'] = $item['route_plain_key'];
+                $actionPayload['acl_transformed'] = $item['acl_transformed'];
+            }
+
+            $modules[$moduleKey]['controllers'][$controllerKey]['actions'][] = $actionPayload;
+
+            $modules[$moduleKey]['action_count']++;
+            $modules[$moduleKey]['controllers'][$controllerKey]['action_count']++;
+
+            if ($item['whitelist']) {
+                $modules[$moduleKey]['whitelist_count']++;
+                $modules[$moduleKey]['controllers'][$controllerKey]['whitelist_count']++;
+                $whitelistCount++;
             }
         }
 
-        $this->filesystem->put(app_path($app . '-acl.md'), implode("\n", $code));
-        $this->command->info('+ ./app/acl.md (Updated)');
+        foreach ($modules as &$module) {
+            $module['controllers'] = array_values($module['controllers']);
+        }
+        unset($module);
+
+        $document = [
+            'meta' => [
+                'app'          => $app,
+                'app_name'     => $config['api_name'] ?? ($config['name']['zh-CN'] ?? $app),
+                'generated_at' => $this->generatedAt,
+                'generated_by' => $this->generatedBy,
+                'stats'        => [
+                    'module_count'     => count($modules),
+                    'controller_count' => $controllerCount,
+                    'action_count'     => count($actions),
+                    'whitelist_count'  => $whitelistCount,
+                ],
+            ],
+            'modules' => array_values($modules),
+        ];
+
+        $dir = $this->utility->getAclPath();
+        $this->checkDirectory($dir);
+
+        $file = $dir . $app . '.yaml';
+        $this->filesystem->put($file, Yaml::dump($document, 8, 4, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+        $this->console()->updated($this->utility->getAclPath(true) . $app . '.yaml');
+    }
+
+    private function resolveAuthorizationInfo(array $acl, array $fallback): array
+    {
+        $targets = $acl['targets'] ?? [];
+        if (count($targets) !== 1) {
+            return $fallback;
+        }
+
+        $methodInfo = $this->aclResolver()->targetMethodInfo((string) $targets[0]);
+        if ($methodInfo === null) {
+            return $fallback;
+        }
+
+        return $this->utility->parseActionInfo($methodInfo['reflection']);
+    }
+
+    private function aclResolver(): AclActionResolver
+    {
+        return $this->aclActionResolver ??= new AclActionResolver;
+    }
+
+    /**
+     * 判断 action 是否通过 transform_methods 把 ACL key 复用到了"别的 controller"上
+     */
+    private function isCrossControllerTransform(array $meta): bool
+    {
+        if (! ($meta['acl_transformed'] ?? false)) {
+            return false;
+        }
+
+        $targets    = $meta['acl_targets'] ?? [];
+        $controller = $meta['controller']  ?? '';
+        if ($targets === [] || $controller === '') {
+            return false;
+        }
+
+        foreach ($targets as $target) {
+            if (! str_starts_with((string) $target, $controller . '::')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -180,32 +346,13 @@ class UpdateAuthorizationGenerator extends Generator
         return $str;
     }
 
-    /**
-     * 获取并缓存 控制器 的反向解析结果
-     */
-    private function getController(string $name)
+    private function getController(string $name): \ReflectionClass
     {
-        if (isset($this->controllers[$name])) {
-            return $this->controllers[$name];
-        }
-
-        $this->controllers[$name] = new \ReflectionClass($name);
-
-        return $this->controllers[$name];
+        return $this->reflectionClasses[$name] ??= new \ReflectionClass($name);
     }
 
-    /**
-     * 获取并缓存 控制器 方法函数 的反向解析结果
-     */
-    private function getMethod($controller, $action)
+    private function getMethod(string $controller, string $action): \ReflectionMethod
     {
-        $key = $controller . '_' . $action;
-        if (isset($this->controllers[$key])) {
-            return $this->controllers[$key];
-        }
-
-        $this->controllers[$key] = new \ReflectionMethod($controller, $action);
-
-        return $this->controllers[$key];
+        return $this->reflectionMethods["{$controller}@{$action}"] ??= new \ReflectionMethod($controller, $action);
     }
 }

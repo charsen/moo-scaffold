@@ -1,44 +1,54 @@
-<?php
+<?php declare(strict_types=1);
+
+/*
+ * @Author: Charsen
+ * @Date: 2024-07-29 16:22
+ * @LastEditors: Charsen
+ * @LastEditTime: 2025-07-18 10:02
+ * @Description: Create Schema Generator
+ */
 
 namespace Mooeen\Scaffold\Generator;
 
-/**
- * Create Schema Generator
- *
- * @author Charsen https://github.com/charsen
- */
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
+
 class CreateSchemaGenerator extends Generator
 {
     /**
-     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     * @throws FileNotFoundException
      */
     public function start(string $schema_name, bool $force = false): bool
     {
-        $schema_relative_file = $this->utility->getSchemaPatch("{$schema_name}.yaml", true);
-        $schema_file          = $this->utility->getSchemaPatch("{$schema_name}.yaml");
+        $schema_relative_file = $this->utility->getSchemaPath("{$schema_name}.yaml", true);
+        $schema_file          = $this->utility->getSchemaPath("{$schema_name}.yaml");
+        $schema_exists        = $this->filesystem->exists($schema_file);
 
-        if (! $this->filesystem->exists($schema_file) || $force) {
+        if (! $schema_exists || $force) {
             $meta = [
                 'schema_name'  => $schema_name,
                 'author'       => $this->utility->getConfig('author'),
-                'date'         => date('Y-m-d H:i:s'),
+                'date'         => date('Y-m-d H:i'),
                 'ModuleName'   => $schema_name,
                 'ModuleFolder' => $schema_name,
             ];
             $this->filesystem->put($schema_file, $this->compileStub($meta));
 
-            $this->command->info("+ $schema_relative_file" . ($force ? ' (Overwrite)' : ''));
+            if ($schema_exists) {
+                $this->console()->overwritten($schema_relative_file);
+            } else {
+                $this->console()->created($schema_relative_file);
+            }
 
             return true;
         }
 
-        $this->command->warn("x $schema_relative_file" . ' (Skipped)');
+        $this->console()->skipped($schema_relative_file);
 
         return false;
     }
 
     /**
-     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     * @throws FileNotFoundException
      */
     protected function compileStub(array $meta): string
     {

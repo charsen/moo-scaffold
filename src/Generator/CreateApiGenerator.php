@@ -1,144 +1,760 @@
-<?php
+<?php declare(strict_types=1);
+
+/*
+ * @Author: Charsen
+ * @Date: 2024-07-29 16:22
+ * @LastEditors: Charsen
+ * @LastEditTime: 2026-06-20 13:30
+ * @Description: Create Api YAML Schema
+ */
 
 namespace Mooeen\Scaffold\Generator;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
-use JsonException;
-use Mooeen\Scaffold\Models\MooApi;
+use Mooeen\Scaffold\Utility;
+use Symfony\Component\Yaml\Yaml;
 
-/**
- * Create Api
- *
- * @author Charsen https://github.com/charsen
- */
 class CreateApiGenerator extends Generator
 {
+    private const STALE_MODE_KEEP = 'keep';
+
+    private const STALE_MODE_DEPRECATE = 'deprecate';
+
+    private const STALE_MODE_DELETE = 'delete';
+
+    private const STALE_REASON = 'Route removed from current routes definition';
+
     private string $app;
 
-    private array $controllers;
+    private string $namespace = 'Index';
+
+    private string $apiPath;
+
+    private string $apiRelativePath;
+
+    private string $filesPath;
+
+    private array $controllers = [];
+
+    private array $publishedActions = [];
+
+    private string $currentLoginUser = '';
+
+    private string $generatedAt = '';
+
+    private string $staleMode = self::STALE_MODE_DEPRECATE;
+
+    private bool $syncNames = false;
+
+    /** docblock name/desc 与 yaml 现值的分歧记录(start() 结尾汇报)。@var list<array{key:string,old:string,new:string,synced:bool}> */
+    private array $nameDiffs = [];
+
+    /** 当前正构建的 controller(给 nameDiffs 的 key 加前缀,避免跨 controller 同名 action 混淆) */
+    private string $diffControllerName = '';
 
     /**
      * @throws \ReflectionException
      */
-    public function start(string $app, string $folder, array $routes): bool
-    {
-        $this->app   = $app;
-        $controllers = $this->updateDB($routes);
+    public function start(
+        string $app,
+        string $namespace,
+        array $routes,
+        bool $force = false,
+        string $staleMode = self::STALE_MODE_DEPRECATE,
+        bool $syncNames = false,
+    ): bool {
+        $this->app              = $app;
+        $this->syncNames        = $syncNames;
+        $this->nameDiffs        = [];
+        $this->publishedActions = [];
+        $this->currentLoginUser = $this->utility->resolveCurrentLoginUser();
+        $this->generatedAt      = date('Y-m-d H:i:s');
+        $this->staleMode        = in_array($staleMode, [self::STALE_MODE_KEEP, self::STALE_MODE_DEPRECATE, self::STALE_MODE_DELETE], true)
+            ? $staleMode
+            : self::STALE_MODE_DEPRECATE;
+        $this->apiPath         = $this->utility->getApiPath('schema') . $app . '/';
+        $this->apiRelativePath = $this->utility->getApiPath('schema', true) . $app . '/';
 
-        // 推送新数据
-        // - 字段值明明不相等(一个空，一个不空)，但是判断不相等的时候就是得不到TRUE。
-        // - 并不是<>不稳定，而是字段值为NULL是，不能使用=或者<>比较值，应该使用IS NULL判断是否为空。
-        // - 把空理解为未知,一个非空和未知比较,结果还是未知.
-        foreach ($controllers as $controller) {
-            $updates = MooApi::where('api_controller', $controller)
-                             ->whereRaw('`api_status`!=`x_status`')
-                             ->orWhereNull('x_status')
-                             ->get();
-            // dump($updates->toArray());
-            foreach ($updates as $update) {
-                $this->pushApi($update);
-            }
+        // 处理 <ROOT_PATH> 为空字符串
+        $namespace       = ($namespace === '<ROOT_PATH>' || $namespace === '/') ? '' : $namespace;
+        $this->filesPath = $this->apiPath . (empty($namespace) ? '' : $namespace . '/');
+        $this->namespace = empty($namespace) ? 'Index' : $namespace;
+
+        $grouped           = $this->groupRoutesByController($routes);
+        $existingYamlFiles = $this->getNamespaceYamlFiles($this->filesPath);
+
+        if ($grouped === [] && $existingYamlFiles === []) {
+            $this->console()->error('当前命名空间下没有找到任何路由。');
+
+            return false;
         }
+
+        if ($grouped !== []) {
+            $this->checkDirectory($this->filesPath);
+        }
+
+        $menuTransform   = [];
+        $controllerNames = [];
+
+        foreach ($grouped as $controllerName => $data) {
+            $yamlFile        = $this->filesPath . $controllerName . '.yaml';
+            $relativeYaml    = $this->buildRelativeYamlPath($controllerName);
+            $reflectionClass = $this->getController($data['controller_class']);
+
+            $pmcNames   = $this->utility->parsePMCNames($reflectionClass);
+            $moduleName = $pmcNames['module']['name']['zh-CN'] ?? '';
+            if ($moduleName !== '' && ! isset($menuTransform[$this->namespace])) {
+                $menuTransform[$this->namespace] = $moduleName;
+            }
+
+            $controllerNames[] = $controllerName;
+            $this->syncControllerFile(
+                $yamlFile,
+                $relativeYaml,
+                $controllerName,
+                $data['actions'],
+                $reflectionClass,
+                $force,
+            );
+        }
+
+        $this->handleStaleControllerFiles($existingYamlFiles, array_keys($grouped));
+        $this->updateMenusTransform($menuTransform, $this->namespace, $controllerNames);
+        $this->writePublishHistory();
+        $this->reportNameDiffs();
 
         return true;
     }
 
-    /**
-     * 更新数据库
-     */
-    private function updateDB(array $routes): array
+    /** docblock name 与 yaml name 分歧汇报(start 结尾)。@return list<array{key:string,old:string,new:string,synced:bool}> */
+    public function getNameDiffs(): array
     {
-        // dump($routes);
-        $res_controllers   = [];
-        $check_controllers = [];
-        foreach ($routes as $item) {
-            $item['method']       = str_replace('GET|HEAD', 'GET', $item['method']);
-            $item['operation_id'] = str_replace(['App\\', 'Controllers\\', '\\', '@'], ['', '', '_', '_'], $item['action']) . "_{$item['method']}";
-            $exist                = MooApi::where('api_operation_id', $item['operation_id'])->first();
-            $new_data             = $this->getNewApiData($item);
-            $res_controllers[]    = $new_data['api_controller'];
+        return $this->nameDiffs;
+    }
 
-            if ($exist) {
-                $check_controllers[$new_data['api_controller']][] = $exist->id; // 保存下已存在的 id
-
-                // 有可能 n 久前写了个接口，后来有删除了，现在又写了一个同名的
-                // 这时: api_status = 'deprecated', x_status = null or 'deprecated'
-                // 更新: api_status = 'released' , 后续的流程才能重新发布到 x 远程平台
-                if ($exist->api_status !== 'released') {
-                    $exist->api_status = 'released';
-                }
-
-                if ($this->checkParameterChanges($exist, $new_data)) {
-                    $exist->x_status       = null;
-                    $exist->api_parameters = $new_data['api_parameters'];
-                }
-
-                $check_fields = ['api_name', 'api_summary', 'api_description', 'api_uri', 'api_route_name'];
-                foreach ($check_fields as $field) {
-                    if ($exist->{$field} !== $new_data[$field]) {
-                        $exist->{$field} = $new_data[$field];
-                        $exist->x_status = null;
-                    }
-                }
-
-                if ($exist->isDirty()) {
-                    $exist->save();
-                }
-            } else {
-                MooApi::create($new_data);
-            }
-
-            // break;
+    private function reportNameDiffs(): void
+    {
+        if ($this->nameDiffs === []) {
+            return;
         }
-
-        // 1、新增后，由于是自动生成的，可能接口会多，手动删除 controller 中的 action 后，实际的接口变少了
-        // 这时: api_status = 'released' , x_status = null
-        // 2、查找出，已 push 到 x 远程平台上，但这次不在 routes 中（已删除）的接口
-        // 这时：x_status = 'released' , x_status = 'released'
-        //
-        // 更新: api_status = 'deprecated' , 后续的流程才能重新发布到 x 远程平台
-        foreach ($check_controllers as $controller => $ids) {
-            if (empty($ids)) {
+        // 同 key 去重(同一 action 可能被收集多次)
+        $seen  = [];
+        $diffs = [];
+        foreach ($this->nameDiffs as $d) {
+            if (isset($seen[$d['key']])) {
                 continue;
             }
-
-            $destroys = MooApi::where('api_controller', $controller)->whereNotNull('x_created_at')->whereNotIn('id', $ids)->get();
-            foreach ($destroys as $destroy) {
-                $destroy->api_status = 'deprecated';
-                $destroy->x_status   = null;
-                $destroy->save();
-            }
+            $seen[$d['key']] = true;
+            $diffs[]         = $d;
         }
 
-        return $res_controllers;
+        if ($this->syncNames) {
+            $this->console()->info('已用 docblock 同步以下接口名称(--sync-names):');
+            foreach ($diffs as $d) {
+                $this->console()->info("  · {$d['key']}: '{$d['old']}' → '{$d['new']}'");
+            }
+
+            return;
+        }
+        $this->console()->warn('以下接口的 docblock 名称与 yaml 不一致(已保留 yaml;如需同步加 --sync-names):');
+        foreach ($diffs as $d) {
+            $this->console()->info("  · {$d['key']}: docblock '{$d['new']}' ≠ yaml '{$d['old']}'");
+        }
     }
 
     /**
-     * 检查 请求参数 是否发生变化
+     * 按控制器分组路由
      */
-    private function checkParameterChanges(Model $model, array $new_data): bool
+    private function groupRoutesByController(array $routes): array
     {
-        // 请求变量是否发生变化了，变化了，则重置 x 远程平台状态，以便后续发起更新
-        $db_parameter_keys = array_keys($model->api_parameters);
-        $parameters        = $new_data['api_parameters'];
-        $parameter_keys    = array_keys($parameters);
+        $grouped = [];
 
-        // 先判断 字段是否有变化
-        if (collect($db_parameter_keys)->diff($parameter_keys)->isNotEmpty() or collect($parameter_keys)->diff($db_parameter_keys)->isNotEmpty()) {
-            return true;
+        foreach ($routes as $route) {
+            [$controllerClass, $actionName] = explode('@', $route['action']);
+            $shortName                      = Utility::stripControllerSuffix(class_basename($controllerClass));
+            $method                         = $this->normalizeMethod($route['method']);
+
+            if (! isset($grouped[$shortName])) {
+                $grouped[$shortName] = [
+                    'controller_class' => $controllerClass,
+                    'actions'          => [],
+                ];
+            }
+
+            $grouped[$shortName]['actions'][$actionName] = [
+                'method' => $method,
+                'uri'    => $route['uri'],
+            ];
         }
 
-        // 对比具体的规则是否变化了
-        foreach ($model->api_parameters as $field => $rules) {
-            if (collect($rules)->diff($parameters[$field])->isNotEmpty()) {
-                return true;
+        return $grouped;
+    }
+
+    private function syncControllerFile(
+        string $yamlFile,
+        string $relativeYaml,
+        string $controllerName,
+        array $actions,
+        \ReflectionClass $reflectionClass,
+        bool $force,
+    ): void {
+        [$existingData, $duplicateActionKeys] = $this->loadExistingYamlData($yamlFile);
+        $fileExists                           = $this->filesystem->isFile($yamlFile);
+        $existingActions                      = is_array($existingData['actions'] ?? null) ? $existingData['actions'] : [];
+        $newActionNames                       = array_values(array_diff(
+            array_keys($actions),
+            $this->utility->removeActionNameMethod(array_keys($existingActions))
+        ));
+        $staleActionKeys = $this->getStaleActionKeys($existingActions, array_keys($actions));
+        $routeChanged    = $this->hasRouteSignatureChanges($existingActions, $actions);
+        $restoredCount   = $this->countRestoredDeprecatedActions($existingActions, $actions);
+
+        if ($duplicateActionKeys !== []) {
+            $this->console()->warn(
+                $relativeYaml . ' contains duplicate action blocks: [' . implode(', ', $duplicateActionKeys) . ']. Rewriting file.'
+            );
+        }
+
+        $documentDate = $fileExists ? $this->extractDocumentDate((string) $this->filesystem->get($yamlFile)) : $this->generatedAt;
+        $payload      = $this->buildControllerSchemaContent($controllerName, $actions, $reflectionClass, $existingData, $documentDate);
+        $content      = $payload['content'];
+
+        if ($fileExists) {
+            $currentContent = (string) $this->filesystem->get($yamlFile);
+            if (! $force && $duplicateActionKeys === [] && $currentContent === $content) {
+                if ($staleActionKeys !== [] && $this->staleMode === self::STALE_MODE_KEEP) {
+                    $this->console()->warn(
+                        $relativeYaml . ' still contains stale actions: [' . implode(', ', $staleActionKeys) . ']'
+                    );
+                }
+                $this->console()->unchanged($relativeYaml);
+
+                return;
+            }
+
+            $payload = $this->buildControllerSchemaContent($controllerName, $actions, $reflectionClass, $existingData);
+            $content = $payload['content'];
+        }
+
+        $put = $this->filesystem->put($yamlFile, $content);
+        if (! $put) {
+            $this->console()->failed($relativeYaml, 'Write failed');
+
+            return;
+        }
+
+        if (! $fileExists) {
+            $this->recordPublishedActions($controllerName, $relativeYaml, $payload['active_records'], 'create');
+        } else {
+            // 文件已存在时只把"新加的 action"记成 'append' 进发布历史;
+            // 原地改写已有 action 不记 — re-publish 的默认副作用没信号量,
+            // 否则历史里全是「覆盖 N」把真新接口淹没。
+            $appendedRecords = array_values(array_filter(
+                $payload['active_records'],
+                static fn (array $r): bool => ! empty($r['is_new'])
+            ));
+            if ($appendedRecords !== []) {
+                $this->recordPublishedActions($controllerName, $relativeYaml, $appendedRecords, 'append');
             }
         }
 
-        foreach ($parameters as $field => $rules) {
-            if (collect($rules)->diff($model->api_parameters[$field])->isNotEmpty()) {
+        if ($payload['deprecated_records'] !== []) {
+            $this->recordPublishedActions($controllerName, $relativeYaml, $payload['deprecated_records'], 'deprecated');
+        }
+
+        if ($payload['deleted_records'] !== []) {
+            $this->recordPublishedActions($controllerName, $relativeYaml, $payload['deleted_records'], 'delete');
+        }
+
+        if (! $fileExists) {
+            $this->console()->created($relativeYaml);
+
+            return;
+        }
+
+        $this->console()->updated(
+            $relativeYaml,
+            $this->buildSyncDetail($newActionNames, $staleActionKeys, $routeChanged, $restoredCount, $payload)
+        );
+    }
+
+    private function handleStaleControllerFiles(array $existingYamlFiles, array $currentControllers): void
+    {
+        foreach ($existingYamlFiles as $controllerName => $yamlFile) {
+            if (in_array($controllerName, $currentControllers, true)) {
+                continue;
+            }
+
+            $relativeYaml = $this->buildRelativeYamlPath($controllerName);
+
+            if ($this->staleMode === self::STALE_MODE_KEEP) {
+                $this->console()->warn($relativeYaml . ' still contains a stale controller schema.');
+
+                continue;
+            }
+
+            [$existingData]  = $this->loadExistingYamlData($yamlFile);
+            $existingActions = is_array($existingData['actions'] ?? null) ? $existingData['actions'] : [];
+
+            if ($this->staleMode === self::STALE_MODE_DELETE) {
+                $this->deleteControllerFile($yamlFile, $relativeYaml, $controllerName, $existingActions);
+
+                continue;
+            }
+
+            $documentDate   = $this->extractDocumentDate((string) $this->filesystem->get($yamlFile));
+            $payload        = $this->buildControllerSchemaContent($controllerName, [], null, $existingData, $documentDate);
+            $content        = $payload['content'];
+            $currentContent = (string) $this->filesystem->get($yamlFile);
+
+            if ($currentContent === $content) {
+                $this->console()->unchanged($relativeYaml);
+
+                continue;
+            }
+
+            $payload = $this->buildControllerSchemaContent($controllerName, [], null, $existingData);
+            $content = $payload['content'];
+
+            $put = $this->filesystem->put($yamlFile, $content);
+            if (! $put) {
+                $this->console()->failed($relativeYaml, 'Write failed');
+
+                continue;
+            }
+
+            if ($payload['deprecated_records'] !== []) {
+                $this->recordPublishedActions($controllerName, $relativeYaml, $payload['deprecated_records'], 'deprecated');
+            }
+
+            $this->console()->updated(
+                $relativeYaml,
+                'Deprecated ' . count($payload['deprecated_records']) . ' stale action(s)'
+            );
+        }
+    }
+
+    private function deleteControllerFile(
+        string $yamlFile,
+        string $relativeYaml,
+        string $controllerName,
+        array $existingActions,
+    ): void {
+        $deletedRecords = [];
+        foreach ($existingActions as $actionKey => $actionData) {
+            if (! is_array($actionData)) {
+                continue;
+            }
+            $deletedRecords[] = $this->buildRecordFromStoredAction((string) $actionKey, $actionData);
+        }
+
+        if ($this->filesystem->delete($yamlFile)) {
+            if ($deletedRecords !== []) {
+                $this->recordPublishedActions($controllerName, $relativeYaml, $deletedRecords, 'delete');
+            }
+            $this->console()->cleaned(
+                $relativeYaml,
+                'Removed stale controller schema' . ($deletedRecords === [] ? '' : ' (' . count($deletedRecords) . ' action(s))')
+            );
+
+            return;
+        }
+
+        $this->console()->failed($relativeYaml, 'Delete failed');
+    }
+
+    private function buildControllerSchemaContent(
+        string $controllerName,
+        array $actions,
+        ?\ReflectionClass $reflectionClass,
+        array $existingData = [],
+        ?string $documentDate = null,
+    ): array {
+        $this->diffControllerName  = $controllerName;
+        $controllerData            = is_array($existingData['controller'] ?? null) ? $existingData['controller'] : [];
+        $existingActions           = is_array($existingData['actions'] ?? null) ? $existingData['actions'] : [];
+        $staleActionKeys           = $this->getStaleActionKeys($existingActions, array_keys($actions));
+        $forceControllerDeprecated = $actions === [] && $this->staleMode === self::STALE_MODE_DEPRECATE && $staleActionKeys !== [];
+
+        $names                 = $reflectionClass !== null ? $this->utility->parsePMCNames($reflectionClass) : [];
+        $controllerDisplayName = trim((string) ($controllerData['name'] ?? ($names['controller']['name']['zh-CN'] ?? '')));
+        $controllerCode        = $controllerData['code'] ?? '';
+        $controllerDesc        = $controllerData['desc'] ?? [];
+
+        $code   = ['###'];
+        $code[] = "# {$controllerName} Api";
+        $code[] = '#';
+        $code[] = '# @author ' . $this->utility->getConfig('author');
+        $code[] = '# @date ' . ($documentDate ?: $this->generatedAt);
+        $code[] = '##';
+        $code[] = 'controller:';
+        $code[] = $this->getTabs(1) . 'code: ' . (is_scalar($controllerCode) ? (string) $controllerCode : '');
+        // plan-40 §二 F6:走 quoteYamlString — controller name/class 来自配置 yaml / reflection,
+        // 不走 SchemaLoader 校验通道,含换行 / 单引号会撕裂 yaml(40-addendum-escape-coverage-audit.md F6)
+        $code[] = $this->getTabs(1) . "class: '" . $this->quoteYamlString(trim((string) ($controllerData['class'] ?? $controllerName))) . "'";
+        $code[] = $this->getTabs(1) . "name: '" . $this->quoteYamlString($controllerDisplayName) . "'";
+        $this->appendYamlField($code, 'desc', is_array($controllerDesc) ? $controllerDesc : [], 1);
+        if ($forceControllerDeprecated) {
+            $code[] = $this->getTabs(1) . 'deprecated: true';
+        }
+        $this->appendExtraYamlFields(
+            $code,
+            $controllerData,
+            ['code', 'class', 'name', 'desc', 'deprecated'],
+            1,
+        );
+        $code[] = 'actions:';
+
+        $activeRecords     = [];
+        $deprecatedRecords = [];
+        $deletedRecords    = [];
+
+        foreach ($this->resolveOrderedActiveActionNames($actions, $existingActions) as $actionName) {
+            if (! isset($actions[$actionName])) {
+                continue;
+            }
+
+            $attr            = $actions[$actionName];
+            $activeRecords[] = $this->buildActiveAction(
+                $code,
+                $reflectionClass,
+                $existingActions,
+                $actionName,
+                $attr['method'],
+                $attr['uri'],
+            );
+        }
+
+        foreach ($staleActionKeys as $actionKey) {
+            $storedAction = $existingActions[$actionKey] ?? null;
+            if (! is_array($storedAction)) {
+                continue;
+            }
+
+            if ($this->staleMode === self::STALE_MODE_KEEP) {
+                $this->buildStoredAction($code, $actionKey, $storedAction, false);
+
+                continue;
+            }
+
+            if ($this->staleMode === self::STALE_MODE_DEPRECATE) {
+                $alreadyDeprecated = $this->utility->isApiActionDeprecated($storedAction);
+                $record            = $this->buildStoredAction($code, $actionKey, $storedAction, true);
+                if (! $alreadyDeprecated) {
+                    $deprecatedRecords[] = $record;
+                }
+
+                continue;
+            }
+
+            $deletedRecords[] = $this->buildRecordFromStoredAction($actionKey, $storedAction);
+        }
+
+        $code[] = '';
+
+        return [
+            'content'            => implode("\n", $code),
+            'active_records'     => $activeRecords,
+            'deprecated_records' => $deprecatedRecords,
+            'deleted_records'    => $deletedRecords,
+        ];
+    }
+
+    private function extractDocumentDate(string $content): string
+    {
+        if (preg_match('/^#\s*@date\s+(.+)$/m', $content, $matches) !== 1) {
+            return $this->generatedAt;
+        }
+
+        $date = trim((string) ($matches[1] ?? ''));
+
+        return $date !== '' ? $date : $this->generatedAt;
+    }
+
+    private function resolveOrderedActiveActionNames(array $actions, array $existingActions): array
+    {
+        $ordered = [];
+
+        foreach (array_keys($existingActions) as $existingKey) {
+            $actionName = (string) $this->utility->removeActionNameMethod((string) $existingKey);
+            if (isset($actions[$actionName]) && ! in_array($actionName, $ordered, true)) {
+                $ordered[] = $actionName;
+            }
+        }
+
+        foreach ($this->getDefaultActions() as $actionName) {
+            if (isset($actions[$actionName]) && ! in_array($actionName, $ordered, true)) {
+                $ordered[] = $actionName;
+            }
+        }
+
+        foreach (array_keys($actions) as $actionName) {
+            if (! in_array($actionName, $ordered, true)) {
+                $ordered[] = $actionName;
+            }
+        }
+
+        return $ordered;
+    }
+
+    private function getStaleActionKeys(array $existingActions, array $currentActionNames): array
+    {
+        $stale = [];
+
+        foreach (array_keys($existingActions) as $actionKey) {
+            $actionName = (string) $this->utility->removeActionNameMethod((string) $actionKey);
+            if (! in_array($actionName, $currentActionNames, true)) {
+                $stale[] = (string) $actionKey;
+            }
+        }
+
+        return $stale;
+    }
+
+    private function buildActiveAction(
+        array &$code,
+        ?\ReflectionClass $reflectionClass,
+        array $existingActions,
+        string $actionName,
+        string $method,
+        string $uri,
+    ): array {
+        $methodLower       = strtolower($method);
+        $actionKey         = "{$actionName}_{$methodLower}";
+        $existingActionKey = $this->findExistingActionKey($existingActions, $actionName, $actionKey);
+        $existingAction    = $existingActionKey !== null && is_array($existingActions[$existingActionKey] ?? null)
+            ? $existingActions[$existingActionKey]
+            : [];
+        $touchUpdatedMeta = $this->shouldTouchActiveActionMeta($existingActionKey, $existingAction, $actionKey, $method, $uri);
+        $meta             = $this->buildActionMeta($existingAction, $touchUpdatedMeta);
+        // name/desc 来源:docblock(第 1 行 name / 第 2 行起 desc)。已有 action 默认保留 yaml 现值(手改优先);
+        //   --sync-names 时用 docblock 覆盖。无论同步与否,docblock≠yaml 都记进 nameDiffs 由 start() 结尾汇报。
+        $docName         = trim((string) $this->getActionName($reflectionClass, $actionName));
+        $docDesc         = $this->getActionDesc($reflectionClass, $actionName);
+        $hasExistingName = array_key_exists('name', $existingAction);
+        $existingName    = $hasExistingName ? trim((string) $existingAction['name']) : null;
+        $diffKey         = ($this->diffControllerName !== '' ? $this->diffControllerName . '/' : '') . $actionKey;
+
+        if (! $hasExistingName) {
+            $name = $docName;                  // 新 action → docblock
+        } elseif ($this->syncNames) {
+            $name = $docName;                  // 显式同步 → docblock 覆盖
+            if ($docName !== '' && $docName !== $existingName) {
+                $this->nameDiffs[] = ['key' => $diffKey, 'old' => (string) $existingName, 'new' => $docName, 'synced' => true];
+            }
+        } else {
+            $name = (string) $existingName;    // 默认保留 yaml
+            if ($docName !== '' && $docName !== $existingName) {
+                $this->nameDiffs[] = ['key' => $diffKey, 'old' => (string) $existingName, 'new' => $docName, 'synced' => false];
+            }
+        }
+
+        // desc 同口径:无 yaml desc(新 action / 现状 desc:[])→ docblock;有手写 desc 则保留(sync 时 docblock 非空才覆盖)
+        $existingDesc = $existingAction['desc'] ?? null;
+        if ($existingDesc === null || $existingDesc === []) {
+            $desc = $docDesc;
+        } elseif ($this->syncNames) {
+            $desc = $docDesc !== [] ? $docDesc : $existingDesc;
+        } else {
+            $desc = $existingDesc;
+        }
+
+        $code[] = $this->getTabs(1) . "{$actionKey}:";
+        // 2026-06-11 修:name 是唯一漏走 quoteYamlString 的字符串槽。来自方法 docblock(自由文本),
+        // 含半角冒号 / # / @[*-% 首字符 / 引号 → 写出非法 YAML;且每次 moo:api 从旧 yaml 回读再发射,
+        // 坏一次文件就永久解析失败。跟 controller.name / meta 一致补外引号 + inner-escape。
+        $code[] = $this->getTabs(2) . "name: '" . $this->quoteYamlString($name) . "'";
+        $this->appendYamlField($code, 'desc', $desc);
+        $this->appendYamlField($code, 'prototype', $this->getExistingActionField($existingAction, 'prototype', ''));
+        if (array_key_exists('rule_action', $existingAction)) {
+            $this->appendYamlField($code, 'rule_action', $existingAction['rule_action']);
+        }
+        $code[] = $this->getTabs(2) . "request: [{$method}, {$uri}]";
+        $this->appendActionMeta($code, $meta);
+        $this->appendYamlField($code, 'url_params', $this->getExistingActionField($existingAction, 'url_params', []));
+        $this->appendYamlField($code, 'body_params', $this->getExistingActionField($existingAction, 'body_params', []));
+        $this->appendExtraYamlFields(
+            $code,
+            $existingAction,
+            ['name', 'desc', 'prototype', 'rule_action', 'deprecated', 'request', 'meta', 'url_params', 'body_params', 'created_at', 'updated_by', 'updated_at', 'deprecated_by', 'deprecated_at', 'deprecated_reason', 'creator', 'user'],
+        );
+
+        return [
+            'action'     => $actionName,
+            'action_key' => $actionKey,
+            'method'     => $method,
+            'uri'        => $uri,
+            'name'       => $name,
+            'is_new'     => $existingActionKey === null,
+        ];
+    }
+
+    private function buildStoredAction(
+        array &$code,
+        string $actionKey,
+        array $actionData,
+        bool $forceDeprecated,
+    ): array {
+        $actionName     = (string) $this->utility->removeActionNameMethod($actionKey);
+        [$method, $uri] = $this->getStoredRequest($actionData);
+        $name           = trim((string) ($actionData['name'] ?? $actionName));
+        $meta           = $forceDeprecated
+            ? $this->buildDeprecatedActionMeta($actionData)
+            : $this->utility->normalizeApiActionMeta($actionData);
+        $deprecated = $forceDeprecated || $this->utility->isApiActionDeprecated($actionData);
+
+        $code[] = $this->getTabs(1) . "{$actionKey}:";
+        // 2026-06-11 修:name 是唯一漏走 quoteYamlString 的字符串槽。来自方法 docblock(自由文本),
+        // 含半角冒号 / # / @[*-% 首字符 / 引号 → 写出非法 YAML;且每次 moo:api 从旧 yaml 回读再发射,
+        // 坏一次文件就永久解析失败。跟 controller.name / meta 一致补外引号 + inner-escape。
+        $code[] = $this->getTabs(2) . "name: '" . $this->quoteYamlString($name) . "'";
+        $this->appendYamlField($code, 'desc', $actionData['desc'] ?? []);
+        $this->appendYamlField($code, 'prototype', $actionData['prototype'] ?? '');
+        if (array_key_exists('rule_action', $actionData)) {
+            $this->appendYamlField($code, 'rule_action', $actionData['rule_action']);
+        }
+        if ($deprecated) {
+            $code[] = $this->getTabs(2) . 'deprecated: true';
+        }
+        $code[] = $this->getTabs(2) . "request: [{$method}, {$uri}]";
+        $this->appendActionMeta($code, $meta, $deprecated);
+        $this->appendYamlField($code, 'url_params', $actionData['url_params'] ?? []);
+        $this->appendYamlField($code, 'body_params', $actionData['body_params'] ?? []);
+        $this->appendExtraYamlFields(
+            $code,
+            $actionData,
+            ['name', 'desc', 'prototype', 'rule_action', 'deprecated', 'request', 'meta', 'url_params', 'body_params', 'created_at', 'updated_by', 'updated_at', 'deprecated_by', 'deprecated_at', 'deprecated_reason', 'creator', 'user'],
+        );
+
+        return [
+            'action'     => $actionName,
+            'action_key' => $actionKey,
+            'method'     => $method,
+            'uri'        => $uri,
+            'name'       => $name,
+        ];
+    }
+
+    private function appendActionMeta(array &$code, array $meta, bool $includeDeprecatedMeta = false): void
+    {
+        // plan-40 §二 escape audit:base quoteYamlString 只 inner-escape,外引号 caller 加
+        $code[] = $this->getTabs(2) . 'meta:';
+        $code[] = $this->getTabs(3) . "creator: '" . $this->quoteYamlString($meta['creator'] ?? '') . "'";
+        $code[] = $this->getTabs(3) . "created_at: '" . $this->quoteYamlString($meta['created_at'] ?? '') . "'";
+
+        $updatedBy = trim((string) ($meta['updated_by'] ?? ''));
+        $updatedAt = trim((string) ($meta['updated_at'] ?? ''));
+        $code[]    = $this->getTabs(3) . "updated_by: '" . $this->quoteYamlString($updatedBy) . "'";
+        $code[]    = $this->getTabs(3) . "updated_at: '" . $this->quoteYamlString($updatedAt) . "'";
+
+        $deprecatedBy     = trim((string) ($meta['deprecated_by'] ?? ''));
+        $deprecatedAt     = trim((string) ($meta['deprecated_at'] ?? ''));
+        $deprecatedReason = trim((string) ($meta['deprecated_reason'] ?? ''));
+        if ($deprecatedBy !== '' || $deprecatedAt !== '' || $deprecatedReason !== '') {
+            $code[] = $this->getTabs(3) . "deprecated_by: '" . $this->quoteYamlString($deprecatedBy) . "'";
+            $code[] = $this->getTabs(3) . "deprecated_at: '" . $this->quoteYamlString($deprecatedAt) . "'";
+            $code[] = $this->getTabs(3) . "deprecated_reason: '" . $this->quoteYamlString($deprecatedReason) . "'";
+        }
+    }
+
+    private function buildActionMeta(array $existingAction, bool $touchUpdatedMeta): array
+    {
+        $existingMeta = $this->utility->normalizeApiActionMeta($existingAction);
+
+        return [
+            'creator'           => $existingMeta['creator']    !== '' ? $existingMeta['creator'] : $this->currentLoginUser,
+            'created_at'        => $existingMeta['created_at'] !== '' ? $existingMeta['created_at'] : $this->generatedAt,
+            'updated_by'        => $touchUpdatedMeta ? $this->currentLoginUser : $existingMeta['updated_by'],
+            'updated_at'        => $touchUpdatedMeta ? $this->generatedAt : $existingMeta['updated_at'],
+            'deprecated_by'     => '',
+            'deprecated_at'     => '',
+            'deprecated_reason' => '',
+        ];
+    }
+
+    private function buildDeprecatedActionMeta(array $existingAction): array
+    {
+        $existingMeta      = $this->utility->normalizeApiActionMeta($existingAction);
+        $alreadyDeprecated = $this->utility->isApiActionDeprecated($existingAction);
+
+        return [
+            'creator'    => $existingMeta['creator']    !== '' ? $existingMeta['creator'] : $this->currentLoginUser,
+            'created_at' => $existingMeta['created_at'] !== '' ? $existingMeta['created_at'] : $this->generatedAt,
+            'updated_by' => $alreadyDeprecated
+                ? $existingMeta['updated_by']
+                : $this->currentLoginUser,
+            'updated_at' => $alreadyDeprecated
+                ? $existingMeta['updated_at']
+                : $this->generatedAt,
+            'deprecated_by' => $existingMeta['deprecated_by'] !== ''
+                ? $existingMeta['deprecated_by']
+                : $this->currentLoginUser,
+            'deprecated_at' => $existingMeta['deprecated_at'] !== ''
+                ? $existingMeta['deprecated_at']
+                : $this->generatedAt,
+            'deprecated_reason' => $existingMeta['deprecated_reason'] !== ''
+                ? $existingMeta['deprecated_reason']
+                : self::STALE_REASON,
+        ];
+    }
+
+    private function findExistingActionKey(array $existingActions, string $actionName, string $preferredKey): ?string
+    {
+        if (isset($existingActions[$preferredKey]) && is_array($existingActions[$preferredKey])) {
+            return $preferredKey;
+        }
+
+        foreach ($existingActions as $existingKey => $existingAction) {
+            if (! is_array($existingAction)) {
+                continue;
+            }
+
+            if ($this->utility->removeActionNameMethod((string) $existingKey) === $actionName) {
+                return (string) $existingKey;
+            }
+        }
+
+        return null;
+    }
+
+    private function shouldTouchActiveActionMeta(
+        ?string $existingActionKey,
+        array $existingAction,
+        string $targetActionKey,
+        string $method,
+        string $uri,
+    ): bool {
+        if ($existingAction === []) {
+            return false;
+        }
+
+        [$existingMethod, $existingUri] = $this->getStoredRequest($existingAction);
+
+        return $existingActionKey !== $targetActionKey
+            || $existingMethod    !== strtoupper($method)
+            || $existingUri       !== $uri
+            || $this->utility->isApiActionDeprecated($existingAction);
+    }
+
+    private function hasRouteSignatureChanges(array $existingActions, array $actions): bool
+    {
+        foreach ($actions as $actionName => $attr) {
+            $targetActionKey   = $actionName . '_' . strtolower($attr['method']);
+            $existingActionKey = $this->findExistingActionKey($existingActions, $actionName, $targetActionKey);
+            if ($existingActionKey === null) {
+                continue;
+            }
+
+            $existingAction = $existingActions[$existingActionKey] ?? null;
+            if (! is_array($existingAction)) {
+                continue;
+            }
+
+            [$existingMethod, $existingUri] = $this->getStoredRequest($existingAction);
+            if (
+                $existingActionKey !== $targetActionKey
+                || $existingMethod !== strtoupper($attr['method'])
+                || $existingUri    !== $attr['uri']
+            ) {
                 return true;
             }
         }
@@ -146,382 +762,486 @@ class CreateApiGenerator extends Generator
         return false;
     }
 
-    /**
-     * 通过 控制器动作 指定的 Request 规则，获取 请求参数
-     */
-    private function getActionParameters(array $route): array
+    private function countRestoredDeprecatedActions(array $existingActions, array $actions): int
     {
-        [$controller, $action] = explode('@', $route['action']);
-        $request               = $this->utility->getActionRequestClass($this->getMethod($controller, $action));
+        $count = 0;
 
-        return ($request === null or ! method_exists($request, 'rules'))
-            ? []
-            : $request->rules();
-    }
+        foreach ($actions as $actionName => $attr) {
+            $targetActionKey   = $actionName . '_' . strtolower($attr['method']);
+            $existingActionKey = $this->findExistingActionKey($existingActions, $actionName, $targetActionKey);
+            if ($existingActionKey === null) {
+                continue;
+            }
 
-    /**
-     * 获取 新接口数据
-     */
-    private function getNewApiData(array $route): array
-    {
-        // dump($route);
-        [$controller, $action] = explode('@', $route['action']);
-
-        $PMC_names = $this->utility->parsePMCNames($this->getController($controller));
-        $x_folder  = $PMC_names['module']['name']['zh-CN'] . '/'
-                    . $PMC_names['controller']['name']['zh-CN'];
-
-        // 如果是多个 api 项目配置，则可以省略以及目录，否则加上顶级目录名称
-        if (! $this->checkXConfigMultiple()) {
-            $x_folder = $PMC_names['package']['name']['zh-CN'] . '/' . $x_folder;
+            $existingAction = $existingActions[$existingActionKey] ?? null;
+            if (is_array($existingAction) && $this->utility->isApiActionDeprecated($existingAction)) {
+                $count++;
+            }
         }
 
-        $action_info = $this->utility->parseActionInfo($this->getMethod($controller, $action));
+        return $count;
+    }
+
+    private function getExistingActionField(array $existingAction, string $field, mixed $default): mixed
+    {
+        if (! array_key_exists($field, $existingAction) || $existingAction[$field] === null) {
+            return $default;
+        }
+
+        return $existingAction[$field];
+    }
+
+    private function getStoredRequest(array $actionData): array
+    {
+        $request = is_array($actionData['request'] ?? null) ? $actionData['request'] : [];
 
         return [
-            'app_name'           => $this->app,
-            'api_operation_id'   => $route['operation_id'],
-            'api_name'           => $this->utility->parseActionName($this->getMethod($controller, $action)),
-            'api_uri'            => $route['uri'],
-            'api_summary'        => $action_info['whitelist'] ? '<whitelist>' : '',
-            'api_description'    => '',
-            'api_request_method' => $route['method'],
-            'api_route_name'     => $route['name'],
-            'api_controller'     => $controller,
-            'api_action'         => $action,
-            'api_parameters'     => $this->getActionParameters($route),
-            'api_status'         => 'released', // 与 x_status 不一致时，需要更新 x 远程平台
-            'x_folder'           => trim($x_folder, '/'),
+            strtoupper(trim((string) ($request[0] ?? 'GET'))),
+            trim((string) ($request[1] ?? '')),
         ];
     }
 
-    /**
-     * 获取并缓存 控制器 方法函数 的反向解析结果
-     */
-    private function getMethod($controller, $action)
+    private function buildRecordFromStoredAction(string $actionKey, array $actionData): array
     {
-        $key = $controller . '_' . $action;
-        if (isset($this->controllers[$key])) {
-            return $this->controllers[$key];
+        [$method, $uri] = $this->getStoredRequest($actionData);
+        $actionName     = (string) $this->utility->removeActionNameMethod($actionKey);
+
+        return [
+            'action'     => $actionName,
+            'action_key' => $actionKey,
+            'method'     => $method,
+            'uri'        => $uri,
+            'name'       => trim((string) ($actionData['name'] ?? $actionName)),
+        ];
+    }
+
+    private function buildSyncDetail(
+        array $newActionNames,
+        array $staleActionKeys,
+        bool $routeChanged,
+        int $restoredCount,
+        array $payload,
+    ): string {
+        $parts = [];
+
+        if ($newActionNames !== []) {
+            $parts[] = 'Added ' . count($newActionNames) . ' action(s)';
         }
 
-        $this->controllers[$key] = new \ReflectionMethod($controller, $action);
+        if ($routeChanged) {
+            $parts[] = 'Synced route changes';
+        }
 
-        return $this->controllers[$key];
+        if ($restoredCount > 0) {
+            $parts[] = 'Reactivated ' . $restoredCount . ' action(s)';
+        }
+
+        if ($payload['deprecated_records'] !== []) {
+            $parts[] = 'Deprecated ' . count($payload['deprecated_records']) . ' stale action(s)';
+        }
+
+        if ($payload['deleted_records'] !== []) {
+            $parts[] = 'Removed ' . count($payload['deleted_records']) . ' stale action(s)';
+        }
+
+        if ($parts === [] && $staleActionKeys !== [] && $this->staleMode === self::STALE_MODE_KEEP) {
+            $parts[] = 'Kept ' . count($staleActionKeys) . ' stale action(s)';
+        }
+
+        return implode('; ', $parts) ?: 'Synced file';
+    }
+
+    private function buildRelativeYamlPath(string $controllerName): string
+    {
+        return $this->apiRelativePath . ($this->namespace === 'Index' ? '' : $this->namespace . '/') . $controllerName . '.yaml';
+    }
+
+    private function getNamespaceYamlFiles(string $path): array
+    {
+        if (! $this->filesystem->isDirectory($path)) {
+            return [];
+        }
+
+        $files = [];
+        foreach ($this->filesystem->files($path) as $file) {
+            $baseName = $file->getBasename();
+            if (! str_ends_with($baseName, '.yaml') || str_starts_with($baseName, '_')) {
+                continue;
+            }
+
+            $files[$file->getBasename('.yaml')] = $file->getPathname();
+        }
+
+        return $files;
+    }
+
+    private function loadExistingYamlData(string $yamlFile): array
+    {
+        if (! $this->filesystem->isFile($yamlFile)) {
+            return [[], []];
+        }
+
+        $existingData        = $this->utility->parseYamlFile($yamlFile);
+        $duplicateActionKeys = $this->getDuplicateActionKeys($yamlFile);
+        if ($duplicateActionKeys !== []) {
+            $existingData['actions'] = $this->getExistingActionsFromRawYaml($yamlFile);
+        }
+
+        return [$existingData, $duplicateActionKeys];
+    }
+
+    private function appendYamlField(array &$code, string $field, mixed $value, int $indentLevel = 2): void
+    {
+        if ($value === '') {
+            $code[] = $this->getTabs($indentLevel) . "{$field}: ''";
+
+            return;
+        }
+
+        if (is_array($value) && $value === []) {
+            $code[] = $this->getTabs($indentLevel) . "{$field}: []";
+
+            return;
+        }
+
+        $yaml = trim(Yaml::dump([$field => $value], 8, 4, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+        foreach (preg_split('/\R/u', $yaml) ?: [] as $line) {
+            $code[] = $this->getTabs($indentLevel) . $line;
+        }
+    }
+
+    private function appendExtraYamlFields(
+        array &$code,
+        array $data,
+        array $excludedFields,
+        int $indentLevel = 2,
+    ): void {
+        $excluded = array_flip($excludedFields);
+
+        foreach ($data as $field => $value) {
+            if (isset($excluded[(string) $field])) {
+                continue;
+            }
+
+            $this->appendYamlField($code, (string) $field, $value, $indentLevel);
+        }
+    }
+
+    // plan-40 §二 escape audit:子类原有 private quoteYamlString 跟父类 Generator::quoteYamlString
+    // 语义不同(子类带外单引号,父类只 inner-escape)+ 同名异义 + private 覆盖 protected 报错。
+    // 删私有版,所有 callsite 统一用 base helper + 外面手动 `'...'` 包(40-addendum F6/F7 修法)。
+
+    /**
+     * 获取 action 中文名称
+     */
+    private function getActionName(?\ReflectionClass $reflectionClass, string $actionName): string
+    {
+        $defaultNames = ['create' => '创建表单', 'edit' => '编辑表单'];
+
+        if (isset($defaultNames[$actionName])) {
+            return $defaultNames[$actionName];
+        }
+
+        if ($reflectionClass === null || ! $reflectionClass->hasMethod($actionName)) {
+            return $actionName;
+        }
+
+        $reflectionMethod = $reflectionClass->getMethod($actionName);
+        $name             = $this->utility->parseActionName($reflectionMethod);
+
+        return $name === '' ? $actionName : $name;
     }
 
     /**
-     * 获取并缓存 控制器 的反向解析结果
+     * docblock 第 2 行起的描述(多行 list)。create/edit 等无 reflection 的默认 action 返回 []。
+     *
+     * @return list<string>
      */
-    private function getController(string $name)
+    private function getActionDesc(?\ReflectionClass $reflectionClass, string $actionName): array
     {
-        if (isset($this->controllers[$name])) {
-            return $this->controllers[$name];
+        if ($reflectionClass === null || ! $reflectionClass->hasMethod($actionName)) {
+            return [];
         }
 
-        $this->controllers[$name] = new \ReflectionClass($name);
+        return $this->utility->parseActionDesc($reflectionClass->getMethod($actionName));
+    }
+
+    private function normalizeMethod(string $method): string
+    {
+        $methods = array_values(array_filter(array_map('trim', explode('|', strtoupper($method)))));
+        if ($methods === []) {
+            return 'GET';
+        }
+
+        $methods = array_values(array_unique($methods));
+
+        // 跳过路由系统自动附带的 HEAD / OPTIONS，优先选择真正的调试方法
+        $primaryMethods = array_values(array_filter(
+            $methods,
+            static fn (string $item): bool => ! in_array($item, ['HEAD', 'OPTIONS'], true)
+        ));
+
+        if ($primaryMethods === []) {
+            $primaryMethods = $methods;
+        }
+
+        foreach (['POST', 'PUT', 'PATCH', 'DELETE', 'GET'] as $candidate) {
+            if (in_array($candidate, $primaryMethods, true)) {
+                return $candidate;
+            }
+        }
+
+        return $primaryMethods[0];
+    }
+
+    /**
+     * 获取并缓存控制器的 ReflectionClass
+     */
+    private function getController(string $name): \ReflectionClass
+    {
+        if (! isset($this->controllers[$name])) {
+            $this->controllers[$name] = new \ReflectionClass($name);
+        }
 
         return $this->controllers[$name];
     }
 
     /**
-     * 推送 api 数据到 x 远程平台
+     * 更新 _menus_transform.yaml（只追加新条目，保留用户手动排序）
+     *
+     * 嵌套格式：
+     *   'Index':
+     *       name: '根目录'
+     *       controllers: [Auth, Editor, Uploader]
      */
-    private function pushApi(Model $model): void
+    private function updateMenusTransform(array $newEntries, string $folderKey, array $controllerNames): void
     {
-        $project_id = $this->utility->getConfig("api_fox.{$this->app}.project_id");
-        $token      = $this->utility->getConfig("api_fox.{$this->app}.token");
-        $url        = "https://api.apifox.cn/api/v1/projects/{$project_id}/import-data";
-        // $url = "https://api.apifox.com/api/v1/projects/{$project_id}/http-apis";
+        $transformFile = $this->apiPath . '_menus_transform.yaml';
+        $existing      = [];
 
-        $headers = [
-            'X-Apifox-Version' => '2024-01-20',
-            'Content-Type'     => 'application/json',
-            'Authorization'    => 'Bearer ' . $token,
-        ];
-
-        $params = [
-            'importFormat' => 'openapi',
-            // 'importBasePath'   => 'false', // 是否在接口路径加上basePath, 建议不传，即为 false，推荐将 BasePath 放到环境里的”前置 URL“里
-            'importFullPath' => 'false',
-            // 'apiFolderId'    => '0', // 导入到目标目录的ID, 不传表示导入到根目录
-            // 'schemaFolderId'   => '0',
-            'apiOverwriteMode' => 'methodAndPath', // 匹配到相同接口时的覆盖模式，不传表示忽略 {methodAndPath: 覆盖, merge: 智能合并, both: 保存两者}
-            'syncApiFolder'    => true, // 是否同步更新接口所在目录
-            // 'url'              => '',  // 数据源 URL，当同时传递 url 和 data 的参数时，会优先使用 url 的数据作为导入数据源
-            // 'auth'          => '{"username": "admin", "password":"123456"}', // 数据源 URL 授权用户名和密码
-        ];
-
-        // $tags = array_map(static fn ($item) => ['name' => $item], explode('/', $model->x_folder));
-        // dump($tags);
-
-        $api_data = [
-            'openapi' => '3.1.0',
-            'paths'   => [
-                "/{$model->api_uri}" => [
-                    strtolower($model->api_request_method) => [
-                        'tags'            => explode('/', $model->x_folder),
-                        'operationId'     => $model->api_operation_id,
-                        'x-apifox-status' => $model->api_status, // { released, deprecated }
-                        'deprecated'      => $model->api_status === 'deprecated',
-                        'x-apifox-folder' => $model->x_folder,
-                        'summary'         => $model->api_name,
-                        'description'     => '',
-                        'parameters'      => $this->getParameters($model),
-                        'requestBody'     => $this->getRequestBody($model),
-                        'responses'       => $this->getResponseConfig($model->api_action),
-                    ],
-                ],
-            ],
-        ];
-        // dump($api_data);
-
-        try {
-            //$api_data['parameters'] = array_merge($api_data['parameters'], $api_header);
-            $params['data'] = json_encode($api_data, JSON_THROW_ON_ERROR);
-        } catch (JsonException $e) {
-            $this->command->error('Json Encode Exception');
+        if ($this->filesystem->isFile($transformFile)) {
+            $existing = $this->utility->normalizeMenusTransform($this->utility->parseYamlFile($transformFile));
         }
 
-        // asForm()->  // 使用 application/x-www-form-urlencoded 作为请求的数据类型
-        $response = Http::withHeaders($headers)->post($url, $params);
-        if ($response->successful()) {
-            $model->x_version       = $headers['X-Apifox-Version'];
-            $model->x_import_format = $params['importFormat'];
-            $model->x_status        = $model->api_status;
-            if ($model->x_created_at !== null) {
-                $model->x_updated_at = now();
-                $model->x_updated_times++;
-            } else {
-                $model->x_created_at = now();
+        $changed = false;
+
+        foreach ($newEntries as $key => $name) {
+            if (! isset($existing[$key])) {
+                $existing[$key] = ['name' => $name, 'controllers' => $controllerNames];
+                $changed        = true;
             }
-            $model->save();
-
-            $this->command->info("+ {$model->api_name}: {$model->api_uri}");
         }
-        // dump($response->status());
-        // dump($response->headers());
-        // dump($response->body());
-        // dump(json_decode($response->body(), false, 512, JSON_THROW_ON_ERROR));
-    }
 
-    private function getRequestBody(Model $model): array
-    {
-        // type: { application/x-www-form-urlencoded | multipart/form-data }
-        // multipart/form-data 不支持 PUT 和 PATCH
-        // 用 multipart/form-data 则需要在参数中增加一个 _method = 'PUT' 来指定为 PUT
-        $type = 'application/x-www-form-urlencoded';
-        $res  = [
-            'content' => [
-                $type => [
-                    'schema' => [
-                        'type'       => 'object',
-                        'properties' => [],
-                        'required'   => [],
-                    ],
-                ],
-            ],
-        ];
-        $properties = [];
-        $required   = [];
-
-        if ($model->api_request_method !== 'GET') { // in_array($model->api_request_method, ['POST', 'PUT', 'DELETE'])
-            foreach ($model->api_parameters as $field => $rules) {
-                $value_type         = $this->getParameterType($field, $rules);
-                $properties[$field] = [
-                    'description' => __('validation.attributes.' . $field),
-                    'type'        => $value_type,
-                    'example'     => $this->getParameterExample($field, $value_type, $rules),
-                ];
-
-                if (! in_array('nullable', $rules, true)) {
-                    $required[] = $field;
-                }
+        if (isset($existing[$folderKey])) {
+            $existingControllers = $existing[$folderKey]['controllers'] ?? [];
+            $newControllers      = array_diff($controllerNames, $existingControllers);
+            if ($newControllers !== []) {
+                $existing[$folderKey]['controllers'] = array_merge($existingControllers, array_values($newControllers));
+                $changed                             = true;
             }
-
-            $res['content'][$type]['schema']['properties'] = $properties;
-            $res['content'][$type]['schema']['required']   = $required;
         }
 
-        return empty($properties) ? [] : $res;
+        if (! $changed) {
+            return;
+        }
+
+        $code   = ['###'];
+        $code[] = '# 转换 api 调试工具菜单';
+        $code[] = '#';
+        $code[] = '# 目录和控制器的顺序决定了显示排序';
+        $code[] = '##';
+
+        // plan-40 §二 F7:走 quoteYamlString — $key / $name 来自 controller config(menu key),
+        // 不走 SchemaLoader 校验,含单引号会撕裂 _menus_transform.yaml(40-addendum-escape-coverage-audit.md F7)
+        foreach ($existing as $key => $attr) {
+            $name        = $attr['name']        ?? $key;
+            $controllers = $attr['controllers'] ?? [];
+            $code[]      = "'" . $this->quoteYamlString($key) . "':";
+            $code[]      = $this->getTabs(1) . "name: '" . $this->quoteYamlString($name) . "'";
+            $code[]      = $this->getTabs(1) . 'controllers: ' . ($controllers === [] ? '[]' : '[' . implode(', ', $controllers) . ']');
+        }
+
+        $code[] = '';
+        $this->filesystem->put($transformFile, implode("\n", $code));
+        $this->console()->updated('_menus_transform.yaml');
     }
 
     /**
-     * 获取 api 调试平台的请求参数的数据格式 openapi 3.1.0
+     * 记录本次发布的接口
      */
-    private function getParameters(Model $model): array
+    private function recordPublishedActions(string $controllerName, string $relativeYaml, array $actions, string $operation): void
     {
-        $res = [];
-
-        // 除了制定排除的外，都要加 header Authorization
-        if (! in_array("{$model->api_controller}@{$model->api_action}", $this->utility->getConfig('authorization.exclude_actions'), true)) {
-            $res[] = [
-                'name'        => 'Authorization',
-                'in'          => 'header',
-                'description' => 'Bearer 个人访问令牌',
-                'required'    => true,
-                'schema'      => ['type' => 'string'],
-                'example'     => 'Bearer {{access_token}}',
+        foreach ($actions as $item) {
+            unset($item['is_new']); // 内部判定字段,不入历史 YAML
+            $this->publishedActions[] = [
+                'operation'  => $operation,
+                'controller' => $controllerName,
+                'file'       => str_replace('\\', '/', ltrim($relativeYaml, './')),
+                'debug'      => [
+                    'app'        => $this->app,
+                    'folder'     => $this->namespace,
+                    'controller' => $controllerName,
+                    'action'     => $item['action_key'] ?? '',
+                ],
+                ...$item,
             ];
         }
-
-        // edit, update, delete 的网址中包含 id 变量值
-        if (str_contains($model->api_uri, '{id}')) {
-            $res[] = [
-                'name'        => 'id',
-                'in'          => 'path',
-                'description' => 'ID',
-                'required'    => true,
-                'schema'      => ['type' => 'integer'],
-            ];
-        }
-
-        if ($model->api_request_method === 'GET') {
-            foreach ($model->api_parameters as $field => $rules) {
-                $value_type = $this->getParameterType($field, $rules);
-                $res[]      = [
-                    'name'        => $field,
-                    'in'          => 'query',
-                    'description' => __('validation.attributes.' . $field),
-                    'required'    => ! in_array('nullable', $rules, true),
-                    'schema'      => ['type' => $value_type],
-                    'example'     => $this->getParameterExample($field, $value_type, $rules),
-                ];
-            }
-        }
-
-        return $res;
     }
 
     /**
-     * 获取 api 调试平台的请求参数的数据类型
+     * 生成接口发布历史记录
      */
-    private function getParameterType(string $field, array $rules): mixed
+    private function writePublishHistory(): void
     {
-        if (in_array('integer', $rules, true) or in_array('numeric', $rules, true)) {
-            return 'integer';
+        if ($this->publishedActions === []) {
+            return;
         }
 
-        if (in_array('string', $rules, true)) {
-            return 'string';
-        }
+        $historyPath  = $this->utility->getApiPath('history');
+        $relativePath = $this->utility->getApiPath('history', true);
+        $this->checkDirectory($historyPath);
 
-        return 'string';
-    }
+        $publishedAt     = date('Y-m-d H:i:s');
+        $author          = trim((string) $this->utility->getConfig('author'));
+        $controllerCount = count(array_unique(array_column($this->publishedActions, 'controller')));
+        $fileName        = 'publish_' . date('Ymd_His') . '_' . substr(md5($publishedAt . $author . json_encode($this->publishedActions, JSON_UNESCAPED_UNICODE)), 8, 8) . '.yaml';
+        $fullPath        = $historyPath . $fileName;
 
-    /**
-     * 获取 api 调试平台的请求参数的默认值/示例值
-     */
-    private function getParameterExample(string $field, string $value_type, array $rules): mixed
-    {
-        $min = 3;
-        $max = 16;
-        foreach ($rules as $rule) {
-            if (Str::startsWith($rule, 'in:')) {
-                // {% mock 'pick', '[1,2,3,4]' %}
-                return "{% mock 'pick', '[" . str_replace('in:', '', $rule) . "]' %}";
-            }
-
-            if (Str::endsWith($rule, 'min:')) {
-                $min = str_replace('min:', '', $rule);
-            }
-
-            if (Str::endsWith($rule, 'min:')) {
-                $max = str_replace('max:', '', $rule);
-            }
-        }
-
-        if (str_contains($field, 'password')) {
-            return "{% mock 'string', '', 6, 12 %}";
-        }
-
-        if (Str::endsWith($field, '_code')) {
-            //return "{% mock 'string', 'lower/upper', {$min}, {$max} %}";
-            return "{% mock 'title', {$min}, {$max} %}";
-        }
-
-        if ($field === 'language') {
-            return 'zh-CN';
-        }
-
-        if ($field === 'page') {
-            return 1;
-        }
-
-        if ($field === 'page_limit') {
-            return "{% mock 'integer', 5, 15 %}";
-        }
-
-        // TODO: get some ids ？
-        if ($field === 'ids') {
-            return '';
-        }
-
-        // TODO: get one id ？
-        // 解析 controller 构造器的 model，random 一条
-        if (Str::endsWith($field, '_id')) {
-            return '';
-        }
-
-        // 中文字符串
-        return "{% mock 'ctitle', {$min}, {$max} %}";
-    }
-
-    /**
-     * 获取 api 调试平台的请求结构的数据结构
-     */
-    private function getResponseConfig(string $action): array
-    {
-        $codes = ['index' => 200, 'store' => 201];
-        $code  = $codes[$action] ?? 200;
-
-        return [
-            $code => [
-                'description' => '成功',
-                'content'     => [
-                    'application/json' => [
-                        'schema' => [
-                            'type'       => 'object',
-                            'properties' => [
-                                // 'data' => [
-                                //     'anyOf' => [
-                                //         [
-                                //             'type'  => 'array',
-                                //             'items' => [
-                                //                 'type' => ['string', 'integer', 'boolean', 'array', 'object', 'number', 'null'],
-                                //             ],
-                                //         ],
-                                //         [
-                                //             'type'                       => 'object',
-                                //             'additionalProperties'       => false,
-                                //             'x-apifox-orders'            => [],
-                                //             'properties'                 => [],
-                                //             'x-apifox-ignore-properties' => [],
-                                //         ],
-                                //     ],
-                                // ],
-                                // links
-                                // meta
-                                // columns
-                                // form_widgets
-                            ],
-                            'x-apifox-ignore-properties' => [],
-                            'x-apifox-orders'            => [],
-                        ],
-                    ],
-                ],
-            ],
+        $meta = [
+            'app'              => $this->app,
+            'namespace'        => $this->namespace,
+            'published_at'     => $publishedAt,
+            'controller_count' => $controllerCount,
+            'action_count'     => count($this->publishedActions),
         ];
+        if ($author !== '') {
+            $meta['author'] = $author;
+        }
+
+        $data = [
+            'meta'    => $meta,
+            'actions' => $this->publishedActions,
+        ];
+
+        $yaml   = Yaml::dump($data, 4, 4, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+        $code   = ['###'];
+        $code[] = '# Api Publish History';
+        $code[] = '#';
+        $code[] = '# @author ' . $author;
+        $code[] = '# @date ' . $publishedAt;
+        $code[] = '##';
+        $code[] = trim($yaml);
+        $code[] = '';
+
+        $this->filesystem->put($fullPath, implode("\n", $code));
+        $this->console()->history($relativePath . $fileName);
     }
 
     /**
-     * 检查 多个 app 的 x 远程平台是否为同一个 project
+     * 检测 actions 区块中是否存在重复 action key
      */
-    private function checkXConfigMultiple(): bool
+    private function getDuplicateActionKeys(string $yamlFile): array
     {
-        $count = collect($this->utility->getConfig('api_fox'))->pluck('project_id')->unique()->count();
+        if (! $this->filesystem->isFile($yamlFile)) {
+            return [];
+        }
 
-        return $count > 1;
+        $lines     = preg_split('/\R/u', (string) $this->filesystem->get($yamlFile)) ?: [];
+        $inActions = false;
+        $counts    = [];
+
+        foreach ($lines as $line) {
+            if (! $inActions && trim($line) === 'actions:') {
+                $inActions = true;
+
+                continue;
+            }
+
+            if (! $inActions) {
+                continue;
+            }
+
+            if ($line !== '' && preg_match('/^\S/', $line) === 1) {
+                break;
+            }
+
+            if (preg_match('/^\s{4}([^\s:][^:]*)\s*:\s*$/', $line, $matches) === 1) {
+                $key          = $matches[1];
+                $counts[$key] = ($counts[$key] ?? 0) + 1;
+            }
+        }
+
+        return array_keys(array_filter($counts, static fn (int $count): bool => $count > 1));
+    }
+
+    /**
+     * 重复 key 会导致 Yaml::parseFile 抛异常，这里从原始文本中逐块提取 action 数据
+     */
+    private function getExistingActionsFromRawYaml(string $yamlFile): array
+    {
+        if (! $this->filesystem->isFile($yamlFile)) {
+            return [];
+        }
+
+        $lines        = preg_split('/\R/u', (string) $this->filesystem->get($yamlFile)) ?: [];
+        $inActions    = false;
+        $currentKey   = null;
+        $currentBlock = [];
+        $actions      = [];
+
+        $flush = function () use (&$actions, &$currentKey, &$currentBlock): void {
+            if ($currentKey === null || $currentBlock === []) {
+                return;
+            }
+
+            try {
+                $parsed = Yaml::parse(implode("\n", $currentBlock)) ?: [];
+            } catch (\Throwable) {
+                $parsed = [];
+            }
+
+            if (is_array($parsed[$currentKey] ?? null)) {
+                $actions[$currentKey] = $parsed[$currentKey];
+            }
+
+            $currentKey   = null;
+            $currentBlock = [];
+        };
+
+        foreach ($lines as $line) {
+            if (! $inActions && trim($line) === 'actions:') {
+                $inActions = true;
+
+                continue;
+            }
+
+            if (! $inActions) {
+                continue;
+            }
+
+            if ($line !== '' && preg_match('/^\S/', $line) === 1) {
+                $flush();
+                break;
+            }
+
+            if (preg_match('/^\s{4}([^\s:][^:]*)\s*:\s*$/', $line, $matches) === 1) {
+                $flush();
+                $currentKey   = $matches[1];
+                $currentBlock = [$currentKey . ':'];
+
+                continue;
+            }
+
+            if ($currentKey !== null) {
+                $currentBlock[] = str_starts_with($line, $this->getTabs(1))
+                    ? substr($line, strlen($this->getTabs(1)))
+                    : $line;
+            }
+        }
+
+        $flush();
+
+        return $actions;
     }
 
     /**
@@ -529,6 +1249,6 @@ class CreateApiGenerator extends Generator
      */
     private function getDefaultActions(): array
     {
-        return ['create', 'edit', 'index', 'trashed', 'store', 'update', 'show', 'destroy', 'destroyBatch', 'restore'];
+        return ['create', 'store', 'edit', 'update', 'index', 'trashed', 'show', 'destroy', 'destroyBatch', 'forceDestroy', 'restore'];
     }
 }
