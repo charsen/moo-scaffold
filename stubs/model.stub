@@ -1,0 +1,57 @@
+<?php declare(strict_types = 1);
+/*
+ * @Author: {{author}}
+ * @Date: {{date}}
+ * @LastEditors: {{author}}
+ * @LastEditTime: {{date}}
+ * @Description: {{class}} Model
+ */
+
+namespace {{namespace}};
+
+{{use_class}}
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * {{class}} Model
+ *
+{{property_code}}
+ * @method \Illuminate\Database\Eloquent\Builder select(array $fields)
+ * @method \Illuminate\Database\Eloquent\Builder query()
+ */
+class {{class}} extends Model
+{
+{{use_trait}}
+
+    /**
+     * 表格名称
+     * @var string
+     */
+    protected $table = '{{table_name}}';
+
+    /**
+     * 指定字段默认值
+     * @var array
+     */
+    protected $attributes = [{{attributes}}];
+
+{{casts}}
+
+    /**
+     * 可以被批量赋值的属性
+     * @var array
+     */
+    protected $fillable = [{{fillable}}];
+
+{{hidden}}
+{{appends}}
+
+    /**
+     * 指定 Filter
+     */
+    public function modelFilter(): string
+    {
+        return {{filter}}::class;
+    }
+
+}

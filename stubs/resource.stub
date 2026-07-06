@@ -1,0 +1,28 @@
+<?php declare(strict_types = 1);
+/*
+ * @Author: {{author}}
+ * @Date: {{date}}
+ * @LastEditors: {{author}}
+ * @LastEditTime: {{date}}
+ * @Description: {{class_name}}
+ */
+
+namespace {{namespace}};
+
+use Illuminate\Http\Request;
+use Mooeen\Scaffold\Foundation\BaseResource;
+
+class {{class}}Resource extends BaseResource
+{
+    /**
+     * Transform the resource into an array.
+     */
+    public function toArray(Request $request):array
+    {
+        $data = collect([
+            {{fields_code}}
+        ]);
+
+        return $this->filterFields($data);
+    }
+}

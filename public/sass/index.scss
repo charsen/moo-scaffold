@@ -1,0 +1,65 @@
+// ==============================================================================
+// Scaffold CSS 入口
+// 仅放 @use + 极少全局根规则（box-sizing / 100% 高度）
+// ==============================================================================
+
+// 1-settings：颜色 token (_theme) + 设计令牌 (_tokens)
+@use "base/_base";
+@use "_theme";
+@use "1-settings/tokens";
+
+// 通用动效 / 兼容旧侧栏 / JSON 高亮
+// 2026-05-22 plan-43 Batch A:_animate.scss 整删(.dropDown 类 + dropDown keyframes 全无引用)
+@use "_aside";
+@use "_json-format";
+
+// 6-components：与 components/*.blade.php 一一对应
+@use "6-components/icon";
+@use "6-components/hero";
+@use "6-components/btn";
+@use "6-components/input";
+@use "6-components/card";
+@use "6-components/empty";
+@use "6-components/badge";
+@use "6-components/method-badge";
+@use "6-components/stat-card";
+@use "6-components/app-picker";
+@use "6-components/tabs";
+@use "6-components/table";
+@use "6-components/drawer";
+@use "6-components/modal";
+@use "6-components/toast";
+@use "6-components/side-tree";
+@use "6-components/json";
+@use "6-components/panel";
+@use "6-components/section-header";
+
+// 5-layout：布局壳 + 顶部栏
+@use "5-layout/shell";
+@use "5-layout/header";
+
+// 7-pages：页面级粘合
+@use "7-pages/login";
+@use "7-pages/error";
+@use "7-pages/accounts";
+@use "7-pages/config";
+@use "7-pages/api";
+@use "7-pages/route";
+@use "7-pages/db";
+// 2026-05-22 plan-43 Batch A:7-pages/acl.scss 整删(.p-acl-doc__* 13 类全无 blade 引用,routes.php:157 /acl → route.list redirect)
+@use "7-pages/api-request";
+@use "7-pages/form-preview";
+@use "7-pages/dashboard";
+@use "7-pages/cloud";
+@use "7-pages/designer";
+@use "7-pages/components-preview";
+@use "7-pages/docs-center";
+
+// ------------------------------------------------------------------------------
+// 根级规则
+// ------------------------------------------------------------------------------
+* {
+    box-sizing: border-box;
+}
+
+// 注意：html/body 高度由 _shell.scss 设为 auto + min-height 100%，以启用浏览器原生滚动

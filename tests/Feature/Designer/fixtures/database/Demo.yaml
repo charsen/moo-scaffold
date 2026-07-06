@@ -1,0 +1,19 @@
+### 测试 fixture · Demo schema(plan-37 P1-1:测试基准 schema 脱钩 production yaml)
+# 内容:1 张 demo_users 表,3 个字段(系统字段 id/created_at/updated_at 由 designer 隐式补)
+module:
+    folder: demo
+    name: 演示模块
+    desc: 测试用 fixture,baseline 跟 snapshot 对齐
+tables:
+    demo_users:
+        name: 演示用户
+        desc: 测试表
+        index:
+            id: { type: primary, fields: id }
+            demo_users_user_name: { type: index, fields: user_name }
+        fields:
+            id: {  }
+            user_name: { name: 用户名, type: varchar, size: 64 }
+            user_age: { name: 年龄, type: int, default: 0 }
+            created_at: { type: timestamp }
+            updated_at: { type: timestamp }

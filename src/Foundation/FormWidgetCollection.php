@@ -1,4 +1,11 @@
-<?php
+<?php declare(strict_types=1);
+/*
+ * @Author: Charsen
+ * @Date: 2024-07-29 16:22
+ * @LastEditors: Charsen
+ * @LastEditTime: 2026-05-14 10:16
+ * @Description:Form Widget Collection
+ */
 
 namespace Mooeen\Scaffold\Foundation;
 
@@ -8,6 +15,127 @@ use Illuminate\Support\Str;
 
 class FormWidgetCollection extends ResourceCollection
 {
+    protected bool $is_search = false;
+
+    protected array $layout = [];
+
+    protected array $res = [];
+
+    /**
+     * Set whether the form widgets are for search.
+     */
+    public function search($val = true): self
+    {
+        $this->is_search = $val;
+
+        return $this;
+    }
+
+    /**
+     * Set the layout for the form widgets.
+     */
+    public function setLayout(array $layout): self
+    {
+        $this->layout = $layout;
+
+        return $this;
+    }
+
+    /**
+     * 从 FormRequest 中获取布局并校验
+     */
+    public function withLayout(FormRequest $request): self
+    {
+        $layout = $request->formLayout();
+
+        return empty($layout) ? $this : $this->setLayout($request->checkFormLayout($layout));
+    }
+
+    /**
+     * 从 FormRequest 构建表单控件集合
+     *
+     * $base 为控件覆盖基层（trait 内手写的标准定制），$override 为调用方按次传入的覆盖层，
+     * 两层在此递归合并（$override 优先）后作为 overrides 套到自动控件上，调用方无需再写 array_replace_recursive。
+     */
+    public static function makeForm(FormRequest $request, array $base = [], bool $with_default = false, array $override = []): self
+    {
+        $widgets = $request->getFormConfig(reset: array_replace_recursive($base, $override), with_default: $with_default);
+
+        return static::make($widgets)->withLayout($request);
+    }
+
+    /**
+     * 从 FormRequest 构建搜索表单控件集合
+     *
+     * $base / $override 语义同 makeForm：基层覆盖 + 按次覆盖，在此递归合并。
+     */
+    public static function makeSearch(FormRequest $request, array $base = [], array $exclude = [], array $override = []): self
+    {
+        $widgets = $request->getFormConfig(reset: array_replace_recursive($base, $override), exclude: ['page', 'page_limit', ...$exclude], with_default: false);
+
+        return static::make($widgets)->search()->withLayout($request);
+    }
+
+    /**
+     * Set a default value for a specific field.
+     */
+    public function default(string $field, $val): self
+    {
+        return $this->putMore("{$field}.default", $val);
+    }
+
+    public function disabled(string $field, $val = true): self
+    {
+        return $this->putMore("{$field}.disabled", $val);
+    }
+
+    public function hidden(string $field, $val = true): self
+    {
+        return $this->putMore("{$field}.hidden", $val);
+    }
+
+    public function options(string $field, $val): self
+    {
+        return $this->putMore("{$field}.options", $val);
+    }
+
+    public function setFilter(string $field, $val): self
+    {
+        return $this->putMore("{$field}.filter", $val);
+    }
+
+    public function type(string $field, $val): self
+    {
+        return $this->putMore("{$field}.type", $val);
+    }
+
+    public function isArray(string $field, $val = true): self
+    {
+        return $this->putMore("{$field}.array", $val);
+    }
+
+    public function tip(string $field, $val): self
+    {
+        return $this->putMore("{$field}.tip", $val);
+    }
+
+    public function putMore($field, $val)
+    {
+        $this->collection->putMore($field, $val);
+
+        return $this;
+    }
+
+    /**
+     * Remove specific fields from the collection.
+     */
+    public function forget($keys): self
+    {
+        $this->collection->forgetMore($keys);
+
+        return $this;
+    }
+
     /**
      * Transform the resource collection into an array.
      * - required       : 是否必填，默认为 true
@@ -25,13 +153,15 @@ class FormWidgetCollection extends ResourceCollection
     public function toArray(Request $request): array
     {
         $this->collection = $this->collection->map(function ($item, $key) {
+            // 2026-05-22:保留 field key 进 item,前端 API 调试器表单预览拿真实字段名做数据 key
+            $item['field']    = $item['field']    ?? $key;
             $item['required'] = $item['required'] ?? true;
             $item['keep_id']  = $item['keep_id']  ?? false;
             $item['label']    = $item['label']    ?? __('validation.attributes.' . $key);
             $item['type']     = $item['type']     ?? 'input';
 
             // 不保留 ID 字符
-            if ( ! $item['keep_id']) {
+            if (! $item['keep_id']) {
                 $item['label'] = trim(str_replace('ID', '', $item['label']));
 
                 if (str_contains($item['label'], ' Ids')) {
@@ -50,7 +180,7 @@ class FormWidgetCollection extends ResourceCollection
             if ($item['type'] === 'cascader') {
                 // 在创建时返回默认值，让 vue 组件获取到的是一个 vm 对象，确保 element 组件绑定 v-model 成功!
                 // 前端已解决!!!
-                //$item['default']  = $item['default'] ?? [null];
+                // $item['default']  = $item['default'] ?? [null];
 
                 // 不能去掉，在 多选时 ，选择完，输入其它文本框时，原选择的内容会被清空
                 $item['multiple'] = $item['multiple'] ?? false;
@@ -95,6 +225,51 @@ class FormWidgetCollection extends ResourceCollection
             return $item;
         });
 
-        return array_values($this->collection->all());
+        return $this->transformLayout();
+    }
+
+    /**
+     * 转换表单控件布局
+     */
+    protected function transformLayout(): array
+    {
+        if (empty($this->layout)) {
+            if ($this->is_search) {
+                // 搜索表单，默认都在一行中
+                $this->collection->map(function ($item) {
+                    $this->layout[] = $item;
+                });
+                $this->res[] = $this->layout;
+            } else {
+                // 为设置 layout 时，默认每个控件单独一行
+                $this->collection = $this->collection->map(function ($item) {
+                    $this->res[] = [$item];
+                });
+            }
+        } else {
+            foreach ($this->layout as $widgets) {
+                // 一行一个控件
+                if (count($widgets) === 1) {
+                    $field  = array_key_first($widgets);
+                    $config = isset($widgets[$field]['span']) ? ['span' => $widgets[$field]['span']] : ['span' => null];
+                    // [... ['field1'], ['field2'] ... ] 时，下标是数字
+                    $field       = is_int($field) ? $widgets[$field] : $field;
+                    $this->res[] = [array_merge($config, $this->collection->get($field, []))];
+                }
+                // 一行多个控件
+                else {
+                    $tmp = [];
+                    foreach ($widgets as $field => $config) {
+                        // [... ['field1', 'field2'] ... ] 时，下标是数字
+                        $field  = is_int($field) ? $config : $field;
+                        $config = isset($config['span']) ? ['span' => $config['span']] : ['span' => null];
+                        $tmp[]  = array_merge($config, $this->collection->get($field, []));
+                    }
+                    $this->res[] = $tmp;
+                }
+            }
+        }
+
+        return $this->res;
     }
 }

@@ -1,0 +1,97 @@
+// ==============================================================================
+// Component: Hero (plan-22 P1-S1)
+// 对应 Blade: <x-scaffold::hero>
+// 替代旧的 .p-runtime-hero / .p-acc-hero / .p-route-hero / .p-config-hero 等自闭类
+// 通用结构:左侧 main(标题+描述)+ 右侧 meta-inline 或 actions(均可选)
+// ==============================================================================
+
+.scaffold-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) 0 var(--space-5);
+  flex-wrap: wrap;
+}
+
+.scaffold-hero__main {
+  flex: 1 1 auto;
+  min-width: 0;
+
+  .section-desc {
+    margin: var(--space-2) 0 0;
+    color: var(--text-desc);
+    font-size: var(--font-sm);
+    line-height: var(--line-base);
+    max-width: 720px;
+  }
+
+  .section-desc code {
+    background: var(--bg-card-alt);
+    padding: 1px 6px;
+    border-radius: var(--radius-xs);
+    font-size: var(--font-xs);
+  }
+}
+
+.scaffold-hero__actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-shrink: 0;
+
+  // plan-22 P1-S1: @if 不能包 named slot,条件移进 slot 内 → 容器可能空
+  &:empty { display: none; }
+}
+
+// 2026-05-24:hero 内"返回"link — dictionaries 砍 sub-nav 后挪进来,挂在标题之前同行
+.scaffold-hero__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  margin-right: var(--space-2);
+  border: 1px solid var(--border-light);
+  border-radius: var(--shell-control-radius);
+  background: var(--bg-card);
+  color: var(--text-desc);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  line-height: 1.4;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+
+  &:hover {
+    border-color: var(--accent-hover-border);
+    color: var(--accent-text);
+  }
+}
+
+// 2026-05-22 plan-43 Batch A:.scaffold-hero__badges:empty 锚类清(hero.blade.php 直接 {{ $badges }} 入 h2 无 .scaffold-hero__badges wrapper,规则永不命中)
+
+// plan-19 v9 F5 + plan-22 P1-S1:compact variant 用于 designer 首屏 / 详情页
+// 压扁版 — 减 padding,标题缩到 .section-title-md(子标题级别),让位给主内容卡
+.scaffold-hero--compact {
+  padding: var(--space-2) 0 var(--space-3);
+  align-items: center;
+
+  .section-title-with-icon {
+    font-size: var(--font-base);
+  }
+}
+
+// plan-22 P1-S1:card variant 用于 db/index, db/dictionaries 这类"hero 即卡"页面
+// 复用旧 .p-db__hero / .p-dict__hero 的"卡片化 hero"视觉(border + bg-gradient + shadow)
+.scaffold-hero--card {
+  border: 1px solid var(--border-light);
+  border-radius: var(--shell-card-radius);
+  padding: var(--space-6);
+  background: var(--bg-card-gradient);
+  box-shadow: var(--shadow-card);
+}
+
+// 复合:card + compact 用于 designer/index 首屏(原 .p-db__hero.p-db__hero--compact)
+// 保留卡 border/bg/shadow,但 padding 缩到 3/5(让位给下方模块卡网格)
+.scaffold-hero--card.scaffold-hero--compact {
+  padding: var(--space-3) var(--space-5);
+}

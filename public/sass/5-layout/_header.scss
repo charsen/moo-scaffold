@@ -1,0 +1,388 @@
+// ==============================================================================
+// Layout: Header (顶部固定栏)
+// 替换 layouts/_header.blade.php 内的内联 <style>
+// 对应 Blade: <x-scaffold::header />
+// ==============================================================================
+
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-header);
+  height: var(--shell-header-height);
+  padding: 0 var(--space-5);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-light);
+  box-shadow: var(--elevation-strip);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.header__logo {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  cursor: pointer;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.header__logo img {
+  height: 22px;
+  width: auto;
+  display: block;
+  opacity: 0.9;
+  transition: opacity var(--transition-fast);
+}
+
+.header__logo:hover img {
+  opacity: 1;
+}
+
+.header__logo::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -1px;
+  width: 24px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  opacity: 0;
+  background: var(--accent-hover-border);
+  transform: translateX(-50%) scaleX(.4);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.header__logo.is-active::after {
+  opacity: 1;
+  transform: translateX(-50%) scaleX(1);
+}
+
+.header__menu {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 100%;
+  overflow: hidden;
+}
+
+.header__menu-item {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--font-base);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  position: relative;
+  white-space: nowrap;
+  transition: color var(--transition-fast);
+}
+
+// 重点项(数据库设计 / 接口调试)前缀图标;默认带 accent 橙做"重点功能"高亮,
+// idle 降透明度让色更浅,hover/active 回满,label 仍走 secondary 灰。
+.header__menu-icon {
+  margin-right: var(--space-1);
+  flex-shrink: 0;
+  color: var(--accent-text);
+  opacity: .45;
+  transition: opacity var(--transition-fast);
+}
+
+.header__menu-item:hover .header__menu-icon,
+.header__menu-item.is-active .header__menu-icon {
+  opacity: 1;
+}
+
+.header__menu-item:hover {
+  color: var(--text-heading);
+}
+
+.header__menu-item.is-active {
+  color: var(--accent-text);
+}
+
+.header__menu-item.is-active::after {
+  content: '';
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: 0;
+  height: 2px;
+  background: var(--accent-hover-border);
+  border-radius: 1px 1px 0 0;
+}
+
+.header__right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+// -------- 主题切换 --------
+// 主题切换:单图标按钮(亮=sun / 暗=moon)。尺寸 + hover 复用下方 settings/help trigger 合并选择器。
+.header__theme .icon-moon { display: none; }
+[data-theme="dark"] .header__theme .icon-sun { display: none; }
+[data-theme="dark"] .header__theme .icon-moon { display: block; }
+
+// -------- 用户菜单 --------
+// -------- Scaffold 配置下拉（theme toggle 和 user menu 之间） --------
+.header__settings {
+  position: relative;
+}
+
+// P2-B 帮助 trigger 跟 settings trigger 共用尺寸/hover,只是无 active 态(外链)
+.header__settings-trigger,
+.header__help-trigger,
+.header__theme {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-decoration: none;
+  appearance: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+
+  &:hover {
+    background: var(--bg-card-alt);
+    color: var(--text-heading);
+  }
+}
+
+// 2026-05-24 三轮 audit A2:settings trigger active 态视觉(进 config / accounts 后 gear 高亮,
+// 跟 .header__menu-item.is-active + .header__logo.is-active 风格一致)。help-trigger 是外链无 active,不挂。
+.header__settings-trigger.is-active {
+  color: var(--accent-text);
+  background: var(--accent-bg);
+  border-color: var(--accent-hover-border);
+}
+
+// 2026-05-22 plan-43 Batch A:.header__settings-menu* 4 selector 死类清理(settings 实际是直链非 popover)
+
+.header__user {
+  position: relative;
+}
+
+.header__user-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-sm);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+
+  &:hover {
+    background: var(--bg-card-alt);
+  }
+}
+
+.header__user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+}
+
+.header__user-name {
+  max-width: 110px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.header__user-menu {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  min-width: 180px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-2);
+  padding: var(--space-2);
+  z-index: var(--z-dropdown);
+}
+
+.header__user-menu-title {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-heading);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.header__user-menu-divider {
+  margin: var(--space-1) 0;
+  border: 0;
+  border-top: 1px solid var(--border-light);
+}
+
+// logout 走 POST 表单 + <button>(防 GET CSRF 强制登出);form display:contents 让 button
+// 直接当菜单项,button 重置成跟 <a> 一致外观(width/border/background/text-align/cursor)。
+.header__user-menu-form {
+  display: contents;
+}
+
+.header__user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-body);
+  font-size: var(--font-sm);
+  font-family: inherit;
+  text-align: left;
+  text-decoration: none;
+  border: 0;
+  background: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+
+  &:hover {
+    background: var(--bg-card-alt);
+    color: var(--text-heading);
+  }
+}
+
+// plan-22 T9: header menu badge(从 header.blade.php inline <style> 外迁)
+.header__menu-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 6px;
+    min-width: 18px;
+    height: 16px;
+    padding: 0 5px;
+    border-radius: var(--radius-sm);
+    background: var(--badge-red);
+    color: #fff;
+    font-size: 11px;
+    font-weight: var(--weight-semibold);
+    line-height: 1;
+    font-family: var(--font-family-mono);
+    vertical-align: middle;
+}
+.header__menu-item.is-active .header__menu-badge {
+    background: var(--badge-red);   // 原 inline 用 --color-danger-strong fallback hex,但 token 不存在,改 badge-red 一致
+    opacity: .92;
+}
+
+// 2026-05-21:header 主导航下方一行 sub-nav,放 app 切换 tabs (api.list / api.request /
+// route.list 3 个 app-aware 页面共用)。
+// 设计:跟主导航视觉相呼应——白底分割线,pill tabs,active 走 --accent-bg/--accent-text。
+//
+// 布局:fixed sticky 在 header 下方,跟 fixed header / fixed aside 一起占顶部空间。
+// body padding-top 跟 .aside top 用 :has() 检测 subnav 存在,自动加 --shell-subnav-height。
+.scaffold-subnav-bar {
+    position: fixed;
+    top: var(--shell-header-height);
+    left: 0;
+    right: 0;
+    height: var(--shell-subnav-height);
+    z-index: 95;          // header(100) 之下,aside(90) 之上,dropdown(200) 之下
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: 0 var(--space-5); // 对齐全局 gutter 20px(原 --space-4=16 让 app 切换条比 logo/aside 左缩 4px)
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-light);
+}
+
+// subnav 存在时 body padding-top + .aside top 同步加 subnav 高度,无需 JS / 额外 body class
+body:has(.scaffold-subnav-bar) {
+    padding-top: calc(var(--shell-header-height) + var(--shell-subnav-height));
+}
+body:has(.scaffold-subnav-bar) .aside {
+    top: calc(var(--shell-header-height) + var(--shell-subnav-height) + var(--shell-content-top));
+}
+
+.scaffold-app-tabs {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+
+    &__label {
+        font-size: var(--font-sm);
+        color: var(--text-desc);
+        font-weight: var(--weight-medium);
+        // 像主菜单 "应用:" 这样的 label,避免 user 看不懂这一行
+    }
+
+    // 2026-05-23:designer/show 路由专用返回链接(返回 designer index 模块列表)
+    // 2026-05-24 二轮 audit A9:跟 .scaffold-hero__back 字重对齐 medium(原继承默认 400)
+    &__back {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        border: 1px solid var(--border-light);
+        border-radius: var(--shell-control-radius);
+        background: var(--bg-card);
+        color: var(--text-desc);
+        font-size: var(--font-sm);
+        font-weight: var(--weight-medium);
+        text-decoration: none;
+        line-height: 1.4;
+        transition: border-color var(--transition-fast), color var(--transition-fast);
+        margin-right: var(--space-2);
+
+        &:hover {
+            border-color: var(--accent-hover-border);
+            color: var(--accent-text);
+        }
+    }
+
+    &__list {
+        display: inline-flex;
+        gap: var(--space-1);
+        padding: 2px;
+        background: var(--bg-card-alt);
+        border-radius: var(--shell-control-radius);
+    }
+
+    &__tab {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-1);     // 2026-05-22:支持 icon+label 间距(designer sub-nav 复用 segmented 风格)
+        padding: 4px var(--space-3);
+        border-radius: calc(var(--shell-control-radius) - 2px);
+        font-size: var(--font-sm);
+        color: var(--text-body);
+        text-decoration: none;
+        line-height: 1.4;
+        transition: background var(--transition-fast), color var(--transition-fast);
+
+        &:hover:not(.is-active) {
+            background: var(--bg-card);
+            color: var(--text-heading);
+        }
+
+        &.is-active {
+            background: var(--accent-bg);
+            color: var(--accent-text);
+            font-weight: var(--weight-medium);
+        }
+    }
+}

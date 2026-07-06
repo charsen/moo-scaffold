@@ -1,0 +1,98 @@
+// ==============================================================================
+// Component: Tabs (Alpine 驱动)
+// 对应 Blade: <x-scaffold::tabs :tabs="[...]" default="...">...</x-scaffold::tabs>
+// 需要 Alpine.js 3.x
+// ==============================================================================
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.tabs__list {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border-light);
+  align-items: stretch;
+}
+
+.tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  height: 34px;
+  margin-bottom: -1px;
+  border: 0;
+  background: transparent;
+  color: var(--text-desc);
+  font-family: inherit;
+  font-size: var(--font-base);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  position: relative;
+  transition: color var(--transition-fast);
+  white-space: nowrap;
+
+  &:hover {
+    color: var(--text-heading);
+  }
+
+  &.is-active {
+    color: var(--accent-text);
+
+    &::after {
+      content: '';
+      position: absolute;
+      left: var(--space-3);
+      right: var(--space-3);
+      bottom: 0;
+      height: 2px;
+      background: var(--accent-hover-border);
+      border-radius: 1px 1px 0 0;
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent-hover-border);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+}
+
+.tabs__panels {
+  display: contents;
+}
+
+.tabs__panel {
+  // Alpine x-cloak 用，避免初始闪烁
+}
+
+// 全局 cloak helper（重复声明无害，便于查找）
+[x-cloak] {
+  display: none !important;
+}
+
+// -------- 修饰 --------
+.tabs--pills .tabs__list {
+  border-bottom: 0;
+  gap: var(--space-2);
+}
+
+.tabs--pills .tabs__tab {
+  height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  margin-bottom: 0;
+
+  &.is-active {
+    color: var(--accent-text);
+    background: var(--accent-bg);
+
+    &::after {
+      display: none;
+    }
+  }
+}

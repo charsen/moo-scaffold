@@ -1,0 +1,19 @@
+# Scaffold 顶层页面 URL 清单（smoke-http.sh 用）
+# 每行一个 path（不含 host）；# 开头为注释
+#
+# 这些 URL 验证页面能渲染（200/302 都 OK，跳到登录页也算"页面正常工作"）
+# 需要登录态 / 复杂参数的子页面（如 api/show?app=...&f=...）不在此清单——
+# 它们由 manual screenshots 矩阵覆盖
+
+/scaffold/
+/scaffold/accounts
+/scaffold/acl
+/scaffold/api
+/scaffold/api/request
+/scaffold/config
+/scaffold/db/designer
+/scaffold/dictionaries
+/scaffold/routes
+# runtimes / sql-slows 本地查看器已退役 → CloudRedirectController 302 跳云端(云端未配时返 200 notice),两者均算页面正常
+/scaffold/runtimes
+/scaffold/sql-slows

@@ -1,2 +1,16 @@
-.idea
+/vendor/
+/node_modules/
+/composer.lock
+/package-lock.json
+/tests/Browser/.report/
+/tests/Browser/.auth/admin.json
+/test-results/
+/.phpunit.result.cache
+/.playwright-mcp/
+/tmp/
 .DS_Store
+.vscode/
+/public/css/*.map
+
+# 本地 env(密钥/本机路径,不入仓;模板见 .env.e2e.example)
+.env

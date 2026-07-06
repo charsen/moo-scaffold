@@ -1,0 +1,66 @@
+<?php declare(strict_types = 1);
+/*
+ * @Author: {{author}}
+ * @Date: {{date}}
+ * @LastEditors: {{author}}
+ * @LastEditTime: {{date}}
+ * @Description: {{controller_name}}Controller's Trait
+ */
+
+namespace {{namespace}};
+
+use {{model_class}};
+use Mooeen\Scaffold\Foundation\FormRequest;
+use Mooeen\Scaffold\Foundation\FormWidgetCollection;
+use Mooeen\Scaffold\Foundation\TableColumnsCollection;
+
+trait {{trait_class}}
+{
+    /**
+     * 列表的查询字段
+     */
+    private function getListFields(string $action = 'index'): array
+    {
+        $fields = [{{list_fields}}];
+
+        if ($action === 'index') {
+            $append = ['updated_at'];
+        } else {
+            $append = ['deleted_at'];
+        }
+
+        return [...$fields, ...$append];
+    }
+
+    /**
+     * 列表的表头
+     */
+    private function getListColumns(string $action = 'index'): TableColumnsCollection
+    {
+        $columns = [
+            {{list_columns}}
+        ];
+
+        return TableColumnsCollection::makeColumns($columns, $action);
+    }
+
+    /**
+     * 列表的表单控件
+     */
+    private function getListFormWidgets(FormRequest $request, string $action = 'index', array $override = []): FormWidgetCollection
+    {
+        $base = [];
+
+        return FormWidgetCollection::makeSearch($request, $base, override: $override);
+    }
+
+    /**
+     * Create|Edit 的表单控件
+     */
+    private function getFormWidgets(FormRequest $request, string $method, array $override = []): FormWidgetCollection
+    {
+        $base = [];
+
+        return FormWidgetCollection::makeForm($request, $base, $method === 'create', $override);
+    }
+}

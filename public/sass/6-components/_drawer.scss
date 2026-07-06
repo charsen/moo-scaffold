@@ -1,0 +1,164 @@
+// ==============================================================================
+// Component: Drawer (右侧滑出抽屉，Alpine 驱动)
+// 对应 Blade: <x-scaffold::drawer name="..." title="...">...</x-scaffold::drawer>
+// 通过全局事件触发：$dispatch('open-drawer', 'NAME')
+// ==============================================================================
+
+// 2026-05-20 用户反馈:任意弹出(drawer / modal / popover / confirm)打开时锁 body scroll
+// 统一 window.scaffoldBodyLock counter,push/pop 跨弹出共享,最后一个关闭才 unlock
+// 来源:drawer 组件 / scaffoldConfirm / designer 9+ modal($watch _isAnyModalOpen)
+body.is-modal-open {
+  overflow: hidden;
+}
+
+.drawer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-drawer);
+  pointer-events: none;
+}
+
+// 2026-05-22 plan-43 Batch B:走 --popover-backdrop token,删 dark override block
+.drawer__backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--popover-backdrop);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.drawer__panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  // 宽度由视图通过 style="--drawer-width: ..." 注入，默认 420px
+  width: var(--drawer-width, 420px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  box-shadow: var(--elevation-2);
+  pointer-events: auto;
+  max-width: 100vw;
+}
+
+.drawer__panel--right { right: 0; }
+.drawer__panel--left  { left: 0; }
+
+.drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+}
+
+.drawer__title {
+  margin: 0;
+  font-size: var(--font-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--text-heading);
+  line-height: var(--line-tight);
+}
+
+.drawer__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-desc);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+
+  &:hover {
+    background: var(--bg-card-alt);
+    color: var(--text-heading);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent-hover-border);
+    outline-offset: 2px;
+  }
+}
+
+.drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-5);
+}
+
+.drawer__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--border-light);
+  background: var(--bg-card-alt);
+  flex-shrink: 0;
+}
+
+// -------- plan-22 P1-I1:drawer loading 骨架 --------
+// 用法:loadDetail JS 在 fetch 前塞入 div.drawer__skeleton(4 行)替代纯 "加载中..." 文字
+// 设计:行级灰条 + shimmer 平移;runtime+todo 抽屉共用,view 层不再各自写 loading 文字
+.drawer__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+}
+
+.drawer__skeleton-line {
+  height: 12px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--bg-card-alt) 0%,
+    var(--border-light) 50%,
+    var(--bg-card-alt) 100%
+  );
+  background-size: 200% 100%;
+  animation: drawer-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+// 行级宽度阶梯,模拟"标题 + 副标题 + 段落"的视觉节奏
+.drawer__skeleton-line--w70 { width: 70%; height: 18px; }
+.drawer__skeleton-line--w45 { width: 45%; }
+.drawer__skeleton-line--w90 { width: 90%; }
+.drawer__skeleton-line--w60 { width: 60%; }
+
+@keyframes drawer-skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer__skeleton-line { animation: none; }
+}
+
+// -------- Alpine transition classes --------
+.drawer-bd-enter,
+.drawer-bd-leave {
+  transition: opacity var(--transition-base);
+}
+.drawer-bd-enter-start,
+.drawer-bd-leave-end { opacity: 0; }
+.drawer-bd-enter-end,
+.drawer-bd-leave-start { opacity: 1; }
+
+.drawer-pn-enter,
+.drawer-pn-leave {
+  transition: transform var(--transition-base);
+}
+.drawer-pn-enter-start--right,
+.drawer-pn-leave-end--right { transform: translateX(100%); }
+.drawer-pn-enter-start--left,
+.drawer-pn-leave-end--left { transform: translateX(-100%); }
+.drawer-pn-enter-end,
+.drawer-pn-leave-start { transform: translateX(0); }

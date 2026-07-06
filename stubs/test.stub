@@ -1,0 +1,25 @@
+<?php declare(strict_types=1);
+
+/*
+ * @Author:      {{author}}
+ * @Date:        {{date}}
+ * @Description: {{controller}} 路由契约冒烟（moo:test 生成，B-lean）—— 纯静态契约：控制器类生成了 +
+ *               路由插对了。**不发 HTTP、不碰 DB / auth / middleware**，所以永远能跑、改 codegen 不会无端变红
+ *               （早期版本发过 HTTP 冒烟，被 host 中间件栈如 LARAVEL_START 拖炸 → 砍）。
+ *               要补真业务断言（index 列表 / store 落库 …）往本文件下面加即可；本文件只生成一次（除非 moo:test -f）。
+ */
+
+use Illuminate\Support\Facades\Route;
+
+it('{{controller}}：控制器类已生成且可加载', function () {
+    // false = 控制器没生成 / 命名空间错 / 文件语法炸（autoload 不到）
+    expect(class_exists('{{controller_fqcn}}'))->toBeTrue();
+});
+
+it('{{controller}}：路由已注册（codegen 把路由插进 routes 了）', function () {
+    $routes = collect(Route::getRoutes()->getRoutes())
+        ->filter(fn ($r) => str_starts_with((string) $r->getActionName(), '{{controller_fqcn}}@'));
+
+    // 空 = 路由没插进去（routes/*.php 的 :insert_code_here 标记被删？控制器没挂上路由？）
+    expect($routes)->not->toBeEmpty();
+});

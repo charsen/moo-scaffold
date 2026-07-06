@@ -1,0 +1,12 @@
+// ==============================================================================
+// Component: Icon (inline SVG, currentColor)
+// 对应 Blade: <x-scaffold::icon name="..." size="16" />
+// ==============================================================================
+
+.icon {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+  color: currentColor;
+  pointer-events: none;
+}

@@ -1,21 +1,25 @@
-<?php
+<?php declare(strict_types=1);
+
+/*
+ * @Author: Charsen
+ * @Date: 2024-07-29 16:22
+ * @LastEditors: Charsen
+ * @LastEditTime: 2025-07-18 10:02
+ * @Description: Actions
+ */
 
 namespace Mooeen\Scaffold\Foundation;
 
-/**
- * Actions
- *
- * @author : charsen
- *
- * @date: 2018-12-05 10:48
- */
 class Actions
 {
     private array $data;
 
+    private string $app;
+
     public function __construct(string $app = 'admin')
     {
-        $this->data = config('actions.' . $app . '.actions', []);
+        $this->app  = $app;
+        $this->data = config('actions.' . $this->app . '.actions', []);
     }
 
     /**
@@ -34,7 +38,7 @@ class Actions
         foreach ($data as $key => $v) {
             if (! empty($v['checked'])) {
                 foreach ($v['checked'] as $c) {
-                    $res[] = $c;
+                    $res[] = (string) $c;
                 }
             }
 
@@ -49,17 +53,21 @@ class Actions
     /**
      * 给前端格式化权限点
      */
-    public function formatActions($data, $role_actions, $parent_id = 'app_admin'): array
+    public function formatActions($data, $role_actions, $parent_id = ''): array
     {
-        $res = [];
+        $parent_id    = $parent_id === '' ? "app_{$this->app}" : $parent_id;
+        $role_actions = array_map('strval', $role_actions);
+        $res          = [];
 
         foreach ($data as $key => $v) {
+            $key = (string) $key;
             $one = ['id' => $key, 'pid' => $parent_id, 'label' => $v['name']];
 
             if (! empty($v['children'])) {
                 $one['checked']      = [];
                 $one['children_ids'] = [];
                 foreach ($v['children'] as $tmp => $tmp_one) {
+                    $tmp                   = (string) $tmp;
                     $one['children_ids'][] = $tmp;
                     if (in_array($tmp, $role_actions, true)) {
                         $one['checked'][]     = $tmp;
@@ -98,8 +106,8 @@ class Actions
             if (preg_match('/controller\-[\w\-]+$/', $key)) {
                 foreach ($val as $action) {
                     // 只保留有多语言的功能
-                    if (__('actions.' . $action) !== 'actions.' . $action) {
-                        $all_actions[] = $action;
+                    if (__("actions.{$this->app}.{$action}") !== "actions.{$this->app}.{$action}") {
+                        $all_actions[] = (string) $action;
                     }
                 }
             } else {
@@ -120,8 +128,8 @@ class Actions
         }
 
         foreach ($data as $key => &$val) {
-            $lang = __('actions.' . $key);
-            if ($lang === 'actions.' . $key) {
+            $lang = __("actions.{$this->app}.{$key}");
+            if ($lang === "actions.{$this->app}.{$key}") {
                 // 移除没多语言的项目
                 unset($data[$key]);
 
@@ -131,9 +139,9 @@ class Actions
             if (preg_match('/controller\-[\w\-]+$/', $key)) {
                 $temp = [];
                 foreach ($val as $action) {
-                    $action_lang = __('actions.' . $action);
+                    $action_lang = __("actions.{$this->app}.{$action}");
                     // 只保留有多语言的功能
-                    if ($action_lang !== 'actions.' . $action) {
+                    if ($action_lang !== "actions.{$this->app}.{$action}") {
                         $temp[$action] = ['name' => $action_lang];
                     }
                 }

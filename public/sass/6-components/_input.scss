@@ -1,0 +1,100 @@
+// ==============================================================================
+// Component: Input + Field wrapper
+// 对应 Blade:
+//   <x-scaffold::input>                              (裸输入)
+//   <x-scaffold::field label="..." hint="...">      (含 label / hint / error 容器)
+//     <x-scaffold::input />
+//   </x-scaffold::field>
+// ==============================================================================
+
+.input {
+  display: block;
+  width: 100%;
+  height: var(--control-md);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--font-base);
+  line-height: var(--line-base);
+  appearance: none;
+  transition: border-color var(--transition-fast),
+              box-shadow var(--transition-fast),
+              background var(--transition-fast);
+}
+
+.input::placeholder {
+  color: var(--text-light);
+}
+
+.input:hover {
+  border-color: var(--border-tab-hover);
+}
+
+.input:focus,
+.input:focus-visible {
+  outline: none;
+  border-color: var(--accent-hover-border);
+  box-shadow: 0 0 0 3px var(--accent-hover-shadow);
+}
+
+.input:disabled,
+.input[readonly] {
+  background: var(--bg-input-readonly);
+  color: var(--text-muted);
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+// -------- 尺寸 --------
+.input--sm {
+  height: var(--control-sm);
+  padding: 0 var(--space-3);
+  font-size: var(--font-sm);
+}
+
+.input--lg {
+  height: var(--control-lg);
+  padding: 0 var(--space-5);
+}
+
+.input--xl {
+  height: var(--control-xl);
+  padding: 0 var(--space-5);
+  font-size: var(--font-md);
+}
+
+// -------- 字段包装 --------
+.field {
+  display: block;
+}
+
+.field__label {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--text-body);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-medium);
+}
+
+.field__hint {
+  margin-top: var(--space-2);
+  color: var(--text-desc);
+  font-size: var(--font-sm);
+  line-height: var(--line-base);
+}
+
+.field--error .input {
+  border-color: var(--text-error);
+
+  &:focus,
+  &:focus-visible {
+    box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.12);
+  }
+}
+
+.field--error .field__hint {
+  color: var(--text-error);
+}

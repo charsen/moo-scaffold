@@ -1,0 +1,116 @@
+// ==============================================================================
+// Component: App Picker + App Card
+// 对应 Blade: <x-scaffold::app-picker>...<x-scaffold::app-card />...</x-scaffold::app-picker>
+// 用于：API 文档 / ACL 入口处的多应用选择
+// ==============================================================================
+
+// 默认 auto-fit：单卡最小 240px，自动按容器宽度排列；不够 240px 就换行
+// 历史上用 repeat(4, minmax(0, 1fr)) 会把卡片挤到 ~150px 文字被截断
+.app-picker {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+// 显式指定列数时锁死，仍保留 240px 最小宽度
+.app-picker--cols-2 { grid-template-columns: repeat(2, minmax(240px, 1fr)); }
+.app-picker--cols-3 { grid-template-columns: repeat(3, minmax(240px, 1fr)); }
+.app-picker--cols-4 { grid-template-columns: repeat(4, minmax(240px, 1fr)); }
+.app-picker--cols-5 { grid-template-columns: repeat(5, minmax(240px, 1fr)); }
+
+// -------- App Card --------
+.app-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--shell-card-radius);
+  box-shadow: var(--elevation-1);
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+
+  // 简化 hover：仅高亮边框 + 浅浅阴影，去掉抬起 / 左侧竖条 / 渐变背景等过度效果
+  &:hover {
+    border-color: var(--accent-hover-border);
+    box-shadow: 0 4px 12px var(--accent-hover-shadow);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent-hover-border);
+    outline-offset: 2px;
+  }
+
+  &:active {
+    filter: brightness(0.96);
+  }
+
+  &.is-active {
+    border-color: var(--accent-hover-border);
+    background: var(--accent-bg);
+    box-shadow: 0 0 0 1px var(--accent-hover-border) inset;
+  }
+}
+
+// icon-box 从浅灰底改为橙底（accent-bg）+ accent-text，跟 dict module-icon 同款视觉
+.app-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  transition: background var(--transition-base);
+}
+
+.app-card:hover .app-card__icon {
+  background: var(--accent-bg-hover);
+}
+
+.app-card.is-active .app-card__icon {
+  background: var(--accent-hover-border);
+  color: var(--text-inverse);
+}
+
+.app-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.app-card__name {
+  font-size: var(--font-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text-heading);
+  line-height: var(--line-snug);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-card.is-active .app-card__name {
+  color: var(--accent-text-dark);
+}
+
+.app-card__desc {
+  font-size: var(--font-sm);
+  color: var(--text-desc);
+  line-height: var(--line-base);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.app-card__badge {
+  flex-shrink: 0;
+  align-self: flex-start;
+}

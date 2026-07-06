@@ -1,0 +1,17 @@
+<?php declare(strict_types = 1);
+
+namespace {{trait_namespace}};
+
+{{use_class}}
+
+/**
+ * {{trait_class}}
+ *
+ * - 会被生成直接覆盖，所以不要在这里写代码
+ */
+trait {{trait_class}}
+{
+{{get_txt_fn}}
+{{get_float_fn}}
+
+}
