@@ -1,0 +1,121 @@
+// ==============================================================================
+// Component: Panel (结构性容器)
+// 推荐用 <x-scaffold::panel> Blade 组件消费（components/panel.blade.php）
+// 含 hd slot / hdClass / wrapBody 三个 prop，覆盖单 .bd / 多 .bd / 紧耦合 hd 三类
+//
+// 也兼容裸 HTML 标记（仅供 stub 模板等无法用 Blade 组件的场景）:
+//   <div class="panel xxx-panel">
+//       <div class="hd"><h3>Title</h3></div>
+//       <div class="bd">...</div>
+//   </div>
+// ==============================================================================
+
+.panel {
+    margin: var(--space-5) 0;
+    padding: 0 var(--space-5);
+    background-color: var(--bg-card);
+
+    .hd {
+        padding-bottom: var(--space-2);
+
+        h3 {
+            font-weight: var(--weight-semibold);
+            color: var(--text-heading);
+        }
+
+        em {
+            margin-left: var(--space-2);
+            font-size: var(--font-xs);
+            vertical-align: 1px;
+            opacity: 0;
+        }
+
+        i {
+            margin-right: var(--space-2);
+            vertical-align: -3px;
+        }
+    }
+
+    .table {
+        border: var(--border-color) solid 1px;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+
+        // .debug-param-table 是 api/param 调试器参数表，单元格 padding 走 input 自身
+        &.debug-param-table {
+            td { padding: 0; }
+        }
+
+        table {
+            width: 100%;
+        }
+
+        tr {
+            &:hover,
+            &.active {
+                td { background-color: var(--bg-hover-row); }
+            }
+
+            &.active {
+                td:first-child {
+                    border-left: var(--accent-hover-border) solid 8px;
+                    padding-left: 11px;
+                }
+            }
+        }
+
+        th {
+            // 表头高度收紧但视觉舒适：上下 12 + 左右 8 + 显式 line-height
+            // 之前只有 padding: 8 让表头比 td (line-height 20) 视觉矮一截
+            padding: var(--space-3) var(--space-2);
+            line-height: 20px;
+            text-align: left;
+            font-weight: normal;
+            color: var(--text-desc);
+            background-color: var(--bg-content);
+
+            &:first-child {
+                padding-left: 15px;
+            }
+        }
+
+        td {
+            border-top: var(--border-color) solid 1px;
+            padding: var(--space-2);
+            min-width: 50px;
+            line-height: 20px;
+            color: var(--text-body);
+
+            &:first-child {
+                padding-left: 15px;
+            }
+        }
+
+        .txt,
+        .select {
+            border: 0;
+            padding: 0 var(--space-2);
+            width: 100%;
+            height: 40px;
+            line-height: 40px;
+            color: var(--text-primary);
+            background-color: transparent;
+        }
+        // select 复用全局 chevron(base/_scaffolding.scss);上面 padding 简写把 padding-right 收成 var(--space-2),
+        // 长选项值会压住右侧箭头,单独给 select 补回右内边距
+        .select {
+            padding-right: 22px;
+        }
+
+        .value {
+            background-color: var(--bg-hover-row);
+        }
+    }
+
+    // 2026-05-22 plan-43 Batch A:.link-table 死类清(0 blade 引用)
+}
+
+// 暗模 readonly value 单元格再调深，与 hover-row 拉开
+[data-theme="dark"] .panel .table .value {
+    background-color: var(--bg-input-readonly-strong);
+}

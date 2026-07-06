@@ -1,0 +1,84 @@
+// ==============================================================================
+// Component: Stat Card (用于 dashboard 指标 / API 概览数据)
+// 对应 Blade: <x-scaffold::stat-card label="..." value="..." hint="..." tone="..." />
+// ==============================================================================
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-md);
+  padding: var(--space-5);
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--shell-card-radius);
+  box-shadow: var(--elevation-1);
+  transition: transform var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base), color var(--transition-base);
+
+  &:hover {
+    border-color: var(--border-tab-hover);
+    box-shadow: var(--elevation-2);
+    transform: translateY(-2px); // 轻微抬起：暗示可交互 + 质感
+
+    .stat-card__value { color: var(--accent-text); }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent-hover-border);
+    outline-offset: 2px;
+  }
+
+  // 尊重无障碍偏好：动画禁用时去掉 transform，保留 border/shadow 变化
+  @media (prefers-reduced-motion: reduce) {
+    &:hover { transform: none; }
+  }
+}
+
+.stat-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card-alt);
+  color: var(--text-desc);
+}
+
+.stat-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.stat-card__value {
+  font-size: var(--font-2xl);
+  font-weight: var(--weight-semibold);
+  color: var(--text-heading);
+  line-height: var(--line-tight);
+  letter-spacing: -0.01em;
+}
+
+.stat-card__label {
+  font-size: var(--font-sm);
+  color: var(--text-desc);
+  line-height: var(--line-base);
+}
+
+.stat-card__hint {
+  margin-top: var(--space-1);
+  font-size: var(--font-xs);
+  color: var(--text-light);
+  line-height: var(--line-base);
+}
+
+// -------- 色调（仅图标染色） --------
+// 背景走 token，让 _theme.scss 控制 light / dark
+.stat-card--info    .stat-card__icon { color: var(--badge-blue);   background: var(--badge-blue-bg); }
+.stat-card--success .stat-card__icon { color: var(--badge-green);  background: var(--badge-green-bg); }
+.stat-card--warning .stat-card__icon { color: var(--badge-orange); background: var(--badge-orange-bg); }
+.stat-card--danger  .stat-card__icon { color: var(--badge-red);    background: var(--badge-red-bg); }
+.stat-card--accent  .stat-card__icon { color: var(--accent-text);  background: var(--accent-bg); }

@@ -1,0 +1,194 @@
+// ==============================================================================
+// Page: Config (Scaffold 配置中心 + .env 镜像)
+// 对应 Blade: src/Http/Views/config/index.blade.php + config/env.blade.php
+// plan-22 T8: 从两个 blade 的 inline <style> 块外迁
+//
+// C 方案(2026-05-18):layouts.app → layouts.two_columns
+// .p-config-page = 外层 flex 二列(sidebar + main)
+// .p-config-page__sidebar = 220px sticky(api-debug-list 内嵌)
+// .p-config-shell = main 列(保留命名,旧 SCSS 卡片/section/form 规则继续命中)
+// ==============================================================================
+
+// display: contents 让 wrapper 视觉消失,sidebar + main 直接做 .container 的 flex 子项
+.p-config-page {
+    display: contents;
+}
+
+.p-config-page__sidebar {
+    flex: 0 0 240px;
+    position: sticky;
+    top: calc(var(--shell-header-height) + var(--space-3));
+    max-height: calc(100vh - var(--shell-header-height) - var(--space-6));
+    overflow-y: auto;
+    padding: var(--space-2) 0;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--shell-card-radius);
+    box-shadow: var(--elevation-1);
+}
+
+// 2026-06-10:侧栏分组名/子项字号 + 行高的收窄已上提为 _side-tree.scss 组件默认值
+// (user 确认 config 先行版后推全侧栏),本页不再 override。
+
+.p-config-shell {
+    flex: 1;
+    min-width: 0;
+    padding: var(--space-3) var(--space-5) var(--space-6); // 对齐 recorder-page 家族(runtime/sql-slow/todos)12/20/24
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--shell-card-radius);
+    box-shadow: var(--elevation-1);
+}
+
+// 2026-05-28 phase C-1:.p-config-warning 砍 — 改用统一的 .p-designer-locked-banner(同 designer)
+//                       橙底 vs 红底两套 lock 视觉收口
+
+// Sections —— 不再包裹 card,靠 table 自带卡框 + 节间距区分
+.p-config-sections {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+}
+.p-config-section { scroll-margin-top: var(--space-6); }
+.p-config-section-header {
+    margin: 0 0 var(--space-3);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--border-light);
+
+    h3 {
+        margin: 0;
+        font-size: var(--font-md);
+        color: var(--text-heading);
+    }
+}
+.p-config-section-desc {
+    display: block;
+    margin-top: var(--space-1);
+    font-size: var(--font-xs);
+    color: var(--text-desc);
+}
+
+// Flash
+.p-config-flash {
+    margin: 0 0 var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+}
+.p-config-flash--ok    { background: var(--badge-green-bg);  border-left: 3px solid var(--badge-green); }
+.p-config-flash--err   { background: var(--badge-red-bg);    border-left: 3px solid var(--badge-red); }
+.p-config-flash--diff  { background: var(--bg-card-alt);     border-left: 3px solid var(--text-desc); }
+.p-config-flash--warn  { background: var(--badge-orange-bg); border-left: 3px solid var(--accent-text); }
+.p-config-flash--diff ul,
+.p-config-flash--warn ul { margin: 6px 0 0; padding-left: 18px; font-size: var(--font-xs); }
+
+// Field cell
+.p-config-field-label {
+    font-weight: var(--weight-medium);
+    font-size: var(--font-sm);
+    color: var(--text-heading);
+}
+.p-config-field-path {
+    font-size: var(--font-xs);
+    color: var(--text-muted);
+    margin-top: 2px;
+
+    code { background: transparent; padding: 0; }
+}
+.p-config-field-desc {
+    font-size: var(--font-xs);
+    color: var(--text-desc);
+    margin-top: var(--space-1);
+}
+.p-config-mask-hint { margin-left: var(--space-1); cursor: help; opacity: .7; }
+
+.p-config-input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--border-input);
+    border-radius: var(--radius-xs);
+    font: inherit;
+    font-size: var(--font-sm);
+    background: var(--bg-input);
+    color: var(--text-primary);
+
+    &:focus {
+        // 2026-05-22 plan-43 Batch C:focus ring 全包统一
+        border-color: var(--accent-hover-border);
+        outline: none;
+        box-shadow: 0 0 0 3px var(--accent-hover-shadow);
+    }
+
+    &--narrow { width: 120px; }
+}
+.p-config-bool {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--font-sm);
+
+    input { width: auto; }
+}
+
+.p-config-env-key {
+    margin-top: var(--space-1);
+    font-size: var(--font-xs);
+    color: var(--text-muted);
+
+    code { background: transparent; padding: 0; font-size: var(--font-xs); }
+}
+.p-config-locked-hint {
+    font-size: var(--font-xs);
+    color: var(--text-muted);
+    margin-top: var(--space-1);
+}
+
+.p-config-map-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.p-config-map-row {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+}
+.p-config-input--map-k { width: 140px; flex-shrink: 0; }
+.p-config-input--map-v { flex: 1; }
+.p-config-map-add {
+    align-self: flex-start;
+    margin-top: 2px;
+}
+
+.p-config-null  { color: var(--text-muted);  font-size: var(--font-xs); }
+.p-config-true  { color: var(--badge-green); }
+.p-config-false { color: var(--badge-red); }
+.p-config-map   {
+    font-size: var(--font-xs);
+    line-height: 1.8;
+}
+
+.p-config-form-actions {
+    margin-top: var(--space-4);
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+}
+.p-config-form-hint {
+    font-size: var(--font-xs);
+    color: var(--text-muted);
+}
+
+// env 镜像页:返回链接 + mask 字体
+.p-config-back {
+    font-size: var(--font-sm);
+    color: var(--text-desc);
+    text-decoration: none;
+    margin-left: var(--space-4);
+
+    &:hover { color: var(--accent-text); }
+}
+.p-config-mask {
+    color: var(--text-desc);
+    font-family: var(--font-family-mono);
+    letter-spacing: 0.5px;
+}

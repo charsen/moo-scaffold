@@ -1,0 +1,3 @@
+# 测试 fixture · 下划线前缀文件,listSchemaFiles 必须排除(不当作 schema)。
+# 内容无意义 —— 仅用于让 SchemaLoaderTest 的 "_fields excluded" 断言被真正执行。
+_placeholder: true

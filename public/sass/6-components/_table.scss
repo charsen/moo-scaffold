@@ -1,0 +1,121 @@
+// ==============================================================================
+// Component: Table
+// 对应 Blade: <x-scaffold::table>...</x-scaffold::table>
+// 规范 §3.6: 表头浅灰底、行 hover 主题色淡染、容器圆角 8px
+// 也可作为纯 CSS 类应用到原生 <table>
+// ==============================================================================
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--shell-control-radius);
+  overflow: hidden;
+  font-size: var(--font-base);
+  color: var(--text-body);
+  box-shadow: var(--shadow-card);  // plan-22: 让所有表自动"浮"起,解决 runtimes/todos/accounts 裸表贴页问题
+}
+
+// plan-22: 嵌套在已有阴影卡块内的表不要双阴影
+// plan-32 续:config / accounts shell 等 page-level main card 容器,内部 table 不该再有 elevation(避免卡中卡)
+//（runtime / todo shell 已随查看器退役删除）
+.p-designer-card-block .table,
+.card .table,
+.panel .table,
+.p-config-shell .table,
+.p-acc-shell .table {
+  box-shadow: none;
+  border: none;
+  border-radius: 0;
+}
+
+.table thead th {
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-card-alt);
+  color: var(--text-desc);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-medium);
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.table thead th:first-child { padding-left: var(--space-5); }
+.table thead th:last-child  { padding-right: var(--space-5); }
+
+.table tbody td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-row);
+  vertical-align: middle;
+  line-height: var(--line-base);
+}
+
+.table tbody td:first-child { padding-left: var(--space-5); }
+.table tbody td:last-child  { padding-right: var(--space-5); }
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr {
+  transition: background var(--transition-fast);
+}
+
+.table tbody tr:hover {
+  background: var(--bg-hover-row);
+}
+
+// 暗模 hover 在 card 上对比度只有 ~1.3:1，再调深一档
+[data-theme="dark"] .table tbody tr:hover {
+  background: var(--bg-row-hover-strong);
+}
+
+// 链接式 / 可点击行
+.table tbody tr.is-clickable {
+  cursor: pointer;
+}
+
+.table tbody tr.is-active {
+  background: var(--accent-bg);
+
+  td:first-child {
+    box-shadow: 2px 0 0 var(--accent-hover-border) inset;
+  }
+}
+
+// -------- 修饰 --------
+.table--compact {
+  thead th { padding: var(--space-2) var(--space-3); }
+  tbody td { padding: var(--space-2) var(--space-3); }
+  thead th:first-child, tbody td:first-child { padding-left: var(--space-4); }
+  thead th:last-child,  tbody td:last-child  { padding-right: var(--space-4); }
+}
+
+.table--striped tbody tr:nth-child(even) {
+  background: var(--bg-card-alt);
+}
+
+.table--striped tbody tr:nth-child(even):hover {
+  background: var(--bg-hover-row);
+}
+
+.table--borderless {
+  border: 0;
+  border-radius: 0;
+
+  thead th { background: transparent; }
+}
+
+// 列对齐辅助
+.table .is-center { text-align: center; }
+.table .is-right  { text-align: right; }
+.table .is-num    { font-variant-numeric: tabular-nums; text-align: right; }
+
+// 操作列容器
+.table__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}

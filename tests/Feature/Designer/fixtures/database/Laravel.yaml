@@ -1,0 +1,31 @@
+### 测试 fixture · Laravel 框架表
+# plan-37 P1-1 后补:满足 SchemaLoaderTest 的 "Laravel always present" 不变量(任何 Laravel-based
+# 下游 scaffold 都有 Laravel.yaml),并提供第 2 个 schema 让 ksort / 多-schema 断言有实际意义。
+# 最小化:2 张框架表(migrations / users),结构对齐真实下游 Laravel.yaml。
+module:
+    name: Laravel 基础表
+    folder: Laravel
+    desc: Laravel 框架默认表(测试 fixture)
+tables:
+    migrations:
+        name: 迁移记录
+        desc: Laravel 数据库迁移记录表
+        index:
+            id: { type: primary, fields: id }
+        fields:
+            id: { type: int, increment: true }
+            migration: { name: 迁移, type: varchar, size: 255 }
+            batch: { name: 批次, type: int }
+    users:
+        name: 用户
+        desc: Laravel 默认用户表
+        index:
+            id: { type: primary, fields: id }
+            users_email_unique: { type: unique, fields: email }
+        fields:
+            id: { type: bigint, increment: true }
+            name: { name: 姓名, type: varchar, size: 255 }
+            email: { name: 邮箱, type: varchar, size: 255 }
+            password: { name: 密码, type: varchar, size: 255 }
+            created_at: {  }
+            updated_at: {  }

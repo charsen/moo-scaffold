@@ -1,0 +1,65 @@
+// ==============================================================================
+// Component: Badge (chip / 状态标签)
+// 对应 Blade: <x-scaffold::badge tone="success|info|warning|danger|neutral|accent">
+// ==============================================================================
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-xs);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.badge--sm {
+  min-height: 18px;
+  padding: 0 var(--space-1);
+  font-size: var(--font-xs);
+}
+
+// -------- 色调 --------
+// 背景走 token，让 _theme.scss 控制 light / dark 配色
+.badge--neutral {
+  color: var(--text-desc);
+  background: var(--bg-chip);
+}
+
+.badge--info {
+  color: var(--badge-blue);
+  background: var(--badge-blue-bg);
+}
+
+.badge--success {
+  color: var(--badge-green);
+  background: var(--badge-green-bg);
+}
+
+.badge--warning {
+  color: var(--badge-orange);
+  background: var(--badge-orange-bg);
+}
+
+.badge--danger {
+  color: var(--badge-red);
+  background: var(--badge-red-bg);
+}
+
+.badge--accent {
+  color: var(--accent-text);
+  background: var(--accent-bg);
+}
+
+// 实心 / solid 变体
+.badge--solid {
+  color: var(--text-inverse);
+}
+.badge--solid.badge--info { background: var(--badge-blue); }
+.badge--solid.badge--success { background: var(--badge-green); }
+.badge--solid.badge--warning { background: var(--badge-orange); }
+.badge--solid.badge--danger { background: var(--badge-red); }
+.badge--solid.badge--accent { background: var(--accent-hover-border); }

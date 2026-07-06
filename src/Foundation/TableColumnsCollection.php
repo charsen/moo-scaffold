@@ -1,4 +1,12 @@
-<?php
+<?php declare(strict_types=1);
+
+/*
+ * @Author: Charsen
+ * @Date: 2024-07-29 16:22
+ * @LastEditors: Charsen
+ * @LastEditTime: 2026-06-25 14:09
+ * @Description: Table Columns Collection
+ */
 
 namespace Mooeen\Scaffold\Foundation;
 
@@ -7,6 +15,20 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 
 class TableColumnsCollection extends ResourceCollection
 {
+    /**
+     * 构建列表表头（自动追加 updated_at/deleted_at + options 列）
+     */
+    public static function makeColumns(array $columns, string $action = 'index', int $optionsWidth = 110): self
+    {
+        if ($action === 'index') {
+            $append = ['updated_at' => ['width' => 100], 'options' => ['width' => $optionsWidth]];
+        } else {
+            $append = ['deleted_at' => ['width' => 180], 'options' => ['width' => $optionsWidth]];
+        }
+
+        return static::make([...$columns, ...$append]);
+    }
+
     /**
      * Transform the resource collection into an array.
      * - label          : label, 默认从多语言 db. 中取值
@@ -21,7 +43,7 @@ class TableColumnsCollection extends ResourceCollection
      * - min-width      : 默认值 100,
      * - children       : { }
      *
-     * @param  Request  $request
+     * @param Request $request
      */
     public function toArray($request): array
     {
@@ -54,7 +76,7 @@ class TableColumnsCollection extends ResourceCollection
             }
 
             // 不保留 ID 字符
-            if ( ! $one['keep_id']) {
+            if (! $one['keep_id']) {
                 $one['label'] = str_replace('ID', '', $one['label']);
             }
 
@@ -70,7 +92,7 @@ class TableColumnsCollection extends ResourceCollection
             // 操作列处理
             if ($field === 'options') {
                 $one['type']  = $one['type'] === 'slot' ? 'slot' : 'options';
-                $one['fixed'] = 'right';
+                $one['fixed'] = 'end';
             }
 
             return $one;

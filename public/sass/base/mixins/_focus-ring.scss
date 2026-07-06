@@ -1,0 +1,9 @@
+// plan-22 T6: 焦点环统一 mixin
+//   - 双保险:outline(被 overflow:hidden 裁掉时还有 box-shadow 兜底)
+//   - 颜色用 --accent-hover-border 自动跟主题
+//   - 用法:在元素 :focus-visible 块内 @include focus-ring;
+@mixin focus-ring($offset: 2px) {
+    outline: 2px solid var(--accent-hover-border);
+    outline-offset: $offset;
+    box-shadow: 0 0 0 3px var(--accent-hover-shadow);
+}

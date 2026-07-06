@@ -1,0 +1,22 @@
+<?php declare(strict_types=1);
+/*
+ * @Author:      {{author}}
+ * @Date:        {{date}}
+ * @Description: Rename {{from}} to {{to}}
+ */
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::rename('{{from}}', '{{to}}');
+    }
+
+    public function down(): void
+    {
+        Schema::rename('{{to}}', '{{from}}');
+    }
+};

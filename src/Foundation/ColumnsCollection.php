@@ -1,4 +1,12 @@
-<?php
+<?php declare(strict_types=1);
+
+/*
+ * @Author: Charsen
+ * @Date: 2024-07-29 16:22
+ * @LastEditors: Charsen
+ * @LastEditTime: 2025-07-18 10:03
+ * @Description: Columns Collection
+ */
 
 namespace Mooeen\Scaffold\Foundation;
 
@@ -17,7 +25,7 @@ class ColumnsCollection extends ResourceCollection
      *                    = image 时, 增加 { }
      *                    = slot 时, v-slot:shower_{field}
      *
-     * @param  Request  $request
+     * @param Request $request
      */
     public function toArray($request): array
     {

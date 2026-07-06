@@ -1,0 +1,40 @@
+// ==============================================================================
+// Component: JSON viewer (静态格式化输出 + 语法高亮)
+// 对应 Blade: <x-scaffold::json :data="..." />
+// 注：交互式折叠 / 展开仍由遗留 jsonFormat.js（_json-format.scss）提供
+//     本组件给静态展示用，避免每次都拉 jsonFormat 库
+// ==============================================================================
+
+.json-block {
+  margin: 0;
+  padding: var(--space-4);
+  background: var(--bg-code);
+  border: 1px solid var(--border-light);
+  border-radius: var(--shell-control-radius);
+  color: var(--text-body);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-sm);
+  line-height: var(--line-base);
+  overflow-x: auto;
+  white-space: pre;
+  word-break: normal;
+}
+
+.json-block__token-key     { color: var(--json-property); }
+.json-block__token-string  { color: var(--json-string); }
+.json-block__token-number  { color: var(--json-number); }
+.json-block__token-boolean { color: var(--json-boolean); }
+.json-block__token-null    { color: var(--json-null); }
+.json-block__token-bracket { color: var(--json-bracket); }
+
+// -------- 修饰 --------
+.json-block--inline {
+  display: inline-block;
+  padding: 2px var(--space-2);
+  white-space: pre-wrap;
+  font-size: var(--font-xs);
+}
+
+.json-block--bordered {
+  border-color: var(--accent-border);
+}

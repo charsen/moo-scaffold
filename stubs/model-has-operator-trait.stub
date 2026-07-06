@@ -1,0 +1,36 @@
+<?php declare(strict_types=1);
+
+namespace {{namespace}};
+
+/**
+ * 操作人填充 Trait —— 声明式 opt-in
+ *
+ * 在 model 上 `use HasOperator;` 即开启自动填充：
+ *   - creating: 按 $fillable 含字段决定写 creator_id / updater_id
+ *   - updating: 仅写 updater_id（若 $fillable 含之）
+ *
+ * 由 moo:model 在表含 creator_id / updater_id 时自动 use 进 model。
+ */
+trait HasOperator
+{
+    public static function bootHasOperator(): void
+    {
+        static::creating(function ($model) {
+            $fillable = $model->getFillable();
+            $userId   = auth()->id();
+
+            if (in_array('creator_id', $fillable, true)) {
+                $model->creator_id = $userId;
+            }
+            if (in_array('updater_id', $fillable, true)) {
+                $model->updater_id = $userId;
+            }
+        });
+
+        static::updating(function ($model) {
+            if (in_array('updater_id', $model->getFillable(), true)) {
+                $model->updater_id = auth()->id();
+            }
+        });
+    }
+}

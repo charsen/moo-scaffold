@@ -1,0 +1,192 @@
+<?php declare(strict_types = 1);
+/*
+ * @Author: {{author}}
+ * @Date: {{date}}
+ * @LastEditors: {{author}}
+ * @LastEditTime: {{date}}
+ * @Description: {{entity_name}}控制器
+ */
+
+namespace {{namespace}};
+
+use {{model_class}};
+use {{use_base_action}};
+use {{use_controller_trait}};
+{{use_requests}}
+use {{use_columns}};
+use {{use_form_widgets}};
+use {{use_base_resources}};
+use {{use_base_resources_collection}};
+use {{use_base_controller}};
+
+/**
+ * ACL
+ *
+ * @package_name {zh-CN: {{package_name}} | en: {{package_en_name}}}
+ * @module_name {zh-CN: {{module_name}} | en: {{module_en_name}}}
+ * @controller_name {zh-CN: {{entity_name}}管理 | en: Management {{entity_en_name}}}
+ */
+class {{controller_name}}Controller extends Controller
+{
+{{use_traits_code}}
+
+    protected {{model_name}} $model;
+
+    /**
+     * @param \{{model_class}} $model
+     */
+    public function __construct({{model_name}} $model)
+    {
+        $this->model = $model;
+    }
+
+    /**
+     * 执行 action 前先验证权限
+     */
+    public function boot(): void
+    {
+        $this->checkAuthorization();
+    }
+
+    /**
+     * {{entity_name}}列表
+     *
+     * @acl {zh-CN: {{entity_name}}列表, en: {{entity_en_name}} List, desc: }
+     */
+    public function index(IndexRequest $request): BaseResourceCollection
+    {
+        $validated = $request->validated();
+
+        $result    = $this->model->select($this->getListFields())
+                                 ->filter($validated)
+                                 ->latest('{{model_key_name}}')
+                                 ->paginate(($validated['page_limit'] ?? NULL));
+        $result->append(['options']);
+
+        return BaseResource::collection($result)
+                           ->additional([
+                               'columns'      => $this->getListColumns(),
+                               'form_widgets' => $this->getListFormWidgets($request),
+                           ]);
+    }
+
+    /**
+     * {{entity_name}}回收站
+     *
+     * @acl {zh-CN: {{entity_name}}回收站, en: {{entity_en_name}} Trashed, desc: }
+     */
+    public function trashed(IndexRequest $request): BaseResourceCollection
+    {
+        $validated = $request->validated();
+
+        $result    = $this->model->select($this->getListFields('trashed'))
+                                 ->filter($validated)
+                                 ->latest('deleted_at')
+                                 ->onlyTrashed()
+                                 ->paginate(($validated['page_limit'] ?? NULL));
+        $result->append(['options']);
+
+        return BaseResource::collection($result)
+                           ->trashed()
+                           ->additional([
+                               'columns'      => $this->getListColumns('trashed'),
+                               'form_widgets' => $this->getListFormWidgets($request, 'trashed'),
+                           ]);
+    }
+
+    /**
+     * 创建{{entity_name}}
+     *
+     * @acl {zh-CN: 创建{{entity_name}}, en: Create {{entity_en_name}}, desc: }
+     */
+    public function store(StoreRequest $request): BaseResource
+    {
+        $validated = $request->validated();
+
+        $result    = $this->model->create($validated);
+
+        return BaseResource::make($result);
+    }
+
+    /**
+     * 更新{{entity_name}}
+     *
+     * @acl {zh-CN: 更新{{entity_name}}, en: Update {{entity_en_name}}, desc: }
+     */
+    public function update(UpdateRequest $request, int|string $id): BaseResource
+    {
+        $validated = $request->validated();
+
+        $result = $this->model->findOrFail($id);
+        $result->fill($validated);
+        $result->save();
+
+        return BaseResource::make($result);
+    }
+
+    /**
+     * 查看{{entity_name}}
+     *
+     * @acl {zh-CN: 查看{{entity_name}}, en: Show {{entity_en_name}}, desc: }
+     */
+    public function show(int|string $id): BaseResource
+    {
+        $result  = $this->model->withTrashed()->findOrFail($id);
+        $result->append(['options']);
+
+        $columns = [
+            {{show_fields}}
+        ];
+
+        return BaseResource::make($result)->additional(['columns' => ColumnsCollection::make($columns)]);
+    }
+
+    /**
+     * 删除{{entity_name}}
+     *
+     * @acl {zh-CN: 删除{{entity_name}}, en: Destroy {{entity_en_name}}, desc: }
+     */
+    public function destroyBatch(DestroyBatchRequest $request): BaseResource
+    {
+        return $this->destroyBatchAction($request);
+    }
+
+    /**
+     * 永久删除{{entity_name}}
+     *
+     * @acl {zh-CN: 永久删除{{entity_name}}, en: Destroy Forever {{entity_en_name}}, desc: }
+     */
+    public function forceDestroy(int|string $id): BaseResource
+    {
+        return $this->forceDestroyAction($id);
+    }
+
+    /**
+     * 恢复{{entity_name}}
+     */
+    public function restore(DestroyBatchRequest $request): BaseResource
+    {
+        return $this->restoreAction($request);
+    }
+
+    /**
+     * 创建表单
+     */
+    public function create(CreateRequest $request): FormWidgetCollection
+    {
+        return $this->getFormWidgets(new StoreRequest, 'create');
+    }
+
+    /**
+     * 编辑表单
+     */
+    public function edit(EditRequest $request, int|string $id): BaseResource
+    {
+        $result = $this->model->findOrFail($id);
+
+        return BaseResource::make($result)
+                           ->additional([
+                               'form_widgets' => $this->getFormWidgets(new UpdateRequest, 'edit'),
+                           ]);
+    }
+}

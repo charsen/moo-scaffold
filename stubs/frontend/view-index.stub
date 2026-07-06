@@ -1,0 +1,15 @@
+<template>
+  <Scaffold ref="scaffoldRef" :entity="entity" :actions="actions">
+  </Scaffold>
+</template>
+
+<script setup lang="ts">
+  import { getActions } from '@/utils/auth'
+
+  const entity = '{{model_class}}'
+  const actions = getActions('{{acl_key}}')
+
+  defineOptions({
+    name: `${entity}Index`,
+  })
+</script>
