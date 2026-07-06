@@ -1,42 +1,70 @@
 {
-    "name": "charsen/moo-scaffold",
-    "description": "mooeen Scaffold for Laravel",
-    "keywords": [
-        "mooeen",
-        "scaffold"
-    ],
-    "homepage": "https://github.com/charsen/laravel-scaffold",
-    "license": "MIT",
-    "authors": [
-        {
-            "name": "Charsen",
-            "email": "780537@qq.com",
-            "homepage": "https://www.charsen.com",
-            "role": "Developer"
-        }
-    ],
-    "require": {
-        "php": "^8.1",
-        "laravel/framework": "^10.10",
-        "brick/varexporter": "^0.5.0",
-        "symfony/yaml": "^6.4"
-    },
-    "autoload": {
-        "psr-4": {
-            "Mooeen\\Scaffold\\": "src"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "Mooeen\\Scaffold\\Tests\\": "tests"
-        }
-    },
-    "scripts": {},
-    "extra": {
-        "laravel": {
-            "providers": [
-                "Mooeen\\Scaffold\\ScaffoldProvider"
-            ]
-        }
+  "name": "charsen/moo-scaffold",
+  "description": "Schema 驱动的 Laravel 后端代码生成器 + 开发辅助后台:写 YAML 生成 Model/Controller/Migration/API/ACL/i18n,内置数据库设计器、接口调试、开发文档中心",
+  "keywords": [
+    "mooeen",
+    "scaffold",
+    "laravel",
+    "code-generation",
+    "database-designer",
+    "api-debugger",
+    "acl"
+  ],
+  "type": "library",
+  "homepage": "https://github.com/charsen/moo-scaffold",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Charsen",
+      "email": "780537@gmail.com",
+      "homepage": "https://www.charsen.com",
+      "role": "Developer"
     }
+  ],
+  "support": {
+    "issues": "https://github.com/charsen/moo-scaffold/issues",
+    "source": "https://github.com/charsen/moo-scaffold",
+    "docs": "https://github.com/charsen/moo-scaffold/blob/master/README.md"
+  },
+  "require": {
+    "php": "^8.2",
+    "laravel/framework": "^12.1.1",
+    "charsen/moo-monitor-laravel": "^0.1.3",
+    "brick/varexporter": "^0.7.0",
+    "symfony/yaml": "^7.0",
+    "fakerphp/faker": "^1.23"
+  },
+  "require-dev": {
+    "roave/security-advisories": "dev-latest",
+    "laravel/pint": "^1.13",
+    "pestphp/pest": "^3.0",
+    "pestphp/pest-plugin-laravel": "^3.0",
+    "orchestra/testbench": "^10.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Mooeen\\Scaffold\\": "src"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Mooeen\\Scaffold\\Tests\\": "tests"
+    }
+  },
+  "scripts": {
+    "test": "./vendor/bin/pest",
+    "test:filter": "./vendor/bin/pest --filter"
+  },
+  "config": {
+    "allow-plugins": {
+      "pestphp/pest-plugin": true
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Mooeen\\Scaffold\\ScaffoldProvider"
+      ]
+    }
+  }
 }

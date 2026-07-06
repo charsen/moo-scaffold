@@ -1,0 +1,216 @@
+// ==============================================================================
+// Page: Login
+// 对应视图: scaffold::auth.login
+// 2026-06-19 plan-A:从居中单卡升为分栏 —— 左品牌/身份栏 + 右表单。
+//   - 左栏:accent 暖渐变(主题感知)承载 thesis(font-3xl)+ 流水线 signature(呼应首页 hero)
+//   - 右栏:中性卡面,表单贴左、限宽 360
+//   - 文字/面板全走 design token(明暗主题各自 legible),零硬编码
+//   - 窄屏(≤860)上下堆叠,极窄(≤480)收起流水线
+// ==============================================================================
+
+.p-login {
+  // 登录页是独立 HTML(非 shell),要清掉全局 body 的 padding-top(--shell-header-height)
+  // + body{padding:--space-5},否则分栏会被 header 偏移挤出顶/右一圈灰边。
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: var(--bg-page);
+}
+
+.p-login__split {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+}
+
+// ── 左:品牌 / 身份栏 ─────────────────────────────────────────────
+.p-login__brand-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-7);
+  background: var(--accent-gradient);
+  border-right: 1px solid var(--accent-border);
+}
+
+.p-login__brand-inner {
+  width: min(440px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.p-login__logo {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+  align-self: flex-start;
+}
+
+// dark 主题:logo.png 是深色字 wordmark,在深棕品牌栏上糊。无法改 raster、滤白又会丢橙 S
+// → 给彩色 logo 垫一张白底片(content-box 保 40px 图高,padding 出底片边距),深底上既清晰又保住品牌橙。
+// (header 同款 logo.png 在 dark 也有此问题,属 shell 层另案,本次只收 login。)
+[data-theme="dark"] .p-login__logo {
+  box-sizing: content-box;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  // 微灰底片:纯白(--text-inverse)略掺暗卡色(--bg-card)压成柔和浅灰,不刺眼又托得住深色字。
+  // 无现成"浅底片"token,且禁反用 text-* 当底色 → 用 color-mix 由两个语义 token 现调,零硬编码。
+  background: color-mix(in srgb, var(--text-inverse) 90%, var(--bg-card));
+}
+
+.p-login__headline {
+  margin: 0;
+  font-size: var(--font-3xl);
+  line-height: var(--line-tight);
+  font-weight: var(--weight-bold);
+  color: var(--text-heading);
+}
+
+.p-login__tagline {
+  margin: 0;
+  font-size: var(--font-base);
+  line-height: var(--line-base);
+  color: var(--text-desc);
+}
+
+// 流水线 signature:YAML(输入,muted)→ 生成阶段(accent pill),节点间 ▸ 编码"流向"。
+// nowrap 强制一行(brand-inner 已加宽到 440 容下 5 节点);窄屏 ≤480 整条收起。
+.p-login__pipeline {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.p-login__node {
+  display: inline-flex;
+  align-items: center;
+}
+
+.p-login__node:not(:last-child)::after {
+  content: '\25B8';    // ▸
+  margin: 0 var(--space-2);
+  color: var(--accent-text);
+  font-family: var(--font-family-mono);
+}
+
+.p-login__stage {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--accent-border);
+  background: var(--bg-card);
+  color: var(--accent-text);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-semibold);
+}
+
+// 输入节点(YAML):你写的,不是生成的 —— 中性 muted 区分(不用 dashed)。
+.p-login__stage.is-input {
+  border-color: var(--border-light);
+  background: var(--bg-card-alt);
+  color: var(--text-desc);
+}
+
+// ── 右:表单栏 ───────────────────────────────────────────────────
+.p-login__form-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-7);
+  background: var(--bg-card);
+}
+
+.p-login__form-inner {
+  width: min(360px, 100%);
+}
+
+.p-login__form-head {
+  margin-bottom: var(--space-6);
+}
+
+.p-login__form-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-xl);
+  font-weight: var(--weight-bold);
+  color: var(--text-heading);
+}
+
+.p-login__intro {
+  margin: 0;
+  color: var(--text-desc);
+  font-size: var(--font-sm);
+  line-height: var(--line-base);
+}
+
+.p-login__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.p-login__alert {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--alert-border);
+  border-left: 3px solid var(--alert-left-border);
+  border-radius: var(--radius-sm);
+  background: var(--alert-bg);
+  color: var(--text-error);
+  font-size: var(--font-sm);
+  line-height: var(--line-base);
+  margin-bottom: var(--space-4);
+
+  // alert 内 inline code 微紧凑
+  code {
+    background: var(--bg-card-alt);
+    padding: 1px 6px;
+    border-radius: var(--radius-xs);
+  }
+}
+
+.p-login__meta {
+  margin: var(--space-3) 0 0;
+  color: var(--text-light);
+  font-size: var(--font-xs);
+  line-height: var(--line-base);
+}
+
+// ── 窄屏:上下堆叠 ───────────────────────────────────────────────
+@media (max-width: 860px) {
+  .p-login__split {
+    grid-template-columns: 1fr;
+  }
+
+  .p-login__brand-panel {
+    min-height: auto;
+    padding: var(--space-7) var(--space-6);
+    border-right: 0;
+    border-bottom: 1px solid var(--accent-border);
+  }
+
+  .p-login__brand-inner {
+    width: 100%;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+
+  .p-login__headline {
+    font-size: var(--font-2xl);
+  }
+
+  .p-login__form-panel {
+    padding: var(--space-7) var(--space-6);
+  }
+}
+
+@media (max-width: 480px) {
+  .p-login__pipeline {
+    display: none;    // 极窄省高度,流水线收起
+  }
+}

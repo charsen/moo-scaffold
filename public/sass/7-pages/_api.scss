@@ -1,0 +1,152 @@
+// ==============================================================================
+// Page: API 文档 (api/index 嵌入 api/show 详情)
+// 仅页面级粘合（标题区、URL 展示框、章节布局）；
+// method-badge / stat-card / table / badge / btn 全部使用组件
+// ==============================================================================
+
+.p-api-doc {
+  padding: var(--space-6) 0 var(--space-7);
+}
+
+.p-api-doc__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin: 0 var(--space-5) var(--space-4);
+}
+
+.p-api-doc__title-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.p-api-doc__title {
+  margin: 0;
+  font-size: var(--font-2xl);
+  font-weight: var(--weight-semibold);
+  color: var(--text-heading);
+  line-height: var(--line-snug);
+}
+
+.p-api-doc__title.is-deprecated {
+  color: var(--text-desc);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  text-decoration-color: rgba(180, 83, 9, .5);
+}
+
+// ACL badge 内嵌 code 标签的微调字号
+.p-api-doc__acl-code {
+  font-size: 11px;
+}
+
+.p-api-doc__route {
+  margin: 0 var(--space-5) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--shell-control-radius);
+  background: var(--route-bg);
+  color: var(--route-text);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-sm);
+  line-height: var(--line-base);
+  word-break: break-all;
+}
+
+.p-api-doc__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-3);
+  margin: 0 var(--space-5) var(--space-5);
+}
+
+.p-api-doc__alert {
+  margin: 0 var(--space-5) var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--alert-border);
+  border-left: 3px solid var(--alert-left-border);
+  border-radius: var(--shell-control-radius);
+  background: var(--alert-bg);
+
+  h3 {
+    margin: 0 0 var(--space-2);
+    color: var(--accent-text-dark);
+    font-size: var(--font-md);
+    font-weight: var(--weight-semibold);
+  }
+
+  p {
+    margin: var(--space-1) 0 0;
+    color: var(--text-secondary);
+    font-size: var(--font-sm);
+    line-height: var(--line-base);
+  }
+}
+
+.p-api-doc__alert--deprecated {
+  border-left-color: var(--badge-orange);
+  background: linear-gradient(135deg, var(--accent-bg) 0%, var(--accent-bg-hover) 100%);
+}
+
+.p-api-doc__section {
+  margin: var(--space-5);
+}
+
+.p-api-doc__section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+
+  h3 {
+    margin: 0;
+    color: var(--text-heading);
+    font-size: var(--font-md);
+    font-weight: var(--weight-semibold);
+  }
+}
+
+.p-api-doc__section-count {
+  color: var(--text-light);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+}
+
+.p-api-doc__required {
+  color: var(--badge-red);
+  font-style: normal;
+  font-weight: var(--weight-bold);
+  margin-right: 2px;
+}
+
+.p-api-doc__loading {
+  margin: var(--space-10) auto 0;
+  text-align: center;
+  font-size: var(--font-md);
+  color: var(--text-light);
+}
+
+.p-api-doc__loading.is-error {
+  color: var(--text-error);
+}
+
+// Header / Request / Response 参数表共用列宽：参数 25 / 名称 20 / 值 25 / 说明 auto
+.p-api-doc__param-table th:nth-child(1),
+.p-api-doc__param-table th:nth-child(3) { width: 25%; }
+.p-api-doc__param-table th:nth-child(2) { width: 20%; }
+
+// ============================================================
+// API 入口空态（选择应用 / 选择接口）
+// ============================================================
+.p-api-picker {
+  padding: var(--space-7) var(--space-5) var(--space-5);
+}
+
+// plan-22 S1:p-api-picker__head 已删 — 用 <x-scaffold::hero compact>,
+// .p-api-picker 内 hero 顶 margin-bottom 走 hero 默认间距 + .scaffold-hero 间距由通用规则给。

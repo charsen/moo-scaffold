@@ -1,0 +1,182 @@
+// ==============================================================================
+// Layout: Shell container
+// 对应 Blade: <x-scaffold::shell> 渲染：
+//   <div class="container [pl0] [is-collapsed-sidebar]">
+//     <div class="left"  id="left_container">{slot}</div>
+//     <div class="right" id="right_container">{slot}</div>
+//
+// #id 仅作 JS 选择器钩子（jQuery 广泛依赖），样式一律走 .class，避免 specificity 异味。
+//
+// Modifier classes:
+//   .pl0                  — 无 aside 模式（auth/login / 单栏页）
+//   .is-collapsed-sidebar — 选定 app 后隐藏 .left（api/acl 等）
+// ==============================================================================
+
+// 2026-05-23 plan-50 后续:fixed top-bar 跨整个 viewport(在 header / subnav 下方),
+// 容纳 app selector(左)+ tabs(右),让 sidebar / 中右栏都能让出空间对齐
+// 高度 var(--shell-top-bar-height) 默认 48px
+:root {
+    --shell-top-bar-height: 48px;
+}
+
+.scaffold-top-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: var(--shell-header-height);
+    height: var(--shell-top-bar-height);
+    z-index: 9;
+    background: var(--bg-page);
+    // 2026-05-23 user 反馈:去 border-bottom,跟下方 aside / main 卡片自己的 border 衔接,
+    // 不再多一条横线
+    display: flex;
+    align-items: stretch;
+}
+
+// 有 subnav 时,top-bar 在 subnav 之下
+body:has(.scaffold-subnav-bar) .scaffold-top-bar {
+    top: calc(var(--shell-header-height) + var(--shell-subnav-height));
+}
+
+// 有 top-bar 时,aside 顶部紧贴 top-bar 下沿(不留 content-top 空白)
+body.has-shell-top-bar .aside {
+    top: calc(var(--shell-header-height) + var(--shell-top-bar-height));
+}
+body.has-shell-top-bar:has(.scaffold-subnav-bar) .aside {
+    top: calc(var(--shell-header-height) + var(--shell-subnav-height) + var(--shell-top-bar-height));
+}
+
+// 有 top-bar 时,body padding-top 加上 top-bar 高度;.container 移除 content-top
+// 上 padding,让 main 紧贴 top-bar 下沿
+body.has-shell-top-bar {
+    padding-top: calc(var(--shell-header-height) + var(--shell-top-bar-height));
+
+    .container { padding-top: 0; }
+}
+body.has-shell-top-bar:has(.scaffold-subnav-bar) {
+    padding-top: calc(var(--shell-header-height) + var(--shell-subnav-height) + var(--shell-top-bar-height));
+}
+
+// 全局：让 body 成为滚动容器，header 固定在顶部
+// 之前用 .container { position: absolute; top: 64px; bottom: 0 } 拉满视口并把
+// 滚动放进 .left / .right 各自内部，导致：
+//  - 滚动条出现在卡片里，不是浏览器原生
+//  - sticky 元素相对内层滚动容器固定，与 fixed header 行为割裂
+// 现在改为浏览器原生滚动：body 偏移 header 高度，aside fixed，container 自然文档流
+html, body {
+    height: auto;
+    min-height: 100%;
+}
+
+body {
+    padding-top: var(--shell-header-height);
+}
+
+.container {
+    // 单点间距：aside↔.left、.left↔.right、.right↔viewport 三处块间距统一走这一个变量
+    // 2026-05-30 user 拍板:桌面左右 gutter 12px 太挤,统一抬到 20px(= var(--space-5));移动端保持 12
+    --scaffold-shell-gap: 20px;
+    --scaffold-shell-gap-mobile: 12px;
+    // aside 实际宽度（与 _aside.scss 保持同步）
+    --scaffold-shell-aside-width: 260px;
+
+    // margin-left 紧贴 aside 右沿；左侧块间距全部由 padding-left 提供（= --scaffold-shell-gap）
+    // 这样三处块间距对称：左 padding / 中间 gap / 右 padding 都等于 --scaffold-shell-gap
+    margin-left: var(--scaffold-shell-aside-width);
+    padding: var(--shell-content-top) var(--scaffold-shell-gap) var(--space-5);
+    min-height: calc(100vh - var(--shell-header-height));
+    display: flex;
+    gap: var(--scaffold-shell-gap);
+
+    &.pl0 {
+        margin-left: 0;
+    }
+
+    .left,
+    .right {
+        flex: 1;
+        // flex 经典坑：子项默认 min-width: auto，长 URL / 不可换行的 toolbar 会撑大 flex item，
+        // 导致 .left 超出 1 : 1.25 的分配宽度，挤压甚至覆盖 .right。强制 0 让 flex 接管收缩
+        min-width: 0;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--elevation-2);
+        background-color: var(--bg-card);
+    }
+
+    .right {
+        flex: 1.25;
+        background: var(--bg-card-gradient);
+
+        &.ml0 { margin-left: 0; }
+
+        &.transparent {
+            position: relative;
+            // light 模式 --bg-page 跟 --bg-transparent-state 颜色太近视觉融合,
+            // 加 1px border 让主区从 layout 浮出来;dark 模式 border-light 跟 card
+            // 同低对比,几乎不可见,不破坏"transparent" 视觉语义
+            box-shadow: none;
+            background: var(--bg-transparent-state);
+            border: 1px solid var(--border-light);
+        }
+
+        .none {
+            position: absolute;
+            left: 50%;
+            top: 20%;
+            transform: translate(-50%, 0);
+
+            h2 {
+                margin-top: var(--space-5);
+                text-align: center;
+                color: var(--text-muted);
+            }
+        }
+    }
+
+    // 选定 app 后：隐藏左侧 controllers 列表，右侧占满
+    &.is-collapsed-sidebar {
+        .left { display: none; }
+        .right { flex: 1; }
+    }
+
+    @media (max-width: 768px) {
+        padding-left: var(--scaffold-shell-gap-mobile);
+        padding-right: var(--scaffold-shell-gap-mobile);
+    }
+
+    // 2026-05-23 user 反馈:api/request 接口调试页 — 外框 fit 视口高度,内部 .left/.right
+    // 独立滚动。避免长 form / param table 触发浏览器原生滚动条,header / aside / panel
+    // 都各自固定,视觉一致。
+    // height = 视口 - header - subnav(body padding-top 已 push down 这两个,所以 100vh
+    // 减回去就是 container 可用空间)。
+    &.is-api-request {
+        height: calc(100vh - var(--shell-header-height) - var(--shell-subnav-height));
+        min-height: 0;
+        overflow: hidden;
+
+        > .left,
+        > .right {
+            overflow-y: auto;
+            // flex 子项默认 min-height: auto(content-size),会撑爆 overflow:hidden 父容器
+            // 子项内容一长就把滚动条挤到 body 上。重置 min-height: 0 让父 overflow 接管
+            min-height: 0;
+        }
+    }
+
+    // plan-50 后续:api.request 实际用 topBar(非 subnav,app-tabs 已挪进 shell.blade topBar slot),
+    // topBar fixed 在 main 之外、body padding-top 已让出 header+topbar。main 可用高度 = 100vh - header - topbar。
+    // 修正:原公式 - subnav - topbar 把 subnav 和 topbar 当成同时存在,但本页无 subnav,多扣一个 48px →
+    // main 短一截、两栏底部留白。数值上 subnav==topbar==48 掩盖了语义错;这里按真实存在的 topbar 扣减。
+    &.has-top-bar.is-api-request {
+        height: calc(100vh - var(--shell-header-height) - var(--shell-top-bar-height));
+    }
+}
+
+// 2026-05-30:有 subnav 的页面(api.list / api.request / route.list),body padding-top 与 .aside top
+// 已经 +subnav(见 _header.scss body:has(.scaffold-subnav-bar) 两条),但 .container 的
+// min-height 仍是 100vh - header,漏减 subnav → 短内容/空态页底部溢出整一个 subnav 高(48px)
+// 撑出整页滚动条。这里对称补减 subnav。api.request 走 .is-api-request 自管 height(且 min-height:0),
+// 本规则特异性更高会覆盖它,故 :not(.is-api-request) 排除。top-bar 仅 api.request 用,无需再减。
+body:has(.scaffold-subnav-bar) .container:not(.is-api-request) {
+    min-height: calc(100vh - var(--shell-header-height) - var(--shell-subnav-height));
+}

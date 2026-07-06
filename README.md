@@ -1,242 +1,75 @@
-# Laravel Scaffold
+# moo-scaffold
 
-## Dev Installing
+> **Laravel 后端代码生成器 + 开发辅助后台。** 写一份 YAML,一条命令生成全套能直接跑的后端代码;再附一个「开发期可写、生产只读」的 `/scaffold` 开发后台。
 
-```sh
-$ composer config repositories.scaffold path ../packages/moo-scaffold
-$ composer require charsen/moo-scaffold:dev-master
+**一个有主见的参考实现,不是开箱即用的通用脚手架。** 它沉淀了一个人多年 Laravel 的取舍——你可以拿去用,也可以只借走背后的判断。
+
+`PHP 8.2+` · `Laravel 12` · `MIT`
+
+---
+
+## 一眼看懂
+
+写 20 行 YAML:
+
+```yaml
+tables:
+  books:
+    model:      { class: Book }
+    controller: { app: ['admin'], class: BookController }
+    fields:
+      id:     {}
+      title:  { name: 书名, type: varchar, size: '2,200' }
+      status: { name: 状态, type: tinyint, default: 7 }
+    enums:
+      status: { draft: [2, draft, 草稿], published: [7, published, 已发布] }
 ```
 
-## Intro
+跑一条 `php artisan moo:free admin Book -a`,生成一整套**能直接 commit 的代码**(不是占位脚手架):
 
-“约定大于配置” 、“以机械化代替手工化作业”
+> `Book` model + Filter + Factory · `books` migration · `BookController`(CRUD + 批量 + 软删恢复)+ 路由自动挂载 · Store/Update Request(校验规则从字段长度 / 枚举推导)· `BookResource` · 接口文档 YAML · ACL 权限映射(精确到动作)· i18n 多语言 · 前端 `.ts` / `.vue`
 
-支持多语言，默认 {en, zh-CN}
+手写这些 ≈ 8 个文件、200+ 行,改一个字段要同步 6 处;这里改 YAML 重跑即可。
 
-待补充... (可先按下面流程操作体验)
+## 三块功能
 
-## create new laravel
+**1. 代码生成** —— `moo:fresh` 解析 schema 到缓存,`moo:free` 一条流水线吐全套代码。模板即编码规范(`stubs/` + `src/Foundation/`),生成的是你愿意 commit 的代码。
 
-```sh
-composer create-project --prefer-dist laravel/laravel "name"
+**2. 开发后台 `/scaffold`** —— 数据库设计器(可视化改 schema)、接口调试器(类 Postman,按路由自动识别参数)、ACL 查看、配置可视化编辑、开发文档中心(Markdown + Mermaid 流程图 + 接口 / 表深链)。**只在开发环境可写,生产一律只读。**
+
+**3. 运行时监控** —— 异常 / 慢 SQL 自动捕获、缓冲、推送到云端统一看(由 [moo-monitor-laravel](https://github.com/charsen/moo-monitor-laravel) 提供,AI 可经 MCP 读取辅助修复)。
+
+![/scaffold 开发后台首页:左侧命令速览,右侧 schema 统计 + 运行时监控汇聚](docs/images/scaffold-home.png)
+
+## 快速开始
+
+```bash
+composer require --dev charsen/moo-scaffold:^2.1
+php artisan moo:init "你的名字"
+php artisan vendor:publish --provider="Mooeen\\Scaffold\\ScaffoldProvider" --tag=public --force
+php artisan moo:account:add admin --password=xxx --role=admin
 ```
 
-## 修改配置 `.env`
+还需在 `routes/admin.php` 留一行插入标记、注册 `Route::iResource` 宏。**完整前置 + 「5 分钟从 YAML 到接口」示例** → **[安装指南](docs/guide/01-install.md)**。
 
-1. 开发域名
-2. 数据库配置 (需要手动先创建数据库)
+## 文档
 
-## 通过 composer 安装
+| 我想… | 看这里 |
+|---|---|
+| 第一次装包 / 前置配置 | [安装指南](docs/guide/01-install.md) |
+| 学 schema 语法 | [完整字段样例](docs/schema_demo.yaml) · [Schema 与代码生成](docs/guide/02-schema-codegen.md) |
+| 命令速查(忘了 flag) | [CLI 速查](docs/guide/03-cli-reference.md) |
+| 全部模块手册 | [docs/guide/](docs/guide/README.md) |
+| 安全模型(dev 写 / prod 只读) | [安全模型](docs/guide/12-security.md) |
+| 设计取舍 / 模块总览 | [项目总览](docs/overview.md) |
+| 给包做贡献 / 跑测试 | [贡献指南](CONTRIBUTING.md) |
 
-```sh
-composer require --dev charsen/moo-scaffold
-```
+## 设计哲学(一句话版)
 
-通过命令行看是否安装成功 `Scaffold`
+功能必须简单(能走 git 就走 git)· dev-only 写 / prod 只读 · UI 可追求完美但完美 ≠ 功能复杂 · 模板即编码规范。
 
-```sh
-php artisan list
-```
+展开版见 [项目总览](docs/overview.md) 与 [操作手册](docs/guide/README.md)。
 
-看到结果中有 scaffold , moo:api ... 等就是已经安装成功
+## License
 
-## 初始化开发者信息（自己）及初始化目录
-
-```sh
-php artisan moo:init "Charsen <https://github.com/charsen>"
-```
-
-## 发布配置文件 及 前端公共资源包
-
-- 将会发布 `scaffold.php` 到 `config` 目录下.
-
-```sh
-php artisan vendor:publish --provider=Mooeen\\Scaffold\\ScaffoldProvider --tag=config
-```
-
-## 创建一个模块的 schema 文件
-
-```sh
-php artisan moo:schema `module_name`
-```
-
-- 添加 `-f` 覆盖已存在文件
-- PS1: 暂不支持多级目录！建议：`module_name = schema_file_name`
-- PS2：`controller` 的定义，只支持 `app/Http/Controllers/` 往下 **两级**，更深的层级 **不支持**!!!
-
-将会生成 `schema` 文件 `+ ./scaffold/database/<module_name>.yaml`
-
-设计模块下的数据表，- 具体说明详见 demo:
-
-[docs/schema_demo.yaml](https://github.com/charsen/laravel-scaffold/blob/master/docs/schema_demo.yaml)
-
-## 创建数据迁移文件
-
-```sh
-php artisan moo:migration `schema_file_name`
-```
-
-- `schema_file_name` 非必写，若不写会有提示做选择
-- 添加 `-m` 会执行 `php artisan migrate`
-- 添加 `--fresh` 刷新缓存数据，会先执行 `artisan moo:fresh`
-
-## 创建模型文件
-
-> 前置动作：再 DataBaseSeeder.php 中加入 //:auto_insert_code_here::do_not_delete ，一遍生成代码时
-
-```sh
-php artisan moo:model `schema_file_name`
-```
-
-- `schema_file_name` 非必写，若不写会有提示做选择
-- 默认生成 Trait 文件
-- 添加 `-f` 覆盖已存在文件 model 和 factory 文件
-- 添加 `-F` 生成对应的 `factory` 文件，并更新到 `database/seeds/DatabaseSeeder.php`
-
-
-## 设置 `cors` 跨域设置
-
-修改 `config/cors.php` 加入 后台路径
-
-```php
-    //...
-    'paths' => ['admin/*', 'api/*'],
-    //...
-```
-
-## 路由设置
-
-### 注册新方法 `iResource`
-
-添加 `route` 的 `iResource` 方法，于 `app/Providers/RouteServiceProvider.php` 文件中：
-
-```php
-    //...
-    public function boot()
-    {
-        //
-        $this->registerMacros();
-
-        parent::boot();
-    }
-    //...
-    protected function registerMacros()
-    {
-        Route::macro('iResource', function($name, $controller) {
-            Route::get($name . '/trashed', $controller . '@trashed')->name($name . '.trashed');
-            Route::delete($name . '/forever/{id}', $controller . '@forceDestroy')->name($name . '.forceDestroy');
-            Route::delete($name . '/batch', $controller . '@destroyBatch')->name($name . '.destroyBatch');
-            Route::patch($name . '/restore', $controller . '@restore')->name($name . '.restore');
-            Route::resource($name, $controller);
-        });
-    }
-    //...
-```
-
-
-### 配置 `admin` 路由对应的中件间
-
-在 `app/Http/Kernel.php` 中添加
-
-```php
-    //...
-    protected $middlewareGroups = [
-        //...
-        'admin' => [
-            \Illuminate\Routing\Middleware\SubstituteBindings::class,
-        ],
-        //...
-    ];
-    //...
-```
-
-### 注册 `admin` 路由配置文件
-
-于 `app/Providers/RouteServiceProvider.php` 文件中，添加：
-
-```php
-    //...
-    public function map()
-    {
-        $this->mapApiRoutes();
-
-        $this->mapWebRoutes();
-
-        //
-        $this->mapAdminRoutes();
-    }
-
-    //...
-    protected function mapAdminRoutes()
-    {
-        Route::prefix('admin')
-             ->middleware('admin')
-             ->group(base_path('routes/admin.php'));
-    }
-    //...
-```
-
-
-## 创建控制器
-
-基础控制器支持自定义，可修改 `config/scaffold.php` 中的配置；
-
-```sh
-php artisan moo:controller `app_name` `schema_file_name`
-```
-
-- `schema_file_name` 非必写，若不写会有提示做选择
-- 添加 `-f` 覆盖已存在文件（Request 文件不会被覆盖，需要手动删除）
-- 同时会生成对应的 `From Request` 对象于 `app/Http/Requests/` 路径下（目录层次与 `Controller` 的一致）
-- 如果之前已经有 trait 文件了，并且存在 controller 文件，则不再生成 request 文件，避免删除了又重新生成
-- 
-_**!!! PS: !!!**_
-
-- `controller` 里的 `action` 是生成 `接口文档及调试` 的依据，`one action = one api`
-- 请先 **认真** 设置 `From Request` 里的验证规则，因为类里的验证规则是生成 `api` 及 `表单控件` 时的数据来源
-
-
-### 执行命令生成接口对应的配置文件
-
-生成接口测试 `yaml` 文件，后续调整 `controller` 时，若有删减会提示需要手动去掉 `yaml` 中对应的 `action` ，若有增加则会自动追加到 `yaml` 文件。
-
-```sh
-php artisan moo:api `namesapce`
-```
-
-- `namesapce` 非必写，若不写会有提示做选择（`app/controllers` 下的某个目录，或多级目录）
-- 添加 `-f` 覆盖已存在文件
-- 添加 `-i` 忽略用 `controller` 里的 `actions` 求交集 (见下方 PS2)
-- 添加 `--fresh` 刷新缓存数据，会先执行 `artisan moo:fresh`
-
-**PS1:**
-
-- api 里的参数 默认通过 `From Request` 对象 `验证规则` 里读取
-- 默认的接口名称通过 `"反射"` 控制器中动作的注释来获取
-
-**PS2:**
-
-```php
-Route::iResource('departments', \App\Admin\Controllers\System\DepartmentController::class);
-```
-
-- 要先设置好路由规则，程序通过 `Route::getRoutes()` 获取接口地址（但由于用了 `Route::resources`，实际 `action` 可能没那么多）
-- 用路由与控制器的 `actions` 求交集，得出真实的接口
-- 生成时：默认附加新的 `action` 到对应的接口 `yaml` 文件，
-- 生成时：若有 `action` 被删减会提醒，需要 `手工删除` 接口 `yaml` 文件中的代码
-
-## 更新 i18n 文件
-
-```sh
-php artisan moo:i18n
-```
-
-- 添加 `--fresh` 刷新缓存数据，会先执行 `artisan moo:fresh`
-- 目前支持 `英文` 、`中文` 两个语种
-- 可先润色 `scaffold/database/_fields.yaml` 里的内容，此文件会自动根据数据表的字段，添加或删掉项目
-
-## 快速导航
-
-- https://learnku.com/docs/laravel/8.5/validation/10378#189a36
-- https://fakerphp.github.io/formatters/numbers-and-strings/
-- https://github.com/fzaninotto/Faker/tree/master/src/Faker/Provider/zh_CN
+MIT

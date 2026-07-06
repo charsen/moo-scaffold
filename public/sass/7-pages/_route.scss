@@ -1,0 +1,802 @@
+// ==============================================================================
+// Page: 接口路由 (route/index)
+// 全部 class 名沿用旧版以保护 JS 选择器（route-row/route-module/route-sidebar-item 等）
+// ==============================================================================
+
+// route 视图把 .route-sidebar + .route-main 包在 .p-route-shell 里以避开 Blade @section 的限制（一个 section 只能有一个 root 元素），
+// 这里用 display: contents 让两个子级成为 .container 的直接 flex 子项
+.p-route-shell {
+  display: contents;
+}
+
+// route/index 用 two_columns layout（无 aside）；
+// .route-sidebar 和 .route-main 直接做 .container 的 flex 子项
+// 修饰类由 @section('container_class', 'is-route') 经 Shell prop 注入到 .container 上
+.container.pl0.is-route {
+  // 上下间距 / 卡片间距 直接继承 .container 默认（已与全局 token 对齐，不再覆盖）
+  gap: var(--scaffold-shell-gap);
+}
+
+// plan-32:.route-sidebar* ~220 行全删 — 已迁 <x-scaffold::side-tree>(组件视觉接管)
+// 旧版二级展开 / chevron / tree guide / bullet 已被 side-tree 内置能力(group + items + count + icon)替代
+// 保留 .route-main(db / dict / designer 仍在用)
+
+// plan-32:.p-route-shell 直接孩子 .side-tree 需要 page-level layout(sticky/宽/卡框 — 旧 .route-sidebar 同款)
+// 因为 .p-route-shell 是 display:contents,.side-tree 直接做 .container 的 flex 子项,不继承任何 width/sticky
+// route / db / dict / designer 4 个页面共用,同一规则一次写好
+.p-route-shell > .side-tree {
+  position: sticky;
+  top: calc(var(--shell-header-height) + var(--shell-content-top));
+  flex: 0 0 260px;
+  width: 260px;
+  max-height: calc(100vh - var(--shell-header-height) - var(--shell-content-top) - var(--space-5));
+  border: 1px solid var(--border-light);
+  border-radius: var(--shell-card-radius);
+  background: var(--bg-card);
+  box-shadow: var(--elevation-1);
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  // ---- 一级 module head:加重视觉权重(font-weight 600 + heading 色 + 卡片化 hover)
+  > .side-tree__list > .side-tree__group {
+    margin-bottom: var(--space-1);
+
+    > .side-tree__group-head {
+      padding: 6px var(--space-3) 6px var(--space-2);
+      // 字号 / weight / color 走组件默认(font-lg 18px / semibold / text-heading,陷阱 #21 设计意图)
+    }
+
+    > .side-tree__group-head:hover {
+      background: var(--bg-card-alt);
+    }
+  }
+
+  // ---- 二级 controller item:mono 字体 + 小字号 + side-tree 内置 status 点缀(灰圆点,跟 /api 同款)
+  // 不再加 vertical guide line 和 bullet ::before — 用 side-tree 内置 .side-tree__item-status 视觉
+  // .is-active 视觉走 side-tree 默认(accent bg + 左 accent 杠,todos 同款)
+  > .side-tree__list > .side-tree__group > .side-tree__items > .side-tree__item > .side-tree__item-link {
+    font-family: var(--font-family-mono);
+    font-size: var(--font-xs);
+    color: var(--text-secondary);
+  }
+
+  // 2026-05-22:.side-tree__count pill 视觉已上提到 _side-tree.scss base,本 page 不再 override
+}
+
+// 2026-05-30:本 .side-tree 规则被 route / db / dict / designer 4 页共用,但 subnav 只有 route.list 有。
+// 基础规则 top / max-height 只减了 header + content-top,漏减 subnav → 有 subnav 时 sticky 滑到 subnav
+// 下被遮、底部多出一个 subnav 高(48px),二级 controller 展开后末项溢出视口被裁。:has 限定只命中带
+// subnav 的 route 页补减,db/dict/designer(无 subnav)落基础规则不变。对称于 _header.scss 的
+// body:has(.scaffold-subnav-bar) .aside { top: +subnav }。
+body:has(.scaffold-subnav-bar) .p-route-shell > .side-tree {
+  top: calc(var(--shell-header-height) + var(--shell-subnav-height) + var(--shell-content-top));
+  max-height: calc(100vh - var(--shell-header-height) - var(--shell-subnav-height) - var(--shell-content-top) - var(--space-5));
+}
+
+// -------- 右侧主区 --------
+.route-main {
+  flex: 1;
+  min-width: 0;
+  // 滚动交给浏览器，去掉内部高度限制 / overflow
+}
+
+// plan-22 P1-S1: .p-route-hero / .p-route-hero-main 已删,统一走 <x-scaffold::hero>(见 6-components/_hero.scss)
+
+// 2026-05-22 plan-43 Batch E:.route-app-tabs + .route-app-tab 一族 ~52 行死类清(blade 内 page tabs 已砍,顶部 sub-nav 唯一 app switcher)
+
+// -------- 头部(搜索 + stats)--------
+// 2026-05-30:砍 hero 标题(跟顶部导航重复),搜索上移到 header 行 —— 搜索左 / stats 右。
+//            沿用原 hero 上下间距(--space-4 0 --space-5)。stats 用 .section-meta-inline 样式 + 靠右。
+.route-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 0 var(--space-5);   // 去掉上内边距:搜索条顶部跟左侧 sidebar 卡片顶部对齐(原 --space-4 把它压低了)
+  // 不 wrap:强制搜索 + stats 同一行(原 flex-wrap 让 stats 在宽度紧时掉到第二行)
+}
+.route-header .route-search-bar {
+  margin-bottom: 0;   // 进 header 后去掉自带下边距(header padding 管间距)
+  min-width: 0;       // 窄屏让搜索收缩,不顶掉 stats / 不溢出
+}
+.route-header__stats {
+  margin-left: auto;  // 顶到右侧(无 current_app 无搜索时也靠右)
+  flex-shrink: 0;     // 不被搜索挤压
+  flex-wrap: nowrap;  // stat 数字不内部折行(section-meta-inline 默认 wrap)
+}
+
+// -------- 搜索 --------
+// plan-34:.route-summary 并入 hero meta,只剩 search bar
+.route-search-bar {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.route-search-bar .input {
+  flex: 0 0 400px;   // 200px 基础上再加 200px = 400px(固定宽);.input 基础已带 1px 边框
+  max-width: 400px;
+}
+
+// -------- 模块卡片（折叠容器） --------
+.route-module {
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--border-light);
+  border-radius: var(--shell-card-radius);
+  background: var(--bg-card);
+  box-shadow: var(--elevation-1);
+  overflow: hidden;
+}
+
+.route-module-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  background: linear-gradient(135deg, var(--bg-card), var(--bg-card-alt));
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition-base);
+
+  &:hover {
+    background: var(--bg-card-alt);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent-hover-border);
+    outline-offset: -2px;
+  }
+}
+
+// .route-module-name 改为 h3 + .section-title-with-icon 后，
+// 字号 / 字重 / 颜色由通用组件接管，这里仅留 class 作 JS / 别处选择器钩子
+.route-module-name {
+  // 显式 reset 旧 span 的 font-md：让 .section-title-with-icon 的 font-lg 生效
+  font-size: inherit;
+}
+
+.route-module-meta {
+  color: var(--text-light);
+  font-size: var(--font-xs);
+}
+
+.route-module-toggle {
+  margin-left: auto;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--text-light);
+  transition: transform var(--transition-base);
+}
+
+.route-module.collapsed .route-module-toggle {
+  transform: rotate(-90deg);
+}
+
+.route-module.collapsed .route-module-body {
+  display: none;
+}
+
+.route-module-body {
+  overflow-x: auto;
+}
+
+// -------- 路由表（嵌入 route-module，无外框） --------
+.route-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-xs);
+}
+
+.route-table thead {
+  background: var(--bg-card-alt);
+}
+
+.route-table th {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  color: var(--text-light);
+  font-weight: var(--weight-semibold);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.route-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-row);
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+.route-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.route-table tbody tr:hover {
+  background: var(--bg-card-alt);
+}
+
+// 控制器分组行（跨 9 列的子标题）
+.route-group-row td {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--accent-text);
+  background: var(--accent-bg);
+  border-bottom: 1px solid var(--accent-border);
+  letter-spacing: .02em;
+}
+
+// 2026-05-28 phase C-5:去 !important — 用 specificity(tbody + class)压过 `.route-table tbody tr:hover` (L189),
+//                       group-row 是分组标题不响应 hover 视觉,保持 accent-bg
+.route-table tbody .route-group-row:hover td {
+  background: var(--accent-bg);
+}
+
+// 列宽
+.col-index      { width: 40px; text-align: center; color: var(--text-light); font-size: 11px; }
+.col-api-name   { width: 200px; color: var(--text-heading); font-weight: var(--weight-medium); }
+.col-method     { width: 96px; }
+.col-uri        { min-width: 200px; }
+.col-controller { width: 130px; }
+.col-action     { width: 120px; }
+.col-acl        { min-width: 160px; }
+.col-acl-hash   { min-width: 120px; }
+.col-links      { width: 110px; white-space: nowrap; }
+
+// 行内 code（uri / acl）
+.route-table code {
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-card-alt);
+  color: var(--text-heading);
+  font-size: var(--font-xs);
+  font-family: var(--font-family-mono);
+  word-break: break-all;
+}
+
+.acl-code {
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-card-alt);
+  color: var(--text-desc);
+  font-size: 11px;
+  font-family: var(--font-family-mono);
+  word-break: break-all;
+}
+
+// -------- 空状态 --------
+.route-empty {
+  padding: var(--space-10) 0;
+  text-align: center;
+  color: var(--text-light);
+  font-size: var(--font-base);
+}
+
+// ============================================================================
+// plan-29 · 接口路由合并 ACL 抽屉
+// ============================================================================
+
+// 行交互:整行可点击 + hover 高亮(让用户知道点击有反馈)
+.route-row {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+
+  &:hover {
+    background: var(--bg-card-alt);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: -2px;
+  }
+}
+
+// 白名单 chip(在接口名称单元格,跟 ACL 颜色语义对齐:绿=安全/允许)
+.route-whitelist-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  margin-left: var(--space-2);
+  font-size: 11px;
+  font-weight: var(--weight-medium);
+  color: var(--badge-green);
+  background: var(--badge-green-bg);
+  border-radius: var(--radius-xs);
+  vertical-align: middle;
+
+  &--sm {
+    margin-left: var(--space-1);
+    padding: 0 4px;
+    font-size: 10px;
+  }
+}
+
+// 顶部 filter chip(只看白名单)
+.route-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-pill);
+  background: var(--bg-card);
+  font-size: var(--font-sm);
+  color: var(--text-body);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+
+  &:hover {
+    border-color: var(--accent-hover-border);
+  }
+
+  &:has(input:checked) {
+    border-color: var(--badge-green);
+    color: var(--badge-green);
+    background: var(--badge-green-bg);
+  }
+
+  input[type="checkbox"] {
+    margin: 0;
+    accent-color: var(--badge-green);
+  }
+
+  &__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: 9px;
+    background: var(--border-light);
+    color: var(--text-desc);
+    font-size: 11px;
+    line-height: 1;
+  }
+}
+
+// 抽屉
+.p-route-drawer {
+  font-size: var(--font-sm);
+  color: var(--text-body);
+  line-height: var(--line-base);
+}
+
+.p-route-drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.p-route-drawer__methoduri {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--bg-card-alt);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-sm);
+  color: var(--text-heading);
+  word-break: break-all;
+}
+
+.p-route-drawer__methods {
+  font-weight: var(--weight-semibold);
+  color: var(--accent-text);
+  font-size: var(--font-xs);
+}
+
+.p-route-drawer__uri { color: var(--text-heading); }
+
+.p-route-drawer__zh-path {
+  margin: var(--space-2) 0;
+  font-size: var(--font-sm);
+  color: var(--text-desc);
+}
+
+.p-route-drawer__desc {
+  margin: var(--space-2) 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-card-alt);
+  border-left: 3px solid var(--border-light);
+  border-radius: var(--radius-xs);
+  font-size: var(--font-xs);
+  color: var(--text-desc);
+}
+
+// ACL key 明 / 密文 dl
+.p-route-drawer__keys {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  background: var(--bg-card-alt);
+  border-radius: var(--radius-xs);
+
+  dt {
+    font-size: var(--font-sm);
+    font-weight: var(--weight-medium);
+    color: var(--text-body);
+    align-self: center;
+  }
+  dd {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+
+    code {
+      flex: 1;
+      padding: 3px 8px;
+      background: var(--bg-card);
+      border-radius: var(--radius-xs);
+      font-family: var(--font-family-mono);
+      font-size: var(--font-sm);
+      color: var(--text-heading);
+      word-break: break-all;
+      overflow: hidden;
+    }
+  }
+}
+
+.p-route-drawer__copy {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border-light);
+  background: var(--bg-card);
+  border-radius: var(--radius-xs);
+  font-size: var(--font-xs);
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+
+  &:hover { border-color: var(--accent-hover-border); }
+}
+
+// 兄弟 actions 列表
+.p-route-drawer__siblings {
+  margin-top: var(--space-4);
+
+  ul {
+    list-style: none;
+    padding: 0;
+    margin: var(--space-2) 0 0;
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-xs);
+  }
+  li { border-bottom: 1px solid var(--border-light); }
+  li:last-child { border-bottom: none; }
+}
+
+.p-route-drawer__section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--font-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text-heading);
+}
+
+.p-route-drawer__count {
+  font-size: 11px;
+  color: var(--text-desc);
+  font-weight: normal;
+}
+
+.p-route-drawer__sibling {
+  display: grid;
+  grid-template-columns: 60px 1fr auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  font-size: var(--font-xs);
+
+  &:hover { background: var(--bg-card-alt); }
+  &.is-current { background: var(--bg-page); }
+}
+
+.p-route-drawer__sibling-method {
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  color: var(--accent-text);
+  font-weight: var(--weight-semibold);
+}
+
+.p-route-drawer__sibling-uri {
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  color: var(--text-body);
+  padding: 1px 4px;
+  background: var(--bg-card-alt);
+  border-radius: var(--radius-xs);
+  word-break: break-all;
+}
+
+.p-route-drawer__sibling-name {
+  color: var(--text-desc);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.p-route-drawer__missing {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  background: var(--badge-orange-bg);
+  border-left: 3px solid var(--badge-orange);
+  border-radius: var(--radius-xs);
+  font-size: var(--font-xs);
+  color: var(--badge-orange);
+  line-height: 1.6;
+
+  code {
+    background: var(--bg-card);   // 2026-05-28 phase C-2:原 rgba(0,0,0,.04) 在暗模(黑底)肉眼无底色 → 走 token
+    padding: 1px 4px;
+    border-radius: var(--radius-xs);    // plan-43 B token 收口
+    font-family: var(--font-family-mono);
+  }
+}
+
+.p-route-drawer__source {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--border-light);
+  font-size: 11px;
+  color: var(--text-light);
+
+  code {
+    color: var(--text-desc);
+    font-family: var(--font-family-mono);
+  }
+}
+
+// plan-29 #2 B:抽屉内 section 标题,统一字号 + 权重,视觉跟"同 controller 兄弟 actions"对齐
+.p-route-drawer__label {
+  display: inline-block;
+  font-size: var(--font-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text-heading);
+  margin-bottom: var(--space-2);
+  letter-spacing: 0;
+}
+
+.p-route-drawer__file {
+  margin: var(--space-3) 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-card-alt);
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+
+  code {
+    flex: 1;
+    padding: 2px 6px;
+    background: var(--bg-card);
+    border-radius: var(--radius-xs);
+    font-family: var(--font-family-mono);
+    font-size: 11px;
+    color: var(--text-heading);
+    word-break: break-all;
+    min-width: 0;
+  }
+}
+
+.p-route-drawer__middleware {
+  margin: var(--space-3) 0;
+}
+
+.p-route-drawer__mw-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+
+  li code {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--bg-card-alt);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-pill);
+    font-family: var(--font-family-mono);
+    font-size: 11px;
+    color: var(--text-body);
+  }
+}
+
+.p-route-drawer__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+  flex-wrap: wrap;
+}
+
+.p-route-drawer__action-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  font-size: var(--font-sm);
+  color: var(--text-body);
+  text-decoration: none;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--accent-hover-border);
+    background: var(--bg-card-alt);
+  }
+
+  &--primary {
+    border-color: var(--accent-text);
+    background: var(--accent-bg);
+    color: var(--accent-text);
+
+    &:hover {
+      background: var(--accent-text);
+      color: var(--bg-card);
+    }
+  }
+}
+
+// plan-29 #3 C1:curl 块
+.p-route-drawer__curl {
+  margin: var(--space-3) 0;
+
+  .p-route-drawer__label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    .p-route-drawer__copy {
+      margin-left: var(--space-2);
+    }
+  }
+}
+
+.p-route-drawer__curl-pre {
+  margin: var(--space-1) 0 var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xs);
+  overflow-x: auto;
+  max-height: 180px;
+  overflow-y: auto;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-body);
+  white-space: pre;
+  word-break: keep-all;
+}
+
+.p-route-drawer__curl-hint {
+  margin: 2px 0 0;
+  font-size: 10px;
+  color: var(--text-light);
+}
+
+// plan-29 #3 C3:跨 app 对照
+.p-route-drawer__cross {
+  margin: var(--space-3) 0;
+
+  small {
+    font-size: 10px;
+    color: var(--badge-orange);
+    text-transform: none;
+    letter-spacing: 0;
+    margin-left: var(--space-1);
+  }
+}
+
+.p-route-drawer__cross-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+
+.p-route-drawer__cross-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-pill);
+  background: var(--bg-card);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  color: var(--text-body);
+  text-decoration: none;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+
+  &:hover {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+  }
+}
+
+// plan-29 fix:transform_methods 提示块(create→store 这种 resource action 鉴权目标说明)
+.p-route-drawer__transform {
+  margin: -4px 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--badge-blue-bg);
+  border-left: 3px solid var(--badge-blue);
+  border-radius: var(--radius-xs);
+
+  .p-route-drawer__label {
+    display: block;
+    color: var(--badge-blue);
+    margin-bottom: var(--space-1);
+
+    small {
+      font-size: 10px;
+      color: var(--text-desc);
+      text-transform: none;
+      letter-spacing: 0;
+      margin-left: var(--space-1);
+      font-weight: normal;
+    }
+  }
+}
+
+.p-route-drawer__transform-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 2px 0;
+    font-size: 11px;
+
+    code {
+      padding: 2px 6px;
+      background: var(--bg-card);
+      border-radius: var(--radius-xs);
+      font-family: var(--font-family-mono);
+      color: var(--text-heading);
+      word-break: break-all;
+    }
+  }
+}
+
+.p-route-drawer__transform-key {
+  flex-shrink: 0;
+  width: 70px;
+  font-size: 10px;
+  color: var(--text-desc);
+  text-transform: uppercase;
+}

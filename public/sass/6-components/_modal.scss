@@ -1,0 +1,140 @@
+// ==============================================================================
+// Component: Modal
+// 对应 Blade: <x-scaffold::modal name="..." title="..." size="sm|md|lg">
+//             <x-slot:footer>...</x-slot:footer>
+//             body...
+//          </x-scaffold::modal>
+//
+// Alpine 控制：父级 x-data 暴露 `name` 属性（boolean）；@click backdrop / Esc 由父级或
+// dismissible prop 处理；本组件只负责 markup + 样式。
+// ==============================================================================
+
+.modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-5);
+}
+
+// 2026-05-22 plan-43 Batch B:走 --popover-backdrop token,跟 drawer/popover 三态统一
+.modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: var(--popover-backdrop);
+    backdrop-filter: blur(2px);
+}
+
+.modal-panel {
+    position: relative;
+    width: 100%;
+    max-width: 640px;
+    max-height: calc(100vh - var(--space-7));
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    box-shadow: var(--elevation-3);
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-panel--sm { max-width: 420px; }
+.modal-panel--lg { max-width: 880px; }
+
+// 2026-05-22 plan-43 Batch D:danger tone(scaffoldConfirm danger=true / 业务 destructive confirm)
+// 红顶 3px border + 红色标题前 ⚠ icon,跟 designer .p-designer-rename-popover--danger 视觉一脉相承
+.modal-panel--danger {
+    border-top: 3px solid var(--badge-red);
+
+    .modal-header h3::before {
+        content: "⚠";
+        margin-right: var(--space-2);
+        color: var(--badge-red);
+    }
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: var(--font-md);
+    color: var(--text-heading);
+    font-weight: var(--weight-semibold);
+}
+
+.modal-close {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: var(--text-desc);
+    cursor: pointer;
+    border-radius: var(--radius-xs);
+
+    &:hover { background: var(--bg-card-alt); }
+}
+
+.modal-body {
+    padding: var(--space-4);
+    overflow-y: auto;
+    flex: 1 1 auto;
+    color: var(--text-body);
+}
+
+.modal-body p { margin: 0; line-height: var(--line-base); font-size: var(--font-sm); }
+.modal-body code {
+    background: var(--bg-card-alt);
+    padding: 1px 6px;
+    border-radius: var(--radius-xs);
+    font-family: var(--font-family-mono);
+}
+
+// plan-22 Q4: challenge text 二次确认输入框(purge 等破坏性操作要求输匹配文本才能 confirm)
+.modal-challenge {
+    margin-top: var(--space-4);
+    padding-top: var(--space-4);
+    border-top: 1px dashed var(--border-light);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+.modal-challenge__label {
+    font-size: var(--font-sm);
+    color: var(--text-desc);
+}
+.modal-challenge__input {
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border-light);
+    border-radius: var(--shell-control-radius);
+    background: var(--bg-card);
+    font-size: var(--font-sm);
+    font-family: var(--font-family-mono);
+    color: var(--text-body);
+
+    &:focus {
+        outline: none;
+        border-color: var(--accent-hover-border);
+        box-shadow: 0 0 0 3px var(--accent-hover-shadow);
+    }
+}
+
+.modal-footer {
+    display: flex;
+    gap: var(--space-2);
+    justify-content: flex-end;
+    padding: var(--space-3) var(--space-4);
+    border-top: 1px solid var(--border-light);
+}

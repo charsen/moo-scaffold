@@ -1,0 +1,15 @@
+{
+    "name": "@charsen/moo-scaffold",
+    "private": true,
+    "description": "Playwright e2e suite for scaffold designer UI(独立于宿主项目 npm 依赖)",
+    "scripts": {
+        "build:css": "npx sass public/sass/index.scss public/css/index.css --style=compressed --no-source-map",
+        "test:e2e": "playwright test",
+        "test:e2e:safe": "bash -c 'playwright test \"$@\"; r=$?; [ -n \"$E2E_HOST_SCAFFOLD_DB_PATH\" ] && git -C \"$E2E_HOST_SCAFFOLD_DB_PATH\" checkout . >/dev/null 2>&1; exit $r' --",
+        "test:e2e:ui": "playwright test --ui",
+        "test:e2e:auth": "playwright codegen --save-storage=tests/Browser/.auth/admin.json ${E2E_BASE_URL:-http://localhost}/scaffold"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.60.0"
+    }
+}

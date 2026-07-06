@@ -1,0 +1,211 @@
+// type
+body {
+    line-height: var(--line-base);
+    font-family: var(--font-family-base);
+    font-size: var(--font-base);
+    -webkit-font-smoothing: antialiased;
+    -moz-font-smoothing: antialiased;
+    font-smoothing: antialiased;
+    color: var(--text-primary);
+    background-color: var(--bg-page);
+}
+
+// scrollbar
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+    border-radius: 3px;
+    background: var(--scrollbar-thumb);
+    &:hover {
+        background: var(--scrollbar-thumb-hover);
+    }
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+a {
+    color: var(--text-primary);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    &:hover{
+        color: var(--accent-hover-border);
+    }
+}
+
+em, i{
+    font-style: normal;
+}
+
+img{
+    vertical-align: middle;
+}
+
+input[type=text],
+input[type=password],
+input[type=tel],
+input[type=number],
+button,
+textarea{
+    -webkit-appearance: none;
+}
+
+button{
+    border: 0;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    outline: none;
+}
+
+// 2026-05-22 plan-43 Batch C:appearance:none 干掉原生箭头同时上提默认 chevron
+// (`:where` 保证特异性 0,page 局部 select 类可无障碍覆盖,如 .p-designer-fields__select 自带 chevron 不冲突)
+select:where(:not([multiple]):not([size])) {
+    appearance: none;
+    -moz-appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4 L5 7 L8 4' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 10px 10px;
+    padding-right: 24px;     // 留 chevron 视觉空间
+}
+// list-style select(multiple / size>1)无需箭头
+select[multiple],
+select[size] {
+    appearance: none;
+    -moz-appearance: none;
+    -webkit-appearance: none;
+}
+
+textarea{
+    resize: none;
+}
+
+h1, h2, h3, h4, h5, h6, p {
+    margin: 0;
+    font-weight: normal;
+}
+
+h1{
+    font-size: var(--font-2xl);
+}
+
+h2{
+    font-size: var(--font-xl);
+}
+
+h3{
+    font-size: var(--font-lg);
+}
+
+input,
+textarea{
+    outline: medium;
+}
+
+
+// shortcut
+@for $i from 1 through 5 {
+    $odd: 5px !default;
+    .mt#{$i}0 {
+        margin-top: $i * 10px !important;
+    }
+    .mt#{$i}5 {
+        margin-top: $i * 10px + $odd !important;
+    }
+    .mr#{$i}0 {
+        margin-right: $i * 10px !important;
+    }
+    .mr#{$i}5 {
+        margin-right: $i * 10px + $odd !important;
+    }
+    .mb#{$i}0 {
+        margin-bottom: $i * 10px !important;
+    }
+    .mb#{$i}5 {
+        margin-bottom: $i * 10px + $odd !important;
+    }
+    .ml#{$i}0 {
+        margin-left: $i * 10px !important;
+    }
+    .ml#{$i}5 {
+        margin-left: $i * 10px + $odd !important;
+    }
+}
+
+.text-center {
+    text-align: center !important;
+}
+
+.text-right{
+    text-align: right !important;
+}
+
+.text-left{
+    text-align: left !important;
+}
+
+.hide{
+    display: none;
+}
+
+.font-red{
+    color: var(--text-error) !important;
+}
+
+.font-blue{
+    color: var(--link-color) !important;
+}
+
+.font-white{
+    color: #fff !important;
+}
+
+.font-orange{
+    color: var(--accent-text) !important;
+}
+
+.font-green{
+    color: var(--badge-green) !important;
+}
+
+.font-gray{
+    color: var(--text-muted) !important;
+}
+
+// ==============================================================================
+// 可访问性：尊重用户的减少动效偏好（WCAG 2.3.3）
+// ==============================================================================
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+// ==============================================================================
+// 通用工具类（从 _legacy.scss 提出）
+// ==============================================================================
+
+.link {
+    color: var(--link-color);
+}
+
+// 从退役的 runtime/sql-slow 查看器页样式中提出的通用工具类（dashboard / config / accounts / route 等仍在用）
+.text-muted { color: var(--text-light); }
+.small { font-size: 12px; }

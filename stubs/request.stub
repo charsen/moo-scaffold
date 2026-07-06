@@ -1,0 +1,28 @@
+<?php declare(strict_types = 1);
+/*
+ * @Author: {{author}}
+ * @Date: {{date}}
+ * @LastEditors: {{author}}
+ * @LastEditTime: {{date}}
+ * @Description: {{request_name}}
+ */
+
+namespace {{namespace}};
+
+{{use_custom_rules}}
+use {{use_base_request}};
+
+class {{request_name}} extends FormRequest
+{
+    use {{trait_name}};
+
+    /**
+     * Get the validation rules that apply to the request.
+     */
+    public function rules(): array
+    {
+        return {{rules}};
+    }
+    
+{{form_layout}}
+}

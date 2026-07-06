@@ -1,0 +1,25 @@
+#
+# Scaffold 开发人员账号模板（plan 18）
+#
+# 用法：首次运行 `php artisan moo:account:add` 会从此模板初始化 scaffold/accounts.yaml；
+#       后续由 scaffold UI / CLI 维护。
+# 注意：accounts.yaml 跟随 git（团队 + 远程部署同步），密码以 bcrypt hash 存储。
+#       本模板入 git，请勿写入真实密码。
+
+meta:
+    schema_version: 1
+    updated_at: ''
+    updated_by: ''
+    source: stub                  # stub | scaffold-ui | cli
+    count: 0
+
+accounts:
+    # 示例：一个普通 admin（首次启动用，登录后请立即改密）
+    # 此处明文 '123654' 会在 store 首次写入时自动 bcrypt 化
+    - username: admin
+      password: '123654'
+      phone: ''
+      role: admin                 # admin | member
+      enabled: true
+      created_at: ''
+      updated_at: ''

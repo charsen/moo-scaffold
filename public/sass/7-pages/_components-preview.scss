@@ -1,0 +1,96 @@
+// ==============================================================================
+// Page: /scaffold/_components 组件预览页（仅 APP_DEBUG=true 启用）
+// 对应 view: src/Http/Views/_components.blade.php
+// .pv-* 前缀以避免与业务类名冲突
+// ==============================================================================
+
+.pv-body {
+    margin: 0;
+    padding: var(--space-8);
+    min-height: 100vh;
+    background: var(--bg-page);
+    color: var(--text-body);
+    font-family: var(--font-family-base);
+    font-size: var(--font-base);
+    line-height: var(--line-base);
+}
+
+.pv-wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+}
+
+.pv-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    h1 {
+        margin: 0;
+        color: var(--text-heading);
+        font-size: var(--font-xl);
+        font-weight: var(--weight-semibold);
+    }
+}
+
+.pv-section {
+    padding: var(--space-6);
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+
+    h2 {
+        margin: 0 0 var(--space-4);
+        color: var(--text-heading);
+        font-size: var(--font-md);
+        font-weight: var(--weight-semibold);
+
+        code {
+            font-weight: var(--weight-regular);
+            color: var(--text-desc);
+            font-size: var(--font-sm);
+        }
+    }
+}
+
+.pv-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+    margin-bottom: var(--space-4);
+
+    &:last-child { margin-bottom: 0; }
+    &--top { align-items: flex-start; }
+}
+
+.pv-label {
+    width: 110px;
+    flex-shrink: 0;
+    color: var(--text-desc);
+    font-size: var(--font-sm);
+}
+
+.pv-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+}
+
+.pv-w200 { flex: 1; max-width: 200px; }
+.pv-w280 { flex: 1; max-width: 280px; }
+.pv-w320 { flex: 1; max-width: 320px; }
+
+.pv-section code,
+.pv-head code,
+.pv-row code {
+    font-family: var(--font-family-mono);
+    font-size: var(--font-sm);
+    padding: var(--space-1) var(--space-2);
+    background: var(--bg-code);
+    border-radius: var(--radius-xs);
+    color: var(--text-body);
+}

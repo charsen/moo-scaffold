@@ -1,0 +1,33 @@
+<?php declare(strict_types = 1);
+/*
+ * @Author: {{author}}
+ * @Date: {{date}}
+ * @LastEditors: {{author}}
+ * @LastEditTime: {{date}}
+ * @Description: {{entity_name}}控制器
+ */
+
+namespace {{namespace}};
+
+use {{use_controller_trait}};
+use {{use_base_controller}};
+
+/**
+ * ACL
+ *
+ * @package_name {zh-CN: {{package_name}} | en: {{package_en_name}}}
+ * @module_name {zh-CN: {{module_name}} | en: {{module_en_name}}}
+ * @controller_name {zh-CN: {{entity_name}} | en: {{entity_en_name}}}
+ */
+class {{controller_name}}Controller extends Controller
+{
+    use {{controller_name}}Trait;
+
+    /**
+     * Constructor
+     */
+    public function __construct()
+    {
+        // $this->model = $model;
+    }
+}

@@ -1,0 +1,275 @@
+// ==============================================================================
+// Page: Accounts (开发人员管理)
+// 对应 Blade: src/Http/Views/accounts/index.blade.php
+// plan-22 T8: 从 accounts/index.blade.php 的 inline <style> 块外迁
+//
+// C 方案(2026-05-18):layouts.app → layouts.two_columns
+// .p-acc-page = 外层 flex 二列(sidebar + main)
+// .p-acc-page__sidebar = 240px sticky(共用 .p-config-page__sidebar 的 api-debug-list 内嵌样式)
+// .p-acc-shell = main 列(保留命名,旧 SCSS 表格/modal 规则继续命中)
+// ==============================================================================
+
+[x-cloak] { display: none !important; }
+
+// display: contents 让 wrapper 视觉消失,sidebar + main 直接做 .container 的 flex 子项
+.p-acc-page {
+    display: contents;
+}
+
+.p-acc-page__sidebar {
+    flex: 0 0 240px;
+    position: sticky;
+    top: calc(var(--shell-header-height) + var(--space-3));
+    max-height: calc(100vh - var(--shell-header-height) - var(--space-6));
+    overflow-y: auto;
+    padding: var(--space-2) 0;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--shell-card-radius);
+    box-shadow: var(--elevation-1);
+}
+
+.p-acc-shell {
+    flex: 1;
+    min-width: 0;
+    padding: var(--space-3) var(--space-5) var(--space-6); // 对齐 recorder-page 家族(runtime/sql-slow/todos)12/20/24
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--shell-card-radius);
+    box-shadow: var(--elevation-1);
+}
+
+.p-acc-meta {
+    display: flex;
+    gap: var(--space-5);
+    flex-wrap: wrap;
+    margin: var(--space-3) 0 var(--space-4);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border-light);
+    font-size: var(--font-sm);
+    color: var(--text-desc);
+
+    strong { color: var(--text-heading); }
+    code { background: transparent; padding: 0; }
+}
+
+.p-acc-flash {
+    margin: 0 0 var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+}
+.p-acc-flash--ok {
+    background: var(--badge-green-bg);
+    border-left: 3px solid var(--badge-green);
+    color: var(--text-heading);
+}
+.p-acc-flash--err {
+    background: var(--badge-red-bg);
+    border-left: 3px solid var(--badge-red);
+    color: var(--badge-red);
+}
+
+// 2026-05-22 plan-43 Batch A:.p-acc-token-full / -token-cell / -token 兼容兜底类清(scaffold 哲学 trust internal code 砍兜底)
+.acc-null { color: var(--text-muted); font-size: var(--font-xs); }
+
+// 通用 icon-only 按钮
+.p-acc-iconbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    margin: 0;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-xs);
+    background: var(--bg-card);
+    color: var(--text-desc);
+    cursor: pointer;
+    transition: background var(--transition-fast),
+                color var(--transition-fast),
+                border-color var(--transition-fast);
+
+    &:hover {
+        background: var(--accent-bg);
+        color: var(--accent-text);
+        border-color: var(--accent-text);
+    }
+    // 2026-05-22 plan-43 Batch C:icon button 加 focus-visible 焦点环(键盘可达性)
+    &:focus-visible {
+        outline: 2px solid var(--accent-hover-border);
+        outline-offset: 1px;
+    }
+    &.is-copied {
+        background: var(--badge-green-bg);
+        color: var(--badge-green);
+        border-color: var(--badge-green);
+    }
+    &.is-error,
+    &--danger:hover {
+        background: var(--badge-red-bg);
+        color: var(--badge-red);
+        border-color: var(--badge-red);
+    }
+    &.is-off { opacity: .55; }
+}
+
+// fixed layout:百分比列宽生效,用户名列不再独吞富余横向空间(否则它是唯一贪婪列)
+.p-acc-table {
+    table-layout: fixed;
+    width: 100%;
+}
+// 序号列:居中、弱化、等宽数字
+.p-acc-idx {
+    text-align: center;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.p-acc-table .is-disabled { opacity: .55; }
+.p-acc-actions {
+    white-space: nowrap;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+
+    form { margin: 0; display: inline-flex; }
+}
+
+// ── 身份单元:首字母头像(状态点叠角)+ 名称块(+ 折叠手机号) ──
+.p-acc-id {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+}
+.p-acc-avatar {
+    position: relative;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-pill);
+    font-size: var(--font-sm);
+    font-weight: 600;
+    line-height: 1;
+    user-select: none;
+    // 色相由行内 --h(crc32(username) % 360)驱动,亮暗双轨各自取明度
+    background: hsl(var(--h, 220) 55% 90%);
+    color: hsl(var(--h, 220) 42% 32%);
+
+    &.is-off {
+        background: var(--bg-input-readonly);
+        color: var(--text-muted);
+    }
+}
+[data-theme="dark"] .p-acc-avatar {
+    background: hsl(var(--h, 220) 28% 24%);
+    color: hsl(var(--h, 220) 60% 74%);
+
+    &.is-off {
+        background: var(--bg-input-readonly);
+        color: var(--text-muted);
+    }
+}
+.p-acc-avatar__dot {
+    position: absolute;
+    right: -1px;
+    bottom: -1px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--badge-green);
+    border: 2px solid var(--bg-card);
+}
+.p-acc-avatar.is-off .p-acc-avatar__dot {
+    background: var(--text-muted);
+}
+.p-acc-id__text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+.p-acc-id__name {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+
+    strong { color: var(--text-heading); font-weight: 600; }
+}
+.p-acc-id__off {
+    font-size: var(--font-xs);
+    color: var(--text-muted);
+}
+.p-acc-id__phone {
+    font-size: var(--font-xs);
+    color: var(--text-desc);
+    font-variant-numeric: tabular-nums;
+}
+
+// 新增/编辑弹窗:表单网格
+.p-acc-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: var(--space-3) var(--space-4);
+
+    label {
+        display: block;
+        font-size: var(--font-sm);
+
+        > span {
+            display: block;
+            margin-bottom: var(--space-1);
+            color: var(--text-desc);
+
+            em {
+                color: var(--badge-red);
+                font-style: normal;
+                margin-left: 2px;
+            }
+        }
+    }
+    input, select {
+        width: 100%;
+        padding: 6px 10px;
+        border: 1px solid var(--border-input);
+        border-radius: var(--radius-xs);
+        font: inherit;
+        // 用 background-color 而非 background 简写:简写会把全局 select chevron 的 background-image
+        // (base/_scaffolding.scss `select:where()`)一并重置成 none → 身份下拉框丢箭头。
+        background-color: var(--bg-input);
+        color: var(--text-primary);
+
+        &:focus {
+            // 2026-05-22 plan-43 Batch C:focus ring 全包统一 (border-color + box-shadow 3px ring token)
+            border-color: var(--accent-hover-border);
+            outline: none;
+            box-shadow: 0 0 0 3px var(--accent-hover-shadow);
+        }
+    }
+    // 上面 padding 简写把全局 chevron 需要的 padding-right:24px 也覆盖了,给 select 单独补回留出箭头空间
+    select {
+        padding-right: 24px;
+    }
+    input[readonly] {
+        background: var(--bg-input-readonly);
+        cursor: not-allowed;
+    }
+    small {
+        display: block;
+        margin-top: var(--space-1);
+        font-size: var(--font-xs);
+        color: var(--text-muted);
+    }
+}
+.p-acc-form-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-top: var(--space-6);
+
+    input { width: auto; }
+}

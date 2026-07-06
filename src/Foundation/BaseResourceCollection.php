@@ -1,37 +1,36 @@
-<?php
+<?php declare(strict_types=1);
+
+/*
+ * @Author: Charsen
+ * @Date: 2024-07-29 16:22
+ * @LastEditors: Charsen
+ * @LastEditTime: 2025-07-29 16:39
+ * @Description: Base Resource Collection
+ */
 
 namespace Mooeen\Scaffold\Foundation;
 
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 
-/**
- * resource collection.
- */
 class BaseResourceCollection extends ResourceCollection
 {
-    protected mixed $withoutFields = [];
+    use BaseResourceTrait;
+
+    protected mixed $customFields = [];
+
+    protected bool $hide = true;
+
+    protected bool $trashed = false;
 
     /**
      * 将资源集合转换为数组
      *
      * @return array<string, mixed>
      */
-    public function toArray($request): array
+    public function toArray(Request $request): array
     {
         return $this->processCollection($request);
-    }
-
-    /**
-     * Set the keys that are supposed to be filtered out.
-     *
-     *
-     * @return $this
-     */
-    public function hide(mixed $fields): self
-    {
-        $this->withoutFields = $fields;
-
-        return $this;
     }
 
     /**
@@ -39,25 +38,30 @@ class BaseResourceCollection extends ResourceCollection
      *
      * @return array<string, mixed>
      */
-    protected function processCollection($request): array
+    protected function processCollection(Request $request): array
     {
         return $this->collection->map(function (BaseResource $resource) use ($request) {
-            return $resource->hide($this->withoutFields)->toArray($request);
+            return (! $this->hide)
+                ? $resource->show($this->customFields)->trashed($this->trashed)->toArray($request)
+                : $resource->hide($this->customFields)->trashed($this->trashed)->toArray($request); // except()
         })->all();
     }
 
     /**
-     * 自定义分页信息
+     * custom pagination information
      */
-    //    public function paginationInformation($request, $paginated, $default): array
-    //    {
-    //        return [
-    //            'meta' => [
-    //                'page'       => $paginated['current_page'],
-    //                'per_page'   => $paginated['per_page'],
-    //                'total'      => $paginated['total'],
-    //                'total_page' => $paginated['last_page'],
-    //            ],
-    //        ];
-    //    }
+    public function paginationInformation($request, $paginated, $default): array
+    {
+        // 2026-05-24 audit P1:$default['meta'] 在非分页 collection 上可能缺失,加 ?? null 守护
+        $meta = $default['meta'] ?? [];
+
+        return [
+            'meta' => [
+                'page'       => $meta['current_page'] ?? null,
+                'per_page'   => $meta['per_page']     ?? null,
+                'total'      => $meta['total']        ?? null,
+                'total_page' => $meta['last_page']    ?? null,
+            ],
+        ];
+    }
 }

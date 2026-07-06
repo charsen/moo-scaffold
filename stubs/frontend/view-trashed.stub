@@ -1,0 +1,15 @@
+<template>
+  <ScaffoldTrashed :entity="entity" :actions="actions">
+  </ScaffoldTrashed>
+</template>
+
+<script setup lang="ts">
+  import { getTrashedActions } from '@/utils/auth'
+
+  const entity = '{{model_class}}'
+  const actions = getTrashedActions('{{acl_key}}')
+
+  defineOptions({
+    name: `${entity}Trashed`,
+  })
+</script>

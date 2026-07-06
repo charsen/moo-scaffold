@@ -1,58 +1,35 @@
-<?php
+<?php declare(strict_types=1);
+
+/*
+ * @Author: Charsen
+ * @Date: 2024-07-29 16:22
+ * @LastEditors: Charsen
+ * @LastEditTime: 2025-07-16 11:06
+ * @Description: Create a new module schema
+ */
 
 namespace Mooeen\Scaffold\Command;
 
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Mooeen\Scaffold\Generator\CreateSchemaGenerator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
-/**
- * Create a new module schema
- *
- * @author Charsen https://github.com/charsen
- */
 class CreateSchemaCommand extends Command
 {
-    /**
-     * The console command title.
-     *
-     * @var string
-     */
-    protected $title = 'Create a new module schema';
+    protected string $title = 'Create a new module schema';
 
-    /**
-     * The console command name.
-     *
-     * @var string
-     */
     protected $name = 'moo:schema';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
     protected $description = 'Create a new module schema';
 
-    /**
-     * Get the console command options.
-     */
     protected function getOptions(): array
     {
         return [
-            [
-                'force',
-                '-f',
-                InputOption::VALUE_OPTIONAL,
-                'Overwrite the schema file.',
-                false,
-            ],
+            ['force', '-f', InputOption::VALUE_OPTIONAL, 'Overwrite the schema file.', false],
         ];
     }
 
-    /**
-     * Get the console command arguments.
-     */
     protected function getArguments(): array
     {
         return [
@@ -61,28 +38,28 @@ class CreateSchemaCommand extends Command
     }
 
     /**
-     * Execute the console command.
-     *
-     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     * @throws FileNotFoundException
      */
-    public function handle(): bool
+    public function handle(): void
     {
-        $this->alert($this->title);
+        $this->showTitle();
 
-        $this->checkRunning();
+        if (! $this->checkRunning()) {
+            return;
+        }
 
         $schema_name = $this->argument('schema_name');
         $force       = $this->option('force') === null;
 
         if (str_contains($schema_name, '/')) {
-            $this->error('Multi-level directory is not supported at this time.');
+            $this->console()->error('暂不支持多级目录,请用单级名(如 System,不要 System/Sub)。');
 
-            return false;
+            return;
         }
 
         $result = (new CreateSchemaGenerator($this, $this->filesystem, $this->utility))
             ->start($schema_name, $force);
 
-        return $this->tipDone($result);
+        $this->tipDone($result);
     }
 }

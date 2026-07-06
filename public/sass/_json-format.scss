@@ -1,0 +1,106 @@
+@charset "utf-8";
+
+/* json format */
+.CodeContainer {
+    margin: 0;
+    // <pre> 默认 white-space: pre，遇到 JWT 这种无空格长串不换行会撑爆容器
+    // pre-wrap 保留缩进 + 允许软换行；break-all 处理单词内强制断行
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+}
+
+.PropertyName {
+    color: var(--json-property);
+}
+
+.ArrayBrace, .ObjectBrace, .Comma, .collapsible {
+    color: var(--json-bracket);
+}
+
+.Number {
+    color: var(--json-number);
+}
+
+.String {
+    color: var(--json-string);
+}
+
+.Boolean {
+    color: var(--json-boolean);
+    font-weight: 600;
+}
+
+.Function {
+    color: var(--json-function);
+    text-decoration: italic;
+}
+
+.Null {
+    color: var(--json-null);
+    font-weight: 600;
+}
+
+.Expanded {
+    position: relative;
+    display: inline-block;
+    margin-left: 5px;
+    padding-left: 15px;
+    height: 15px;
+    vertical-align: -2px;
+    cursor: pointer;
+
+    &:hover {
+        &:after {
+            border-color: var(--accent-hover-border);
+            color: var(--accent-hover-border);
+        }
+    }
+
+    &:after {
+        position: absolute;
+        left: 0;
+        top: 0;
+        border: var(--json-border) solid 1px;
+        width: 13px;
+        height: 13px;
+        line-height: 13px;
+        text-align: center;
+        content: '-';
+        color: var(--json-ctrl-text);
+        background-color: var(--json-expand-bg);
+    }
+}
+
+.Collapsed {
+    position: relative;
+    display: inline-block;
+    margin-left: 5px;
+    padding-left: 15px;
+    height: 15px;
+    vertical-align: -2px;
+    cursor: pointer;
+
+    &:hover {
+        color: var(--accent-hover-border);
+
+        &:after {
+            border-color: var(--accent-hover-border);
+            color: var(--accent-hover-border);
+        }
+    }
+
+    &:after {
+        position: absolute;
+        left: 0;
+        top: 0;
+        border: var(--json-border) solid 1px;
+        width: 13px;
+        height: 13px;
+        line-height: 15px;
+        text-align: center;
+        content: '+';
+        color: var(--json-ctrl-text);
+        background-color: var(--json-expand-bg);
+    }
+}

@@ -1,0 +1,696 @@
+// ==============================================================================
+// Page: 文档中心 (plan-52) —— 阅读页(docs/index) + 编辑器(docs/edit) + Mermaid 隔离帧
+// 侧导航复用 side-tree;正文是 DocMarkdownRenderer 产出的 HTML(含 shortcode chip + mermaid iframe)。
+// ==============================================================================
+
+// ---- 侧导航 -------------------------------------------------------------------
+.p-docs-nav {
+  &__hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    // 左右 12px 内缩,跟下方 .side-tree__search 的左右边框对齐 —— 否则「文档·2」贴 nav 边、
+    // 比搜索框/分组都靠左,视觉上挂出去一截(2026-06-23 user 反馈)。
+    padding: 0 var(--space-3);
+    margin-bottom: var(--space-3);
+    font-size: var(--font-base);
+    font-weight: var(--weight-semibold);
+    color: var(--text-heading);
+  }
+  &__new {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--font-xs);
+    font-weight: var(--weight-medium);
+    color: var(--accent-text);
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-xs);
+    transition: background var(--transition-fast);
+    &:hover { background: var(--accent-bg); }
+  }
+  &__empty {
+    margin-top: var(--space-4);
+    font-size: var(--font-sm);
+    color: var(--text-muted);
+  }
+}
+
+// ---- 阅读页:正文卡片(中) + 目录(右),填满 main,消除右侧空白 -------------------
+.p-docs-reader {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  // 正文卡纵向铺满可用高度:短文档也填满屏,长文档照常撑高(stretch 取 max(容器高,内容高))。
+  // TOC 用自身的 align-self:flex-start 退出拉伸,保持顶对齐 + sticky。
+  align-items: stretch;
+  gap: var(--space-6);
+
+  // 正文卡片:flex:1 填满 reader 剩余宽(TOC flex:none 自动靠右),大屏不留右侧空白
+  &__main {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--elevation-1);
+    padding: var(--space-6) var(--space-7);
+
+    // 空态(无文档 / 文档不存在):卡内居中,撑满整片内容区,不再裸浮
+    &--center {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
+
+  &__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-5);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border-light);
+  }
+  &__crumb {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    color: var(--text-muted);
+  }
+  &__group { font-size: var(--font-sm); }
+  &__title {
+    font-size: var(--font-md);
+    font-weight: var(--weight-semibold);
+    color: var(--text-heading);
+  }
+
+  // 右侧操作区(宽度开关 + 编辑):flex 行 + 定 gap,别让两个 btn 靠空白字符挤在一起(排版不齐)
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  &__width { min-width: 52px; justify-content: center; }   // 「全宽/限宽」两字等宽,切换不抖
+
+  // 右侧目录:sticky,顶距让出固定 header
+  &__toc {
+    flex: none;
+    width: 200px;
+    position: sticky;
+    top: calc(var(--shell-header-height) + var(--space-5));
+    align-self: flex-start;
+    max-height: calc(100vh - var(--shell-header-height) - var(--space-10));
+    overflow-y: auto;
+
+    &[hidden] { display: none; }
+  }
+}
+
+.p-docs-toc {
+  &__hd {
+    margin: 0 0 var(--space-2) var(--space-3);
+    font-size: var(--font-xs);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  &__link {
+    display: block;
+    padding: 3px var(--space-3);
+    font-size: var(--font-sm);
+    line-height: var(--line-snug);
+    color: var(--text-secondary);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    transition: color var(--transition-fast), border-color var(--transition-fast);
+
+    &:hover { color: var(--text-heading); }
+    &.is-active {
+      color: var(--accent-text);
+      border-left-color: var(--accent-solid);
+      font-weight: var(--weight-medium);
+    }
+    &--h3 { padding-left: var(--space-6); font-size: var(--font-xs); }
+  }
+}
+
+// ---- Markdown 正文排版 --------------------------------------------------------
+.doc-article {
+  font-size: var(--font-base);
+  line-height: var(--line-loose);
+  color: var(--text-body);
+  word-wrap: break-word;
+
+  // 正文文字流宽度:默认全宽(铺满卡片);读者按右上「全宽 / 限宽」开 .is-narrow,才把文字收到舒适行宽
+  // (860 ≈ 1440 下正文宽,1440 及以下两种模式都看不出差别)。表格/代码/流程图不在此列,恒全宽。
+  // 偏好存 localStorage(docs-center.js),跨文档/刷新记住,由读者自己定。
+  &.is-narrow > :is(p, h1, h2, h3, h4, ul, ol, blockquote, hr) {
+    max-width: 860px;
+  }
+
+  h1, h2, h3, h4 {
+    color: var(--text-heading);
+    font-weight: var(--weight-semibold);
+    line-height: var(--line-snug);
+    margin: var(--space-6) 0 var(--space-2);   // 标题→正文收紧(space-3→space-2);各级 top 在下面分别拉开层级
+    scroll-margin-top: calc(var(--shell-header-height) + var(--space-4));   // TOC 跳转让出固定 header
+    position: relative;                        // 容纳悬停锚点 .doc-anchor 的绝对定位
+    &:first-child { margin-top: 0; }
+  }
+  h1 { font-size: var(--font-2xl); }
+  h2 {
+    font-size: var(--font-lg);
+    margin-top: var(--space-8);                 // 大节之间多留白,拉开层级节奏(h2 32 > h3 24 > h4 20)
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--border-light);
+  }
+  h3 { font-size: var(--font-md); margin-top: var(--space-6); }
+  h4 { font-size: var(--font-base); margin-top: var(--space-5); }
+
+  p { margin: var(--space-3) 0; }
+
+  // 导语:h1 后第一段略大 + 弱化,跟标题拉开层级(典型文档头部排版)
+  h1 + p {
+    margin-top: var(--space-4);
+    font-size: var(--font-md);
+    line-height: var(--line-base);
+    color: var(--text-desc);
+  }
+
+  ul, ol { margin: var(--space-3) 0; padding-left: var(--space-6); }
+  ul { list-style: disc; }              // 全局 reset 把 ul 清成 list-style:none → 这里恢复,否则无序列表看着像纯缩进段落
+  ul ul { list-style: circle; }
+  ul ul ul { list-style: square; }
+  ol { list-style: decimal; }
+  li { margin: var(--space-1) 0; }
+  li > ul, li > ol { margin: var(--space-1) 0; }
+  // 任务列表项(GFM)首子是勾选框,不再叠列表符号(只命中直接含 checkbox 的 li,父级 li 保留圆点)
+  li:has(> input[type="checkbox"]) { list-style: none; }
+
+  a:not(.doc-shortcode):not(.doc-anchor) {
+    color: var(--link-color);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    &:hover { border-bottom-color: currentColor; }
+  }
+
+  // 标题悬停锚点:平时隐形,hover 标题(或键盘聚焦)时左侧浮出 #,点击复制本节深链 URL,
+  // 便于把某小节链接发给同事。docs-center.js 给每个标题注入 <a class="doc-anchor">。
+  .doc-anchor {
+    position: absolute;
+    left: calc(-1 * var(--space-5));   // 落在卡片左 padding(space-7)的留白里,不挤正文、不裁切
+    top: 0;
+    display: inline-flex;
+    align-items: center;
+    height: 1.3em;
+    padding: 0 4px;
+    font-weight: var(--weight-normal);
+    color: var(--text-dim);
+    text-decoration: none;
+    opacity: 0;
+    transition: opacity var(--transition-fast), color var(--transition-fast);
+    &:hover { color: var(--accent-text); }
+  }
+  :is(h1, h2, h3, h4):hover .doc-anchor,
+  .doc-anchor:focus-visible { opacity: 1; }
+
+  // 行内码:加发丝边 + 略深字色,从正文里「框」出来。原本只近白底(--bg-code)、字色继承正文 →
+  // 代码感几乎看不见(表格里 `service-hall` 这类路由名跟普通文字混作一团)。
+  code {
+    font-family: var(--font-family-mono);
+    font-size: 0.9em;
+    color: var(--text-heading);
+    background: var(--bg-code);
+    border: 1px solid var(--border-light);
+    padding: 1px 5px;
+    border-radius: var(--radius-xs);
+    // 行内码跨行时,默认 slice 会在断点把边框/底色切出开口裸边;clone 让每行片段各自完整描边。
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+  pre {
+    margin: var(--space-4) 0;
+    padding: var(--space-4);
+    background: var(--code-snippet-bg);
+    color: var(--code-snippet-text);
+    border-radius: var(--radius-md);
+    overflow-x: auto;
+    line-height: var(--line-base);
+    code { background: none; border: 0; color: inherit; padding: 0; font-size: var(--font-sm); }
+  }
+
+  blockquote {
+    margin: var(--space-4) 0;
+    padding: var(--space-3) var(--space-4);   // 提示条:上下留白对齐左右(原 space-1 太挤)
+    border-left: 3px solid var(--accent-border);
+    color: var(--text-secondary);
+    background: var(--bg-card-alt);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    p:first-child { margin-top: 0; }          // 吃掉内层 p 的首尾 margin,留白只由 blockquote padding 控
+    p:last-child { margin-bottom: 0; }
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--space-4) 0;
+    font-size: var(--font-sm);
+    th, td {
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--border-row);
+      text-align: left;
+    }
+    // 尊重 GFM 表格列对齐:渲染器对 |:--:| / |--:| 输出 align="center"/"right",
+    // 否则被上面 th,td{text-align:left} 压死(presentational attr 干不过 CSS 规则)→ 列对齐失效。
+    th[align="center"], td[align="center"] { text-align: center; }
+    th[align="right"],  td[align="right"]  { text-align: right; }
+    th { background: var(--bg-panel-head); font-weight: var(--weight-semibold); color: var(--text-heading); }
+    tbody tr:hover { background: var(--bg-hover-row); }
+  }
+
+  hr {
+    margin: var(--space-6) 0;
+    border: 0;
+    border-top: 1px solid var(--border-light);
+  }
+
+  img { max-width: 100%; border-radius: var(--radius-sm); }
+
+  // 任务列表（GFM）—— GFM 渲染成 disabled checkbox,原生 disabled 会被浏览器强制灰显(accent-color
+  // 也压不住)。appearance:none 自绘:未选是描边空框,已选是品牌橙 + 白勾,读起来才像「已完成」。
+  ul li input[type="checkbox"] {
+    appearance: none;
+    flex: none;
+    width: 15px;
+    height: 15px;
+    margin-right: var(--space-2);
+    vertical-align: -2px;
+    border: 1.5px solid var(--border-input);
+    border-radius: var(--radius-xs);
+    background: var(--bg-card);
+    position: relative;
+    &:checked {
+      background: var(--accent-solid);
+      border-color: var(--accent-solid);
+    }
+    &:checked::after {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 1px;
+      width: 4px;
+      height: 8px;
+      border: solid #fff;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+  }
+}
+
+// ---- 代码块工具条（语言标签 + 复制按钮;docs-center.js 客户端把 <pre><code> 包进 .doc-codeblock） --
+// 代码块恒为深色面(--code-snippet-bg 亮暗都暗),工具条用半透白灰(slate-400 alpha)叠在上面,
+// 亮暗都贴；不硬编码具体色,只叠透明度。复用 picker backdrop 已有的「深面叠 rgba」先例。
+.doc-codeblock {
+  margin: var(--space-4) 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--code-snippet-bg);
+
+  &__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: 4px var(--space-3);
+    background: rgba(148, 163, 184, 0.12);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  }
+  &__lang {
+    font-family: var(--font-family-mono);
+    font-size: var(--font-xs);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--code-snippet-text);
+    opacity: 0.7;
+  }
+  &__copy {
+    font-family: var(--font-family-base);
+    font-size: var(--font-xs);
+    color: var(--code-snippet-text);
+    background: none;
+    border: 0;
+    padding: 2px 7px;
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    opacity: 0.75;
+    transition: opacity var(--transition-fast), background var(--transition-fast);
+    &:hover { opacity: 1; background: rgba(148, 163, 184, 0.16); }
+  }
+
+  // 包裹后 pre 去掉自身外距/圆角,贴合工具条(留白/圆角改由 .doc-codeblock 容器控)
+  pre { margin: 0; border-radius: 0; }
+}
+// 提升特异性盖过 .doc-article pre 的 margin/radius（两者本同级,显式拔高更稳）
+.doc-article .doc-codeblock pre { margin: 0; border-radius: 0; }
+
+// ---- 深链 shortcode chip ------------------------------------------------------
+.doc-shortcode {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  vertical-align: baseline;
+  padding: 1px 8px 2px;
+  margin: 0 1px;
+  font-size: 0.86em;
+  font-weight: var(--weight-medium);
+  line-height: 1.4;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;     // 三类用软填充(对齐 method-badge);transparent 边占位,hover 点亮成同色环
+  background: var(--accent-bg);       // 默认兜底(实际都命中下面某个 modifier)
+  color: var(--accent-text);
+  text-decoration: none;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+  cursor: pointer;
+
+  &:hover { border-color: currentColor; }   // 环用 chip 自己的色相(currentColor = 该 variant 文字色)
+  &__icon { flex: none; }
+  &__label { white-space: nowrap; }
+
+  // 三类深链各给一套主题感知配色(复用 method-badge 的 text/bg token,亮暗双轨已调好):
+  //   debug=接口调试→violet(any) / api=接口文档→blue(get) / db=数据库文档→cyan(patch)
+  &--debug { color: var(--method-any-text);   background: var(--method-any-bg); }
+  &--api   { color: var(--method-get-text);   background: var(--method-get-bg); }
+  &--db    { color: var(--method-patch-text); background: var(--method-patch-bg); }
+
+  &--error {
+    border-color: var(--border-light);
+    background: var(--bg-danger-soft);
+    color: var(--color-danger);
+    cursor: help;
+  }
+}
+
+// ---- Mermaid 流程图（隔离 iframe 容器） --------------------------------------
+.doc-mermaid {
+  margin: var(--space-4) 0;            // 收紧上下留白,图贴正文
+  padding: 0;
+
+  &__src { display: none; }
+
+  &__frame {
+    display: block;
+    width: 100%;
+    min-height: 60px;
+    border: 0;                         // 去灰盒外框,图浮在正文上(原 --bg-card-alt + border 盒子显空)
+    background: transparent;
+  }
+}
+
+.p-docs-empty__new { margin-top: var(--space-4); }
+
+// ---- 编辑器 -------------------------------------------------------------------
+.p-docs-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1;              // 填满 .container.is-docs(flex row),大屏不留右侧空白(否则 flex:0 1 auto 缩成内容宽)
+  min-width: 0;
+  height: calc(100vh - 120px);
+  min-height: 420px;
+
+  &__lock {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-sm);
+    background: var(--bg-danger-soft);
+    color: var(--color-danger-strong);
+    font-size: var(--font-sm);
+    font-weight: var(--weight-medium);
+  }
+
+  &__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-3);
+  }
+  &__path {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-family: var(--font-family-mono);
+    font-size: var(--font-sm);
+    color: var(--text-muted);
+  }
+  &__base { color: var(--text-dim); }
+  &__ext { color: var(--text-dim); }
+  // plan-53 出身:新建文档的落点源下拉(host / 软链扩展包),形态对齐 __slug 输入框
+  &__src {
+    height: var(--control-sm);
+    padding: 0 var(--space-2);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-sm);
+    color: var(--text-dim);
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    border-radius: var(--radius-sm);
+    &:focus { outline: none; border-color: var(--accent-solid); }
+    &:disabled { background: var(--bg-input-readonly); color: var(--text-secondary); }
+  }
+  // 边输入边保存的状态:默认弱化,已保存柔和绿、失败红
+  &__status {
+    margin-left: var(--space-2);
+    font-family: var(--font-family-base);
+    font-size: var(--font-xs);
+    color: var(--text-muted);
+    white-space: nowrap;
+    transition: color var(--transition-fast);
+    &.is-saved { color: var(--method-post-text); }
+    &.is-error { color: var(--color-danger); }
+  }
+  &__slug {
+    min-width: 220px;
+    height: var(--control-sm);
+    padding: 0 var(--space-2);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-sm);
+    color: var(--text-body);
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    border-radius: var(--radius-sm);
+    &:focus { outline: none; border-color: var(--accent-solid); }
+    &[readonly] { background: var(--bg-input-readonly); color: var(--text-secondary); }
+  }
+  &__tools { display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+
+  &__panes {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+    min-height: 0;
+  }
+  &__pane {
+    min-height: 0;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    &--preview { background: var(--bg-card); overflow-y: auto; }
+  }
+  &__textarea {
+    width: 100%;
+    height: 100%;
+    resize: none;
+    border: 0;
+    padding: var(--space-4);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-sm);
+    line-height: var(--line-loose);
+    color: var(--text-body);
+    background: var(--bg-input);
+    tab-size: 2;
+    &:focus { outline: none; }
+  }
+  &__pane--preview .doc-article { padding: var(--space-4); }
+}
+
+// 生产/只读:整页灰写按钮 + 锁 textarea（读类豁免 .p-designer-no-lock）
+.p-docs-editor[data-locked="true"] {
+  button:not(.p-designer-no-lock),
+  .p-docs-editor__slug,
+  .p-docs-editor__textarea {
+    pointer-events: none;
+    opacity: 0.5;
+  }
+}
+
+// ---- 引用 picker（jQuery 驱动的轻量 modal） ---------------------------------
+.p-docs-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 10vh;
+
+  &[hidden] { display: none; }
+
+  &__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+  }
+  &__dialog {
+    position: relative;
+    width: min(640px, 92vw);
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-modal);
+    overflow: hidden;
+  }
+  &__hd {
+    display: flex;
+    flex: none;   // dialog 是 max-height 限高的 flex 列;固定区不可被 list 挤压(否则搜索框/标题被压扁)
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--border-light);
+    font-weight: var(--weight-semibold);
+    color: var(--text-heading);
+  }
+  &__close {
+    display: inline-flex;
+    color: var(--text-muted);
+    border-radius: var(--radius-xs);
+    padding: 2px;
+    &:hover { color: var(--text-heading); background: var(--bg-hover-row); }
+  }
+  &__search {
+    flex: none;   // 同上:不被列表挤压(此前实测被压到 22px,本是 40px)
+    margin: var(--space-3) var(--space-4) 0;
+    height: var(--control-md);
+    padding: 0 var(--space-3);
+    font-size: var(--font-base);
+    color: var(--text-body);
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    border-radius: var(--radius-sm);
+    &:focus { outline: none; border-color: var(--accent-solid); }
+  }
+  &__list {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+  }
+  // 顶部模式条:格式切换(chip/click)+ 接口类型(debug/api),分段控件样式,固定在列表上方不随滚动
+  &__bar {
+    display: flex;
+    flex: none;   // 同上:模式条不被列表挤压
+    gap: var(--space-2);
+    margin: var(--space-3) var(--space-4) 0;
+  }
+  &__seg {
+    flex: 1;
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    background: var(--bg-card-alt);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    &[hidden] { display: none; }
+  }
+  &__segbtn {
+    flex: 1;
+    height: 26px;
+    font-size: var(--font-xs);
+    color: var(--text-secondary);
+    background: none;
+    border: 0;
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    transition: color var(--transition-fast), background var(--transition-fast);
+    &:hover:not(.is-active) { color: var(--text-body); }
+    &.is-active {
+      color: var(--accent-text);
+      background: var(--bg-card);
+      box-shadow: var(--elevation-1);
+      font-weight: var(--weight-medium);
+    }
+  }
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    text-align: left;
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    cursor: pointer;
+    &:hover,
+    &.is-active { background: var(--bg-hover-row); }   // 键盘 ↑/↓ 选中复用 hover 底色
+  }
+  &__method {
+    flex: none;
+    min-width: 42px;
+    font-family: var(--font-family-mono);
+    font-size: 10px;
+    font-weight: var(--weight-semibold);
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+  &__label { flex: 1; font-size: var(--font-sm); color: var(--text-body); }
+  &__target {
+    flex: none;
+    max-width: 46%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-family-mono);
+    font-size: var(--font-xs);
+    color: var(--text-dim);
+  }
+  &__none { padding: var(--space-4); text-align: center; color: var(--text-muted); }
+}
+
+// ---- Mermaid 隔离帧自身（index.css 也被该帧加载） ---------------------------
+.doc-diagram-frame {
+  margin: 0;
+  // 隔离帧是独立 HTML(非 shell),必须清掉全局 body 的 padding-top(--shell-header-height=64px,
+  // 给主站固定头让位用)——否则这 64px 把流程图整体下推,iframe 高度按内容算 → 图底被裁掉。
+  // 同 _login.scss:登录页也是独立 HTML,同样清这个 padding-top。
+  padding: 0;
+  background: transparent;
+
+  &__out { padding: var(--space-1); text-align: center; }   // 窄图/LR 图居中,不再贴左
+  &__out svg { max-width: 100%; height: auto; }
+
+  &__err {
+    margin: 0;
+    padding: var(--space-3);
+    text-align: left;                  // __out 整体居中了,错误信息得左对齐才好读
+    font-family: var(--font-family-mono);
+    font-size: var(--font-sm);
+    line-height: var(--line-base);
+    white-space: pre-wrap;
+    color: var(--code-snippet-error-text);
+    background: var(--bg-danger-soft);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+  }
+}

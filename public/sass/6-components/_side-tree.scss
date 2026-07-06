@@ -1,0 +1,395 @@
+// ==============================================================================
+// Component: Side Tree (左侧树形导航,Alpine 驱动)
+// 对应 Blade: <x-scaffold::side-tree :groups="..." :current="..." />
+// 支持 2 层(group → item)跟 3 层(group → sub_group → item)
+// 含本地搜索过滤 + 折叠 / 展开 + 内置 status / deprecated / method
+// ==============================================================================
+//
+// 2026-05-18 设计师反馈重做:
+//   砍 — 装饰性 dashed 树线(每个 leaf 一条 ::before 短线视觉碎)
+//   砍 — method badge(占 30-40% 宽度,挤 label 看不见)→ 改 inline 颜色文字
+//   砍 — status 14px 圆圈 → 改 4px dot(纯装饰,不抢 label 空间)
+//   砍 — 大缩进(顶 12 / 子 46 / 叶 68)→ 紧凑(顶 8 / 子 20 / 叶 32)
+//   留 — collapse caret(展开/收起需要) + active 左侧 accent 杠(选中提示)
+//
+// 让 label 拿回 70%+ 横向空间,接口名能完整识别。
+
+// 高优先级 reset:阻止 .aside ul a / .aside li:before 等 legacy 全局污染
+// _aside.scss 里 `.aside ul a` 选择器特异度 (0,1,2),普通组件 selector (0,1,0) 压不住。
+// 这里用 `.aside .side-tree`(0,2,0)+ `!important` 关键属性,确保 reset 生效。
+.side-tree {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) 0;
+  overflow-x: hidden;     // 兜底防 leaf 长 label 撑出横滚条
+  max-width: 100%;
+}
+
+// 杀掉 .aside 全局污染(.aside .side-tree scope 内,优先级 0,2,0 压过 .aside ul a 0,1,2)
+.aside .side-tree li::before,
+.aside .side-tree li::after { content: none !important; }
+
+// 不用宽 `a` reset(`.aside .side-tree a` 0,2,1 比 `.aside .side-tree__item-link` 0,2,0 还高,
+// 会把 item-link 的属性压死)。直接给每个 component class 加 .aside 前缀(0,2,0)压过 .aside ul a (0,1,2)。
+.aside .side-tree__item-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  // 2026-06-10:跟组件默认值对齐(14px / 纵向 8px)— 此前 4px/13px 跟默认值漂移,user 反馈行矮字小
+  padding: 8px var(--space-2) 8px var(--space-5);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+  color: var(--text-body);
+  text-decoration: none;
+  font-size: var(--font-base);
+  border-radius: var(--shell-control-radius);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.aside .side-tree__group--sub > .side-tree__items > .side-tree__item > .side-tree__item-link {
+  padding-left: var(--space-8);
+}
+
+// 2026-06-22:可选小节标题(header prop)。视觉同 .p-dbdoc-modules__hd(muted 小字),
+// 但左 padding 取 24px(--space-6)对齐 group-head 标签文字起点
+// = group-head padding-left 8(--space-2) + caret 12(无 items 时 visibility:hidden 仍占位) + gap 4(--space-1)。
+// 不能照搬 db docs 的 12px:那边列表项 padding-left 也是 12,这里列表项是 group-head 结构起点在 24。
+.side-tree__hd {
+  // 下 padding 对齐同组件 .side-tree__search 的 --space-2(8px)头部→列表间距,别用 --space-1(4px)挤着第一个模块
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-6);
+  color: var(--text-desc);
+  font-size: var(--font-xs);
+  letter-spacing: .03em;
+}
+
+.side-tree__search {
+  padding: 0 var(--space-3) var(--space-2);     // 12px 左右留白(原 8px 太挤)
+  // 2026-05-21 A 方案:search input + 折叠/展开 icon 按钮同行(收紧纵向)
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+
+  input { flex: 1; }
+}
+
+// 兜底:.input 在 .aside 里被压扁(老 .aside input 全局规则)+ content-box 让 width 失控
+.aside .side-tree__search input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  min-height: 28px;
+  padding: 4px var(--space-2);
+  border: 1px solid var(--border-light);
+  border-radius: var(--shell-control-radius);
+  background: var(--bg-card);
+  font-size: var(--font-sm);
+  color: var(--text-body);
+  line-height: 1.4;
+  outline: none;
+
+  &:focus { border-color: var(--accent-hover-border); }
+  &::placeholder { color: var(--text-light); }
+}
+
+.side-tree__empty {
+  padding: var(--space-3) var(--space-3);
+  color: var(--text-light);
+  font-size: var(--font-sm);
+  text-align: center;
+}
+
+// 2026-05-21 A 方案 v2:icon-only 折叠 / 展开按钮(放 search 同行,28x28 跟 input 高度对齐)
+.side-tree__toolbar-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border-light);
+  background: var(--bg-card);
+  color: var(--text-desc);
+  border-radius: var(--shell-control-radius);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+
+  &:hover {
+    background: var(--bg-card-alt);
+    color: var(--text-heading);
+    border-color: var(--accent-hover-border);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent-hover-border);
+    outline-offset: 1px;
+  }
+}
+
+.side-tree__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.side-tree__group {
+  display: flex;
+  flex-direction: column;
+}
+
+// ---- group head(顶层分组标题)
+// 字号演进:18px(--font-lg,plan-32)→ 16px(--font-md,2026-05-21 user 反馈太大)→
+// 14px(--font-base,2026-06-10 user 反馈 16px 对 14px 子项仍突兀)。
+// 层级不再靠字号差,改靠 weight(semibold vs regular)+ 颜色(heading vs body)+ 子项缩进表达。
+// sub-group head 走 sub-group selector 单独控(见下面 .side-tree__group--sub)
+.side-tree__group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 6px var(--space-2);
+  border: 0;
+  border-radius: var(--shell-control-radius);
+  background: transparent;
+  color: var(--text-heading);
+  font-family: inherit;
+  font-size: var(--font-base);
+  font-weight: var(--weight-semibold);
+  line-height: 1.2;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background var(--transition-fast), color var(--transition-fast);
+
+  &:hover {
+    background: var(--bg-card-alt);
+    color: var(--text-heading);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent-hover-border);
+    outline-offset: -2px;
+  }
+}
+
+.side-tree__caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  color: var(--text-light);
+  transition: transform var(--transition-fast);
+}
+
+.side-tree__caret.is-collapsed { transform: rotate(-90deg); }
+
+// plan-32:无 items 的 group(纯锚点用法,db / dict 用)隐藏 caret
+.side-tree__group:not(:has(> .side-tree__items > li)) > .side-tree__group-head > .side-tree__caret {
+  visibility: hidden;
+}
+
+// plan-32:group head 可选 icon(/routes 用 protocol icon)
+.side-tree__group-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: var(--text-light);
+  transition: color var(--transition-fast);
+}
+
+.side-tree__group-head:hover .side-tree__group-icon,
+.side-tree__group:not(.is-collapsed) > .side-tree__group-head .side-tree__group-icon {
+  color: var(--accent-text);
+}
+
+// plan-32:scroll-spy 染色(group-level,routes / db / dict scroll spy 用)
+.side-tree__group.is-active > .side-tree__group-head {
+  color: var(--accent-text);
+  background: var(--accent-bg);
+
+  .side-tree__group-icon { color: var(--accent-text); }
+}
+
+.side-tree__group-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// 2026-05-22:pill badge 视觉从 _route.scss override 上提为 base — runtime/todo/dict/api/route 全部统一
+// 一级 group + 二级 item 各一档大小,跟原 route 视觉对齐
+// 2026-06-10:margin-left auto 统一推右缘(user 拍板,推翻 plan-32"紧贴 label"——随 label 长短
+// 参差不齐,右对齐后数字成列好扫读)。最小间距由容器 gap 兜底。
+.side-tree__count {
+  flex-shrink: 0;
+  min-width: 20px;
+  height: 16px;
+  padding: 0 var(--space-2);
+  line-height: 16px;
+  font-size: 11px;
+  text-align: center;
+  // 2026-06-10:bg-card-alt 跟侧栏卡片底几乎同色,pill 推到右缘后没 label 锚着就淡没了 →
+  // 先换 --bg-badge-muted(青灰)仍不够,user 拍板浅橙(badge--accent 同款配对,贴全站 accent 体系)。
+  background: var(--accent-bg);
+  color: var(--text-light);        // 字不跟底走 accent(user:文字不用高亮),浅橙底 + 常规灰字
+  border-radius: var(--radius-pill);
+  font-weight: var(--weight-bold);
+  margin-left: auto;
+}
+
+// 二级 item count 略小一档
+.side-tree__item-link .side-tree__count {
+  min-width: 18px;
+  height: 14px;
+  line-height: 14px;
+  padding: 0 5px;
+  font-size: 10px;
+}
+
+// 类别(顶层 group)之间的 separator。2026-05-31:dashed 在整列铺开显得碎、像占位 → 换 solid hairline,
+// 颜色用 border-lighter(最贴近背景的一档,暗 #262938 / 明 #eef2f7)——只做极轻的分组暗示,不抢视觉。
+.side-tree__list > .side-tree__group + .side-tree__group {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-lighter);
+}
+
+// ---- CSP-safe imperative collapse ----
+.side-tree__group.is-collapsed > .side-tree__items {
+  display: none;
+}
+
+.side-tree__group.is-hidden,
+.side-tree__item.is-hidden {
+  display: none;
+}
+
+// ---- sub-group(3 层模式)----
+.side-tree__sub-groups {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.side-tree__group--sub {
+  > .side-tree__group-head {
+    padding-left: var(--space-5);                // 20px(顶组 8 + 12 step)
+    font-size: var(--font-base);                 // 2026-06-10 起三层同 14px,层级靠 weight(semibold/medium/regular)+ 色 + 缩进
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+  }
+}
+
+// ---- items ----
+.side-tree__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.side-tree__item {
+  position: relative;
+}
+
+.side-tree__item-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px var(--space-2) 8px var(--space-5);     // 顶层 items 缩进 20px;纵向 6→8px(2026-06-10 user 反馈行矮)
+  border-radius: var(--shell-control-radius);
+  color: var(--text-body);
+  text-decoration: none;
+  font-size: var(--font-base);                        // 13px 辅助档 → 14px 正文档(2026-06-10,菜单主体不是辅助文字)
+  line-height: 1.4;
+  transition: background var(--transition-fast), color var(--transition-fast);
+
+  &:hover {
+    background: var(--bg-card-alt);
+    color: var(--text-heading);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent-hover-border);
+    outline-offset: -2px;
+  }
+}
+
+// 3 层模式 leaf 缩进多一档,跟 sub-group head 对齐
+.side-tree__group--sub > .side-tree__items > .side-tree__item > .side-tree__item-link {
+  padding-left: var(--space-8);                       // 32px
+}
+
+.side-tree__item.is-active > .side-tree__item-link {
+  background: var(--accent-bg);
+  color: var(--accent-text-dark);
+  font-weight: var(--weight-semibold);
+}
+
+// active 左侧 accent 杠(唯一保留的视觉装饰,指示"当前选中")
+.side-tree__item.is-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--accent-hover-border);
+  border-radius: 0 1px 1px 0;
+}
+
+// ---- order 序号(只读;仅文档侧栏透传 item.index 时渲染,其它页不传 → 不显示)----
+// 等宽数字 + 右对齐 + 定宽,10/20/22 这种多位数也成列对齐,一眼看全组顺序;要调去改那篇 frontmatter。
+.side-tree__item-index {
+  flex-shrink: 0;
+  min-width: 1.7em;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--text-dim);
+}
+// 选中项里序号跟随高亮字色,不发灰掉队
+.side-tree__item.is-active > .side-tree__item-link .side-tree__item-index { color: inherit; }
+
+// ---- method 文字色(不再 badge box)----
+// 直接给 .method-badge 一个紧凑 inline 样式覆盖(scaffold 范围内,scoped)
+.side-tree .method-badge {
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+  font-size: 10px;
+  font-weight: var(--weight-medium);
+  min-width: 36px;
+  text-align: left;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+.side-tree .method-badge--get    { color: var(--badge-green); }
+.side-tree .method-badge--post   { color: var(--badge-blue); }
+.side-tree .method-badge--put    { color: var(--badge-orange); }
+.side-tree .method-badge--delete { color: var(--badge-red); }
+.side-tree .method-badge--patch  { color: var(--badge-purple); }
+
+.side-tree__item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-tree__item.is-deprecated > .side-tree__item-link .side-tree__item-label {
+  text-decoration: line-through;
+  color: var(--text-light);
+}
