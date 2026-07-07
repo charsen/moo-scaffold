@@ -113,11 +113,12 @@ class CreateControllerGenerator extends Generator
                 // 验证规则处理
                 $rules = $this->rebuildFieldsRules($fields, $enums);
 
-                // BaseActionTrait 恒指 host(包控制器复用 host 的,与 iResource 宏同款「host 提供约定」— moo-system 实证);
-                // 包的 controller trait 平铺在包 Controllers/Admin/Traits 下
+                // 通用资源动作 trait：host 用自持 BaseActionTrait；包用**包内自持** HandlesResourceActions
+                // （切断包→host 反向依赖，包独立可复用；缺则生成进包 Traits/，见 checkPackageResourceActions）。
+                // 包的 controller trait 平铺在包 Controllers/Admin/Traits 下。
                 if ($this->originCtx !== null) {
-                    $hostAdminNsPre  = $this->utility->formatNameSpace($this->utility->getControllerPath('controller.admin.path', true));
-                    $baseActionTrait = "{$hostAdminNsPre}Traits\\BaseActionTrait";
+                    $this->checkPackageResourceActions($path, $namespace_pre);
+                    $baseActionTrait = "{$namespace_pre}Traits\\HandlesResourceActions";
                     $controllerTrait = "{$namespace_pre}Traits\\{$controller_name}Trait";
                 } else {
                     $baseActionTrait = "{$namespace_pre}Traits\\BaseActionTrait";
@@ -460,6 +461,7 @@ class CreateControllerGenerator extends Generator
     private function buildTraitUseCode(string $baseActionTrait, string $controllerTrait): string
     {
         $indent              = $this->getTabs(1);
+        $baseActionName      = Str::afterLast($baseActionTrait, '\\');
         $controllerTraitName = Str::afterLast($controllerTrait, '\\');
         $conflicts           = array_values(array_intersect(
             $this->getTraitMethodNames($baseActionTrait),
@@ -468,16 +470,16 @@ class CreateControllerGenerator extends Generator
 
         if ($conflicts === []) {
             return implode(PHP_EOL, [
-                "{$indent}use BaseActionTrait;",
+                "{$indent}use {$baseActionName};",
                 "{$indent}use {$controllerTraitName};",
             ]);
         }
 
         sort($conflicts);
 
-        $lines = ["{$indent}use BaseActionTrait, {$controllerTraitName} {"];
+        $lines = ["{$indent}use {$baseActionName}, {$controllerTraitName} {"];
         foreach ($conflicts as $method) {
-            $lines[] = "{$indent}{$indent}BaseActionTrait::{$method} insteadof {$controllerTraitName};";
+            $lines[] = "{$indent}{$indent}{$baseActionName}::{$method} insteadof {$controllerTraitName};";
         }
         $lines[] = "{$indent}}";
 
@@ -501,6 +503,31 @@ class CreateControllerGenerator extends Generator
         sort($methods);
 
         return $methods;
+    }
+
+    /**
+     * 包上下文：确保包内通用资源动作 trait（HandlesResourceActions）存在，缺则从 stub 生成到包 Traits/。
+     * 与 checkAdminBaseAction（host BaseActionTrait）对称——让包控制器 use 包自持 trait、不依赖 host BaseActionTrait。
+     * 已存在则不覆盖（可手写扩展）。
+     */
+    private function checkPackageResourceActions(string $controllerPath, string $namespace_pre): void
+    {
+        $traitsPath = rtrim($controllerPath, '/') . '/Traits';
+        $file       = $traitsPath . '/HandlesResourceActions.php';
+
+        if ($this->filesystem->isFile($file)) {
+            return;
+        }
+
+        $this->checkDirectory($traitsPath);
+
+        $data = [
+            'namespace'      => rtrim($namespace_pre, '\\') . '\\Traits',
+            'base_resources' => $this->utility->getConfig('class.resources.base'),
+        ];
+        $content = $this->buildStub($data, $this->getStub('controller-resource-actions-trait'));
+        $this->filesystem->put($file, $content);
+        $this->console()->created('Traits/HandlesResourceActions.php');
     }
 
     /**
