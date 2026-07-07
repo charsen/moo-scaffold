@@ -264,17 +264,34 @@ class CreateControllerGenerator extends Generator
 
         // 创建 BaseRequestTrait
         $trait_name = "{$controller['controller_name']}RequestTrait";
-        $meta       = [
-            'namespace'  => trim($namespace, '\\'),
-            'trait_name' => $trait_name,
-            'table_name' => "'{$controller['table_name']}'",
-            'use_enums'  => implode(PHP_EOL, $use_enums_code),
-            'values'     => implode(PHP_EOL, $values),
-            'options'    => implode(PHP_EOL, $options),
-        ];
+
+        // D11：包自持表 → 生成「委托 trait」（引用包提供的 Request 片段，getTable/options 单一真值源在包内），
+        // 免 host controller 硬编码表名（包一改名 host 硬编码就集体失效）。
+        // config('scaffold.package_request_traits') 为空时走原逻辑 —— 对其它项目零影响。
+        $package_traits = (array) config('scaffold.package_request_traits', []);
+        if (isset($package_traits[$controller['table_name']])) {
+            $delegate_fqcn = ltrim((string) $package_traits[$controller['table_name']], '\\');
+            $meta          = [
+                'namespace'      => trim($namespace, '\\'),
+                'trait_name'     => $trait_name,
+                'delegate_fqcn'  => $delegate_fqcn,
+                'delegate_short' => class_basename($delegate_fqcn),
+            ];
+            $stub = 'request-base-trait-delegated';
+        } else {
+            $meta = [
+                'namespace'  => trim($namespace, '\\'),
+                'trait_name' => $trait_name,
+                'table_name' => "'{$controller['table_name']}'",
+                'use_enums'  => implode(PHP_EOL, $use_enums_code),
+                'values'     => implode(PHP_EOL, $values),
+                'options'    => implode(PHP_EOL, $options),
+            ];
+            $stub = 'request-base-trait';
+        }
         $trait_file   = "{$folder}{$trait_name}.php";
         $trait_exists = $this->filesystem->isFile($trait_file);
-        $this->filesystem->put($trait_file, $this->buildStub($meta, $this->getStub('request-base-trait')));
+        $this->filesystem->put($trait_file, $this->buildStub($meta, $this->getStub($stub)));
         if ($trait_exists) {
             $this->console()->updated($this->relDisplay($trait_file, $this->originCtx), 'Updated request trait');
         } else {

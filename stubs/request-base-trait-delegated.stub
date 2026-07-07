@@ -1,0 +1,14 @@
+<?php declare(strict_types = 1);
+
+namespace {{namespace}};
+
+use {{delegate_fqcn}};
+
+/**
+ * 包自持表 → 委托包提供的 Request 片段（getTable / options 单一真值源在包内），
+ * 免各 host controller 硬编码表名（config: scaffold.package_request_traits）。
+ */
+trait {{trait_name}}
+{
+    use {{delegate_short}};
+}
