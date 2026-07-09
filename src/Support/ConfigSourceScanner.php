@@ -63,17 +63,6 @@ class ConfigSourceScanner
     }
 
     /**
-     * 强制重新扫描，绕过 cache。
-     */
-    public function rebuild(): array
-    {
-        $map = $this->scan();
-        $this->writeCache($map);
-
-        return $map;
-    }
-
-    /**
      * 扫描实现：递归遍历 array，收集叶子节点的 dot-path；
      * 同时正则匹配 env('FOO', ...) 出现位置 → 对应同一行 / 同一层级的 key。
      *
