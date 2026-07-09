@@ -628,23 +628,6 @@ class Utility
     }
 
     /**
-     * 获取所有 Schema 文件的名称(plan-53:走 SchemaLoader::listSchemaFiles 单一真源,
-     * host + 各扩展包聚合;出身用 schemaOrigin() 查)。
-     */
-    public function getSchemaNames(): array
-    {
-        return array_keys(app(\Mooeen\Scaffold\Designer\SchemaLoader::class)->listSchemaFiles());
-    }
-
-    /**
-     * schema 的出身:null = host,否则扩展包 key(plan-53)。
-     */
-    public function schemaOrigin(string $schema): ?string
-    {
-        return app(\Mooeen\Scaffold\Designer\SchemaLoader::class)->originOf($schema);
-    }
-
-    /**
      * 获取一表数据表的数据
      *
      * @throws FileNotFoundException

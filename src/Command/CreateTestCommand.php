@@ -48,8 +48,8 @@ class CreateTestCommand extends Command
         $schema_name = $this->argument('schema_name');
         if (empty($schema_name)) {
             // plan-53:包 schema 测试脚手架未设计(路径/命名空间推导是 host 形态)—— 列表只给 host schema
-            $schema_name = $this->chooseSchema(array_values(array_filter($this->utility->getSchemaNames(), fn (string $s): bool => $this->utility->schemaOrigin($s) === null)));
-        } elseif ($this->utility->schemaOrigin((string) $schema_name) !== null) {
+            $schema_name = $this->chooseSchema($this->hostSchemaNames());
+        } elseif ($this->schemaOrigin((string) $schema_name) !== null) {
             $this->console()->error("「{$schema_name}」是扩展包 schema —— moo:test 暂不支持扩展包。");
 
             return;

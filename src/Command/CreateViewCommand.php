@@ -48,9 +48,8 @@ class CreateViewCommand extends Command
         $schema_name = $this->argument('schema_name');
         if (empty($schema_name)) {
             // plan-53:moo:view 本 plan 不碰包(前端未结合)—— 列表只给 host schema
-            $file_names  = array_values(array_filter($this->utility->getSchemaNames(), fn (string $s): bool => $this->utility->schemaOrigin($s) === null));
-            $schema_name = $this->chooseSchema($file_names);
-        } elseif ($this->utility->schemaOrigin((string) $schema_name) !== null) {
+            $schema_name = $this->chooseSchema($this->hostSchemaNames());
+        } elseif ($this->schemaOrigin((string) $schema_name) !== null) {
             $this->console()->error("「{$schema_name}」是扩展包 schema —— moo:view(前端脚手架)暂不支持扩展包。");
 
             return;

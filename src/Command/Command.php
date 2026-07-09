@@ -13,6 +13,7 @@ namespace Mooeen\Scaffold\Command;
 use Illuminate\Console\Command as BaseCommand;
 use Illuminate\Console\View\Components\Factory;
 use Illuminate\Filesystem\Filesystem;
+use Mooeen\Scaffold\Designer\SchemaLoader;
 use Mooeen\Scaffold\Support\Concerns\InteractsWithConsoleUi;
 use Mooeen\Scaffold\Utility;
 
@@ -68,6 +69,31 @@ class Command extends BaseCommand
     }
 
     /**
+     * 全部 schema 名(plan-53:走 Designer 的 SchemaLoader 单一真源,host + 各扩展包聚合)。
+     * 命令编排层直接问 Designer,不再经 Utility 反调(拆 Utility→SchemaLoader 依赖环)。
+     */
+    protected function schemaNames(): array
+    {
+        return array_keys(app(SchemaLoader::class)->listSchemaFiles());
+    }
+
+    /**
+     * schema 的出身:null = host,否则扩展包 key(plan-53)。
+     */
+    protected function schemaOrigin(string $schema): ?string
+    {
+        return app(SchemaLoader::class)->originOf($schema);
+    }
+
+    /**
+     * 仅 host schema(滤掉扩展包出身)—— moo:view / moo:test 等本 plan 暂不碰包的命令用。
+     */
+    protected function hostSchemaNames(): array
+    {
+        return array_values(array_filter($this->schemaNames(), fn (string $s): bool => $this->schemaOrigin($s) === null));
+    }
+
+    /**
      * plan-53:schema 选择带出身标注(`System〔moo-system 扩展包〕`),选了即定出身、无独立 host/pkg 问题;
      * $forApp 非 admin 时按上下文收窄 —— 包 schema 固定 admin,api 等语境下不列(天然无矛盾)。
      */
@@ -75,7 +101,7 @@ class Command extends BaseCommand
     {
         $labels = [];   // label => name(标注只进选项文本,返回值恒为纯 schema 名)
         foreach ($schemas as $name) {
-            $origin = $this->utility->schemaOrigin((string) $name);
+            $origin = $this->schemaOrigin((string) $name);
             if ($origin !== null && $forApp !== null && $forApp !== 'admin') {
                 continue;
             }
@@ -249,6 +275,6 @@ class Command extends BaseCommand
             return '';
         }
 
-        return $this->chooseSchema($this->utility->getSchemaNames(), '选择 schema(模块)', $forApp);
+        return $this->chooseSchema($this->schemaNames(), '选择 schema(模块)', $forApp);
     }
 }

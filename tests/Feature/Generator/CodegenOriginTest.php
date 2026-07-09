@@ -197,9 +197,11 @@ it('写权硬线:vendor 拷贝包 codegen 全链硬拒', function () {
     (new Filesystem)->deleteDirectory(base_path('vendor/acme-cg'));
 });
 
-it('CLI 单一真源:getSchemaNames 聚合包 schema,schemaOrigin 返回出身', function () {
-    $u = app(Utility::class);
-    expect($u->getSchemaNames())->toContain('PkgGen');
-    expect($u->schemaOrigin('PkgGen'))->toBe('moo-pkgen');
-    expect($u->schemaOrigin('NotExist'))->toBeNull();
+it('CLI 单一真源:SchemaLoader::listSchemaFiles 聚合包 schema,originOf 返回出身', function () {
+    // 3.2:知识挪回 Designer 真源(原经 Utility::getSchemaNames/schemaOrigin 反调 SchemaLoader,已删),
+    // 断言语义一比一等价 —— 有意的测试迁移。
+    $loader = app(\Mooeen\Scaffold\Designer\SchemaLoader::class);
+    expect(array_keys($loader->listSchemaFiles()))->toContain('PkgGen');
+    expect($loader->originOf('PkgGen'))->toBe('moo-pkgen');
+    expect($loader->originOf('NotExist'))->toBeNull();
 });
