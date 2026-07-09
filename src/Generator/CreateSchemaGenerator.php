@@ -31,13 +31,7 @@ class CreateSchemaGenerator extends Generator
                 'ModuleName'   => $schema_name,
                 'ModuleFolder' => $schema_name,
             ];
-            $this->filesystem->put($schema_file, $this->compileStub($meta));
-
-            if ($schema_exists) {
-                $this->console()->overwritten($schema_relative_file);
-            } else {
-                $this->console()->created($schema_relative_file);
-            }
+            $this->putAndReport($schema_file, $schema_relative_file, $this->compileStub($meta));
 
             return true;
         }

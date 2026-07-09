@@ -182,12 +182,7 @@ class CreateControllerGenerator extends Generator
                 // 2026-05-20 audit hook 占位符独立行(L107/L123)+ 周围空行 = hook 空时残留 3+ 连续 whitespace-only 行
                 // 折叠 3+ 连续空行(含 whitespace-only)为单个空行,保留 hook 有内容时的视觉间距
                 $content = preg_replace('/(?:\n[ \t]*){3,}/', "\n\n", $content);
-                $this->filesystem->put($controller_file, $content);
-                if ($controller_exists) {
-                    $this->console()->overwritten($controller_relative_file);
-                } else {
-                    $this->console()->created($controller_relative_file);
-                }
+                $this->putAndReport($controller_file, $controller_relative_file, $content);
                 $this->console()->newLine();
 
                 $created[] = [
@@ -391,12 +386,7 @@ class CreateControllerGenerator extends Generator
             ];
 
             $content = $this->buildStub($meta, $this->getStub('request'));
-            $this->filesystem->put($request_file, $content);
-            if ($request_exists) {
-                $this->console()->overwritten($request_relative_file);
-            } else {
-                $this->console()->created($request_relative_file);
-            }
+            $this->putAndReport($request_file, $request_relative_file, $content);
         }
 
         return $use_codes;
@@ -443,12 +433,7 @@ class CreateControllerGenerator extends Generator
         }
 
         $content = $this->buildStub($meta, $this->getStub("controller-{$app}-trait"));
-        $this->filesystem->put($trait_file, $content);
-        if ($trait_exists) {
-            $this->console()->overwritten($trait_relative_file);
-        } else {
-            $this->console()->created($trait_relative_file);
-        }
+        $this->putAndReport($trait_file, $trait_relative_file, $content);
     }
 
     /**

@@ -88,7 +88,6 @@ class CreateResourceGenerator extends Generator
         // 文件处理
         $resource_file = $resource_path . "/{$class}Resource.php";
         $relative_file = $this->relDisplay($resource_file, $this->originCtx);
-        $file_exists   = $this->filesystem->isFile($resource_file);
 
         $meta = [
             'author'      => $this->utility->getConfig('author'),
@@ -101,12 +100,7 @@ class CreateResourceGenerator extends Generator
 
         // 生成 resource 文件
         $content = $this->buildStub($meta, $this->getStub('resource'));
-        $this->filesystem->put($resource_file, $content);
-        if ($file_exists) {
-            $this->console()->overwritten($relative_file);
-        } else {
-            $this->console()->created($relative_file);
-        }
+        $this->putAndReport($resource_file, $relative_file, $content);
     }
 
     /**

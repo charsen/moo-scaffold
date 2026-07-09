@@ -118,7 +118,6 @@ class CreateModelGenerator extends Generator
         // 文件处理
         $model_file    = $model_path . "/{$class}.php";
         $relative_file = $this->relDisplay($model_file, $this->originCtx);
-        $file_exists   = $this->filesystem->isFile($model_file);
 
         // model 文件代码处理
         $use_trait = ['Filterable'];
@@ -188,12 +187,7 @@ class CreateModelGenerator extends Generator
 
         // 生成 model 文件
         $content = $this->buildStub($meta, $this->getStub('model'));
-        $this->filesystem->put($model_file, $content);
-        if ($file_exists) {
-            $this->console()->overwritten($relative_file);
-        } else {
-            $this->console()->created($relative_file);
-        }
+        $this->putAndReport($model_file, $relative_file, $content);
     }
 
     /**
@@ -413,13 +407,7 @@ class CreateModelGenerator extends Generator
         ];
 
         $content = $this->buildStub($meta, $this->getStub('model-filter'));
-        $this->filesystem->put($filter_file, $content);
-
-        if ($file_exists) {
-            $this->console()->overwritten($relative_file);
-        } else {
-            $this->console()->created($relative_file);
-        }
+        $this->putAndReport($filter_file, $relative_file, $content);
     }
 
     /**
@@ -510,12 +498,7 @@ class CreateModelGenerator extends Generator
         $this->updateSeeder($meta['model_class']);
 
         $content = $this->buildStub($meta, $this->getStub('model-factory'));
-        $this->filesystem->put($factory_file, $content);
-        if ($file_exists) {
-            $this->console()->overwritten($relative_file);
-        } else {
-            $this->console()->created($relative_file);
-        }
+        $this->putAndReport($factory_file, $relative_file, $content);
     }
 
     /**
