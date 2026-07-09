@@ -77,7 +77,6 @@ class CreateTSModelGenerator extends Generator
         // 文件处理
         $model_file    = $model_path . "/{$class}.ts";
         $relative_file = $this->model_relative_path . $schema['module']['folder'] . "/{$class}.ts";
-        $file_exists   = $this->filesystem->isFile($model_file);
 
         $meta = [
             'author'      => $this->utility->getConfig('author'),
@@ -89,12 +88,7 @@ class CreateTSModelGenerator extends Generator
 
         // 生成 model 文件
         $content = $this->buildStub($meta, $this->getFrontendStub('model'));
-        $this->filesystem->put($model_file, $content);
-        if ($file_exists) {
-            $this->console()->overwritten($relative_file);
-        } else {
-            $this->console()->created($relative_file);
-        }
+        $this->putAndReport($model_file, $relative_file, $content);
     }
 
     /**

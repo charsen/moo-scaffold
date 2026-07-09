@@ -70,7 +70,6 @@ class CreateViewGenerator extends Generator
     ): void {
         $view_file     = $view_path . "/{$filename}";
         $relative_file = $view_relative_path . "/{$filename}";
-        $file_exists   = $this->filesystem->isFile($view_file);
 
         $meta = [
             'author'      => $this->utility->getConfig('author'),
@@ -79,12 +78,6 @@ class CreateViewGenerator extends Generator
             'acl_key'     => $acl_key,
         ];
 
-        $this->filesystem->put($view_file, $this->buildStub($meta, $this->getFrontendStub($stub)));
-
-        if ($file_exists) {
-            $this->console()->overwritten($relative_file);
-        } else {
-            $this->console()->created($relative_file);
-        }
+        $this->putAndReport($view_file, $relative_file, $this->buildStub($meta, $this->getFrontendStub($stub)));
     }
 }

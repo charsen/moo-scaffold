@@ -51,17 +51,13 @@ class CreateTestGenerator extends Generator
                 continue;
             }
 
-            $existed = $this->filesystem->isFile($test_file);
-
             $meta = [
                 'author'          => (string) $this->utility->getConfig('author'),
                 'date'            => date('Y-m-d H:i'),
                 'controller'      => $controller,
                 'controller_fqcn' => $fqcn,
             ];
-            $this->filesystem->put($test_file, $this->buildStub($meta, $this->getStub('test')));
-
-            $existed ? $this->console()->overwritten($relative) : $this->console()->created($relative);
+            $this->putAndReport($test_file, $relative, $this->buildStub($meta, $this->getStub('test')));
         }
 
         return true;
