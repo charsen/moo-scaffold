@@ -67,7 +67,7 @@ class CreateModelCommand extends Command
 
         $this->tipCallCommand('moo:model ' . $schema_name);
 
-        $force   = $this->option('force')   === null;
+        $force   = $this->isForced();
         $factory = $this->option('factory') === null;
 
         // plan-53:包 schema 不生成 Factory —— 包 model 平铺命名空间(Mooeen\X\Models\Foo)与 host
