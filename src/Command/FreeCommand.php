@@ -94,7 +94,7 @@ class FreeCommand extends Command
         // 先刷缓存,再定位 schema —— `-t` 给的全局唯一表 key 能反查出 schema(读 models.php),省得记模块名
         (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start(false, true);
 
-        $file_names  = $this->utility->getSchemaNames();
+        $file_names  = $this->schemaNames();
         $schema_name = $this->resolveSchemaArg($this->argument('schema'), $only_table, $app);
         if ($schema_name === '') {
             return;
@@ -106,7 +106,7 @@ class FreeCommand extends Command
         }
 
         // plan-53 fail-fast:包 schema 固定 admin(交互路径已按 app 收窄列不出来;这里拦显式传参的矛盾组合)
-        $schema_origin = $this->utility->schemaOrigin($schema_name);
+        $schema_origin = $this->schemaOrigin($schema_name);
         if ($schema_origin !== null && $app !== 'admin') {
             $this->console()->error("「{$schema_name}」是扩展包 [{$schema_origin}] 的 schema(固定 admin),不能用于 app 「{$app}」。");
 

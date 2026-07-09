@@ -109,7 +109,7 @@ class DbAuditCommand extends Command
      */
     private function collectSchemas(string $only): array
     {
-        $all = $this->utility->getSchemaNames();
+        $all = $this->schemaNames();
         sort($all);
         if ($only === '') {
             return $all;
