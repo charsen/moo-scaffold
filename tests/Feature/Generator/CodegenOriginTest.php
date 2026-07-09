@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use Illuminate\Filesystem\Filesystem;
+use Mooeen\Scaffold\Command\CreateViewCommand;
 use Mooeen\Scaffold\Designer\SchemaLoader;
 use Mooeen\Scaffold\Generator\CreateControllerGenerator;
 use Mooeen\Scaffold\Generator\CreateModelGenerator;
@@ -204,4 +205,22 @@ it('CLI 单一真源:SchemaLoader::listSchemaFiles 聚合包 schema,originOf 返
     expect(array_keys($loader->listSchemaFiles()))->toContain('PkgGen');
     expect($loader->originOf('PkgGen'))->toBe('moo-pkgen');
     expect($loader->originOf('NotExist'))->toBeNull();
+});
+
+it('Command::hostSchemaNames 滤掉扩展包出身 schema,只留 host(3.2 唯一带逻辑的助手)', function () {
+    // 3.2:moo:view / moo:test 用 hostSchemaNames() 列表(包 schema 前端/测试脚手架未设计)。
+    // 该助手是三个新助手里唯一带 array_filter 逻辑的,单独锁「包 schema 被滤掉」。
+    $cmd = new CreateViewCommand(app(Filesystem::class), app(Utility::class));
+
+    $schemaNames = new ReflectionMethod($cmd, 'schemaNames');
+    $schemaNames->setAccessible(true);
+    $hostSchemaNames = new ReflectionMethod($cmd, 'hostSchemaNames');
+    $hostSchemaNames->setAccessible(true);
+
+    $all  = $schemaNames->invoke($cmd);
+    $host = $hostSchemaNames->invoke($cmd);
+
+    expect($all)->toContain('PkgGen');           // 全量含扩展包 schema
+    expect($host)->not->toContain('PkgGen');     // host-only 把它滤掉
+    expect(count($host))->toBeLessThan(count($all));   // 过滤确实生效(至少少了 PkgGen)
 });
