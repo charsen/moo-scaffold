@@ -39,12 +39,8 @@ class CreateControllerGenerator extends Generator
         }
 
         // plan-53 出身:包 schema 的 Controller/Request/Trait 落包目录(平铺),路由插包 routes/admin.php
-        $origin = null;
-        foreach ($all[$schema_name] as $attr0) {
-            $origin = $attr0['origin'] ?? null;
-
-            break;
-        }
+        $first  = reset($all[$schema_name]);
+        $origin = is_array($first) ? ($first['origin'] ?? null) : null;
         $this->assertOriginWritable($origin);
         $this->originCtx = $this->originContext($origin);
 

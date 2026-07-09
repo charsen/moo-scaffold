@@ -23,9 +23,6 @@ use Throwable;
 
 class Utility
 {
-    /**
-     * @var mixed
-     */
     protected Filesystem $filesystem;
 
     public function __construct()
