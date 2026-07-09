@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Mooeen\Scaffold\Http\Controllers\AccountController;
 use Mooeen\Scaffold\Http\Controllers\ApiController;
+use Mooeen\Scaffold\Http\Controllers\ApiProxyController;
 use Mooeen\Scaffold\Http\Controllers\AuthController;
 use Mooeen\Scaffold\Http\Controllers\CloudController;
 use Mooeen\Scaffold\Http\Controllers\CloudRedirectController;
@@ -183,7 +184,7 @@ Route::prefix($prefix)->middleware(array_merge($middleware, [SecurityHeaders::cl
         Route::get('/api/param', ApiController::class . '@param')->name('api.param');
         Route::post('/api/cache', ApiController::class . '@cache')->name('api.cache');
         // plan-40 §三 R-1 横切:origin 白名单已防 SSRF,加 throttle 防反射 DDoS 工具滥用
-        Route::post('/api/proxy', ApiController::class . '@proxy')
+        Route::post('/api/proxy', ApiProxyController::class . '@proxy')
             ->middleware('throttle:60,1')
             ->name('api.proxy');
 
