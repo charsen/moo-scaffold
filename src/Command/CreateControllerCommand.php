@@ -61,7 +61,7 @@ class CreateControllerCommand extends Command
             return;
         }
 
-        $force = $this->option('force') === null;
+        $force = $this->isForced();
 
         $this->tipCallCommand('moo:controller ' . $schema_name);
         $result = (new CreateControllerGenerator($this, $this->filesystem, $this->utility))

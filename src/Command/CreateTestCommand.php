@@ -64,7 +64,7 @@ class CreateTestCommand extends Command
             return;
         }
 
-        $force     = $this->option('force') === null;
+        $force     = $this->isForced();
         $generator = new CreateTestGenerator($this, $this->filesystem, $this->utility);
 
         $this->tipCallCommand('moo:test ' . $schema_name);

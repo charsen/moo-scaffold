@@ -65,7 +65,7 @@ class CreateViewCommand extends Command
             return;
         }
 
-        $force      = $this->option('force') === null;
+        $force      = $this->isForced();
         $controller = $this->choicePrompt('选择控制器', array_keys($all[$schema_name]));
 
         $this->tipCallCommand('moo:view ' . $schema_name);

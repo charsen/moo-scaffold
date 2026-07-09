@@ -58,7 +58,7 @@ class CreateResourceCommand extends Command
             return;
         }
 
-        $force = $this->option('force') === null;
+        $force = $this->isForced();
 
         $this->tipCallCommand('moo:resource ' . $schema_name);
         $result = (new CreateResourceGenerator($this, $this->filesystem, $this->utility))

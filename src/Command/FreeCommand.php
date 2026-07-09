@@ -76,8 +76,8 @@ class FreeCommand extends Command
             return;
         }
 
-        $force = $this->option('force') === null;
-        $api   = $this->option('api')   === null;
+        $force = $this->isForced();
+        $api   = $this->option('api') === null;
 
         // -t/--table:只生成单个表 key 的 Model/Resource/Controller;空值(仅给 flag 不给值)视作不过滤
         $only_table = $this->resolveOnlyTable();

@@ -93,6 +93,15 @@ class Command extends BaseCommand
         return $this->confirmPrompt("现在就执行 '{$command}' 吗", true);
     }
 
+    /**
+     * -f/--force 是 VALUE_OPTIONAL:传了不带值 → option 为 null → 强制;
+     * 没传 → 默认 false → 不强制。=== null 即"用户传了 -f"。
+     */
+    protected function isForced(): bool
+    {
+        return $this->option('force') === null;
+    }
+
     protected function reportAppNotConfigured(string $app, string $detail = 'Please check the scaffold controller configuration.'): void
     {
         $this->console()->error("App \"{$app}\" is not configured. {$detail}");

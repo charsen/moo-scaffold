@@ -110,7 +110,7 @@ class CreateApiCommand extends Command
 
         $this->tipCallCommand('moo:api');
 
-        $force     = $this->option('force') === null;
+        $force     = $this->isForced();
         $staleMode = strtolower(trim((string) $this->option('stale')));
         if (! in_array($staleMode, ['keep', 'deprecate', 'delete'], true)) {
             $this->console()->warn("--stale 选项无效 [{$staleMode}],回退为 [deprecate]。");
