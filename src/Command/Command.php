@@ -122,6 +122,9 @@ class Command extends BaseCommand
     /**
      * -f/--force 是 VALUE_OPTIONAL:传了不带值 → option 为 null → 强制;
      * 没传 → 默认 false → 不强制。=== null 即"用户传了 -f"。
+     *
+     * ⚠ 仅适用于 force 声明为 VALUE_OPTIONAL 的命令;若某命令把 force 声明成 VALUE_NONE
+     * (如 SnapshotInitCommand,读 `(bool) $this->option('force')`),语义相反,勿改用本助手。
      */
     protected function isForced(): bool
     {
