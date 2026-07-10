@@ -103,6 +103,80 @@
                 localStorage.setItem("scaffold_theme", "dark");
             }
         });
+
+        // 侧栏拖拽调宽 + 记忆（2026-07-09，通用版：服务 aside / 路由 flex 栏 / 设计器 grid 栏）
+        // 把手 position:fixed，left/top/height 由 JS 贴住目标侧栏实测右沿（跨三种布局稳）。
+        // edge=viewport：var 直接取 clientX（aside，其 var = 预留区右沿 X）；
+        // 否则 card 模式：var = clientX - 侧栏左沿（route/designer，其 var = 卡片本身宽度）。
+        (function () {
+            var root = document.documentElement;
+
+            var initResizer = function (rz) {
+                var target = document.getElementById(rz.getAttribute("data-resize-target"));
+                if (!target) return;                                // 目标侧栏不在本页 → 跳过
+                var VAR = rz.getAttribute("data-resize-var");
+                var KEY = rz.getAttribute("data-resize-key");
+                var MIN = parseInt(rz.getAttribute("data-resize-min"), 10) || 200;
+                var MAXABS = parseInt(rz.getAttribute("data-resize-max"), 10) || 520;
+                var DEF = parseInt(rz.getAttribute("data-resize-default"), 10) || 260;
+                var edgeMode = rz.getAttribute("data-resize-edge") === "viewport";
+                var maxW = function () { return Math.min(MAXABS, Math.round(window.innerWidth * 0.45)); };
+                var dragging = false, raf = 0;
+
+                // 把手贴住目标侧栏实测右沿（宽 0 → 该页无此栏，藏起来）
+                var reposition = function () {
+                    var r = target.getBoundingClientRect();
+                    if (r.width <= 0) { rz.style.display = "none"; return; }
+                    rz.style.display = "block";
+                    rz.style.left = (r.right - 3) + "px";
+                    rz.style.top = r.top + "px";
+                    rz.style.height = r.height + "px";
+                };
+                var scheduleReposition = function () {
+                    if (raf) return;
+                    raf = requestAnimationFrame(function () { raf = 0; reposition(); });
+                };
+
+                var onMove = function (e) {
+                    if (!dragging) return;
+                    var origin = edgeMode ? 0 : target.getBoundingClientRect().left;
+                    var w = Math.max(MIN, Math.min(maxW(), Math.round(e.clientX - origin)));
+                    root.style.setProperty(VAR, w + "px");
+                    reposition();
+                    e.preventDefault();
+                };
+                var onUp = function () {
+                    if (!dragging) return;
+                    dragging = false;
+                    document.body.classList.remove("is-resizing");
+                    window.removeEventListener("pointermove", onMove);
+                    window.removeEventListener("pointerup", onUp);
+                    var cur = parseInt(root.style.getPropertyValue(VAR), 10);
+                    if (cur >= MIN && cur <= MAXABS) localStorage.setItem(KEY, String(cur));
+                };
+
+                rz.addEventListener("pointerdown", function (e) {
+                    if (e.button !== 0) return;                      // 仅左键
+                    dragging = true;
+                    document.body.classList.add("is-resizing");
+                    window.addEventListener("pointermove", onMove);
+                    window.addEventListener("pointerup", onUp);
+                    e.preventDefault();
+                });
+                rz.addEventListener("dblclick", function () {        // 双击复位（清记忆）
+                    root.style.setProperty(VAR, DEF + "px");
+                    localStorage.removeItem(KEY);
+                    reposition();
+                });
+
+                reposition();
+                window.addEventListener("resize", scheduleReposition);
+                window.addEventListener("scroll", scheduleReposition, true);   // 捕获:内层滚动也跟着重定位
+            };
+
+            var list = document.querySelectorAll(".side-resizer");
+            for (var i = 0; i < list.length; i++) initResizer(list[i]);
+        })();
     });
 
     // ===========================================================

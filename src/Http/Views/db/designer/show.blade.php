@@ -162,7 +162,7 @@
             {{-- plan-22: 二栏 — 左表列表 280 + 右工作区 flex(原左栏"模块列表"已砍,模块切换走 hero 面包屑回 index) --}}
             <div class="p-designer-shell">
                 {{-- 中：表列表 --}}
-                <aside class="p-designer-col-sidebar p-designer-col-tables">
+                <aside class="p-designer-col-sidebar p-designer-col-tables" id="designer_tables_sidebar">
                     {{-- 2026-05-22:schema 名顶部块(原 .p-designer-header 砍后挪到此处)
                          2026-05-26 P2-7:模块名 + 中文 desc 一行,表数 + 新建按钮另一行 — 信息密度降低
                          2026-05-27:返回链已挪到 subnav bar 最左,本块只剩 schema 信息 + 表数/新建 --}}
@@ -192,6 +192,14 @@
                         @endforeach
                     </ul>
                 </aside>
+
+                {{-- 2026-07-09:表列表栏拖拽把手（JS 贴 #designer_tables_sidebar 右沿；var = 卡片宽度，card 模式）--}}
+                <div class="side-resizer" role="separator" aria-orientation="vertical"
+                     title="拖动调整表列表宽度（双击复位）"
+                     data-resize-target="designer_tables_sidebar"
+                     data-resize-var="--scaffold-designer-aside-width"
+                     data-resize-key="scaffold_designer_aside_width"
+                     data-resize-min="240" data-resize-max="560" data-resize-default="330"></div>
 
                 {{-- 右：当前表设计（每块卡片视觉跟左中栏对齐：border + radius + shadow + 标题区） --}}
                 <main class="p-designer-col-main">
