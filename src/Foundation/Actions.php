@@ -10,6 +10,12 @@
 
 namespace Mooeen\Scaffold\Foundation;
 
+/**
+ * ACL 权限点组装（host 消费面）。
+ *
+ * @api 本类由**宿主项目**实例化消费（ACL 角色/权限页），moo-scaffold 仓内 0 调用属正常——
+ *      勿因 grep 无引用判为死码（见 notes.md「grep 缺失≠死键」教训）。
+ */
 class Actions
 {
     private array $data;
@@ -24,6 +30,8 @@ class Actions
 
     /**
      * 获取所有数据
+     *
+     * @api
      */
     public function get(): array
     {
@@ -32,6 +40,8 @@ class Actions
 
     /**
      * 获取已选中的权限点
+     *
+     * @api
      */
     public static function getCheckedActions(array $data, array &$res = []): array
     {
@@ -52,6 +62,8 @@ class Actions
 
     /**
      * 给前端格式化权限点
+     *
+     * @api
      */
     public function formatActions($data, $role_actions, $parent_id = ''): array
     {
@@ -87,6 +99,8 @@ class Actions
 
     /**
      * 获取所有 Actions 键值
+     *
+     * @api
      */
     public function getOnlyActionKeys(): array
     {
