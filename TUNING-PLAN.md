@@ -14,6 +14,19 @@
 
 ---
 
+## 执行结果（2026-07-09 完成，本节事后补记）
+
+> ⚠ 上面「批准状态」是**执行前**口吻；下面是**实际落地结果**，读者以本节为准。
+
+- ✅ **P1 全做**：1.3 琐碎（`099427d6`）→ 1.4 删 `rebuild()`（`0d2a4227`）→ 1.1 `putAndReport` 收编 11 处（`82287806`）→ 1.2 `isForced()` 统一（`8803056d`，收尾迁第 8 处 + VALUE_NONE 脚手枪警告 `b9af34f5`）。
+- ✅ **P3.1**（`0c9679e1`）：proxy 段析出 `ApiProxyController`（173 行，plan 注释逐字随迁，路由只换目标类）。
+- ✅ **P3.2**（`7dbad16b`）：拆 `Utility→SchemaLoader` 反向依赖环，知识挪到 `Command` 编排层（`schemaNames/schemaOrigin/hostSchemaNames`），删 Utility 两方法，`CodegenOriginTest` 迁真源。
+- ⛔ **P2 已放弃（止损条款生效）**：真做后判定「收敛」只是把分支重定位进更深的值对象——namespace 的 module-folder 插入散在下游、host controller 路径随 app 变会逼 context 存 app-keyed 嵌套 map，读得反不如现状 6 行 if/else 直白。**2026-07-09 止损，维持现状**（详见 `notes.md`）。无新证据不重开；`originCtx` 三元仍留在 4 个生成器 + `ResolvesOriginContext`。
+- 🧪 **测试**：新增 `IsForcedTest` / `PutAndReportTest`，`CodegenOriginTest` 迁真源；HEAD `pest` 全绿（597 passed / 3 skipped）。
+- 📌 **遗留**：`CreateModelGenerator.php` 全仓唯一 `TODO: check in vue3` —— vue3 模板未做，用户 2026-07-09 决定原样留着。
+
+---
+
 ## 〇、总体判断（先说结论）
 
 **这是一个健康度很高的代码库，本方案是"调优"，不是"抢救"。** 实证依据：
