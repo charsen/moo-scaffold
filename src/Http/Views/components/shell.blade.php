@@ -45,6 +45,15 @@ $containerClasses = trim('container' . ($hasAside ? '' : ' pl0') . ($hasTopBar ?
         <aside class="aside" id="aside_container">
             {{ $aside }}
         </aside>
+        {{-- 2026-07-09:侧栏拖拽把手（通用 .side-resizer，JS 贴住 #aside_container 右沿）。
+             aside 的变量语义 = 预留区右沿 X，故 edge=viewport（var 直接取 clientX）。--}}
+        <div class="side-resizer" role="separator" aria-orientation="vertical"
+             title="拖动调整侧栏宽度（双击复位）"
+             data-resize-target="aside_container"
+             data-resize-var="--scaffold-shell-aside-width"
+             data-resize-key="scaffold_aside_width"
+             data-resize-edge="viewport"
+             data-resize-min="220" data-resize-max="520" data-resize-default="260"></div>
     @endif
 
     {{-- 2026-05-23 plan-50 后续:topBar 移出 main 单独 fixed positioned,跨整个 viewport

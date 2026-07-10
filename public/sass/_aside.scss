@@ -12,7 +12,9 @@
     left: var(--space-5);
     top: calc(var(--shell-header-height) + var(--shell-content-top));
     bottom: var(--space-5);
-    width: calc(260px - var(--space-5));
+    // 宽度读 :root 单一真源(_shell.scss);同步收 20 保持右缘 = aside-width 不变。
+    // 可拖拽(见 .aside-resizer + main.js),宽度记忆在 localStorage。
+    width: calc(var(--scaffold-shell-aside-width) - var(--space-5));
     padding-top: var(--space-2);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
@@ -22,5 +24,50 @@
     box-shadow: var(--elevation-1);
 
     // 2026-05-22 plan-43 Batch A:.app-switcher 死类清(plan-25 后旧 sidebar 切换 widget,0 引用)
+}
+
+// ==============================================================================
+// .side-resizer — 通用侧栏拖拽把手(2026-07-09)
+// 一套把手服务三种布局(共享 .aside / 路由 flex 栏 / 设计器 grid 栏)——**位置由 JS 贴住
+// 目标侧栏实测右沿**(main.js 的 initResizer 设 left/top/height),CSS 只管视觉。
+// 拖动改各自的宽度变量;平时透明,hover/拖拽露一条 accent 竖线;双击复位(见 main.js)。
+// 默认 display:none,JS reposition 时才显示(防 JS 未跑时定位在左上角闪一下)。
+// ==============================================================================
+.side-resizer {
+    position: fixed;
+    display: none;          // JS reposition 后置为可见
+    width: 6px;
+    z-index: 8;             // 低于 top-bar(9),不挡内容;高于卡片
+    cursor: col-resize;
+    background: transparent;
+
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 2px;
+        width: 2px;
+        border-radius: 1px;
+        background: transparent;
+        transition: background var(--transition-fast);
+    }
+
+    &:hover::before { background: var(--accent-hover-border); }
+}
+
+// 拖拽进行中:全局禁选中/禁 iframe 抢指针,把手竖线常亮
+body.is-resizing {
+    cursor: col-resize;
+    user-select: none;
+
+    .side-resizer::before { background: var(--accent-text); }
+    // 防止拖过 iframe(文档图表 / 接口调试)时指针被吞
+    iframe { pointer-events: none; }
+}
+
+// 移动端不玩拖拽(触屏拖拽体验差)
+@media (max-width: 768px) {
+    .side-resizer { display: none !important; }
 }
 

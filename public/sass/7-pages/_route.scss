@@ -27,8 +27,9 @@
 .p-route-shell > .side-tree {
   position: sticky;
   top: calc(var(--shell-header-height) + var(--shell-content-top));
-  flex: 0 0 260px;
-  width: 260px;
+  // 2026-07-09:可拖拽宽度(route/db/dict 共用此栏,同享该变量);默认 260,拖拽/记忆见 main.js
+  flex: 0 0 var(--scaffold-route-aside-width, 260px);
+  width: var(--scaffold-route-aside-width, 260px);
   max-height: calc(100vh - var(--shell-header-height) - var(--shell-content-top) - var(--space-5));
   border: 1px solid var(--border-light);
   border-radius: var(--shell-card-radius);

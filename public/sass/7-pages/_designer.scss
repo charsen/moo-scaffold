@@ -451,7 +451,8 @@
 // -------- 二栏 grid (plan-22: 砍左"模块"栏与 index 重复,模块切换走面包屑) --------
 .p-designer-shell {
   display: grid;
-  grid-template-columns: 330px minmax(0, 1fr);
+  // 2026-07-09:表列表栏可拖拽(默认 330);拖拽/记忆见 main.js
+  grid-template-columns: var(--scaffold-designer-aside-width, 330px) minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
 }
