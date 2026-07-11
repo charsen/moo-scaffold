@@ -12,9 +12,9 @@
     left: var(--space-5);
     top: calc(var(--shell-header-height) + var(--shell-content-top));
     bottom: var(--space-5);
-    // 宽度读 :root 单一真源(_shell.scss);同步收 20 保持右缘 = aside-width 不变。
-    // 可拖拽(见 .aside-resizer + main.js),宽度记忆在 localStorage。
-    width: calc(var(--scaffold-shell-aside-width) - var(--space-5));
+    // 宽度 = 卡片本身宽度,与路由/字典栏同语义,共用 --scaffold-nav-width(_shell.scss :root)。
+    // container margin-left = space5 + 该值(= aside 右沿)。可拖拽(.side-resizer + main.js),记忆在 localStorage。
+    width: var(--scaffold-nav-width);
     padding-top: var(--space-2);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;

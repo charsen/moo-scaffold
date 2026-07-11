@@ -27,6 +27,13 @@
             :searchable="false"
             :collapsedByDefault="false"
         />
+        {{-- 2026-07-11:数据字典 sidebar 拖拽把手（JS 贴 #dict_sidebar 右沿；共用 --scaffold-nav-width，与各导航栏一起变）--}}
+        <div class="side-resizer" role="separator" aria-orientation="vertical"
+             title="拖动调整侧栏宽度（双击复位）"
+             data-resize-target="dict_sidebar"
+             data-resize-var="--scaffold-nav-width"
+             data-resize-key="scaffold_nav_width"
+             data-resize-min="220" data-resize-max="520" data-resize-default="260"></div>
     @endif
 
     <div class="route-main">
