@@ -52,13 +52,13 @@
             :searchable="false"
             :collapsedByDefault="true"
         />
-        {{-- 2026-07-09:路由 sidebar 拖拽把手（JS 贴 #route_sidebar 右沿；var = 卡片宽度，card 模式）--}}
+        {{-- 2026-07-11:路由 sidebar 拖拽把手（JS 贴 #route_sidebar 右沿；共用 --scaffold-nav-width，与各导航栏一起变）--}}
         <div class="side-resizer" role="separator" aria-orientation="vertical"
              title="拖动调整侧栏宽度（双击复位）"
              data-resize-target="route_sidebar"
-             data-resize-var="--scaffold-route-aside-width"
-             data-resize-key="scaffold_route_aside_width"
-             data-resize-min="200" data-resize-max="520" data-resize-default="260"></div>
+             data-resize-var="--scaffold-nav-width"
+             data-resize-key="scaffold_nav_width"
+             data-resize-min="220" data-resize-max="520" data-resize-default="260"></div>
     @endif
 @endif
 

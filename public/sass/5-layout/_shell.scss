@@ -17,12 +17,10 @@
 // 高度 var(--shell-top-bar-height) 默认 48px
 :root {
     --shell-top-bar-height: 48px;
-    // 三个可拖拽侧栏各自的宽度真源(2026-07-09)。拖拽把手 / 防闪烁 boot 只改这些变量。
-    // 语义:aside = 预留区右沿 X(卡片 = 该值 - 20 gutter,同时 = container margin);
-    //       route / designer = 侧栏卡片本身宽度。范围钳制见 main.js。
-    --scaffold-shell-aside-width: 260px;    // 共享 aside(文档/db 文档/接口调试/ACL)
-    --scaffold-route-aside-width: 260px;    // 接口路由 flex 栏
-    --scaffold-designer-aside-width: 330px; // 数据库设计器 grid 表列表栏
+    // 可拖拽侧栏宽度真源(2026-07-11 并组:所有导航树统一一个宽度,设计器表列表独立)。
+    // 语义统一为「侧栏卡片本身宽度」。拖拽把手 / 防闪烁 boot 只改这些变量。范围钳制见 main.js。
+    --scaffold-nav-width: 260px;            // 所有导航树侧栏共用:文档/文档编辑/db 文档/接口调试/接口文档/接口路由/数据字典
+    --scaffold-designer-aside-width: 330px; // 数据库设计器 grid 表列表栏(独立)
 }
 
 .scaffold-top-bar {
@@ -87,7 +85,7 @@ body {
 
     // margin-left 紧贴 aside 右沿；左侧块间距全部由 padding-left 提供（= --scaffold-shell-gap）
     // 这样三处块间距对称：左 padding / 中间 gap / 右 padding 都等于 --scaffold-shell-gap
-    margin-left: var(--scaffold-shell-aside-width);
+    margin-left: calc(var(--space-5) + var(--scaffold-nav-width));
     padding: var(--shell-content-top) var(--scaffold-shell-gap) var(--space-5);
     min-height: calc(100vh - var(--shell-header-height));
     display: flex;

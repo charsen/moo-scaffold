@@ -45,14 +45,13 @@ $containerClasses = trim('container' . ($hasAside ? '' : ' pl0') . ($hasTopBar ?
         <aside class="aside" id="aside_container">
             {{ $aside }}
         </aside>
-        {{-- 2026-07-09:侧栏拖拽把手（通用 .side-resizer，JS 贴住 #aside_container 右沿）。
-             aside 的变量语义 = 预留区右沿 X，故 edge=viewport（var 直接取 clientX）。--}}
+        {{-- 2026-07-11:侧栏拖拽把手（通用 .side-resizer，JS 贴住 #aside_container 右沿）。
+             与路由/字典栏共用 --scaffold-nav-width（card 模式，var = 卡片宽度），所有导航栏一起变。--}}
         <div class="side-resizer" role="separator" aria-orientation="vertical"
              title="拖动调整侧栏宽度（双击复位）"
              data-resize-target="aside_container"
-             data-resize-var="--scaffold-shell-aside-width"
-             data-resize-key="scaffold_aside_width"
-             data-resize-edge="viewport"
+             data-resize-var="--scaffold-nav-width"
+             data-resize-key="scaffold_nav_width"
              data-resize-min="220" data-resize-max="520" data-resize-default="260"></div>
     @endif
 
