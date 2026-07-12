@@ -9,6 +9,8 @@
 
 namespace Mooeen\Scaffold;
 
+use Godruoyi\Snowflake\LaravelSequenceResolver;
+use Godruoyi\Snowflake\Snowflake;
 use Illuminate\Support\ServiceProvider;
 use Mooeen\Scaffold\Command\AccountAddCommand;
 use Mooeen\Scaffold\Command\AdderCommand;
@@ -52,6 +54,20 @@ class ScaffoldProvider extends ServiceProvider
     public function register()
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/config.php', 'scaffold');
+
+        // plan 38：三件套上移——共享雪花单例 scaffold.snowflake（原各包各自 registerSnowflake，单例名各异）。
+        // 所有 moo 系包的 Concerns\UsingSnowFlakePrimaryKey 取用本单例；同源 SNOW_FLAKE_* env，id 空间一致。
+        // 生产须跨进程共享 cache（Redis）保证机内同毫秒序列号防撞。
+        $this->app->singleton('scaffold.snowflake', function ($app) {
+            $snowflake = new Snowflake(
+                (int) config('scaffold.snowflake.data_center_id', 1),
+                (int) config('scaffold.snowflake.worker_id', 1),
+            );
+
+            return $snowflake
+                ->setStartTimeStamp(strtotime((string) config('scaffold.snowflake.start_time', '2021-10-10')) * 1000)
+                ->setSequenceResolver(new LaravelSequenceResolver($app['cache']->store()));
+        });
 
         // plan 19 数据库设计器:GitInspector 注入 base_path / TranslationService 注入 env 配置
         $this->app->singleton(\Mooeen\Scaffold\Designer\GitInspector::class, fn ($app) => new \Mooeen\Scaffold\Designer\GitInspector(
