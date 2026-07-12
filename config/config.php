@@ -227,4 +227,11 @@ return [
     // 扩展包(plan-53)**无注册表**:凡 composer 装的包带 scaffold/database/ 目录即被
     // PackageRegistry 自动发现;命名空间取包 psr-4,目录按全 repo 统一约定,软链装才可写。
 
+    // plan 38：三件套上移——共享雪花单例 scaffold.snowflake 的配置（复用 host 既有 SNOW_FLAKE_* env，与各包原值同源）
+    'snowflake' => [
+        'data_center_id' => env('SNOW_FLAKE_DATA_CENTER_ID', 1),
+        'worker_id'      => env('SNOW_FLAKE_WORKER_ID', 1),
+        'start_time'     => env('SNOW_FLAKE_START_TIME', '2021-10-10'),
+    ],
+
 ];
