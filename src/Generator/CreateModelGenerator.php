@@ -59,7 +59,7 @@ class CreateModelGenerator extends Generator
             $this->base_namespace = $this->originCtx->namespaceFor('model') . '\\';
         }
 
-        $this->checkBaseFilter();
+        // plan 38：BaseFilter 已上移 Mooeen\Scaffold\Foundation\BaseFilter，不再逐包生成本地副本（同 Concerns\* 上提）
         $this->checkBaseTraitFiles();
 
         foreach ($all[$schema_name] as $class => $attr) {
@@ -401,7 +401,7 @@ class CreateModelGenerator extends Generator
             'author'          => $this->utility->getConfig('author'),
             'date'            => date('Y-m-d H:i'),
             'namespace'       => $namespace . '\Filters',
-            'use_base_filter' => $this->base_namespace . 'BaseFilter',
+            'use_base_filter' => 'Mooeen\Scaffold\Foundation\BaseFilter', // plan 38：三件套上移，不再逐包 BaseFilter（同 Concerns\* 上提）
             'class_name'      => $filter_class,
             'codes'           => implode(PHP_EOL, $codes),
         ];
@@ -795,29 +795,6 @@ class CreateModelGenerator extends Generator
             'appends'         => $appends_code,
             'get_txt_fn'      => implode(PHP_EOL, $function_code),
         ];
-    }
-
-    /**
-     * 检查 BaseFilter 是否存在，不存在则创建
-     */
-    public function checkBaseFilter(): void
-    {
-        // plan-53:$model_path 已按出身设好(host = getModelPath / 包 = 包 src/Models);包内既有 BaseFilter 命中即跳过
-        $path = $this->model_path;
-        $this->checkDirectory($path);
-        $base_file = $path . 'BaseFilter.php';
-
-        // 检查文件是否存在，不存在则创建
-        if (! $this->filesystem->isFile($base_file)) {
-            $data = [
-                'namespace' => trim($this->base_namespace, '\\'),
-            ];
-
-            $content = $this->buildStub($data, $this->getStub('model-base-filter'));
-            $this->filesystem->put($base_file, $content);
-
-            $this->console()->created($this->relDisplay($base_file, $this->originCtx));
-        }
     }
 
     /**
