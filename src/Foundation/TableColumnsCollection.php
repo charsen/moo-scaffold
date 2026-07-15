@@ -54,11 +54,8 @@ class TableColumnsCollection extends ResourceCollection
             if (is_array($item)) {
                 $field = $index;
                 foreach ($item as $key => $value) {
-                    if (in_array($key, ['width', 'minWidth']) && is_int($value)) {
-                        $one[$key] = $value . 'px';
-                    } else {
-                        $one[$key] = $value;
-                    }
+                    // width/minWidth 原样透传：int 输出裸数字（前端自行归一化），字符串（如 'auto'）保持不变
+                    $one[$key] = $value;
                 }
                 //                $one['key'] = $item['key'] ?? NULL;
             } else {
