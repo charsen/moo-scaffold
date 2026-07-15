@@ -41,7 +41,7 @@ it('CreateModelGenerator 检测 creator_id/updater_id → use HasOperator', func
 
 it('CreateModelGenerator.checkBaseTraitFiles 注册 HasOperator → 自动落地 trait 文件', function () {
     $src = file_get_contents(__DIR__ . '/../../../src/Generator/CreateModelGenerator.php');
-    expect($src)->toContain("'HasOperator'              => 'model-has-operator-trait'");
+    expect($src)->toMatch("/'HasOperator'\\s*=>\\s*'model-has-operator-trait'/");
 });
 
 it('model-has-operator-trait.stub 存在且 boot 钩子按 $fillable 填充', function () {

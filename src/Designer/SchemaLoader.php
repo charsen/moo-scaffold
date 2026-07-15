@@ -351,11 +351,17 @@ class SchemaLoader
         }
         // 最小 stub:仅 module 块 + 空 tables(后续在 designer 新建表)
         $headerComment = "###\n# {$schemaName}\n#\n# @date   " . date('Y-m-d H:i:s') . "\n##\n";
-        $body          = "module:\n    name: {$displayName}\n    folder: {$schemaName}\n";
+        $module        = [
+            'name'   => $displayName,
+            'folder' => $schemaName,
+        ];
         if ($desc !== '') {
-            $body .= "    desc: {$desc}\n";
+            $module['desc'] = $desc;
         }
-        $body .= "tables: {}\n";
+        $body = YamlFormatter::dump([
+            'module' => $module,
+            'tables' => [],
+        ]);
         if (file_put_contents($path, $headerComment . $body, LOCK_EX) === false) {
             throw new SchemaLoadException("write failed: {$path}");
         }
