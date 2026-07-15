@@ -129,7 +129,9 @@ class Generator
     protected function putAndReport(string $file, string $relativeFile, string $content, string $existVerb = 'overwritten'): void
     {
         $fileExists = $this->filesystem->isFile($file);
-        $this->filesystem->put($file, $content);
+        if ($this->filesystem->put($file, $content) === false) {
+            throw new \RuntimeException("文件写入失败：{$file}");
+        }
 
         if ($fileExists) {
             match ($existVerb) {

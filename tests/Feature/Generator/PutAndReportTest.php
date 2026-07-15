@@ -19,9 +19,9 @@ function putAndReport_invoke(Generator $gen, string $file, string $relative, str
     $m->invoke($gen, $file, $relative, $content, $verb);
 }
 
-function putAndReport_gen(BufferedOutput $buffer): Generator
+function putAndReport_gen(BufferedOutput $buffer, ?Filesystem $filesystem = null): Generator
 {
-    return new Generator($buffer, new Filesystem, app(Utility::class));
+    return new Generator($buffer, $filesystem ?? new Filesystem, app(Utility::class));
 }
 
 it('putAndReport:目标不存在 → 写入 + 报 created(不误报 overwritten)', function () {
@@ -81,4 +81,30 @@ it('putAndReport:existVerb=updated 但目标不存在 → 仍报 created(created
     expect($out)->not->toContain('Updated');
 
     @unlink($file);
+});
+
+it('putAndReport:写入失败 → 抛异常且不报告成功', function () {
+    $buffer     = new BufferedOutput;
+    $filesystem = new class extends Filesystem
+    {
+        public function isFile($file)
+        {
+            return false;
+        }
+
+        public function put($path, $contents, $lock = false)
+        {
+            return false;
+        }
+    };
+    $file = '/unwritable/generated.php';
+
+    expect(fn () => putAndReport_invoke(
+        putAndReport_gen($buffer, $filesystem),
+        $file,
+        './generated.php',
+        'content'
+    ))->toThrow(RuntimeException::class, "文件写入失败：{$file}");
+
+    expect($buffer->fetch())->toBe('');
 });

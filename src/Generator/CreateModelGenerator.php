@@ -152,7 +152,7 @@ class CreateModelGenerator extends Generator
         // 雪花算法 ID
         if ($this->utility->getConfig('snow_flake_id')) {
             $use_trait[] = 'UsingSnowFlakePrimaryKey';
-            $use_class[] = "use {$this->base_namespace}Traits\UsingSnowFlakePrimaryKey;";
+            $use_class[] = 'use Mooeen\Scaffold\Concerns\UsingSnowFlakePrimaryKey;';
         }
 
         // 软删除
@@ -805,11 +805,10 @@ class CreateModelGenerator extends Generator
         $path = $this->model_path . 'Traits/';
         $this->checkDirectory($path);
 
-        // EnumExtend / GetSerializeDate / GetUpdatedAtHumanTime / Optional 已上提到
+        // EnumExtend / GetSerializeDate / GetUpdatedAtHumanTime / Optional / UsingSnowFlakePrimaryKey 已上提到
         // mooeen/scaffold 的 Mooeen\Scaffold\Concerns\*（运行时类），不再生成本地副本。
         $files = [
-            'HasOperator'              => 'model-has-operator-trait',
-            'UsingSnowFlakePrimaryKey' => 'model-snowflake-trait',
+            'HasOperator' => 'model-has-operator-trait',
         ];
 
         foreach ($files as $file_name => $stub) {

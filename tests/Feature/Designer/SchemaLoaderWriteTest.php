@@ -43,8 +43,28 @@ it('createSchema writes a minimal yaml with module block', function () {
     expect($content)->toContain('name: 测试模块');
     expect($content)->toContain('folder: TestModule');
     expect($content)->toContain('desc: 描述');
-    expect($content)->toContain('tables: {}');
+    expect($content)->toContain('tables: {  }');
 });
+
+it('createSchema safely serializes module text values', function (string $displayName, string $desc) {
+    $this->loader->createSchema('SpecialModule', $displayName, $desc);
+
+    $content = file_get_contents($this->tmpDir . '/SpecialModule.yaml');
+    $parsed  = Yaml::parse($content);
+
+    expect($content)->toStartWith("###\n# SpecialModule\n")
+        ->and($parsed['module'])->toBe([
+            'name'   => $displayName,
+            'folder' => 'SpecialModule',
+            'desc'   => $desc,
+        ])
+        ->and($parsed['tables'])->toBe([]);
+})->with([
+    'colon'   => ['订单:草稿', '描述:待确认'],
+    'comment' => ['订单 #1', '描述 #草稿'],
+    'newline' => ["订单\n草稿", "第一行\n第二行"],
+    'null'    => ['null', 'null'],
+]);
 
 it('createSchema rejects non-PascalCase name', function () {
     expect(fn () => $this->loader->createSchema('lower_case', '名字'))
