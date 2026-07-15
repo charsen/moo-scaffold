@@ -161,7 +161,7 @@ class ScaffoldController extends Controller
             $data[$moduleKey]            = $moduleData;
             $moduleSummaries[$moduleKey] = [
                 'name'        => $folder['folder_name'] ?? $moduleKey,
-                'origin'      => $folder['origin'] ?? null,   // plan-53:包模块视觉标注用
+                'origin'      => $folder['origin']      ?? null,   // plan-53:包模块视觉标注用
                 'table_count' => count($moduleData),
                 'field_count' => $moduleFieldCount,
                 'value_count' => $moduleValueCount,

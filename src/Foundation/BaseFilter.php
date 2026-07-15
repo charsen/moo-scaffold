@@ -13,6 +13,7 @@ use EloquentFilter\ModelFilter;
  * - $drop_id = false：不剥离 `_id` 后缀
  * - $camel_cased_methods = false：保留 snake_case 方法名
  * - 重写 `removeEmptyInput` 跳过 page / page_limit + 兼容数组/null/空串
+ * - 重写 `filterUnjoinedRelation` 使用 whereHasIn，保留原生成基类的查询行为
  */
 class BaseFilter extends ModelFilter
 {
@@ -46,5 +47,25 @@ class BaseFilter extends ModelFilter
         }
 
         return $filterableInput;
+    }
+
+    /**
+     * 使用 whereHasIn 过滤未 join 的关联模型。
+     */
+    public function filterUnjoinedRelation($related)
+    {
+        $this->query->whereHasIn($related, function ($query) use ($related) {
+            $this->callRelatedLocalSetup($related, $query);
+
+            foreach ($this->getLocalRelation($related) as $closure) {
+                $closure($query);
+            }
+
+            if (count($filterableRelated = $this->getRelatedFilterInput($related)) > 0) {
+                $query->filter($filterableRelated);
+            }
+
+            return $query;
+        });
     }
 }

@@ -33,7 +33,8 @@
     "brick/varexporter": "^0.7.0",
     "symfony/yaml": "^7.0",
     "fakerphp/faker": "^1.23",
-    "godruoyi/php-snowflake": "^3.2"
+    "godruoyi/php-snowflake": "^3.2",
+    "tucker-eric/eloquentfilter": "^3.6"
   },
   "require-dev": {
     "roave/security-advisories": "dev-latest",
