@@ -3,7 +3,7 @@ name: Mirror from Gitee
 on:
   workflow_dispatch:
   schedule:
-    - cron: "47 * * * *"
+    - cron: "47 */6 * * *"
 
 permissions:
   contents: write
@@ -19,15 +19,42 @@ jobs:
     steps:
       - name: Mirror Gitee repository to GitHub
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.MIRROR_GITHUB_TOKEN }}
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
           REPO: ${{ github.event.repository.name }}
         run: |
           set -euo pipefail
 
+          : "${GH_TOKEN:?MIRROR_GITHUB_TOKEN secret is not configured}"
+          : "${GITEE_TOKEN:?GITEE_TOKEN secret is not configured}"
+
           workdir="$(mktemp -d)"
           trap 'rm -rf "$workdir"' EXIT
 
-          git clone --mirror "https://gitee.com/charsen/${REPO}.git" "$workdir/repo.git"
+          cat > "$workdir/askpass.sh" <<'EOF'
+          #!/usr/bin/env bash
+          case "$1" in
+            *Username*) printf '%s\n' 'charsen' ;;
+            *Password*) printf '%s\n' "$GITEE_TOKEN" ;;
+          esac
+          EOF
+          chmod 700 "$workdir/askpass.sh"
+
+          for attempt in 1 2 3; do
+            rm -rf "$workdir/repo.git"
+            if GIT_ASKPASS="$workdir/askpass.sh" GIT_TERMINAL_PROMPT=0 \
+              git clone --mirror "https://gitee.com/charsen/${REPO}.git" "$workdir/repo.git"; then
+              break
+            fi
+
+            if [ "$attempt" -eq 3 ]; then
+              echo "Gitee clone failed after 3 attempts" >&2
+              exit 1
+            fi
+
+            sleep $((attempt * 20))
+          done
+
           cd "$workdir/repo.git"
 
           git remote set-url --push origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
