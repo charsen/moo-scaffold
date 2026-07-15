@@ -102,7 +102,7 @@ it('navTree():host 分组原层级,包源一个 📦 顶层组(sub_groups);host-
     app()->instance(PackageRegistry::class, new PackageRegistry([$pkgRoot]));
     $this->repo->save('设计/pkg篇', "---\ngroup: 设计\n---\n", 'pkg');
 
-    $nav = $this->repo->navTree();
+    $nav      = $this->repo->navTree();
     $pkgGroup = collect($nav)->firstWhere('key', 'pkg:pkg');
     expect($pkgGroup)->not->toBeNull();
     expect($pkgGroup['icon'])->toBe('package');
