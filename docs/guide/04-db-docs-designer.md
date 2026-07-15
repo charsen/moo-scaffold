@@ -24,11 +24,15 @@
 
 | 操作 | 入口 | 范围 |
 |---|---|---|
-| 创建 schema | 总览页"新建模块" | 只写新 yaml + storage cache,不 migrate |
-| 改名 schema | schema hero ✏ | 文件名 + yaml `module.name` 一起改 |
+| 创建 schema | 总览页"新建模块" | 只写新 yaml(`module` + 空 `tables`),不刷新生成器缓存、不 migrate |
+| 改名 schema | schema hero ✏ | 文件名 + yaml `module.folder` 一起改,显示名 `module.name` 不变 |
 | 删 schema | schema hero × | **草稿态** — 只删 yaml,**不**删 migration / DB |
-| 创建表 | sidebar"新建表" | 写新 table 段,带默认 id / 时间戳字段 |
+| 创建表 | sidebar"新建表" | 写新 table 段,带默认 id / creator_id / updater_id / deleted_at / 时间戳字段 |
 | 删表 | 表 hero × | 从 yaml 移除该表段,不动 migration / DB |
+
+新建 Schema 时,文件头的 `# SchemaName / @date` 只记录文件元数据。显示名和说明仍分别写在 `module.name`、`module.desc`;说明为空时省略 `module.desc`。这些值统一经 `YamlFormatter` 序列化,即使包含 `:`、`#`、换行或字面量 `null`,也不会被误解析成注释或其它 YAML 类型。
+
+Designer 能立即读取新 YAML;后续要运行代码生成器时,仍需先执行 `moo:fresh` 刷新 `storage/scaffold` 缓存。
 
 > 删表 / 删 schema 都是**草稿态删**(只动 yaml,不 emit drop migration)。要彻底删 DB 里的表:designer 标删 → 手写 drop migration → migrate → 再删 yaml。
 

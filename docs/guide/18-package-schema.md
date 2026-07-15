@@ -23,8 +23,9 @@ schema 的**出身**在它躺在哪个 `scaffold/database/` 里时就定了:host
 | 产物 | 落点 |
 |---|---|
 | schema yaml / `.snapshots/` / migration | 包 `scaffold/database/`、包 `database/migrations/`(日期命名) |
-| Model / Filter / Trait / Enum | 包 `src/Models/`(平铺,无模块子目录) |
-| Controller / Controller Trait | 包 `src/Http/Controllers/Admin/`(平铺) |
+| Model / Filter / `*ModelTrait` / `HasOperator` / Enum | 包 `src/Models/`(平铺,无模块子目录) |
+| 共享 Model 基类 / Trait | 不复制到包;引用 `Mooeen\Scaffold\Foundation\*` / `Mooeen\Scaffold\Concerns\*` |
+| Controller / Controller Trait / `HandlesResourceActions` | 包 `src/Http/Controllers/Admin/`(平铺) |
 | Request | 包 `src/Http/Requests/{Controller}/` |
 | Resource | 包 `src/Http/Resources/` |
 | 路由 | 包 `routes/admin.php` 标记处 |
@@ -33,7 +34,9 @@ schema 的**出身**在它躺在哪个 `scaffold/database/` 里时就定了:host
 
 不生成的:包 schema 跳过 TS Model(前端结合未设计);`moo:view` 不支持包。
 
-生成的包代码引用 host 的 `App\Admin\Controllers\Traits\BaseActionTrait` 与 `Route::iResource` 宏——扩展包本就要求 host 提供这两者(与 extra_modules 同一约定)。
+包 Controller 使用包内自持的 `Traits\HandlesResourceActions`。文件缺失时生成一次,已存在则不覆盖;不再反向依赖 host 的 `App\Admin\Controllers\Traits\BaseActionTrait`。路由仍使用 host 提供的 `Route::iResource` 宏。
+
+启用 `snow_flake_id` 时,包 Model 直接引用共享 `Mooeen\Scaffold\Concerns\UsingSnowFlakePrimaryKey`,不会生成包内同名 Trait。旧包遗留文件的清理步骤见 [02 §谁会被覆盖](02-schema-codegen.md#谁会被覆盖谁不会)。
 
 ## 日常工作流
 

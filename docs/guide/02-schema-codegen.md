@@ -28,6 +28,7 @@ php artisan moo:free admin Light -a
 module:
     name: 系统管理          # 模块中文名(进 i18n / 文档)
     folder: System          # 命名空间 / 目录名
+    desc: 系统管理模块说明   # 模块说明,是 YAML 字段,不是文件头注释
 
 tables:
     system_departments:
@@ -70,11 +71,16 @@ tables:
 |---|---|---|---|
 | `Model.php` / `ModelFilter.php` | 跳过 | 覆盖 | 写业务逻辑 |
 | `Traits/*ModelTrait.php` | **强制覆盖** | — | schema 投影,别写业务 |
+| `Traits/HasOperator.php` | 缺失时创建 | 不覆盖 | creator_id / updater_id 自动填充,可按项目扩展 |
 | `Enums/*.php` | **强制覆盖** | — | schema 投影,别写业务 |
 | `Controller.php` / `Request.php` / `Resource.php` | 跳过 | 覆盖 | 写 action / 校验 / 返回字段 |
 | `Vue 页面.vue` | 跳过 | 覆盖 | 写前端 |
 | `ModelFactory.php`(仅 `-F`)/ `Model.ts`(仅 `-T`) | 跳过 | 覆盖 | 假数据 / TS 类型 |
 | migration 文件 | 每次新生成 | — | 时间戳唯一 |
+
+`GetSerializeDate`、`GetUpdatedAtHumanTime`、`Optional`、`UsingSnowFlakePrimaryKey` 等通用能力直接引用 `Mooeen\Scaffold\Concerns\*`,不再往业务项目复制同名 Trait。启用 `snow_flake_id` 时,Model 使用共享 `UsingSnowFlakePrimaryKey` 和容器单例 `scaffold.snowflake`,主键按字符串处理,避免前端整数精度丢失。
+
+旧项目里已经生成的 `Traits/UsingSnowFlakePrimaryKey.php` 不会被生成器自动删除。用 `moo:model {schema} -f` 刷新 Model 引用,确认没有代码再引用旧 Trait 后,再手动删除这个遗留文件。
 
 ## 缓存文件速查
 
@@ -96,6 +102,7 @@ tables:
 | 改 schema 后生成器没反应 | 忘跑 `moo:fresh`(生成器读缓存不读 YAML) |
 | 路由没插进去 | `routes/{app}.php` 的 `:insert_code_here:do_not_delete` 标记被删了 |
 | `moo:model -F` 没追加到 Seeder | `DatabaseSeeder.php` 的 `//:auto_insert_code_here::do_not_delete` 标记被删了 |
-| Trait 里的改动消失了 | Trait 每次都被覆盖,业务代码搬到 Model |
+| `*ModelTrait.php` 里的改动消失了 | 这类 schema 投影每次都被覆盖,业务代码搬到 Model |
+| 生成器报“文件写入失败” | 检查目标目录权限和磁盘状态;该文件不会再误报 `Created` / `Overwritten`,修复后重跑 |
 | `moo:api` 没扫到接口 | 接口必须**真实存在于 controller 的 `public function`** 且**有路由指向** |
 | `moo:schema Foo/Bar` 报错 | 不支持多级目录,schema 文件名必须是单一标识符 |
