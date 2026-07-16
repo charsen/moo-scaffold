@@ -28,7 +28,7 @@
   },
   "require": {
     "php": "^8.2",
-    "laravel/framework": "^10.0 || ^11.0 || ^12.0",
+    "laravel/framework": "^12.0",
     "charsen/moo-monitor-laravel": "^0.1.3",
     "brick/varexporter": "^0.7.0",
     "symfony/yaml": "^7.0",
