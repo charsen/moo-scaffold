@@ -10,25 +10,11 @@
         @include('scaffold::docs._nav', ['tree' => $tree, 'current_key' => $current_key, 'locked' => $locked, 'src' => $src ?? null])
     </x-slot:aside>
 
-    @if (! $has_docs)
-        {{-- 空态也进正文卡(跟阅读页一致,不再裸浮在页面底色上) --}}
+    {{-- 空态(还没有任何文档)由目录主页(docs/home)承载;本页只管单篇阅读 + not_found --}}
+    @if ($not_found)
         <div class="p-docs-reader">
             <div class="p-docs-reader__main p-docs-reader__main--center">
-                <x-scaffold::empty title="还没有开发文档"
-                    desc="{{ $locked ? '生产环境为只读预览。文档在本地编辑后随 git 同步过来这里就会出现。' : '在 ' . $rel_base . '/ 下用 Markdown 写设计/流程文档,或点右上「新建」。支持 Mermaid 流程图 + 接口/数据库深链。' }}">
-                    <x-slot:icon><x-scaffold::icon name="book" :size="24" /></x-slot:icon>
-                    @unless ($locked)
-                        <a href="{{ route('docs.edit') }}" class="btn btn--primary p-docs-empty__new">
-                            <x-scaffold::icon name="plus" :size="15" /> 新建第一篇
-                        </a>
-                    @endunless
-                </x-scaffold::empty>
-            </div>
-        </div>
-    @elseif ($not_found)
-        <div class="p-docs-reader">
-            <div class="p-docs-reader__main p-docs-reader__main--center">
-                <x-scaffold::empty title="文档不存在" desc="左侧选一篇,或它可能已被删除/改名(历史走 git)。">
+                <x-scaffold::empty title="文档不存在" desc="左侧选一篇，或它可能已被删除/改名（历史走 git）。">
                     <x-slot:icon><x-scaffold::icon name="warn" :size="24" /></x-slot:icon>
                 </x-scaffold::empty>
             </div>
@@ -40,7 +26,7 @@
                     <div class="p-docs-reader__crumb">
                         @if ($src ?? null)
                             {{-- plan-53 出身徽标:该文档属扩展包,编辑落包仓(只读包不出现编辑按钮) --}}
-                            <x-scaffold::badge tone="info" size="sm" title="扩展包文档,改动落包仓,commit 到该仓">📦 {{ $src }}</x-scaffold::badge>
+                            <x-scaffold::badge tone="info" size="sm" title="扩展包文档，改动落包仓，commit 到该仓">📦 {{ $src }}</x-scaffold::badge>
                         @endif
                         <span class="p-docs-reader__group">{{ $doc['group'] }}</span>
                         <x-scaffold::icon name="chevron-right" :size="13" />

@@ -209,6 +209,10 @@ Route::prefix($prefix)->middleware(array_merge($middleware, [SecurityHeaders::cl
         Route::post('/docs/delete', DocsController::class . '@delete')
             ->middleware('throttle:10,1')
             ->name('docs.delete');
+        // 目录主页拖拽排序落盘(写类,同受 EnforceScaffoldWritable 的 docs/* 锁)
+        Route::post('/docs/reorder', DocsController::class . '@reorder')
+            ->middleware('throttle:30,1')
+            ->name('docs.reorder');
 
         // Scaffold 配置：主页单页 + 锚点（plan 18）；env 镜像独立页；历史回溯走 git
         Route::get('/config', ConfigController::class . '@index')->name('scaffold.config');

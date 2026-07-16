@@ -14,6 +14,7 @@ $icons = [
     'plus'          => '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
     'minus'         => '<line x1="5" y1="12" x2="19" y2="12"/>',
     'more'          => '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+    'grip'          => '<circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>',
     'chevron-down'  => '<polyline points="6 9 12 15 18 9"/>',
     'chevron-up'    => '<polyline points="18 15 12 9 6 15"/>',
     'chevron-right' => '<polyline points="9 18 15 12 9 6"/>',

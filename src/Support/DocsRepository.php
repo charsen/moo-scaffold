@@ -113,7 +113,7 @@ class DocsRepository
     // -------------------------------------------------------------------------
 
     /**
-     * 某源全部文档的扁平列表（按 group→order→title 排序后）。
+     * 某源全部文档的扁平列表（按 组序(组内最小 order)→group→order→title 排序后）。
      *
      * @return list<array{slug:string,title:string,group:string,order:int,tags:list<string>,mtime:int}>
      */
@@ -154,8 +154,17 @@ class DocsRepository
             ];
         }
 
-        usort($docs, static function ($a, $b) {
-            return [$a['group'], $a['order'], $a['title']] <=> [$b['group'], $b['order'], $b['title']];
+        // 全局编号法(目录主页拖拽排序):组序 = 组内最小有效 order —— 拖组块 = 重编组内文档号,
+        // 组顺序随之走,不引入索引文件/组级键。整组没编号(999)沉底;组名做稳定 tie-break。
+        $groupMin = [];
+        foreach ($docs as $d) {
+            if (! isset($groupMin[$d['group']]) || $d['order'] < $groupMin[$d['group']]) {
+                $groupMin[$d['group']] = $d['order'];
+            }
+        }
+        usort($docs, static function ($a, $b) use ($groupMin) {
+            return [$groupMin[$a['group']], $a['group'], $a['order'], $a['title']]
+               <=> [$groupMin[$b['group']], $b['group'], $b['order'], $b['title']];
         });
 
         return $this->allCache[$bucket] = $docs;
@@ -311,6 +320,47 @@ class DocsRepository
         unset($this->allCache[$origin ?? '']);   // 列表变了,作废该源 memo
     }
 
+    /**
+     * 拖拽排序落盘(目录主页):按提交顺序对整源文档全局编号 10/20/30…,
+     * 行级手术只改各文件 frontmatter 的 `order:` 一行(其余字节不动);
+     * 现值已相等的文件跳过不写(git diff 干净)。返回实际改写的文件数。
+     *
+     * 提交集合必须与该源当前全部文档严格一致 —— 并发窗口内有增删就拒,
+     * 让前端提示刷新,防止对着过期列表编号错位。
+     *
+     * @param list<string> $slugs 展示顺序的全量 slug(组块顺序即组顺序)
+     */
+    public function reorder(array $slugs, ?string $origin = null): int
+    {
+        $this->assertWritable($origin);
+
+        $current = [];
+        foreach ($this->all($origin) as $doc) {
+            $current[$doc['slug']] = $doc['order'];
+        }
+        if (count($slugs)                               !== count($current)
+            || array_diff($slugs, array_keys($current)) !== []
+            || array_diff(array_keys($current), $slugs) !== []) {
+            throw new InvalidArgumentException('文档列表已变化（有新增/删除），请刷新页面后重新排序。');
+        }
+
+        $changed = 0;
+        foreach (array_values($slugs) as $i => $slug) {
+            $order = ($i + 1) * 10;
+            if ($current[$slug] === $order) {
+                continue;
+            }
+            $abs = $this->absPath($slug, $origin);
+            $this->fs->put($abs, $this->withOrderLine((string) $this->fs->get($abs), $order));
+            $changed++;
+        }
+        if ($changed > 0) {
+            unset($this->allCache[$origin ?? '']);   // 顺序变了,作废该源 memo
+        }
+
+        return $changed;
+    }
+
     public function assertWritable(?string $origin = null): void
     {
         if (function_exists('app') && app()->environment('production')) {
@@ -321,7 +371,7 @@ class DocsRepository
         }
         // 写权硬线(plan-53):扩展包源须软链装(写 vendor = 写真仓);vcs 拷贝一律拒写
         if ($origin !== null && ! $this->utility->targetContext($origin)->writable) {
-            throw new InvalidArgumentException("扩展包 [{$origin}] 是 vendor 拷贝(非软链安装),只读 —— 编辑请在软链装该包的开发环境进行。");
+            throw new InvalidArgumentException("扩展包 [{$origin}] 是 vendor 拷贝（非软链安装），只读 —— 编辑请在软链装该包的开发环境进行。");
         }
     }
 
@@ -361,6 +411,27 @@ class DocsRepository
         }
 
         return ['meta' => [], 'body' => $raw];
+    }
+
+    /**
+     * 返回把 frontmatter `order:` 设为 $order 后的整篇内容(reorder 专用的行级手术):
+     * 有 order 行原位替换;frontmatter 没这行则在闭合 --- 前补插;整篇无 frontmatter 则头部包最小块。
+     * 除该行外其余字节原样保留 —— 不整篇 YAML 重 dump,注释/键序/格式都不动。
+     */
+    private function withOrderLine(string $raw, int $order): string
+    {
+        if (preg_match('/^(---\r?\n)(.*?)(\r?\n---)(\r?\n|$)/s', $raw, $m)) {
+            $fm = $m[2];
+            if (preg_match('/^order\s*:[^\r\n]*\r?$/m', $fm)) {
+                $fm = preg_replace('/^order\s*:[^\r\n]*\r?$/m', "order: {$order}", $fm, 1);
+            } else {
+                $fm .= "\norder: {$order}";
+            }
+
+            return $m[1] . $fm . $m[3] . $m[4] . substr($raw, strlen($m[0]));
+        }
+
+        return "---\norder: {$order}\n---\n\n" . $raw;
     }
 
     private function deriveTitle(array $meta, string $slug): string

@@ -136,6 +136,71 @@ it('all() 按 group→order→title 排序;firstSlug 取最前', function () {
     expect($this->repo->firstSlug())->toBe('a');
 });
 
+it('all() 组序 = 组内最小 order(全局编号法),组名字典序被 order 压过;无编号组沉底', function () {
+    $this->repo->save('y1', "---\ntitle: Y1\ngroup: 乙\norder: 10\n---\n");
+    $this->repo->save('j1', "---\ntitle: J1\ngroup: 甲\norder: 30\n---\n");
+    $this->repo->save('j2', "---\ntitle: J2\ngroup: 甲\norder: 40\n---\n");
+    $this->repo->save('n1', "---\ntitle: N1\ngroup: 无编号组\n---\n");   // order 缺省 999 → 整组沉底
+    expect(array_column($this->repo->all(), 'slug'))->toBe(['y1', 'j1', 'j2', 'n1']);
+});
+
+// ─── reorder(目录主页拖拽排序):全局编号 + 行级手术 ───
+
+it('reorder() 按提交顺序全局编号 10/20/30 写回,all() 顺序随之生效', function () {
+    $this->repo->save('a', "---\ntitle: A\ngroup: 指南\norder: 1\n---\n正文A\n");
+    $this->repo->save('b', "---\ntitle: B\ngroup: 指南\norder: 2\n---\n正文B\n");
+    $this->repo->save('c', "---\ntitle: C\ngroup: 设计\norder: 1\n---\n正文C\n");
+
+    expect($this->repo->reorder(['c', 'b', 'a']))->toBe(3);
+    expect(array_column($this->repo->all(), 'slug'))->toBe(['c', 'b', 'a']);
+    expect($this->repo->find('c')['meta']['order'])->toBe(10);
+    expect($this->repo->find('b')['meta']['order'])->toBe(20);
+    expect($this->repo->find('a')['meta']['order'])->toBe(30);
+    expect($this->repo->find('a')['body'])->toContain('正文A');
+});
+
+it('reorder() 行级手术:只动 order 行,注释/键序/正文原样保留', function () {
+    $this->repo->save('甲', "---\n# 这行注释要活下来\ntitle: 甲\ngroup: 指南\norder: 5\ntags: [a, b]\n---\n\n# 正文\n");
+    $this->repo->save('乙', "---\ntitle: 乙\ngroup: 指南\norder: 6\n---\n");
+
+    $this->repo->reorder(['乙', '甲']);
+    expect($this->repo->find('甲')['raw'])
+        ->toBe("---\n# 这行注释要活下来\ntitle: 甲\ngroup: 指南\norder: 20\ntags: [a, b]\n---\n\n# 正文\n");
+});
+
+it('reorder() frontmatter 无 order 则补插,整篇无 frontmatter 则头部包最小块', function () {
+    $this->repo->save('x', "---\ntitle: X\n---\n正文X\n");
+    $this->repo->save('y', "光正文,无 frontmatter\n");
+
+    $this->repo->reorder(['y', 'x']);
+    expect($this->repo->find('y')['raw'])->toBe("---\norder: 10\n---\n\n光正文,无 frontmatter\n");
+    expect($this->repo->find('x')['raw'])->toBe("---\ntitle: X\norder: 20\n---\n正文X\n");
+    expect($this->repo->find('y')['title'])->toBe('y');   // 包块后 title 仍回退文件名
+});
+
+it('reorder() 已在位的文件跳过不写(内容一个字节不动)', function () {
+    $this->repo->save('a', "---\ntitle: A\norder: 10\n---\n");
+    $this->repo->save('b', "---\ntitle: B\norder: 20\n---\n");
+    $rawA = file_get_contents($this->sandbox . '/docs/a.md');
+
+    expect($this->repo->reorder(['a', 'b']))->toBe(0);
+    expect(file_get_contents($this->sandbox . '/docs/a.md'))->toBe($rawA);
+});
+
+it('reorder() 提交集合与现存不一致 → 拒(防并发错位)', function () {
+    $this->repo->save('a', "A\n");
+    $this->repo->save('b', "B\n");
+    expect(fn () => $this->repo->reorder(['a']))->toThrow(InvalidArgumentException::class);                // 少一篇
+    expect(fn () => $this->repo->reorder(['a', 'b', 'ghost']))->toThrow(InvalidArgumentException::class);  // 多一篇
+    expect(fn () => $this->repo->reorder(['a', 'a']))->toThrow(InvalidArgumentException::class);           // 重复顶位
+});
+
+it('reorder() 只读模式硬拒', function () {
+    $this->repo->save('a', "A\n");
+    config(['scaffold.config_ui.readonly' => true]);
+    expect(fn () => $this->repo->reorder(['a']))->toThrow(InvalidArgumentException::class);
+});
+
 it('tree() 产出 side-tree 分组结构(key/label/count/items)', function () {
     $this->repo->save('指南/x', "---\ngroup: 指南\n---\n");
     $tree = $this->repo->tree();

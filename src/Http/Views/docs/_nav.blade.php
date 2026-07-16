@@ -2,7 +2,8 @@
      plan-53:一棵树同屏分块 —— host 分组原层级,包源各占一个 📦 顶层组(sub_groups);无切换器 --}}
 <div class="p-docs-nav">
     <div class="p-docs-nav__hd">
-        <span class="p-docs-nav__hd-title">文档 · {{ array_sum(array_column($tree, 'count')) }}</span>
+        {{-- 标题即目录主页入口(裸 /docs):全源总览 + 拖拽排序 --}}
+        <a href="{{ route('docs.index') }}" class="p-docs-nav__hd-title" title="文档目录 · 拖拽排序">文档 · {{ array_sum(array_column($tree, 'count')) }}</a>
         @unless($locked ?? false)
             <a href="{{ route('docs.edit', ($src ?? null) ? ['src' => $src] : []) }}" class="p-docs-nav__new" title="新建文档">
                 <x-scaffold::icon name="plus" :size="14" /> 新建
