@@ -270,7 +270,7 @@ PROMPT;
                 'exception_code'  => $e->getCode(),
                 'exception'       => $e,
             ]);
-            throw new AiUpstreamErrorException('HTTP 调用失败,请检查 AI base_url 设置(/scaffold/config/ai)/ 网络;详情见 Laravel log');
+            throw new AiUpstreamErrorException('HTTP 调用失败，请检查 AI base_url 设置（/scaffold/config/ai）/ 网络；详情见 Laravel log');
         }
 
         if (! $resp->successful()) {
@@ -308,13 +308,13 @@ PROMPT;
         }
         // plan-40 §四 B-5:JSON 不可解析也别 leak content 全文(可能含 prompt leak / 用户输入)
         Log::warning('DeepSeek JSON 不可解析: ' . $content);
-        throw new AiUpstreamErrorException('DeepSeek 响应 JSON 不可解析;详情见 Laravel log');
+        throw new AiUpstreamErrorException('DeepSeek 响应 JSON 不可解析；详情见 Laravel log');
     }
 
     private function assertConfigured(): void
     {
         if ($this->apiKey === '') {
-            throw new AiNotConfiguredException('AI api_key 未配置,请在 /scaffold/config/ai 设置');
+            throw new AiNotConfiguredException('AI api_key 未配置，请在 /scaffold/config/ai 设置');
         }
     }
 

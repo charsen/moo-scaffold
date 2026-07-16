@@ -77,7 +77,7 @@ $isHome = request()->routeIs('scaffold.home');
             target="_blank"
             rel="noopener noreferrer"
             class="header__help-trigger"
-            title="文档(GitHub README)"
+            title="文档（GitHub README）"
             aria-label="文档"
         >
             <x-scaffold::icon name="help-circle" :size="16" />

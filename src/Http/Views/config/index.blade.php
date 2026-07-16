@@ -155,7 +155,7 @@
                                                 @break
                                             @case('list')
                                                 <input type="text" name="{{ $inputName }}" value="{{ is_array($f['raw_value']) ? implode(',', $f['raw_value']) : $f['raw_value'] }}" class="p-config-input" placeholder="逗号分隔"
-                                                    aria-label="{{ $f['label'] }}({{ $f['path'] }},逗号分隔)">
+                                                    aria-label="{{ $f['label'] }}（{{ $f['path'] }}，逗号分隔）">
                                                 @break
                                             @case('text')
                                                 <textarea name="{{ $inputName }}" rows="3" class="p-config-input"

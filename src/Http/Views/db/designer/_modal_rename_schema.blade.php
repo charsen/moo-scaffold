@@ -26,7 +26,7 @@
         readonly
     />
 
-    <label for="renameschema-newkey">新名(PascalCase)</label>
+    <label for="renameschema-newkey">新名（PascalCase）</label>
     <input id="renameschema-newkey" name="rename_schema_new_key" type="text" autocomplete="off"
         class="p-designer-rename-popover__input"
         :value="renameSchemaNewKey"

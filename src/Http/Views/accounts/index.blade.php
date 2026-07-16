@@ -181,7 +181,7 @@
                             :value="editingPassword" x-on:input="setEditing" x-ref="pwdField"
                             :required="passwordRequired"
                             :placeholder="passwordPlaceholder">
-                        <small>存储为 bcrypt hash;旧明文账号在下次登录时会自动升级</small>
+                        <small>存储为 bcrypt hash；旧明文账号在下次登录时会自动升级</small>
                     </label>
                     <label for="acc-form-phone">
                         <span>手机号</span>

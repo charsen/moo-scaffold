@@ -136,7 +136,7 @@
                         @endif
                         @if (! empty($designer_origin) && ! ($designer_locked ?? false))
                             {{-- plan-53:包 schema git 归属提醒 — 用户拍板(2026-07-03)从整行 banner 收进 breadcrumb 行内 chip --}}
-                            <span class="p-designer-header__origin-chip" title="此 schema 属于扩展包 {{ $designer_origin }}(软链直写)—— 改动与生成物落在该包仓库,commit 请到 {{ $designer_origin }} 仓提交">
+                            <span class="p-designer-header__origin-chip" title="此 schema 属于扩展包 {{ $designer_origin }}（软链直写）—— 改动与生成物落在该包仓库，commit 请到 {{ $designer_origin }} 仓提交">
                                 <x-scaffold::icon name="package" :size="12" />
                                 {{ $designer_origin }} · 改动落包仓,commit 到该仓
                             </span>
@@ -375,7 +375,7 @@
                                         <th class="col-name">中文名</th>
                                         <th class="col-type">类型</th>
                                         <th class="col-size">大小</th>
-                                        <th class="col-precision" x-show="showAdvancedCols" x-cloak title="精度(decimal/double/float 的小数位)">精度</th>
+                                        <th class="col-precision" x-show="showAdvancedCols" x-cloak title="精度（decimal/double/float 的小数位）">精度</th>
                                         <th class="col-default">默认值</th>
                                         <th class="col-index">索引</th>
                                         <th class="col-null">null</th>
@@ -466,7 +466,7 @@
                                                 />
                                             </td>
                                             <td x-show="showAdvancedCols" x-cloak>
-                                                <input type="text" name="field_precision" aria-label="字段精度(decimal/double/float 用)" autocomplete="off"
+                                                <input type="text" name="field_precision" aria-label="字段精度（decimal/double/float 用）" autocomplete="off"
                                                     :value="f.precision"
                                                     :readonly="f.row_readonly"
                                                     :disabled="f.precision_disabled"
@@ -520,7 +520,7 @@
                                                 />
                                             </td>
                                             <td class="col-null">
-                                                <input type="checkbox" name="field_unsigned" aria-label="无符号(unsigned)"
+                                                <input type="checkbox" name="field_unsigned" aria-label="无符号（unsigned）"
                                                     :checked="f.unsigned"
                                                     :disabled="f.unsigned_disabled"
                                                     x-on:change="setFieldUnsigned"
@@ -695,7 +695,7 @@
                          role="dialog" aria-modal="true">
                         <button type="button" class="p-designer-rename-popover__close" x-on:click="cancelAddMultiIndex" aria-label="关闭">×</button>
                         <h4>加多字段索引</h4>
-                        <label for="midx-name">索引名(snake_case)</label>
+                        <label for="midx-name">索引名（snake_case）</label>
                         <input id="midx-name" name="multi_idx_name" type="text" autocomplete="off"
                             :value="multiIdxName" x-on:input="setMultiIdxName"
                             placeholder="如 user_status_idx"
@@ -979,7 +979,7 @@
                                     <template x-if="compactHasGitPushed">
                                         <div class="p-designer-compact-modal__pushed">
                                             <p class="p-designer-compact-modal__warn p-designer-compact-modal__warn--amber">
-                                                ⚠ <span x-text="compactGitPushed.length"></span> 个文件已 push 到远端 —— 这些 migration 可能已被其他 dev 拉取并在<strong>本地</strong>跑过。若该表<strong>已在 production / shared 服务器部署</strong>(库里真跑过、回不去),<strong>不要合并</strong>;仅本地 / dev 环境可继续。(检测基于本地 origin refs,担心过期先 <code>git fetch</code>)
+                                                ⚠ <span x-text="compactGitPushed.length"></span> 个文件已 push 到远端 —— 这些 migration 可能已被其他 dev 拉取并在<strong>本地</strong>跑过。若该表<strong>已在 production / shared 服务器部署</strong>（库里真跑过、回不去），<strong>不要合并</strong>；仅本地 / dev 环境可继续。（检测基于本地 origin refs，担心过期先 <code>git fetch</code>）
                                             </p>
                                             <label class="p-designer-rename-popover__checkbox-row">
                                                 <input type="checkbox" :checked="compactForceAck" x-on:change="toggleCompactForceAck" />
@@ -989,13 +989,13 @@
                                     </template>
                                     <template x-if="compactHasDrift">
                                         <div>
-                                            <p class="p-designer-compact-modal__warn p-designer-compact-modal__warn--amber">⚠ Schema drift <span x-text="compactDrift.length"></span> 处差异(真 DB ↔ yaml):</p>
+                                            <p class="p-designer-compact-modal__warn p-designer-compact-modal__warn--amber">⚠ Schema drift <span x-text="compactDrift.length"></span> 处差异（真 DB ↔ yaml）：</p>
                                             <ul class="p-designer-compact-modal__list">
                                                 <template x-for="d in compactDrift" :key="d.detail">
                                                     <li><code x-text="d.type"></code>: <span x-text="d.detail"></span></li>
                                                 </template>
                                             </ul>
-                                            <p class="is-note">合并以 yaml 为准(source of truth)：生产首跑新 create 拿到 yaml 全量；上述差异只说明<strong>本地 DB</strong> 与 yaml 不同步，部署后拉生产库覆盖本地即齐。仅比列名 —— 类型/索引级核对用 <code>moo:db:audit</code>。</p>
+                                            <p class="is-note">合并以 yaml 为准（source of truth）：生产首跑新 create 拿到 yaml 全量；上述差异只说明<strong>本地 DB</strong> 与 yaml 不同步，部署后拉生产库覆盖本地即齐。仅比列名 —— 类型/索引级核对用 <code>moo:db:audit</code>。</p>
                                         </div>
                                     </template>
                                     <template x-if="compactCleanInfo">
@@ -1007,7 +1007,7 @@
                                     </details>
                                     <label class="p-designer-rename-popover__checkbox-row">
                                         <input type="checkbox" :checked="compactCleanDb" x-on:change="toggleCompactCleanDb" />
-                                        <span>同时清理 <code>migrations</code> 表中对应的孤儿记录(LOCAL DB <span x-text="compactUpdateFiles.length"></span> 条)</span>
+                                        <span>同时清理 <code>migrations</code> 表中对应的孤儿记录（LOCAL DB <span x-text="compactUpdateFiles.length"></span> 条）</span>
                                     </label>
                                     <p class="is-note">⚠ 仅在该表的 migration 未发版到 production / shared 环境时使用。多人协作：其他 dev 切回此分支需要清理本地 <code>migrations</code> 表对应记录。</p>
                                 </div>
@@ -1108,7 +1108,7 @@
                                             <td>
                                                 @if ($m['ran'] ?? false)
                                                     <span class="p-designer-migration-status p-designer-migration-status--ran"
-                                                          title="已通过 php artisan migrate 执行(batch #{{ $m['batch'] }})">
+                                                          title="已通过 php artisan migrate 执行（batch #{{ $m['batch'] }}）">
                                                         已执行
                                                     </span>
                                                 @else

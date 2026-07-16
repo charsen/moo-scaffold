@@ -291,7 +291,7 @@
         if (!rows.length) {
             $list.html('<p class="p-docs-picker__none">无匹配</p>');
         } else if (matched > RENDER_CAP) {
-            $list.html(rows.join('') + '<p class="p-docs-picker__none">还有 ' + (matched - RENDER_CAP) + ' 条,继续输入缩小范围…</p>');
+            $list.html(rows.join('') + '<p class="p-docs-picker__none">还有 ' + (matched - RENDER_CAP) + ' 条，继续输入缩小范围…</p>');
         } else {
             $list.html(rows.join(''));
         }

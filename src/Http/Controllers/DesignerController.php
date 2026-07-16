@@ -167,8 +167,8 @@ class DesignerController
             'designer_index_options' => [
                 ''           => '—',
                 'primary'    => 'primary',
-                'unique-app' => 'unique(app · 软删过滤)',
-                'unique-db'  => 'unique(DB · 强约束)',
+                'unique-app' => 'unique（app · 软删过滤）',
+                'unique-db'  => 'unique（DB · 强约束）',
                 'index'      => 'index',
             ],
             'designer_yaml_raw' => $this->loader->loadRawTableText($schema, $tableKey),
