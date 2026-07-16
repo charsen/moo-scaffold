@@ -9,12 +9,23 @@
     </x-slot:aside>
 
     <div class="p-docs-home">
-        <x-scaffold::hero icon="book" title="文档目录" card>
-            <x-slot:desc>{{ $locked ? '生产环境为只读预览，排序与编辑均不可用。' : '拖动行调整组内顺序，拖住分组标题整块调整分组顺序；松手即保存（写回各篇 frontmatter 的 order）。' }}</x-slot:desc>
-            <x-slot:meta>
-                <span><strong>{{ number_format($total) }}</strong> 篇文档</span>
-            </x-slot:meta>
-        </x-scaffold::hero>
+        {{-- 顶部并成一行:标题 + 全文搜索 + 计数(hero 卡 + 玩法说明太占纵向空间,2026-07-16 user 反馈;
+             拖拽提示由把手 title 承担,只读态给徽标)。搜索:标题/slug/正文跨全源现扫(docs-home.js
+             防抖请求 docs.search,无索引);有关键词时隐藏下方分区,结果链接带 ?hl= 让阅读页定位首个命中 --}}
+        <div class="p-docs-home__bar">
+            <h2 class="p-docs-home__bar-title"><x-scaffold::icon name="book" :size="18" /> 文档目录</h2>
+            @if ($total > 0)
+                <input type="search" id="docs_home_search" class="input" autocomplete="off"
+                       placeholder="全文搜索：标题 / 路径 / 正文…（≥2 字）" aria-label="全文搜索">
+            @endif
+            <span class="p-docs-home__bar-meta">
+                @if ($locked)
+                    <x-scaffold::badge tone="warning" size="sm" title="生产/只读模式,排序与编辑不可用">只读</x-scaffold::badge>
+                @endif
+                <strong>{{ number_format($total) }}</strong> 篇文档
+            </span>
+        </div>
+        <div id="docs_home_results" class="p-docs-home__results" hidden></div>
 
         @if ($total === 0)
             <div class="p-docs-home__empty">
@@ -69,8 +80,8 @@
                                             @endif
                                             {{-- 序号 = frontmatter order(全局编号);未设(999 默认)显「–」,首次拖动后落号 --}}
                                             <span class="p-docs-home__order">{{ $doc['order'] >= 999 ? '–' : $doc['order'] }}</span>
+                                            {{-- slug 列砍掉:目录/文件名与标题、组名高度重复,纯噪音(2026-07-16 user 反馈) --}}
                                             <a class="p-docs-home__title" href="{{ route('docs.index', $q) }}">{{ $doc['title'] }}</a>
-                                            <span class="p-docs-home__slug">{{ $doc['slug'] }}</span>
                                             @if (! empty($doc['tags']))
                                                 <span class="p-docs-home__tags">
                                                     @foreach ($doc['tags'] as $tag)
@@ -98,7 +109,10 @@
     <x-slot:scripts>
         <script nonce="{{ $cspNonce ?? '' }}">
             window.ScaffoldDocsHome = {
-                routes: { reorder: '{{ route('docs.reorder', [], false) }}' },
+                routes: {
+                    reorder: '{{ route('docs.reorder', [], false) }}',
+                    search:  '{{ route('docs.search', [], false) }}'
+                },
                 locked: {{ $locked ? 'true' : 'false' }}
             };
             $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });

@@ -46,6 +46,26 @@
                 <article class="doc-article" id="doc_article">
                     {!! $html !!}
                 </article>
+
+                {{-- 上一篇/下一篇:同源 all() 阅读顺序(全局编号序)的相邻两篇,跨组连续 --}}
+                @if (($prev ?? null) || ($next ?? null))
+                    <nav class="p-docs-reader__pager" aria-label="相邻文档">
+                        @if ($prev ?? null)
+                            <a class="p-docs-reader__pager-link" href="{{ route('docs.index', ['doc' => $prev['slug']] + (($src ?? null) ? ['src' => $src] : [])) }}">
+                                <span class="p-docs-reader__pager-dir"><x-scaffold::icon name="chevron-left" :size="13" /> 上一篇 · {{ $prev['group'] }}</span>
+                                <span class="p-docs-reader__pager-title">{{ $prev['title'] }}</span>
+                            </a>
+                        @else
+                            <span class="p-docs-reader__pager-spacer"></span>
+                        @endif
+                        @if ($next ?? null)
+                            <a class="p-docs-reader__pager-link p-docs-reader__pager-link--next" href="{{ route('docs.index', ['doc' => $next['slug']] + (($src ?? null) ? ['src' => $src] : [])) }}">
+                                <span class="p-docs-reader__pager-dir">下一篇 · {{ $next['group'] }} <x-scaffold::icon name="chevron-right" :size="13" /></span>
+                                <span class="p-docs-reader__pager-title">{{ $next['title'] }}</span>
+                            </a>
+                        @endif
+                    </nav>
+                @endif
             </div>
 
             {{-- 右侧目录:docs-center.js 从正文 h2/h3 现算 + scroll-spy;不足 2 个标题则保持 hidden --}}

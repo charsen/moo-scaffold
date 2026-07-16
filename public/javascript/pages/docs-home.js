@@ -139,4 +139,93 @@
 
     var sections = document.querySelectorAll('[data-reorder-src]');
     for (var i = 0; i < sections.length; i++) initSection(sections[i]);
+
+    // ---------- 全文搜索(标题/slug/正文,跨全源,服务端现扫) ----------
+    // ≥2 字防抖请求;有关键词时隐藏分区列表,结果链接带 ?hl= 让阅读页定位首个命中。
+    (function initSearch() {
+        var input = document.getElementById('docs_home_search');
+        var box   = document.getElementById('docs_home_results');
+        if (!input || !box || !CFG.routes || !CFG.routes.search) return;
+
+        var seq = 0, timer = null;
+
+        function setListHidden(hidden) {
+            var els = document.querySelectorAll('[data-reorder-src]');
+            for (var i = 0; i < els.length; i++) els[i].hidden = hidden;
+        }
+
+        // 摘要行内高亮:纯 DOM 拼接(textContent + <mark>),不走 innerHTML,天然防注入
+        function highlightInto(parent, text, q) {
+            var lower = text.toLowerCase(), ql = q.toLowerCase(), from = 0, idx;
+            while ((idx = lower.indexOf(ql, from)) !== -1) {
+                parent.appendChild(document.createTextNode(text.slice(from, idx)));
+                var mark = document.createElement('mark');
+                mark.textContent = text.slice(idx, idx + q.length);
+                parent.appendChild(mark);
+                from = idx + q.length;
+            }
+            parent.appendChild(document.createTextNode(text.slice(from)));
+        }
+
+        function render(data, q) {
+            box.textContent = '';
+            var results = (data && data.results) || [];
+
+            var hd = document.createElement('div');
+            hd.className = 'p-docs-home__results-hd';
+            hd.textContent = results.length
+                ? ('命中 ' + results.length + ' 篇' + (data.truncated ? '（已截断，请细化关键词）' : ''))
+                : '没有匹配「' + q + '」的文档';
+            box.appendChild(hd);
+
+            for (var i = 0; i < results.length; i++) {
+                var r = results[i];
+                var item = document.createElement('a');
+                item.className = 'p-docs-home__result';
+                item.href = r.href + (r.href.indexOf('?') >= 0 ? '&' : '?') + 'hl=' + encodeURIComponent(q);
+
+                var head = document.createElement('div');
+                head.className = 'p-docs-home__result-head';
+                var group = document.createElement('span');
+                group.className = 'p-docs-home__result-group';
+                group.textContent = (r.src ? '📦 ' + r.src + ' · ' : '') + r.group;
+                var title = document.createElement('span');
+                title.className = 'p-docs-home__result-title';
+                highlightInto(title, r.title, q);
+                head.appendChild(group);
+                head.appendChild(title);
+                item.appendChild(head);
+
+                for (var j = 0; j < (r.excerpts || []).length; j++) {
+                    var line = document.createElement('div');
+                    line.className = 'p-docs-home__result-line';
+                    highlightInto(line, r.excerpts[j], q);
+                    item.appendChild(line);
+                }
+                box.appendChild(item);
+            }
+            box.hidden = false;
+            setListHidden(true);
+        }
+
+        function run() {
+            var q = input.value.trim();
+            if (q.length < 2) {                       // 清空/太短 → 还原分区列表
+                box.hidden = true;
+                box.textContent = '';
+                setListHidden(false);
+                return;
+            }
+            var mySeq = ++seq;
+            $.getJSON(CFG.routes.search, { q: q }, function (data) {
+                if (mySeq !== seq) return;            // 慢响应乱序:丢过期结果(对齐编辑器预览守护)
+                render(data, q);
+            });
+        }
+
+        input.addEventListener('input', function () {
+            clearTimeout(timer);
+            timer = setTimeout(run, 250);
+        });
+    })();
 })();

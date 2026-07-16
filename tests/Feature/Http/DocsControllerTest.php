@@ -103,6 +103,38 @@ it('只读模式 POST /scaffold/docs/reorder → 403(EnforceScaffoldWritable 锁
     $this->postJson('/scaffold/docs/reorder', ['slugs' => ['a']])->assertStatus(403);
 });
 
+it('GET /scaffold/docs?doc= 阅读页带 prev/next(全局阅读顺序相邻)', function () {
+    file_put_contents($this->docsDir . '/a.md', "---\ntitle: A\ngroup: 指南\norder: 10\n---\n");
+    file_put_contents($this->docsDir . '/b.md', "---\ntitle: B\ngroup: 指南\norder: 20\n---\n");
+    file_put_contents($this->docsDir . '/c.md', "---\ntitle: C\ngroup: 指南\norder: 30\n---\n");
+
+    $r = $this->get('/scaffold/docs?doc=b')->assertOk();
+    expect($r->viewData('prev')['slug'])->toBe('a');
+    expect($r->viewData('next')['slug'])->toBe('c');
+    // 首篇无 prev、末篇无 next
+    expect($this->get('/scaffold/docs?doc=a')->viewData('prev'))->toBeNull();
+    expect($this->get('/scaffold/docs?doc=c')->viewData('next'))->toBeNull();
+});
+
+it('GET /scaffold/docs/search 命中标题与正文,返回 href;q 太短 → 422', function () {
+    file_put_contents($this->docsDir . '/x.md', "---\ntitle: 网关设计\ngroup: 指南\n---\n正文讲网关限流。\n");
+    file_put_contents($this->docsDir . '/y.md', "---\ntitle: 无关\ngroup: 指南\n---\n不相关。\n");
+
+    $r = $this->getJson('/scaffold/docs/search?q=' . urlencode('网关'))->assertOk();
+    expect($r->json('results'))->toHaveCount(1);
+    expect($r->json('results.0.slug'))->toBe('x');
+    expect($r->json('results.0.href'))->toContain('doc=');
+    expect($r->json('truncated'))->toBeFalse();
+
+    $this->getJson('/scaffold/docs/search?q=x')->assertStatus(422);
+});
+
+it('GET /scaffold/docs/edit 新建模板不再写死 order(缺省沉组尾显「–」)', function () {
+    $raw = $this->get('/scaffold/docs/edit')->viewData('raw');
+    expect($raw)->toContain('title: 新文档');
+    expect(str_contains($raw, 'order:'))->toBeFalse();
+});
+
 it('GET /scaffold/docs/picker → JSON 含 endpoints + tables 数组', function () {
     $r = $this->get('/scaffold/docs/picker');
     $r->assertOk();

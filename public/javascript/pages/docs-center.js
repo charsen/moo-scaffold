@@ -253,6 +253,38 @@
         buildToc();                           // 目录(读 textContent,须在注锚点前)
         wireHeadingAnchors();                 // 标题悬停锚点(buildToc 之后)
         wireWidthToggle();
+        highlightSearchHit(article);          // ?hl= 定位(目录页全文搜索跳转来的)
+    }
+
+    // ----- 搜索命中定位:?hl=关键词 → 正文首个命中文本包 <mark> 并滚动到视口中部 -----
+    // 标题 id 是客户端现算的(h-{i}-...),服务端没法给稳定锚点;直接按命中文本定位比跳节标题还准。
+    function highlightSearchHit(article) {
+        if (!article) return;
+        var m = /[?&]hl=([^&]+)/.exec(window.location.search);
+        if (!m) return;
+        var q; try { q = decodeURIComponent(m[1]); } catch (e) { return; }
+        q = (q || '').trim().toLowerCase();
+        if (!q || q.length > 100) return;
+
+        var walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT, {
+            acceptNode: function (node) {
+                var p = node.parentElement;
+                if (!p || p.closest('[hidden], script, style')) return NodeFilter.FILTER_REJECT;   // mermaid 隐藏图源等
+                return node.nodeValue.toLowerCase().indexOf(q) !== -1
+                    ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+            }
+        });
+        var node = walker.nextNode();
+        if (!node) return;
+
+        var idx = node.nodeValue.toLowerCase().indexOf(q);
+        var hit = node.splitText(idx);
+        hit.splitText(q.length);
+        var mark = document.createElement('mark');
+        mark.className = 'doc-hl';
+        node.parentNode.insertBefore(mark, hit);
+        mark.appendChild(hit);
+        mark.scrollIntoView({ block: 'center' });
     }
 
     if (document.readyState === 'loading') {

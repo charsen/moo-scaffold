@@ -813,20 +813,16 @@
     font-family: var(--font-family-mono);
     color: var(--text-secondary);   // moon 下 muted(#6b6f7e)沉底看不清,提一档
   }
+  // slug 列已砍(与标题/组名重复);flex:1 移到标题上,继续把右侧 tags/时间推到行尾
   &__title {
-    font-weight: var(--weight-medium);
-    color: var(--text-heading);
-    &:hover { color: var(--accent-text); }
-  }
-  &__slug {
     flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: var(--font-xs);
-    font-family: var(--font-family-mono);
-    color: var(--text-muted);
+    font-weight: var(--weight-medium);
+    color: var(--text-heading);
+    &:hover { color: var(--accent-text); }
   }
   &__tags {
     display: inline-flex;
@@ -852,4 +848,137 @@
 body.is-row-dragging {
   user-select: none;
   cursor: grabbing;
+}
+
+// ---- 目录主页:顶栏(标题 + 全文搜索 + 计数,单行;hero 卡撤掉省纵向空间) ---------
+.p-docs-home__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-1);
+  padding: var(--space-3) var(--space-5);
+
+  .input {
+    flex: 1;
+    max-width: 520px;
+  }
+}
+.p-docs-home__bar-title {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--font-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-heading);
+  svg { color: var(--accent-text); }
+}
+.p-docs-home__bar-meta {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  strong {
+    font-size: var(--font-md);
+    color: var(--text-heading);
+  }
+}
+.p-docs-home__results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  &[hidden] { display: none; }
+}
+.p-docs-home__results-hd {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  padding: 0 var(--space-1);
+}
+.p-docs-home__result {
+  display: block;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-1);
+  padding: var(--space-3) var(--space-4);
+  &:hover { background: var(--bg-hover-row); }
+
+  mark {
+    background: var(--accent-bg);
+    color: var(--accent-text);
+    border-radius: var(--radius-xs);
+    padding: 0 1px;
+  }
+}
+.p-docs-home__result-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.p-docs-home__result-group {
+  flex: none;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+.p-docs-home__result-title {
+  font-weight: var(--weight-medium);
+  color: var(--text-heading);
+}
+.p-docs-home__result-line {
+  margin-top: var(--space-1);
+  font-size: var(--font-xs);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// ---- 阅读页:上一篇/下一篇(同源全局阅读顺序) + 搜索命中高亮 --------------------
+.p-docs-reader__pager {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-top: var(--space-7);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-light);
+}
+.p-docs-reader__pager-link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 46%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast);
+  &:hover {
+    border-color: var(--accent-solid);
+    .p-docs-reader__pager-title { color: var(--accent-text); }
+  }
+  &--next { text-align: right; align-items: flex-end; }
+}
+.p-docs-reader__pager-dir {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+.p-docs-reader__pager-title {
+  font-size: var(--font-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-heading);
+}
+
+// ?hl= 搜索跳转的命中高亮(docs-center.js 包的 <mark class="doc-hl">)
+.doc-article mark.doc-hl {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  border-radius: var(--radius-xs);
+  padding: 0 2px;
 }
