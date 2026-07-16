@@ -282,7 +282,7 @@ class SchemaLoader
     public function createTable(string $schema, string $tableKey, string $name, string $desc = '', string $prefix = '', ?string $author = null): void
     {
         if (! preg_match('/^[a-z][a-z0-9_]*$/', $tableKey)) {
-            throw new SchemaLoadException("table key 必须 snake_case(小写字母开头,字母数字下划线):{$tableKey}");
+            throw new SchemaLoadException("table key 必须 snake_case（小写字母开头，字母数字下划线）：{$tableKey}");
         }
         if ($name === '') {
             throw new SchemaLoadException('表显示名必填');
@@ -340,7 +340,7 @@ class SchemaLoader
     public function createSchema(string $schemaName, string $displayName, string $desc = ''): void
     {
         if (! preg_match('/^[A-Z][A-Za-z0-9]*$/', $schemaName)) {
-            throw new SchemaLoadException('schema 名必须 PascalCase(大写字母开头,字母数字):' . $schemaName);
+            throw new SchemaLoadException('schema 名必须 PascalCase（大写字母开头，字母数字）：' . $schemaName);
         }
         if ($displayName === '') {
             throw new SchemaLoadException('显示名必填');
@@ -405,7 +405,7 @@ class SchemaLoader
     public function renameSchema(string $oldName, string $newName): void
     {
         if (! preg_match('/^[A-Z][A-Za-z0-9]*$/', $newName)) {
-            throw new SchemaLoadException('新 schema 名必须 PascalCase(大写字母开头,字母数字):' . $newName);
+            throw new SchemaLoadException('新 schema 名必须 PascalCase（大写字母开头，字母数字）：' . $newName);
         }
         if ($oldName === $newName) {
             return;
@@ -487,7 +487,7 @@ class SchemaLoader
     public function renameTable(string $schema, string $oldKey, string $newKey): void
     {
         if (! preg_match('/^[a-z][a-z0-9_]*$/', $newKey)) {
-            throw new SchemaLoadException('新表 key 必须 snake_case(小写字母开头,小写字母 / 数字 / 下划线):' . $newKey);
+            throw new SchemaLoadException('新表 key 必须 snake_case（小写字母开头，小写字母 / 数字 / 下划线）：' . $newKey);
         }
         if ($oldKey === $newKey) {
             return;
@@ -1260,7 +1260,7 @@ class SchemaLoader
     {
         $origin = $this->originOf($schema);
         if ($origin !== null && ! $this->utility->targetContext($origin)->writable) {
-            throw new SchemaLoadException("扩展包 [{$origin}] 是 vendor 拷贝(非软链安装),schema 只读 —— 请在软链装该包的开发环境编辑。");
+            throw new SchemaLoadException("扩展包 [{$origin}] 是 vendor 拷贝（非软链安装），schema 只读 —— 请在软链装该包的开发环境编辑。");
         }
     }
 
@@ -1420,7 +1420,7 @@ class SchemaLoader
                 }     // _fields.yaml etc.
                 if (isset($out[$name])) {
                     $prev = $origins[$name] ?? 'host';
-                    throw new SchemaLoadException("schema 名跨源重名:[{$name}] 同时在 [{$prev}] 与 [" . ($origin ?? 'host') . '] —— schema 名全局唯一,请改名其一。');
+                    throw new SchemaLoadException("schema 名跨源重名:[{$name}] 同时在 [{$prev}] 与 [" . ($origin ?? 'host') . '] —— schema 名全局唯一，请改名其一。');
                 }
                 $out[$name] = $f->getRealPath();
                 if ($origin !== null) {

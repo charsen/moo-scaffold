@@ -75,7 +75,7 @@
                                 </span>
                                 {{ $module_summaries[$moduleKey]['name'] }}
                                 @if ($module_summaries[$moduleKey]['origin'] ?? null)
-                                    <x-scaffold::badge tone="info" size="sm" title="扩展包模块,schema 在包仓">📦 {{ $module_summaries[$moduleKey]['origin'] }}</x-scaffold::badge>
+                                    <x-scaffold::badge tone="info" size="sm" title="扩展包模块，schema 在包仓">📦 {{ $module_summaries[$moduleKey]['origin'] }}</x-scaffold::badge>
                                 @endif
                             </h3>
                             <div class="p-dict__module-meta">

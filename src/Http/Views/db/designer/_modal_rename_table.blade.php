@@ -17,7 +17,7 @@
 >
     <button type="button" class="p-designer-rename-popover__close" x-on:click="cancelRenameTable" aria-label="关闭">×</button>
     <h4>重命名表 key</h4>
-    <p>改 yaml <code>tables.<span x-text="renameTableCurrentKey"></span></code> → <code>tables.<span x-text="renameTableNewKey"></span></code>(controller / ACL 不受影响)。<br>
+    <p>改 yaml <code>tables.<span x-text="renameTableCurrentKey"></span></code> → <code>tables.<span x-text="renameTableNewKey"></span></code>（controller / ACL 不受影响）。<br>
     <strong>已生成 migration 的表</strong>：会自动生成 <code>Schema::rename</code> migration 并同步 snapshot，之后跑 <code>php artisan migrate</code> 真改 DB 表名。<br>
     <strong>若已生成 Model</strong>，其 <code>$table</code> 下次 <code>moo:model</code> 重生成对齐（或手动改）。</p>
 

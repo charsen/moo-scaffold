@@ -18,7 +18,7 @@
     <h4>新建 schema（模块）</h4>
     <p>会在 <code>scaffold/database/</code> 创建 minimal yaml，后续在 designer 加表。</p>
 
-    <label for="newschema-key">模块名(PascalCase)</label>
+    <label for="newschema-key">模块名（PascalCase）</label>
     <input id="newschema-key" name="new_schema_key" type="text" autocomplete="off"
         class="p-designer-rename-popover__input"
         :value="newSchemaKey"

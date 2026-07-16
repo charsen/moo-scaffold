@@ -74,8 +74,8 @@ class EnforceScaffoldWritable
         }
 
         $reason = $isProduction
-            ? '生产环境禁止改 designer / accounts / config(影响代码与账号体系)'
-            : '当前为强制只读模式(SCAFFOLD_CONFIG_READONLY),禁止改 designer / accounts / config';
+            ? '生产环境禁止改 designer / accounts / config（影响代码与账号体系）'
+            : '当前为强制只读模式（SCAFFOLD_CONFIG_READONLY），禁止改 designer / accounts / config';
 
         return $this->forbidden($request, $reason);
     }

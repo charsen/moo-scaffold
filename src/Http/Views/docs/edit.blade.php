@@ -22,7 +22,7 @@
             <div class="p-docs-editor__path">
                 {{-- plan-53 出身:新建 + 多可写源时给下拉选落点(host / 软链包);其余情况静态显示当前源根 --}}
                 @if ($is_new && count($writable_sources) > 1)
-                    <select id="doc_src" class="p-docs-editor__src" title="文档落点(host 或软链扩展包仓)">
+                    <select id="doc_src" class="p-docs-editor__src" title="文档落点（host 或软链扩展包仓）">
                         @foreach ($writable_sources as $ws)
                             <option value="{{ $ws['key'] }}" @selected(($src ?? null) === ($ws['key'] === '' ? null : $ws['key']))>{{ $ws['label'] }}/</option>
                         @endforeach

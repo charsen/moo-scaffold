@@ -27,7 +27,7 @@ trait ResolvesOriginContext
     protected function assertOriginWritable(?string $origin): void
     {
         if ($origin !== null && ! $this->utility->targetContext($origin)->writable) {
-            throw new \InvalidArgumentException("扩展包 [{$origin}] 是 vendor 拷贝(非软链安装),生成物只读 —— 请在软链装该包的开发环境生成。");
+            throw new \InvalidArgumentException("扩展包 [{$origin}] 是 vendor 拷贝（非软链安装），生成物只读 —— 请在软链装该包的开发环境生成。");
         }
     }
 

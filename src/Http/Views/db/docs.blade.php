@@ -22,7 +22,7 @@
 @if (empty($modules))
     <x-slot:right>
         <x-scaffold::empty title="还没有数据库设计"
-            desc="scaffold/database 下还没有 schema。去「数据库设计」新建模块,或写好 yaml 后这里会自动出现。">
+            desc="scaffold/database 下还没有 schema。去「数据库设计」新建模块，或写好 yaml 后这里会自动出现。">
             <x-slot:icon><x-scaffold::icon name="database" :size="24" /></x-slot:icon>
         </x-scaffold::empty>
     </x-slot:right>
@@ -102,7 +102,7 @@
     {{-- 右:表详情 doc --}}
     <x-slot:right>
         @if (! $detail)
-            <x-scaffold::empty title="请选择数据表" desc="点左侧表名,这里展示它的字段、索引与枚举。">
+            <x-scaffold::empty title="请选择数据表" desc="点左侧表名，这里展示它的字段、索引与枚举。">
                 <x-slot:icon><x-scaffold::icon name="database" :size="24" /></x-slot:icon>
             </x-scaffold::empty>
         @else

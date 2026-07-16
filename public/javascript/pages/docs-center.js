@@ -138,7 +138,7 @@
             article.classList.toggle('is-narrow', narrow);
             // 按钮显示「点一下会切到的模式」(动作),不是当前状态 —— 否则读着是反的
             btn.textContent = narrow ? '全宽' : '限宽';
-            btn.setAttribute('title', narrow ? '当前限宽(舒适行宽),点击切全宽' : '当前全宽,点击切限宽(舒适行宽)');
+            btn.setAttribute('title', narrow ? '当前限宽（舒适行宽），点击切全宽' : '当前全宽，点击切限宽（舒适行宽）');
         }
         var narrow = false;   // 默认全宽,只有显式存了 'narrow' 才限宽
         try { narrow = localStorage.getItem(KEY) === 'narrow'; } catch (e) {}

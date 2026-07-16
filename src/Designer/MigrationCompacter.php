@@ -106,7 +106,7 @@ class MigrationCompacter
         $tmp = $files['create'] . '.compact-tmp';
         if ($this->fs->put($tmp, $previewPhp) === false || ! @rename($tmp, $files['create'])) {
             @unlink($tmp);
-            throw new \RuntimeException('create 文件改写失败(磁盘/权限),已中止 —— 未删除任何 update 文件');
+            throw new \RuntimeException('create 文件改写失败（磁盘/权限），已中止 —— 未删除任何 update 文件');
         }
 
         // 2) 删 N 个 update 文件 —— 删除结果必查:失败的不算已删、不参与 clean_db。

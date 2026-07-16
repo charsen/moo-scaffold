@@ -837,7 +837,7 @@ document.addEventListener('alpine:init', () => {
                 }
             } catch (e) {
                 if (e.code === 'AI_NOT_CONFIGURED') {
-                    this._toast('AI 未配置(SCAFFOLD_AI_API_KEY)，无法检查', 'danger');
+                    this._toast('AI 未配置（SCAFFOLD_AI_API_KEY），无法检查', 'danger');
                 } else {
                     this._toast('拼写检查失败：' + (e.message || e.code), 'danger');
                 }
@@ -1475,7 +1475,7 @@ document.addEventListener('alpine:init', () => {
                 }
             } catch (e) {
                 if (e.code === 'AI_NOT_CONFIGURED') {
-                    this._toast('AI 未配置(SCAFFOLD_AI_API_KEY)，无法翻译', 'danger');
+                    this._toast('AI 未配置（SCAFFOLD_AI_API_KEY），无法翻译', 'danger');
                 } else {
                     this._toast('翻译失败：' + (e.message || e.code), 'danger');
                 }
@@ -1521,7 +1521,7 @@ document.addEventListener('alpine:init', () => {
                 }
             } catch (e) {
                 if (e.code === 'AI_NOT_CONFIGURED') {
-                    this._toast('AI 未配置(SCAFFOLD_AI_API_KEY)，无法翻译', 'danger');
+                    this._toast('AI 未配置（SCAFFOLD_AI_API_KEY），无法翻译', 'danger');
                 } else {
                     this._toast('翻译失败：' + (e.message || e.code), 'danger');
                 }
@@ -1648,7 +1648,7 @@ document.addEventListener('alpine:init', () => {
             const allKeys = this.fields.map(f => f.key);
             if (this.multiIndexes.some(m => m.name === name)) { this._toast('索引名冲突：' + name, 'warning'); return; }
             if (allKeys.includes(name) && this.fields.find(f => f.key === name && f.index && f.index !== 'none')) {
-                this._toast('索引名冲突单字段 index(' + name + ')', 'warning'); return;
+                this._toast('索引名冲突单字段 index（' + name + '）', 'warning'); return;
             }
             this.multiIndexes.push({
                 __rowId: name + ':' + Date.now(),
@@ -2076,7 +2076,7 @@ document.addEventListener('alpine:init', () => {
                 this._saveBatchDraft();     // 翻译结果一并存草稿,防 preview 阶段刷新丢失
             } catch (e) {
                 if (e.code === 'AI_NOT_CONFIGURED') {
-                    this._toast('AI 未配置(SCAFFOLD_AI_API_KEY)，无法翻译', 'danger');
+                    this._toast('AI 未配置（SCAFFOLD_AI_API_KEY），无法翻译', 'danger');
                 } else {
                     this._toast('翻译失败：' + (e.message || e.code), 'danger');
                 }

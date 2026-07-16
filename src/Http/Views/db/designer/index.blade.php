@@ -155,7 +155,7 @@
                     <button type="button"
                             class="p-designer-card p-designer-card--ghost p-designer-card--action"
                             x-on:click="openNewSchema"
-                            title="新建一个模块(scaffold/database/<Module>.yaml)">
+                            title="新建一个模块（scaffold/database/<Module>.yaml）">
                         <div class="p-designer-card__head">
                             <h4>
                                 <x-scaffold::icon name="plus" :size="14" />
