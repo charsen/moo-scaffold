@@ -760,10 +760,13 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
+    // 左侧 3px accent 竖条当层次锚点:moon 下组头(--bg-panel-head)与行底几乎同灰,
+    // 光靠底色分不开;padding 扣掉竖条宽,保证组头 grip 与行 grip 垂直对齐
+    padding: var(--space-2) var(--space-3) var(--space-2) calc(var(--space-3) - 3px);
     background: var(--bg-panel-head);
     border-bottom: 1px solid var(--border-light);
-    &[data-drag-handle] { cursor: grab; }
+    border-left: 3px solid var(--accent-solid);
+    // cursor:grab 收在 .p-docs-home__grip 上(拖拽把手与热区一致,组名文字可选中复制)
   }
   &__group-name {
     font-size: var(--font-sm);
@@ -784,9 +787,11 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-3);   // 竖向 12px:8px 时行挤成一团(2026-07-15 user 反馈)
     font-size: var(--font-sm);
-    & + & { border-top: 1px solid var(--border-lighter); }
+    // 斑马纹替代行分隔线:moon 下 --border-lighter(#262938 on #1a1d27)近乎隐形,一片糊;
+    // 半透 slate 叠底亮暗主题都自然(复用代码块工具条「深面叠 rgba 不硬编码」先例)
+    &:nth-child(even) { background: rgba(148, 163, 184, 0.06); }
     &:hover { background: var(--bg-hover-row); }
     &.is-dragging {
       opacity: 0.55;
@@ -806,7 +811,7 @@
     text-align: right;
     font-size: var(--font-xs);
     font-family: var(--font-family-mono);
-    color: var(--text-muted);
+    color: var(--text-secondary);   // moon 下 muted(#6b6f7e)沉底看不清,提一档
   }
   &__title {
     font-weight: var(--weight-medium);
