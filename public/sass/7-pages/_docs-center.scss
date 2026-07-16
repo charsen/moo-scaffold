@@ -18,6 +18,11 @@
     font-weight: var(--weight-semibold);
     color: var(--text-heading);
   }
+  // 标题改为目录主页(裸 /docs)链接:静置保持标题观感,hover 才露链接性
+  &__hd-title {
+    color: var(--text-heading);
+    &:hover { color: var(--accent-text); }
+  }
   &__new {
     display: inline-flex;
     align-items: center;
@@ -693,4 +698,153 @@
     border: 1px solid var(--border-light);
     border-radius: var(--radius-sm);
   }
+}
+
+// ---- 目录主页(docs/home):全源总览 + 拖拽排序 -----------------------------------
+// 源卡片(host / 📦包)→ 组块 → 行;把手 [data-drag-handle] 由 docs-home.js 驱动,
+// 只读源不渲染把手。行序号 = frontmatter order(全局编号,拖一次全源归一为 10/20/30…)。
+.p-docs-home {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+
+  &__empty {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--elevation-1);
+    padding: var(--space-8) var(--space-6);
+    display: flex;
+    justify-content: center;
+  }
+
+  &__source {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--elevation-1);
+    padding: var(--space-5) var(--space-6);
+    transition: opacity var(--transition-fast);
+    &.is-saving { opacity: 0.6; pointer-events: none; }   // 请求在途:防再拖/再点
+  }
+  &__source-hd {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+  &__source-name {
+    font-size: var(--font-base);
+    font-weight: var(--weight-semibold);
+    color: var(--text-heading);
+  }
+  &__source-path {
+    font-size: var(--font-xs);
+    color: var(--text-muted);
+    font-family: var(--font-family-mono);
+  }
+
+  &__groups {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  &__group {
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    overflow: hidden;   // 圆角裁掉组头底色/行 hover
+    background: var(--bg-card);
+    &.is-dragging { opacity: 0.55; box-shadow: var(--elevation-2); }
+  }
+  &__group-hd {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: var(--bg-panel-head);
+    border-bottom: 1px solid var(--border-light);
+    &[data-drag-handle] { cursor: grab; }
+  }
+  &__group-name {
+    font-size: var(--font-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--text-heading);
+  }
+  &__group-count {
+    font-size: var(--font-xs);
+    color: var(--text-muted);
+  }
+
+  &__rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--font-sm);
+    & + & { border-top: 1px solid var(--border-lighter); }
+    &:hover { background: var(--bg-hover-row); }
+    &.is-dragging {
+      opacity: 0.55;
+      background: var(--accent-bg);
+      box-shadow: var(--elevation-2);
+    }
+  }
+  &__grip {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-muted);
+    cursor: grab;
+    touch-action: none;   // pointer 拖拽必须:阻掉触屏滚动手势抢事件
+  }
+  &__order {
+    min-width: 28px;
+    text-align: right;
+    font-size: var(--font-xs);
+    font-family: var(--font-family-mono);
+    color: var(--text-muted);
+  }
+  &__title {
+    font-weight: var(--weight-medium);
+    color: var(--text-heading);
+    &:hover { color: var(--accent-text); }
+  }
+  &__slug {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--font-xs);
+    font-family: var(--font-family-mono);
+    color: var(--text-muted);
+  }
+  &__tags {
+    display: inline-flex;
+    gap: var(--space-1);
+    flex: none;
+  }
+  &__mtime {
+    flex: none;
+    font-size: var(--font-xs);
+    color: var(--text-muted);
+  }
+  &__edit {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-muted);
+    padding: 2px;
+    border-radius: var(--radius-xs);
+    &:hover { color: var(--accent-text); background: var(--accent-bg); }
+  }
+}
+
+// 拖拽进行中:全局禁选中,别把行文字拖成蓝色选区
+body.is-row-dragging {
+  user-select: none;
+  cursor: grabbing;
 }
