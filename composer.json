@@ -63,6 +63,9 @@
     }
   },
   "extra": {
+    "branch-alias": {
+      "dev-master": "2.x-dev"
+    },
     "laravel": {
       "providers": [
         "Mooeen\\Scaffold\\ScaffoldProvider"
