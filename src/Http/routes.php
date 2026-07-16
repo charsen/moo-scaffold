@@ -213,6 +213,10 @@ Route::prefix($prefix)->middleware(array_merge($middleware, [SecurityHeaders::cl
         Route::post('/docs/reorder', DocsController::class . '@reorder')
             ->middleware('throttle:30,1')
             ->name('docs.reorder');
+        // 全文搜索(只读 JSON,生产可用;搜索框防抖逐键触发,限流放宽到 120/min)
+        Route::get('/docs/search', DocsController::class . '@search')
+            ->middleware('throttle:120,1')
+            ->name('docs.search');
 
         // Scaffold 配置：主页单页 + 锚点（plan 18）；env 镜像独立页；历史回溯走 git
         Route::get('/config', ConfigController::class . '@index')->name('scaffold.config');

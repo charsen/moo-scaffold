@@ -23,6 +23,7 @@ use Mooeen\Scaffold\Utility;
  *   POST /scaffold/docs/preview       实时预览渲染（复用 DocMarkdownRenderer，单一真源）。
  *   POST /scaffold/docs/delete        删除（git-tracked，可 restore）。
  *   POST /scaffold/docs/reorder       拖拽排序落盘（全源 slug 顺序 → 全局编号写回各篇 frontmatter order）。
+ *   GET  /scaffold/docs/search        全文搜索（标题/slug/正文，跨全源，只读 JSON）。
  *   GET  /scaffold/docs/_diagram      Mermaid 隔离渲染帧（单独放宽 CSP）。
  *   GET  /scaffold/docs/picker        引用 picker 的接口/表 catalog（JSON）。
  */
@@ -50,17 +51,57 @@ class DocsController extends Controller
         $doc  = $this->repo->find($slug, $src);
         $html = $doc !== null ? $this->renderer->render($doc['body']) : null;
 
+        // 上一篇/下一篇:同源 all() 阅读顺序(全局编号序)的相邻两篇,跨组连续
+        $prev = $next = null;
+        if ($doc !== null) {
+            $all = $this->repo->all($src);
+            $idx = array_search($doc['slug'], array_column($all, 'slug'), true);
+            if ($idx !== false) {
+                $prev = $all[$idx - 1] ?? null;
+                $next = $all[$idx + 1] ?? null;
+            }
+        }
+
         return $this->view('docs.index', array_merge($this->lockFlags(), [
             'tree'         => $this->repo->navTree(),
             'current_key'  => $doc !== null ? DocsRepository::docKey($doc['slug'], $src) : null,
             'doc'          => $doc,
             'html'         => $html,
+            'prev'         => $prev,
+            'next'         => $next,
             'not_found'    => $doc === null,
             'rel_base'     => $this->repo->relBaseDir($src),
             'src'          => $src,
             'src_writable' => $this->repo->sourceWritable($src),
             'uri'          => $req->getPathInfo(),
         ]));
+    }
+
+    /**
+     * 全文搜索(目录主页搜索框):跨全源(host + 📦包)扫标题/slug/正文,JSON 返回。
+     * 只读端点,生产可用;总量截断到 50 条,截断时置 truncated 让前端提示细化关键词。
+     */
+    public function search(Request $req): JsonResponse
+    {
+        $data = $req->validate(['q' => 'required|string|min:2|max:100']);
+        $q    = trim($data['q']);
+
+        $results   = [];
+        $truncated = false;
+        foreach ($this->repo->sources() as $s) {
+            foreach ($this->repo->search($q, $s['key']) as $hit) {
+                if (count($results) >= 50) {
+                    $truncated = true;
+                    break 2;
+                }
+                $results[] = $hit + [
+                    'src'  => $s['key'] ?? '',
+                    'href' => route('docs.index', ['doc' => $hit['slug']] + ($s['key'] !== null ? ['src' => $s['key']] : []), false),
+                ];
+            }
+        }
+
+        return response()->json(['q' => $q, 'results' => $results, 'truncated' => $truncated]);
     }
 
     /**
@@ -254,7 +295,9 @@ class DocsController extends Controller
     {
         // 不写死 group:让 deriveGroup 按保存路径推断(存到 示例/ 下就归「示例」组)。
         // 原模板硬写 group: 未分组 会盖掉路径推断 → 文件夹下新建的文档全落「未分组」。想显式分组的人自行加回 group: 行。
-        return "---\ntitle: 新文档\norder: 100\ntags: []\n---\n\n# 新文档\n\n在这里写正文。可用 Markdown、Mermaid 流程图、以及深链 shortcode。\n";
+        // 不写死 order:全局编号体系下硬编码 100 会随机插进列表中间;缺省(999)沉组尾显「–」,
+        // 去目录主页拖一下就位(reorder 统一发号)。
+        return "---\ntitle: 新文档\ntags: []\n---\n\n# 新文档\n\n在这里写正文。可用 Markdown、Mermaid 流程图、以及深链 shortcode。\n";
     }
 
     /**

@@ -274,6 +274,67 @@ class DocsRepository
         return $all[0]['slug'] ?? null;
     }
 
+    /**
+     * 全文搜索（单源）：标题 / slug / 正文逐行 stripos，大小写不敏感；无索引现扫
+     * （几十个小 MD，毫秒级，贴「纯文件无索引」的尺子）。标题命中排正文命中前，
+     * 组内维持 all() 的阅读顺序；每篇最多 $perDoc 条命中行摘要。
+     *
+     * @return list<array{slug:string,title:string,group:string,title_hit:bool,excerpts:list<string>}>
+     */
+    public function search(string $q, ?string $origin = null, int $perDoc = 3): array
+    {
+        $q = trim($q);
+        if ($q === '' || mb_strlen($q) < 2) {
+            return [];
+        }
+
+        $titleHits = [];
+        $bodyHits  = [];
+        foreach ($this->all($origin) as $doc) {
+            $titleHit = mb_stripos($doc['title'], $q) !== false || mb_stripos($doc['slug'], $q) !== false;
+
+            $raw      = (string) $this->fs->get($this->absPath($doc['slug'], $origin));
+            $excerpts = [];
+            foreach (explode("\n", $this->parse($raw)['body']) as $line) {
+                if (mb_stripos($line, $q) === false) {
+                    continue;
+                }
+                $excerpts[] = $this->excerptLine($line, $q);
+                if (count($excerpts) >= $perDoc) {
+                    break;
+                }
+            }
+            if (! $titleHit && $excerpts === []) {
+                continue;
+            }
+
+            $entry = [
+                'slug'      => $doc['slug'],
+                'title'     => $doc['title'],
+                'group'     => $doc['group'],
+                'title_hit' => $titleHit,
+                'excerpts'  => $excerpts,
+            ];
+            $titleHit ? $titleHits[] = $entry : $bodyHits[] = $entry;
+        }
+
+        return array_merge($titleHits, $bodyHits);
+    }
+
+    /** 命中行截摘要：短行原样；长行以命中处为中心截 ~120 字，断口补省略号。 */
+    private function excerptLine(string $line, string $q): string
+    {
+        $line = trim($line);
+        if (mb_strlen($line) <= 120) {
+            return $line;
+        }
+        $pos   = mb_stripos($line, $q);
+        $start = max(0, ($pos === false ? 0 : $pos) - 40);
+        $slice = mb_substr($line, $start, 120);
+
+        return ($start > 0 ? '…' : '') . $slice . '…';
+    }
+
     // -------------------------------------------------------------------------
     // 写（production / 只读硬拒）
     // -------------------------------------------------------------------------

@@ -201,6 +201,26 @@ it('reorder() 只读模式硬拒', function () {
     expect(fn () => $this->repo->reorder(['a']))->toThrow(InvalidArgumentException::class);
 });
 
+// ─── search(全文搜索:无索引现扫) ───
+
+it('search() 标题命中排正文命中前,大小写不敏感,附命中行摘要', function () {
+    $this->repo->save('t', "---\ntitle: Docker 部署\ngroup: 指南\norder: 5\n---\n无关正文\n");
+    $this->repo->save('a', "---\ntitle: 部署指南\ngroup: 指南\norder: 10\n---\n正文提到 DOCKER 环境。\n");
+    $this->repo->save('c', "---\ntitle: 无关\ngroup: 指南\norder: 20\n---\n完全不相关。\n");
+
+    $hits = $this->repo->search('docker');
+    expect(array_column($hits, 'slug'))->toBe(['t', 'a']);
+    expect($hits[0]['title_hit'])->toBeTrue();
+    expect($hits[1]['title_hit'])->toBeFalse();
+    expect($hits[1]['excerpts'][0])->toContain('DOCKER 环境');
+});
+
+it('search() 关键词 <2 字返回空;每篇摘要最多 3 行', function () {
+    $this->repo->save('m', "---\ntitle: 多行\n---\n命中一\n命中二\n命中三\n命中四\n");
+    expect($this->repo->search('命'))->toBe([]);
+    expect($this->repo->search('命中')[0]['excerpts'])->toHaveCount(3);
+});
+
 it('tree() 产出 side-tree 分组结构(key/label/count/items)', function () {
     $this->repo->save('指南/x', "---\ngroup: 指南\n---\n");
     $tree = $this->repo->tree();
