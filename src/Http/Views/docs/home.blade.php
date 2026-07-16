@@ -49,9 +49,11 @@
                     <div class="p-docs-home__groups">
                         @foreach ($sec['groups'] as $grp)
                             <div class="p-docs-home__group" data-group="{{ $grp['label'] }}">
-                                <div class="p-docs-home__group-hd" @if ($canDrag) data-drag-handle="group" title="拖动调整分组顺序" @endif>
+                                {{-- 拖拽把手只在六点图标上(与行交互同构):整头可拖时 cursor 与热区不一致
+                                     且组名文字没法选中复制(2026-07-15 user 反馈) --}}
+                                <div class="p-docs-home__group-hd">
                                     @if ($canDrag)
-                                        <span class="p-docs-home__grip"><x-scaffold::icon name="grip" :size="14" /></span>
+                                        <span class="p-docs-home__grip" data-drag-handle="group" title="拖动调整分组顺序"><x-scaffold::icon name="grip" :size="14" /></span>
                                     @endif
                                     <span class="p-docs-home__group-name">{{ $grp['label'] }}</span>
                                     <span class="p-docs-home__group-count">{{ count($grp['items']) }}</span>
