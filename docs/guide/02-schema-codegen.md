@@ -71,7 +71,7 @@ tables:
 |---|---|---|---|
 | `Model.php` / `ModelFilter.php` | 跳过 | 覆盖 | 写业务逻辑 |
 | `Traits/*ModelTrait.php` | **强制覆盖** | — | schema 投影,别写业务 |
-| `Traits/HasOperator.php` | 缺失时创建 | 不覆盖 | creator_id / updater_id 自动填充,可按项目扩展 |
+| `Mooeen\Scaffold\Concerns\HasOperator` | 共享运行时 Trait | 不生成本地副本 | creator_id / updater_id 自动填充；身份来源走 OperatorResolver，无身份为 null |
 | `Enums/*.php` | **强制覆盖** | — | schema 投影,别写业务 |
 | `Controller.php` / `Request.php` / `Resource.php` | 跳过 | 覆盖 | 写 action / 校验 / 返回字段 |
 | `Vue 页面.vue` | 跳过 | 覆盖 | 写前端 |

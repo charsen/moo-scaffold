@@ -23,7 +23,7 @@ schema 的**出身**在它躺在哪个 `scaffold/database/` 里时就定了:host
 | 产物 | 落点 |
 |---|---|
 | schema yaml / `.snapshots/` / migration | 包 `scaffold/database/`、包 `database/migrations/`(日期命名) |
-| Model / Filter / `*ModelTrait` / `HasOperator` / Enum | 包 `src/Models/`(平铺,无模块子目录) |
+| Model / Filter / `*ModelTrait` / Enum | 包 `src/Models/`（平铺，无模块子目录）；`HasOperator` 直接引用 scaffold 共享 Trait |
 | 共享 Model 基类 / Trait | 不复制到包;引用 `Mooeen\Scaffold\Foundation\*` / `Mooeen\Scaffold\Concerns\*` |
 | Controller / Controller Trait / `HandlesResourceActions` | 包 `src/Http/Controllers/Admin/`(平铺) |
 | Request | 包 `src/Http/Requests/{Controller}/` |
