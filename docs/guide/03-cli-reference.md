@@ -146,7 +146,7 @@ php artisan moo:scaffold:merge-yaml scaffold/accounts.yaml --dry-run
   - `moo:db:audit` — 只读对账(也核对生产 DB)
   - `moo:cloud:push` / `moo:cloud:mcp` / `moo:monitor:migrate` — 云端推送 / MCP / 旧版迁移(由 moo-monitor-laravel 提供,无 only_in_local 限制)
 - 改了 schema YAML **务必**先 `moo:fresh`。
-- 生成的 `Traits/*ModelTrait.php` / `Enums/*.php` 每次都被覆盖,**别写业务代码**;共享 `Mooeen\Scaffold\Concerns\*` 和缺失时才创建的 `HasOperator.php` 不在此列。
+- 生成的 `Traits/*ModelTrait.php` / `Enums/*.php` 每次都被覆盖，**别写业务代码**；`HasOperator` 等通用能力直接引用共享 `Mooeen\Scaffold\Concerns\*`，不生成本地副本。
 - `moo:auth` / `moo:api` 只识别 controller 中真实定义过的方法。
 - `moo:schema` **不支持多级目录**。
 - `moo:controller` 依赖 `:insert_code_here:do_not_delete` 标记,标记被删 = 路由插不进去。

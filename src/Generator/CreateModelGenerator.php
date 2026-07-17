@@ -59,9 +59,6 @@ class CreateModelGenerator extends Generator
             $this->base_namespace = $this->originCtx->namespaceFor('model') . '\\';
         }
 
-        // plan 38：BaseFilter 已上移 Mooeen\Scaffold\Foundation\BaseFilter，不再逐包生成本地副本（同 Concerns\* 上提）
-        $this->checkBaseTraitFiles();
-
         foreach ($all[$schema_name] as $class => $attr) {
             // moo:free --table 过滤:只生成指定表 key 的代码,其它表跳过
             if ($only_table !== null && $attr['table_name'] !== $only_table) {
@@ -164,7 +161,7 @@ class CreateModelGenerator extends Generator
         // 操作人填充：表含 creator_id / updater_id 时自动 HasOperator
         if (isset($table_attr['fields']['creator_id']) || isset($table_attr['fields']['updater_id'])) {
             $use_trait[] = 'HasOperator';
-            $use_class[] = "use {$this->base_namespace}Traits\HasOperator;";
+            $use_class[] = 'use Mooeen\Scaffold\Concerns\HasOperator;';
         }
 
         $meta = [
@@ -795,32 +792,5 @@ class CreateModelGenerator extends Generator
             'appends'         => $appends_code,
             'get_txt_fn'      => implode(PHP_EOL, $function_code),
         ];
-    }
-
-    /**
-     * 模型可操作 Trait
-     */
-    private function checkBaseTraitFiles(): void
-    {
-        $path = $this->model_path . 'Traits/';
-        $this->checkDirectory($path);
-
-        // EnumExtend / GetSerializeDate / GetUpdatedAtHumanTime / Optional / UsingSnowFlakePrimaryKey 已上提到
-        // mooeen/scaffold 的 Mooeen\Scaffold\Concerns\*（运行时类），不再生成本地副本。
-        $files = [
-            'HasOperator' => 'model-has-operator-trait',
-        ];
-
-        foreach ($files as $file_name => $stub) {
-            $file = $path . "{$file_name}.php";
-            if (! $this->filesystem->isFile($file)) {
-                $meta = [
-                    'namespace' => $this->base_namespace . 'Traits',
-                ];
-
-                $this->filesystem->put($file, $this->buildStub($meta, $this->getStub($stub)));
-                $this->console()->created($this->relDisplay($file, $this->originCtx));
-            }
-        }
     }
 }

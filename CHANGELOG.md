@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- B-01 方案 B：新增 `Contracts\OperatorResolver` + 默认 `Support\GuardOperatorResolver`（auth()->id()，未登录 null）；model-has-operator-trait stub 改经契约取操作人 ID，开出 host 注入缝。存量下游 HasOperator 不覆盖不自愈，仅新生成生效。
+- B-01 方案 B：新增 `Contracts\OperatorResolver` + 默认 `Support\GuardOperatorResolver`（auth()->id()，未登录 null），开出 host 操作人身份注入缝。
+- `HasOperator` 上移为共享 `Mooeen\Scaffold\Concerns\HasOperator`；生成器不再复制本地 Trait/stub，无身份统一写 null。
 
 ## 2.1.2
 
