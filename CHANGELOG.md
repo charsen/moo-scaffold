@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased
+## 2.2.0
 
 - B-01 方案 B：新增 `Contracts\OperatorResolver` + 默认 `Support\GuardOperatorResolver`（auth()->id()，未登录 null），开出 host 操作人身份注入缝。
 - `HasOperator` 上移为共享 `Mooeen\Scaffold\Concerns\HasOperator`；生成器不再复制本地 Trait/stub，无身份统一写 null。
+- Scaffold Provider 使用 `bindIf()` 注册默认实现，尊重 host 的统一身份绑定。
 
 ## 2.1.2
 
