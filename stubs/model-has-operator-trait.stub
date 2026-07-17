@@ -2,6 +2,8 @@
 
 namespace {{namespace}};
 
+use Mooeen\Scaffold\Contracts\OperatorResolver;
+
 /**
  * 操作人填充 Trait —— 声明式 opt-in
  *
@@ -10,6 +12,7 @@ namespace {{namespace}};
  *   - updating: 仅写 updater_id（若 $fillable 含之）
  *
  * 由 moo:model 在表含 creator_id / updater_id 时自动 use 进 model。
+ * 操作人 ID 经 Mooeen\Scaffold\Contracts\OperatorResolver 取（B-01 方案 B）；scaffold 默认走 auth 登录态（未登录 null），host 可 bind 覆盖。
  */
 trait HasOperator
 {
@@ -17,7 +20,7 @@ trait HasOperator
     {
         static::creating(function ($model) {
             $fillable = $model->getFillable();
-            $userId   = auth()->id();
+            $userId   = app(OperatorResolver::class)->id();
 
             if (in_array('creator_id', $fillable, true)) {
                 $model->creator_id = $userId;
@@ -29,7 +32,7 @@ trait HasOperator
 
         static::updating(function ($model) {
             if (in_array('updater_id', $model->getFillable(), true)) {
-                $model->updater_id = auth()->id();
+                $model->updater_id = app(OperatorResolver::class)->id();
             }
         });
     }

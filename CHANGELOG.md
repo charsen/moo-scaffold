@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- B-01 方案 B：新增 `Contracts\OperatorResolver` + 默认 `Support\GuardOperatorResolver`（auth()->id()，未登录 null）；model-has-operator-trait stub 改经契约取操作人 ID，开出 host 注入缝。存量下游 HasOperator 不覆盖不自愈，仅新生成生效。
+
 ## 2.1.2
 
 - Docs center: the bare `/docs` URL now opens a catalog home page with drag-and-drop ordering — rows within a group, or whole groups at once. Order is written back surgically to each doc's front-matter `order` line using gapped global numbering (10/20/30…), so diffs stay one-line clean.
