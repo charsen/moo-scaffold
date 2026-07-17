@@ -57,5 +57,5 @@ it('model-has-operator-trait.stub 存在且 boot 钩子按 $fillable 填充', fu
     expect($stub)->toContain("in_array('updater_id', \$fillable, true)");
     // updating 仅处理 updater_id
     expect($stub)->toContain('static::updating');
-    expect($stub)->toContain('$model->updater_id = auth()->id();');
+    expect($stub)->toContain('$model->updater_id = app(OperatorResolver::class)->id();');
 });

@@ -69,6 +69,10 @@ class ScaffoldProvider extends ServiceProvider
                 ->setSequenceResolver(new LaravelSequenceResolver($app['cache']->store()));
         });
 
+        // B-01 方案 B：操作人身份注入缝。生成的 HasOperator 经 OperatorResolver 取当前操作人 ID；
+        // 默认 auth()->id()（未登录 null），host 可 bind 覆盖（换 guard / getUserId / 0 兜底）。
+        $this->app->bind(\Mooeen\Scaffold\Contracts\OperatorResolver::class, \Mooeen\Scaffold\Support\GuardOperatorResolver::class);
+
         // plan 19 数据库设计器:GitInspector 注入 base_path / TranslationService 注入 env 配置
         $this->app->singleton(\Mooeen\Scaffold\Designer\GitInspector::class, fn ($app) => new \Mooeen\Scaffold\Designer\GitInspector(
             cwd: $app->basePath(),
