@@ -123,7 +123,7 @@ class ConfigManager
             // plan-40 §五 F1 长度 cap(从 HTTP 验证下沉,见 ConfigController::update):
             // string/text 整值、list/map 每个元素 ≤ 2000,超长拒写走 skipped 提示
             if ($overLong = $this->findOverLongValue($newVal)) {
-                $skipped[$path] = "值过长(>2000 字符):{$overLong},未写入";
+                $skipped[$path] = "值过长（>2000 字符）：{$overLong}，未写入";
 
                 continue;
             }
@@ -134,7 +134,7 @@ class ConfigManager
                 $bad = [];
                 foreach ($newVal as $vk => $vv) {
                     if (! $this->looksLikeHttpUrl((string) $vv)) {
-                        $bad[] = $vk . ' → ' . ($vv === '' ? '(空)' : $vv);
+                        $bad[] = $vk . ' → ' . ($vv === '' ? '（空）' : $vv);
                     }
                 }
                 if ($bad !== []) {
@@ -459,7 +459,7 @@ class ConfigManager
         return [
             'key'    => 'proxy',
             'label'  => '代理设置',
-            'desc'   => '接口调试请求超时(TLS 强制校验,无开关)',
+            'desc'   => '接口调试请求超时（TLS 强制校验，无开关）',
             'fields' => [
                 ['path' => 'proxy.timeout', 'label' => '超时（秒）', 'type' => self::TYPE_INT],
             ],

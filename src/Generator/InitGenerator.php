@@ -37,7 +37,7 @@ class InitGenerator extends Generator
     {
         $file = base_path('.env');
         if (! $this->filesystem->isFile($file)) {
-            $this->console()->error('未找到 `.env` 文件,`SCAFFOLD_AUTHOR` 无法写入。');
+            $this->console()->error('未找到 `.env` 文件，`SCAFFOLD_AUTHOR` 无法写入。');
         } else {
             $env_txt = $this->filesystem->get($file);
             if (preg_match('/SCAFFOLD_AUTHOR=.*/i', $env_txt)) {

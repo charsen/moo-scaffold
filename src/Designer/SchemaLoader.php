@@ -300,7 +300,7 @@ class SchemaLoader
         }
         $raw['tables'] = (array) ($raw['tables'] ?? []);
         if (isset($raw['tables'][$tableKey])) {
-            throw new SchemaLoadException("table key 已存在:{$tableKey}");
+            throw new SchemaLoadException("table key 已存在：{$tableKey}");
         }
         // plan 19 v8 D4:新建表时可选携带 prefix(F29 字段前缀,持久化到 attrs.prefix)
         // 审计 metadata(schema 元数据,不是行字段):新建表 stamp created_*,updated_* 留空 — 首次 saveModule 才补
@@ -347,7 +347,7 @@ class SchemaLoader
         }
         $path = $this->yamlPath($schemaName);
         if (file_exists($path)) {
-            throw new SchemaLoadException("schema 已存在:{$schemaName}");
+            throw new SchemaLoadException("schema 已存在：{$schemaName}");
         }
         // 最小 stub:仅 module 块 + 空 tables(后续在 designer 新建表)
         $headerComment = "###\n# {$schemaName}\n#\n# @date   " . date('Y-m-d H:i:s') . "\n##\n";
@@ -391,7 +391,7 @@ class SchemaLoader
             throw new SchemaLoadException("schema not found: {$schema}");
         }
         if (! $this->isSchemaDraft($schema)) {
-            throw new SchemaLoadException("schema 已生成 migration,不能删:{$schema}(请走 git 流程)");
+            throw new SchemaLoadException("schema 已生成 migration，不能删：{$schema}（请走 git 流程）");
         }
         if (! @unlink($path)) {
             throw new SchemaLoadException("delete failed: {$path}");
@@ -414,7 +414,7 @@ class SchemaLoader
         // 跨源全局重名闸(2026-07-03 复盘审查 #1):新名在任何源(host / 各包)已存在都拒 ——
         // 只查同目录会让 rename 制造出跨源重名,下一次 listSchemaFiles fail-fast 把整个设计器打死
         if (isset($this->listSchemaFiles()[$newName])) {
-            throw new SchemaLoadException("schema 已存在:{$newName}(schema 名跨源全局唯一)");
+            throw new SchemaLoadException("schema 已存在：{$newName}（schema 名跨源全局唯一）");
         }
         $oldPath = $this->yamlPath($oldName);
         // 新名跟旧名同目录(保出身):yamlPath(新名) 会因"未知名"回落 host,包 schema 改名会被搬进 host — 必须用旧文件所在目录拼
@@ -423,10 +423,10 @@ class SchemaLoader
             throw new SchemaLoadException("schema not found: {$oldName}");
         }
         if (file_exists($newPath)) {
-            throw new SchemaLoadException("schema 已存在:{$newName}");
+            throw new SchemaLoadException("schema 已存在：{$newName}");
         }
         if (! $this->isSchemaDraft($oldName)) {
-            throw new SchemaLoadException("schema 已生成 migration,不能改名:{$oldName}(请走 git 流程)");
+            throw new SchemaLoadException("schema 已生成 migration，不能改名：{$oldName}（请走 git 流程）");
         }
         // 读 + 改 module.folder(跟 schema 名同步)+ 写新 path,成功后再删旧
         $originalText = (string) file_get_contents($oldPath);
@@ -507,7 +507,7 @@ class SchemaLoader
             throw new SchemaLoadException("table not found: {$oldKey}");
         }
         if (isset($raw['tables'][$newKey])) {
-            throw new SchemaLoadException("表 key 已存在:{$newKey}");
+            throw new SchemaLoadException("表 key 已存在：{$newKey}");
         }
         // 原位换 key(保序):遍历重建,oldKey 处替成 newKey,其余原样
         $newTables = [];
@@ -1420,7 +1420,7 @@ class SchemaLoader
                 }     // _fields.yaml etc.
                 if (isset($out[$name])) {
                     $prev = $origins[$name] ?? 'host';
-                    throw new SchemaLoadException("schema 名跨源重名:[{$name}] 同时在 [{$prev}] 与 [" . ($origin ?? 'host') . '] —— schema 名全局唯一，请改名其一。');
+                    throw new SchemaLoadException("schema 名跨源重名：[{$name}] 同时在 [{$prev}] 与 [" . ($origin ?? 'host') . '] —— schema 名全局唯一，请改名其一。');
                 }
                 $out[$name] = $f->getRealPath();
                 if ($origin !== null) {
@@ -1593,7 +1593,7 @@ class SchemaLoader
                     $warnings[] = [
                         'table' => $tableName,
                         'field' => $fieldNameStr,
-                        'msg'   => '字段名非法:必须 ^[a-z_][a-z0-9_]*$,本字段已跳过(防 PHP/SQL 注入)',
+                        'msg'   => '字段名非法：必须 ^[a-z_][a-z0-9_]*$，本字段已跳过（防 PHP/SQL 注入）',
                     ];
 
                     continue;
@@ -1602,7 +1602,7 @@ class SchemaLoader
                     $warnings[] = [
                         'table' => $tableName,
                         'field' => $fieldNameStr,
-                        'msg'   => '字段名超 64 字符 MySQL identifier 上限,已跳过',
+                        'msg'   => '字段名超 64 字符 MySQL identifier 上限，已跳过',
                     ];
 
                     continue;
@@ -1636,7 +1636,7 @@ class SchemaLoader
                     $warnings[] = [
                         'table' => $tableName,
                         'field' => $fieldNameStr,
-                        'msg'   => "unsigned 仅对数值类型(int/decimal 等)有意义,{$type} 字段的 unsigned=true 已 strip",
+                        'msg'   => "unsigned 仅对数值类型（int/decimal 等）有意义，{$type} 字段的 unsigned=true 已 strip",
                     ];
                     $unsignedFlag = false;
                     unset($cleaned['unsigned']);
@@ -1660,7 +1660,7 @@ class SchemaLoader
                         $warnings[] = [
                             'table' => $tableName,
                             'field' => $fieldNameStr,
-                            'msg'   => "default '{$default}' 是字符串但字段是 {$type},且 enums 块无此 key — migration cast 后会归 0,请改成 int 或在 enums 中定义 '{$default}'",
+                            'msg'   => "default '{$default}' 是字符串但字段是 {$type}，且 enums 块无此 key — migration cast 后会归 0，请改成 int 或在 enums 中定义 '{$default}'",
                         ];
                     }
                 }
@@ -1806,7 +1806,7 @@ class SchemaLoader
                         $warnings[] = [
                             'table' => $table,
                             'field' => $field,
-                            'msg'   => "format 值 `{$value}` 不符 `<word>` 或 `<word>:<digits>` 格式,已 strip",
+                            'msg'   => "format 值 `{$value}` 不符 `<word>` 或 `<word>:<digits>` 格式，已 strip",
                         ];
 
                         continue;
@@ -1944,13 +1944,13 @@ class SchemaLoader
         $canRemove = ! $isIdField;
         // v6 批次 B:系统字段 hint(tooltip),user hover key 列时提示"可删但不可改"
         if ($isIdField) {
-            $rowTitle = 'ID 主键,固定不可改不可删';
+            $rowTitle = 'ID 主键，固定不可改不可删';
         } elseif ($isSystem) {
             $rowTitle = match ($name) {
-                'deleted_at' => '软删除时间戳。行内只读,但可整行删除(行末 × 按钮)',
-                'created_at' => '自动维护的创建时间。行内只读,但可整行删除(行末 × 按钮)',
-                'updated_at' => '自动维护的更新时间。行内只读,但可整行删除(行末 × 按钮)',
-                default      => '系统字段,行内只读',
+                'deleted_at' => '软删除时间戳。行内只读，但可整行删除（行末 × 按钮）',
+                'created_at' => '自动维护的创建时间。行内只读，但可整行删除（行末 × 按钮）',
+                'updated_at' => '自动维护的更新时间。行内只读，但可整行删除（行末 × 按钮）',
+                default      => '系统字段，行内只读',
             };
         } else {
             $rowTitle = '';
@@ -2017,7 +2017,7 @@ class SchemaLoader
             // v6.2 round 4:size 列校验初始 class(varchar/char/decimal 必须有 size)
             'size_class' => $this->computeSizeClass($attr['type'] ?? null, $attr['size'] ?? null),
             'size_title' => $this->computeSizeClass($attr['type'] ?? null, $attr['size'] ?? null) === 'is-invalid'
-                ? '此类型需要 size,请填(如 varchar 64)'
+                ? '此类型需要 size，请填（如 varchar 64）'
                 : '',
             // #30:default 值跟 type 兼容性校验
             'default_class' => $this->computeDefaultClass($attr['type'] ?? null, $attr['default'] ?? null),

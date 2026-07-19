@@ -91,7 +91,7 @@ class MigrationCompacter
             $pushed = $this->detectGitPushed(array_merge([$files['create']], $files['updates']), $schema);
             if ($pushed !== []) {
                 throw new CompactBlockedException(
-                    'update 文件已 push 到 origin:' . implode(', ', array_map('basename', $pushed)) . ' — 拒绝合并(防多 dev state 不一致),如确认请加 force=true',
+                    'update 文件已 push 到 origin：' . implode(', ', array_map('basename', $pushed)) . ' — 拒绝合并（防多 dev state 不一致），如确认请加 force=true',
                     CompactBlockedException::REASON_GIT_PUSHED,
                 );
             }
@@ -119,7 +119,7 @@ class MigrationCompacter
                 $deletedFiles[]     = basename($abs);
                 $deletedBasenames[] = basename($abs, '.php');
             } else {
-                $warnings[] = '删除失败:' . basename($abs) . '(权限/占用?)— 文件仍在,其 migrations 表记录未动;处理后重跑合并即可(create 改写幂等)';
+                $warnings[] = '删除失败：' . basename($abs) . '（权限/占用？）— 文件仍在，其 migrations 表记录未动；处理后重跑合并即可（create 改写幂等）';
             }
         }
 
@@ -195,20 +195,20 @@ class MigrationCompacter
                 ? CompactBlockedException::REASON_RENAME
                 : CompactBlockedException::REASON_DROP;
             $msg = $b['type'] === 'rename'
-                ? "暂不支持表名变更后的合并历史({$b['file']}),请手动处理"
-                : "暂不支持表被 drop 后的合并历史({$b['file']}),请手动处理";
+                ? "暂不支持表名变更后的合并历史（{$b['file']}），请手动处理"
+                : "暂不支持表被 drop 后的合并历史（{$b['file']}），请手动处理";
             throw new CompactBlockedException($msg, $reason);
         }
 
         if ($creates === []) {
             throw new CompactBlockedException(
-                "找不到 {$table} 的 create migration 文件,无法合并",
+                "找不到 {$table} 的 create migration 文件，无法合并",
                 CompactBlockedException::REASON_NO_CREATE,
             );
         }
         if (count($creates) > 1) {
             throw new CompactBlockedException(
-                "{$table} 有 " . count($creates) . ' 个 create 文件:' . implode(', ', array_map('basename', $creates)) . ' — 请手动审计',
+                "{$table} 有 " . count($creates) . ' 个 create 文件：' . implode(', ', array_map('basename', $creates)) . ' — 请手动审计',
                 CompactBlockedException::REASON_MULTI_CREATE,
             );
         }
@@ -228,7 +228,7 @@ class MigrationCompacter
         $normalized = $this->loader->loadNormalized($schema);
         if (! isset($normalized['tables'][$table])) {
             throw new CompactBlockedException(
-                "yaml 里找不到 {$schema}.{$table},无法重渲 create",
+                "yaml 里找不到 {$schema}.{$table}，无法重渲 create",
                 CompactBlockedException::REASON_NO_CREATE,
             );
         }
@@ -273,7 +273,7 @@ class MigrationCompacter
 
         if (! Schema::hasTable($table)) {
             // 本地 DB 还没建表 → 没法 drift,跳过
-            $warnings[] = ['type' => 'no_db_table', 'detail' => "local DB 无 {$table} 表,跳过 drift 检测"];
+            $warnings[] = ['type' => 'no_db_table', 'detail' => "local DB 无 {$table} 表，跳过 drift 检测"];
 
             return $warnings;
         }
@@ -295,11 +295,11 @@ class MigrationCompacter
 
         // 差集:DB 有但 yaml 没
         foreach (array_diff($dbCols, $yamlFields) as $extra) {
-            $warnings[] = ['type' => 'column_db_only', 'detail' => "列 `{$extra}` 真 DB 有,yaml 无 — 重渲 create 不会包含"];
+            $warnings[] = ['type' => 'column_db_only', 'detail' => "列 `{$extra}` 真 DB 有，yaml 无 — 重渲 create 不会包含"];
         }
         // 差集:yaml 有但 DB 没(yaml 改了但 migrate 没跑过)
         foreach (array_diff($yamlFields, $dbCols) as $missing) {
-            $warnings[] = ['type' => 'column_yaml_only', 'detail' => "列 `{$missing}` yaml 有,真 DB 没 — migrate 未跑全"];
+            $warnings[] = ['type' => 'column_yaml_only', 'detail' => "列 `{$missing}` yaml 有，真 DB 没 — migrate 未跑全"];
         }
 
         return $warnings;
@@ -350,14 +350,14 @@ class MigrationCompacter
                     return [];     // 确认不在 git repo —— 唯一的合法跳过
                 }
                 throw new CompactBlockedException(
-                    '无法确认推送状态(git 异常:' . trim($branchProc->getErrorOutput() ?: 'unknown') . '),拒绝合并;确认未推送可 force',
+                    '无法确认推送状态（git 异常：' . trim($branchProc->getErrorOutput() ?: 'unknown') . '），拒绝合并；确认未推送可 force',
                     CompactBlockedException::REASON_GIT_UNCERTAIN,
                 );
             }
             $branch = trim($branchProc->getOutput());
             if ($branch === '' || $branch === 'HEAD') {
                 throw new CompactBlockedException(
-                    '当前处于 detached HEAD,无法按分支确认推送状态,拒绝合并;切回分支后重试(或确认未推送可 force)',
+                    '当前处于 detached HEAD，无法按分支确认推送状态，拒绝合并；切回分支后重试（或确认未推送可 force）',
                     CompactBlockedException::REASON_GIT_UNCERTAIN,
                 );
             }
@@ -380,7 +380,7 @@ class MigrationCompacter
                 $rootProc->run();
                 if (! $rootProc->isSuccessful() || trim($rootProc->getOutput()) === '') {
                     throw new CompactBlockedException(
-                        "无法确认扩展包 [{$origin}] 的 git 仓根,拒绝合并;确认未推送可 force",
+                        "无法确认扩展包 [{$origin}] 的 git 仓根，拒绝合并；确认未推送可 force",
                         CompactBlockedException::REASON_GIT_UNCERTAIN,
                     );
                 }
@@ -401,7 +401,7 @@ class MigrationCompacter
                 $logProc->run();
                 if (! $logProc->isSuccessful()) {
                     throw new CompactBlockedException(
-                        '无法确认 ' . basename($abs) . ' 的推送状态(git log 异常),拒绝合并;确认未推送可 force',
+                        '无法确认 ' . basename($abs) . ' 的推送状态（git log 异常），拒绝合并；确认未推送可 force',
                         CompactBlockedException::REASON_GIT_UNCERTAIN,
                     );
                 }
@@ -416,7 +416,7 @@ class MigrationCompacter
         } catch (\Throwable $e) {
             // Process 超时 / GitInspector 抛错等 —— 同样属于"无法确认",fail-closed
             throw new CompactBlockedException(
-                '无法确认推送状态(' . $e->getMessage() . '),拒绝合并;确认未推送可 force',
+                '无法确认推送状态（' . $e->getMessage() . '），拒绝合并；确认未推送可 force',
                 CompactBlockedException::REASON_GIT_UNCERTAIN,
             );
         }
@@ -435,7 +435,7 @@ class MigrationCompacter
         try {
             return DB::table('migrations')->whereIn('migration', $migrationBasenames)->delete();
         } catch (\Throwable $e) {
-            $warnings[] = 'DB 清理失败:' . $e->getMessage() . '(文件已删,migrations 表残留孤儿 entry,可手动 DELETE)';
+            $warnings[] = 'DB 清理失败：' . $e->getMessage() . '（文件已删，migrations 表残留孤儿 entry，可手动 DELETE）';
 
             return 0;
         }

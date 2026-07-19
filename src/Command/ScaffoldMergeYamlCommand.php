@@ -50,7 +50,7 @@ class ScaffoldMergeYamlCommand extends Command
         $relative = $this->relativeToRoot($absolute, $repoRoot);
 
         if (! file_exists($absolute)) {
-            $this->error("文件不存在: {$absolute}");
+            $this->error("文件不存在：{$absolute}");
 
             return self::FAILURE;
         }
@@ -93,7 +93,7 @@ class ScaffoldMergeYamlCommand extends Command
 
         // plan-40 §三 R-1 横切补漏:跟全仓 LOCK_EX 一致
         file_put_contents($absolute, $dumped, LOCK_EX);
-        $this->info("已合并: {$relative}");
+        $this->info("已合并：{$relative}");
 
         return self::SUCCESS;
     }

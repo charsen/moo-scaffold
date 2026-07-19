@@ -169,7 +169,7 @@
                     @endphp
                     <tr>
                         <td>
-                            <input type="checkbox" class="checkbox" {{ ($v['require'] && $sendable ? 'checked' : '') }} {{ $sendable ? '' : 'disabled' }} aria-label="启用 Url 参数 {{ $v['name'] }}({{ $displayKey }})">
+                            <input type="checkbox" class="checkbox" {{ ($v['require'] && $sendable ? 'checked' : '') }} {{ $sendable ? '' : 'disabled' }} aria-label="启用 Url 参数 {{ $v['name'] }}（{{ $displayKey }}）">
                             <input type="hidden" class="cache-key" value="{{ $key }}">
                             <input type="hidden" class="send-key" value="{{ $sendKey }}">
                         </td>
@@ -238,7 +238,7 @@
                     @endphp
                     <tr>
                         <td>
-                            <input type="checkbox" class="checkbox" {{ ($v['require'] && $sendable ? 'checked' : '') }} {{ $sendable ? '' : 'disabled' }} aria-label="启用 Body 参数 {{ $v['name'] }}({{ $displayKey }})">
+                            <input type="checkbox" class="checkbox" {{ ($v['require'] && $sendable ? 'checked' : '') }} {{ $sendable ? '' : 'disabled' }} aria-label="启用 Body 参数 {{ $v['name'] }}（{{ $displayKey }}）">
                             <input type="hidden" class="cache-key" value="{{ $key }}">
                             <input type="hidden" class="send-key" value="{{ $sendKey }}">
                         </td>

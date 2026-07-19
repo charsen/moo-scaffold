@@ -97,7 +97,7 @@ class Command extends BaseCommand
      * plan-53:schema 选择带出身标注(`System〔moo-system 扩展包〕`),选了即定出身、无独立 host/pkg 问题;
      * $forApp 非 admin 时按上下文收窄 —— 包 schema 固定 admin,api 等语境下不列(天然无矛盾)。
      */
-    protected function chooseSchema(array $schemas, string $question = '选择 schema(模块)', ?string $forApp = null): string
+    protected function chooseSchema(array $schemas, string $question = '选择 schema（模块）', ?string $forApp = null): string
     {
         $labels = [];   // label => name(标注只进选项文本,返回值恒为纯 schema 名)
         foreach ($schemas as $name) {
@@ -185,7 +185,7 @@ class Command extends BaseCommand
      */
     protected function tipUseDesignerRename(string $next = '确认后再重跑'): void
     {
-        $this->console()->warn("检测到疑似改名(同表同时 add+drop)。CLI 无法接受改名提示,请到 /scaffold/db/designer 点「改名」{$next}。");
+        $this->console()->warn("检测到疑似改名（同表同时 add+drop）。CLI 无法接受改名提示，请到 /scaffold/db/designer 点「改名」{$next}。");
     }
 
     /**
@@ -200,7 +200,7 @@ class Command extends BaseCommand
             return;
         }
 
-        $this->console()->info('💡 路由契约测已就位,择机跑(补完真断言后更佳):');
+        $this->console()->info('💡 路由契约测已就位，择机跑（补完真断言后更佳）：');
         $this->line('   php artisan test ' . implode(' ', $dirs));
     }
 
@@ -225,13 +225,13 @@ class Command extends BaseCommand
         $valid  = array_values(array_column($models[$schema_name] ?? [], 'table_name'));
 
         if (in_array($table, $valid, true)) {
-            $this->console()->info("单表模式:本次只处理表 [{$table}](其它表跳过)");
+            $this->console()->info("单表模式：本次只处理表 [{$table}]（其它表跳过）");
 
             return true;
         }
 
         $this->console()->error("表 key \"{$table}\" 在 schema \"{$schema_name}\" 中不存在。");
-        $this->line('  可选表 key:' . ($valid === [] ? '(无)' : implode(', ', $valid)));
+        $this->line('  可选表 key：' . ($valid === [] ? '（无）' : implode(', ', $valid)));
 
         return false;
     }
@@ -269,15 +269,15 @@ class Command extends BaseCommand
         if ($table !== null && $table !== '') {
             $hit = $this->schemaOfTable($table);
             if ($hit !== null) {
-                $this->console()->info("已按表 [{$table}] 定位到 schema [{$hit}](无需再选模块)");
+                $this->console()->info("已按表 [{$table}] 定位到 schema [{$hit}]（无需再选模块）");
 
                 return $hit;
             }
-            $this->console()->error("找不到表 [{$table}] 所属的 schema —— 先跑 `moo:fresh`,或检查表名拼写。");
+            $this->console()->error("找不到表 [{$table}] 所属的 schema —— 先跑 `moo:fresh`，或检查表名拼写。");
 
             return '';
         }
 
-        return $this->chooseSchema($this->schemaNames(), '选择 schema(模块)', $forApp);
+        return $this->chooseSchema($this->schemaNames(), '选择 schema（模块）', $forApp);
     }
 }

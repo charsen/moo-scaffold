@@ -59,8 +59,8 @@
                 }
                 $('#left_container').html(result);
                 setResponsePane('body');
-                $('#header').html('等待响应头...');
-                $('#json_format').html('准备发送请求...');
+                $('#header').html('等待响应头……');
+                $('#json_format').html('准备发送请求……');
                 // 2026-05-23 user 反馈 bug:切换接口时上一接口的表单预览残留(DOM 内容 + tab 还在),
                 // 清掉 tab/main/output DOM + 内部 state(scaffoldClearFormPreview 由 api-request.js 暴露)
                 if (typeof window.scaffoldClearFormPreview === 'function') {
@@ -388,9 +388,9 @@
                 try { Process({ id: 'json_format', data: t.lastResponseJson }); }
                 catch (e) { $('#json_format').text('<re-render err>'); }
             } else {
-                $('#json_format').html('准备发送请求...');
+                $('#json_format').html('准备发送请求……');
             }
-            $('#header').text(t.lastHeaders || '等待响应头...');   // headersText 是纯文本,.text() 渲染且防注入
+            $('#header').text(t.lastHeaders || '等待响应头……');   // headersText 是纯文本,.text() 渲染且防注入
             // form preview state restore — 先清再按需重渲(tryRenderFormPreview);第二个参是该 tab
             // 切走前用户填的预览值,优先于响应默认还原(2026-06-09 修)。
             if (window.scaffoldClearFormPreview) window.scaffoldClearFormPreview();
@@ -422,8 +422,8 @@
             $('#result_method').html('...');
             $('#result_uri').html('发送请求后将在这里展示实际地址');
             $('#result_meta').attr('hidden', 'hidden');
-            $('#header').html('等待响应头...');
-            $('#json_format').html('准备发送请求...');
+            $('#header').html('等待响应头……');
+            $('#json_format').html('准备发送请求……');
             if (window.scaffoldClearFormPreview) window.scaffoldClearFormPreview();
         },
 

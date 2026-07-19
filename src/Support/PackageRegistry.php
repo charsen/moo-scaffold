@@ -71,13 +71,13 @@ final class PackageRegistry
             $psr4 = is_array($meta) ? (array) ($meta['autoload']['psr-4'] ?? []) : [];
             if ($name === '' || $psr4 === []) {
                 throw new InvalidArgumentException(
-                    "扩展包 [{$root}] 带 scaffold/database/ 但 composer.json 缺 name / autoload.psr-4 —— 改包补齐约定,不做兜底。"
+                    "扩展包 [{$root}] 带 scaffold/database/ 但 composer.json 缺 name / autoload.psr-4 —— 改包补齐约定，不做兜底。"
                 );
             }
 
             $key = str_contains($name, '/') ? substr($name, strrpos($name, '/') + 1) : $name;
             if (isset($out[$key])) {
-                throw new InvalidArgumentException("扩展包 key [{$key}] 重名:[{$out[$key]['name']}] 与 [{$name}]。");
+                throw new InvalidArgumentException("扩展包 key [{$key}] 重名：[{$out[$key]['name']}] 与 [{$name}]。");
             }
 
             $out[$key] = [

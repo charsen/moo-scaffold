@@ -100,7 +100,7 @@
                 <x-scaffold::icon name="warn" :size="14" />
                 <strong>{{ ($designer_is_prod ?? false) ? '生产环境' : (($designer_is_readonly ?? false) ? '只读模式' : (($designer_origin_readonly ?? false) ? '扩展包只读' : '无设计权限')) }}</strong>
                 <span>所有写操作已禁用 — 保存 / 加表 / 删表 / 改字段 / 生成 migration / 跑 migrate / 合并 migration / AI 翻译。</span>
-                <span class="p-designer-locked-banner__hint">{{ ($designer_is_prod ?? false) ? 'APP_ENV=production' : (($designer_is_readonly ?? false) ? 'SCAFFOLD_CONFIG_READONLY=true' : (($designer_origin_readonly ?? false) ? ($designer_origin ?? '') . ' 是 vendor 拷贝,软链(composer path 仓)安装后可编辑' : '需 admin 在「开发人员」授权设计数据库')) }}</span>
+                <span class="p-designer-locked-banner__hint">{{ ($designer_is_prod ?? false) ? 'APP_ENV=production' : (($designer_is_readonly ?? false) ? 'SCAFFOLD_CONFIG_READONLY=true' : (($designer_origin_readonly ?? false) ? ($designer_origin ?? '') . ' 是 vendor 拷贝，软链（composer path 仓）安装后可编辑' : '需 admin 在「开发人员」授权设计数据库')) }}</span>
             </div>
         @endif
         <div
@@ -138,7 +138,7 @@
                             {{-- plan-53:包 schema git 归属提醒 — 用户拍板(2026-07-03)从整行 banner 收进 breadcrumb 行内 chip --}}
                             <span class="p-designer-header__origin-chip" title="此 schema 属于扩展包 {{ $designer_origin }}（软链直写）—— 改动与生成物落在该包仓库，commit 请到 {{ $designer_origin }} 仓提交">
                                 <x-scaffold::icon name="package" :size="12" />
-                                {{ $designer_origin }} · 改动落包仓,commit 到该仓
+                                {{ $designer_origin }} · 改动落包仓，commit 到该仓
                             </span>
                         @endif
                     </div>
@@ -350,7 +350,7 @@
                             <button type="button" class="p-designer-card-block__hd-btn" x-on:click="openAddField">+ 加字段</button>
                             <button type="button" class="p-designer-card-block__hd-btn" x-on:click="openBatch"
                                 :title="batchDraftTitle">
-                                + 批量加 (AI)
+                                + 批量加（AI）
                                 <span x-show="hasBatchDraft" x-cloak class="p-designer-card-block__hd-btn-dot" aria-label="有未完成草稿"></span>
                             </button>
                             {{-- 2026-05-21:DeepSeek 一键字段拼写检查 — 标记疑似 typo,不纠正 --}}
@@ -1264,7 +1264,7 @@
                          git checkout 建议无效(文件没 commit 过)。改互斥显示 + missing banner 给正确恢复命令 --}}
                     <div class="p-designer-preview__banner p-designer-preview__banner--info"
                          x-show="preview.baseline_missing" x-cloak>
-                        ℹ️ 该模块尚未建立 baseline 快照(<code>scaffold/database/.snapshots/<span x-text="schema"></span>.yaml</code>)。
+                        ℹ️ 该模块尚未建立 baseline 快照（<code>scaffold/database/.snapshots/<span x-text="schema"></span>.yaml</code>）。
                         若 DB 已建过这些表（prod 已 run 过 migration），所有表会被拒 emit <code>create_table</code>。
                         请先跑 <code>php artisan moo:snapshot:init --schema=<span x-text="schema"></span></code> 用当前 yaml 锚定 baseline，
                         后续 diff 才能识别真实变更。全新 schema（DB 没建过）则首次 migrate 后 baseline 自动建立。

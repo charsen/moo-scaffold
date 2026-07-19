@@ -371,11 +371,11 @@
                 ['key' => 'changes', 'label' => '最近变更'],
             ]">
                 <div class="tabs__panel" data-tab-panel="history" style="padding:var(--space-3) 0;color:var(--text-body);">
-                    <p style="margin:0 0 var(--space-2);">最近 10 条变更...</p>
+                    <p style="margin:0 0 var(--space-2);">最近 10 条变更……</p>
                     <p style="margin:0;color:var(--text-desc);font-size:var(--font-sm);">这里通常是历史列表。</p>
                 </div>
                 <div class="tabs__panel" data-tab-panel="commands" style="padding:var(--space-3) 0;color:var(--text-body);">
-                    <p style="margin:0;">scaffold 命令引导：<code>php artisan scaffold:init</code> ...</p>
+                    <p style="margin:0;">scaffold 命令引导：<code>php artisan scaffold:init</code> ……</p>
                 </div>
                 <div class="tabs__panel" data-tab-panel="changes" style="padding:var(--space-3) 0;color:var(--text-body);">
                     <p style="margin:0;">近 7 天发布了 5 个新接口。</p>
@@ -501,9 +501,9 @@
         <div class="pv-row">
             <span class="pv-label">触发</span>
             <x-scaffold::btn variant="secondary" x-on:click="$dispatch('toast', { tone: 'success', message: '已保存成功' })">success</x-scaffold::btn>
-            <x-scaffold::btn variant="secondary" x-on:click="$dispatch('toast', { tone: 'info', title: '提示', message: '后台正在同步数据，请稍候...' })">info（含标题）</x-scaffold::btn>
+            <x-scaffold::btn variant="secondary" x-on:click="$dispatch('toast', { tone: 'info', title: '提示', message: '后台正在同步数据，请稍候……' })">info（含标题）</x-scaffold::btn>
             <x-scaffold::btn variant="secondary" x-on:click="$dispatch('toast', { tone: 'warning', message: '该接口已弃用，建议使用 v2 版本' })">warning</x-scaffold::btn>
-            <x-scaffold::btn variant="secondary" x-on:click="$dispatch('toast', { tone: 'danger', message: 'Network 503: 服务暂时不可用' })">danger</x-scaffold::btn>
+            <x-scaffold::btn variant="secondary" x-on:click="$dispatch('toast', { tone: 'danger', message: 'Network 503：服务暂时不可用' })">danger</x-scaffold::btn>
             <x-scaffold::btn variant="secondary" x-on:click="$dispatch('toast', { tone: 'neutral', message: '已复制到剪贴板', duration: 1500 })">neutral · 1.5s</x-scaffold::btn>
         </div>
 

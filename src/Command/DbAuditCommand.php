@@ -35,8 +35,8 @@ class DbAuditCommand extends Command
         $this->showTitle();
 
         if (! $auditor->isSupported()) {
-            $this->warn('无法对账:当前默认连接不是 mysql,或数据库不可达。');
-            $this->line('<fg=gray>(本命令依赖 mysql information_schema 反查实际表结构)</>');
+            $this->warn('无法对账：当前默认连接不是 mysql，或数据库不可达。');
+            $this->line('<fg=gray>（本命令依赖 mysql information_schema 反查实际表结构）</>');
 
             return self::SUCCESS;
         }
@@ -44,7 +44,7 @@ class DbAuditCommand extends Command
         $only    = (string) ($this->option('schema') ?? '');
         $schemas = $this->collectSchemas($only);
         if ($schemas === []) {
-            $this->warn($only !== '' ? "没找到 schema:{$only}" : '没找到任何 schema yaml 文件');
+            $this->warn($only !== '' ? "没找到 schema：{$only}" : '没找到任何 schema yaml 文件');
 
             return self::FAILURE;
         }
@@ -63,20 +63,20 @@ class DbAuditCommand extends Command
             $dirtySchemas++;
             $totalDrift += count($rows);
             $n = count($rows);
-            $this->line("  <fg=yellow>⚠ {$schema}</>  <fg=gray>({$n} 处漂移)</>");
+            $this->line("  <fg=yellow>⚠ {$schema}</>  <fg=gray>（{$n} 处漂移）</>");
             $this->printRows($rows);
         }
 
         $this->line('');
         if ($totalDrift === 0) {
-            $this->info('✓ 全部 ' . count($schemas) . ' 个 schema 的 yaml 与实际 DB 一致,无漂移。');
+            $this->info('✓ 全部 ' . count($schemas) . ' 个 schema 的 yaml 与实际 DB 一致，无漂移。');
 
             return self::SUCCESS;
         }
 
-        $this->warn("⚠ 发现 {$totalDrift} 处 yaml↔DB 漂移,涉及 {$dirtySchemas} 个 schema。");
-        $this->line('<fg=gray>  请按 DB 现状修正对应 yaml(designer 改或手改),改完可重跑本命令复核;</>');
-        $this->line('<fg=gray>  若 baseline 也需同步,再跑 moo:snapshot:init --schema=X --force。</>');
+        $this->warn("⚠ 发现 {$totalDrift} 处 yaml↔DB 漂移，涉及 {$dirtySchemas} 个 schema。");
+        $this->line('<fg=gray>  请按 DB 现状修正对应 yaml（designer 改或手改），改完可重跑本命令复核；</>');
+        $this->line('<fg=gray>  若 baseline 也需同步，再跑 moo:snapshot:init --schema=X --force。</>');
 
         return self::FAILURE;
     }

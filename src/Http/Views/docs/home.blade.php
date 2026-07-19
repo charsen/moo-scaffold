@@ -20,7 +20,7 @@
             @endif
             <span class="p-docs-home__bar-meta">
                 @if ($locked)
-                    <x-scaffold::badge tone="warning" size="sm" title="生产/只读模式,排序与编辑不可用">只读</x-scaffold::badge>
+                    <x-scaffold::badge tone="warning" size="sm" title="生产/只读模式，排序与编辑不可用">只读</x-scaffold::badge>
                 @endif
                 <strong>{{ number_format($total) }}</strong> 篇文档
             </span>

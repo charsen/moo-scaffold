@@ -811,7 +811,7 @@ class ApiController extends Controller
                 $data[$key]['value'] = 10;
             } elseif ($key === 'ids') {
                 $data[$key]['value'] = '2,3';
-                $data[$key]['desc']  = '用,分割为数组';
+                $data[$key]['desc']  = '使用半角逗号（,）分隔为数组';
             } elseif ($key === 'force') {
                 $data[$key]['require'] = false;
                 $data[$key]['name']    = in_array($actionName, ['destroy', 'destroyBatch']) ? '强制删除' : '强制';
@@ -821,7 +821,7 @@ class ApiController extends Controller
 
             // 数组-标量(父,有 field.* 标量子键)→ 可单发,提示按数组填(逗号分隔或 [..] JSON)
             if ($sendable && in_array('array', $attr, true) && in_array($key . '.*', $ruleKeys, true)) {
-                $data[$key]['desc'] = $this->appendParameterHint($data[$key]['desc'], '数组,逗号分隔或 JSON');
+                $data[$key]['desc'] = $this->appendParameterHint($data[$key]['desc'], '数组，逗号分隔或 JSON');
             }
 
             $latestModelId = $this->resolveLatestModelIdFromRules($attr);

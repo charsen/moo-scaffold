@@ -36,7 +36,7 @@
             <input
                 class="input input--sm"
                 type="search"
-                placeholder="搜索..."
+                placeholder="搜索……"
                 x-on:input.debounce.150ms="setQuery"
                 aria-label="过滤"
             >

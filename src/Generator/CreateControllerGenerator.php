@@ -65,7 +65,7 @@ class CreateControllerGenerator extends Generator
 
                 // 包 schema 固定 admin(包控制器挂 host admin 组,extra_modules 范式);其它 app 直接拒
                 if ($this->originCtx !== null && $app_folder !== 'admin') {
-                    $this->console()->error("扩展包 schema 的控制器固定 admin,不支持 app \"{$app_folder}\"(yaml controller.app 请改为 ['admin'])。");
+                    $this->console()->error("扩展包 schema 的控制器固定 admin，不支持 app \"{$app_folder}\"（yaml controller.app 请改为 ['admin']）。");
 
                     continue;
                 }
@@ -850,7 +850,7 @@ class CreateControllerGenerator extends Generator
             return;
         }
         if (! $this->filesystem->isFile($file)) {
-            $this->console()->error("路由文件不存在:{$file_relative}(跳过插入,请补 `// :insert_code_here:do_not_delete` 标记)");
+            $this->console()->error("路由文件不存在：{$file_relative}（跳过插入，请补 `// :insert_code_here:do_not_delete` 标记）");
 
             return;
         }
@@ -877,7 +877,7 @@ class CreateControllerGenerator extends Generator
 
         $insert_holder = '// :insert_code_here:do_not_delete';
         if (! str_contains($file_txt, $insert_holder)) {
-            $this->console()->error("路由文件缺插入标记:{$file_relative}(请加一行 `{$insert_holder}` 后重跑)");
+            $this->console()->error("路由文件缺插入标记：{$file_relative}（请加一行 `{$insert_holder}` 后重跑）");
 
             return;
         }

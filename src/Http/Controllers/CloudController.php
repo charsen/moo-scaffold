@@ -375,7 +375,7 @@ class CloudController extends Controller
     {
         $cfg = (array) config('moo-monitor.cloud', []);
         if (! ($cfg['enabled'] ?? false) || empty($cfg['base_url']) || empty($cfg['token'])) {
-            return $this->back($request, false, 'cloud 未启用(MOO_MONITOR_CLOUD_ENABLED)，或 MOO_MONITOR_CLOUD_TOKEN 未配置（URL 已有默认值）。');
+            return $this->back($request, false, 'cloud 未启用（MOO_MONITOR_CLOUD_ENABLED），或 MOO_MONITOR_CLOUD_TOKEN 未配置（URL 已有默认值）。');
         }
 
         $sync      = new CloudSync;
@@ -421,7 +421,7 @@ class CloudController extends Controller
 
         if ($skipped > 0 && $pushed === 0 && $recycled === 0) {
             // 两类都被分类型开关跳过时,原文案"已推送 0 条"像成功,实际一条没动
-            return $this->back($request, false, '推送被分类型开关跳过(MOO_MONITOR_CLOUD_PUSH_RUNTIMES / SLOW_SQL)，没有任何记录被推送。');
+            return $this->back($request, false, '推送被分类型开关跳过（MOO_MONITOR_CLOUD_PUSH_RUNTIMES / SLOW_SQL），没有任何记录被推送。');
         }
 
         // 推完即清首页云端汇总缓存,面板下次渲染立刻反映最新(否则要等 60s TTL)。

@@ -240,11 +240,11 @@ class CreateModelGenerator extends Generator
                 // 状态,等 user 在 designer 调 AI 翻译填。codegen 端拒生成,引导先 designer 翻译。
                 if (str_starts_with((string) $alias, '__pending_')) {
                     $zhHint = is_array($item) && isset($item[2]) ? (string) $item[2] : '';
-                    $zhPart = $zhHint !== '' ? "(中文标签:「{$zhHint}」)" : '';
+                    $zhPart = $zhHint !== '' ? "（中文标签：「{$zhHint}」）" : '';
                     throw new \RuntimeException(
                         "[{$model_name}] 模型枚举字段 [{$field_name}] 有未翻译的 key{$zhPart}。\n"
-                        . "→ 打开 /scaffold/db/designer,定位到该表 → 枚举区 → 「{$field_name}」组\n"
-                        . "→ 整组未译用顶部 [AI 翻译],单行重译用行尾 ↻ 按钮\n"
+                        . "→ 打开 /scaffold/db/designer，定位到该表 → 枚举区 → 「{$field_name}」组\n"
+                        . "→ 整组未译用顶部 [AI 翻译]，单行重译用行尾 ↻ 按钮\n"
                         . '→ 翻译完成后重跑 moo:model'
                     );
                 }
@@ -323,7 +323,7 @@ class CreateModelGenerator extends Generator
             // method 名要做 PHP identifier(不能含 quote);字符串字面量槽位走 escapePhpString。
             // 首 `_` 放行跟 SchemaLoader 对齐(实际 line 303 已 short-circuit _ 前缀字段)
             if (! preg_match('/^[a-z_][a-z0-9_]*$/', (string) $field_name)) {
-                $this->console()->warn("Filter 跳过非法字段名: {$field_name}");
+                $this->console()->warn("Filter 跳过非法字段名：{$field_name}");
 
                 continue;
             }
@@ -380,7 +380,7 @@ class CreateModelGenerator extends Generator
         foreach ($enums as $field_name => $config) {
             // plan-40 §二 C-6 防御纵深(同上,enum 字段也走同一道闸)
             if (! preg_match('/^[a-z_][a-z0-9_]*$/', (string) $field_name)) {
-                $this->console()->warn("Filter 跳过非法枚举字段名: {$field_name}");
+                $this->console()->warn("Filter 跳过非法枚举字段名：{$field_name}");
 
                 continue;
             }

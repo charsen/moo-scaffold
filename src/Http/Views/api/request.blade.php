@@ -175,11 +175,11 @@
             </div>
         </x-slot:hd>
         <div class="bd api-debug-response-pane is-active" data-pane="body">
-            <div class="json-block api-debug-response-body" id="json_format">发送请求后将在这里展示响应结果...</div>
+            <div class="json-block api-debug-response-body" id="json_format">发送请求后将在这里展示响应结果……</div>
         </div>
         <div class="bd api-debug-response-pane" data-pane="headers">
             <div class="json-block api-debug-response-headers" id="header">
-                等待请求返回...
+                等待请求返回……
             </div>
         </div>
         <div class="bd api-debug-response-pane api-debug-form-preview" data-pane="form-preview">

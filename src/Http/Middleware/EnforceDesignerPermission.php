@@ -45,7 +45,7 @@ class EnforceDesignerPermission
             return $next($request);
         }
 
-        $message = '无「设计数据库」权限,designer 当前只读;请联系 admin 在「开发人员」里授权。';
+        $message = '无「设计数据库」权限，designer 当前只读；请联系 admin 在「开发人员」里授权。';
         if ($request->ajax() || $request->expectsJson()) {
             return response()->json(['error' => $message], 403);
         }

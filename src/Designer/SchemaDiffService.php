@@ -422,7 +422,7 @@ class SchemaDiffService
                     $warnings[] = [
                         'level'     => 'medium',
                         'code'      => 'REVERSE_DEP_DROP',
-                        'msg'       => "字段 {$ch['field']} 仍被引用(请手动核对): {$hit}",
+                        'msg'       => "字段 {$ch['field']} 仍被引用（请手动核对）：{$hit}",
                         'dep_kind'  => $this->classifyDepHit($hit),
                         'dep_field' => (string) $ch['field'],
                         'dep_hit'   => $hit,
@@ -437,7 +437,7 @@ class SchemaDiffService
                     $warnings[] = [
                         'level'     => 'medium',
                         'code'      => 'REVERSE_DEP_RENAME',
-                        'msg'       => "原名 {$ch['from']} 仍被引用,改名后请手动同步: {$hit}",
+                        'msg'       => "原名 {$ch['from']} 仍被引用，改名后请手动同步：{$hit}",
                         'dep_kind'  => $this->classifyDepHit($hit),
                         'dep_field' => (string) $ch['from'],
                         'dep_hit'   => $hit,
@@ -683,7 +683,7 @@ class SchemaDiffService
                 'level' => 'high',
                 // 2026-05-21 fix:跟其他 warning 项统一用 'msg' 字段(frontend openPreview 取 w.msg)
                 //   原 'label' 漏对齐导致 baseline_drift warning 在 preview drawer 显空白
-                'msg' => "baseline 缺失但 DB 已存在表 {$tableKey},拒生成 create_table migration(会跟 prod 已 ran 冲突)。请手动恢复 .snapshots/{Schema}.yaml 的 {$tableKey} 段,或从 git 还原 snapshot。",
+                'msg' => "baseline 缺失但 DB 已存在表 {$tableKey}，拒生成 create_table migration（会跟 prod 已 ran 冲突）。请手动恢复 .snapshots/{Schema}.yaml 的 {$tableKey} 段，或从 git 还原 snapshot。",
             ]],
         ];
     }

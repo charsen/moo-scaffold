@@ -90,7 +90,7 @@
                 <x-scaffold::input
                     type="search"
                     id="route_search"
-                    placeholder="搜索路由：URI、控制器、方法名、接口名称..."
+                    placeholder="搜索路由：URI、控制器、方法名、接口名称……"
                     value="{{ $keyword }}"
                     autocomplete="off"
                     aria-label="搜索路由（URI、控制器、方法名、接口名称）"

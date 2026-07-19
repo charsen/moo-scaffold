@@ -66,7 +66,7 @@ class CreateMigrationCommand extends Command
         try {
             $diff = $diffService->diff($schema_name);
         } catch (SchemaLoadException $e) {
-            $this->console()->error("schema 加载失败:{$e->getMessage()}");
+            $this->console()->error("schema 加载失败：{$e->getMessage()}");
 
             return;
         }
@@ -75,13 +75,13 @@ class CreateMigrationCommand extends Command
         if ($only_table !== null) {
             $filtered = SchemaDiffService::filterToTable($diff, $only_table);
             if ($filtered === null) {
-                $this->console()->error("表 key \"{$only_table}\" 不在 schema \"{$schema_name}\" 的表集中(baseline 与 current 中都没有)。");
-                $this->line('  可选表 key:' . (($keys = array_keys($diff['tables'] ?? [])) === [] ? '(无)' : implode(', ', $keys)));
+                $this->console()->error("表 key \"{$only_table}\" 不在 schema \"{$schema_name}\" 的表集中（baseline 与 current 中都没有）。");
+                $this->line('  可选表 key：' . (($keys = array_keys($diff['tables'] ?? [])) === [] ? '（无）' : implode(', ', $keys)));
 
                 return;
             }
             $diff = $filtered;
-            $this->console()->info("单表模式:仅为表 [{$only_table}] 生成 migration");
+            $this->console()->info("单表模式：仅为表 [{$only_table}] 生成 migration");
         }
 
         // suspected_renames:CLI 没 GUI rename hint 流,提示用户走 Web UI 标改名
@@ -97,7 +97,7 @@ class CreateMigrationCommand extends Command
         try {
             $result = $writer->write($diff);
         } catch (EmptyDiffException $e) {
-            $this->console()->info('无变更,跳过生成 migration。');
+            $this->console()->info('无变更，跳过生成 migration。');
 
             return;
         }
@@ -109,7 +109,7 @@ class CreateMigrationCommand extends Command
         }
         // plan-39:GUI 不再 git commit,CLI 同样不自动 commit,提示用户手动
         $this->line('');
-        $this->line('<fg=gray>提示:scaffold 不会自动 git commit,请手动:</>');
+        $this->line('<fg=gray>提示：scaffold 不会自动 git commit，请手动：</>');
         $this->line('<fg=gray>  git add scaffold/database/' . $schema_name . '.yaml scaffold/database/.snapshots/' . $schema_name . '.yaml database/migrations/...</>');
         $this->line('<fg=gray>  git commit -m "scaffold: update ' . $schema_name . ' schema"</>');
 
