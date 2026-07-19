@@ -148,14 +148,14 @@ class CreateApiGenerator extends Generator
         }
 
         if ($this->syncNames) {
-            $this->console()->info('已用 docblock 同步以下接口名称(--sync-names):');
+            $this->console()->info('已用 docblock 同步以下接口名称（--sync-names）：');
             foreach ($diffs as $d) {
                 $this->console()->info("  · {$d['key']}: '{$d['old']}' → '{$d['new']}'");
             }
 
             return;
         }
-        $this->console()->warn('以下接口的 docblock 名称与 yaml 不一致(已保留 yaml;如需同步加 --sync-names):');
+        $this->console()->warn('以下接口的 docblock 名称与 yaml 不一致（已保留 yaml；如需同步加 --sync-names）：');
         foreach ($diffs as $d) {
             $this->console()->info("  · {$d['key']}: docblock '{$d['new']}' ≠ yaml '{$d['old']}'");
         }

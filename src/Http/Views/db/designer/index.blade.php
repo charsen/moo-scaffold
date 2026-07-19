@@ -82,7 +82,7 @@
                         <x-scaffold::icon :name="$group['origin'] === null ? 'database' : 'package'" :size="13" />
                         {{ $group['label'] }}
                         @if ($group['origin'] !== null)
-                            <span class="p-designer-grid__group-tag">扩展包{{ $group['writable'] ? ' · 软链直写' : ' · 只读(vendor 拷贝)' }}</span>
+                            <span class="p-designer-grid__group-tag">扩展包{{ $group['writable'] ? ' · 软链直写' : ' · 只读（vendor 拷贝）' }}</span>
                         @endif
                     </h4>
                 @endif

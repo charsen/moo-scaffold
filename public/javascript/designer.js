@@ -1089,7 +1089,7 @@ document.addEventListener('alpine:init', () => {
             if (!f || !f.can_remove) return;
             const ok = await window.scaffoldConfirm({
                 title: '删除字段',
-                message: '确认删除字段「' + f.key + '」?\n该字段及其所有 attrs / 索引绑定都会丢失。',
+                message: '确认删除字段「' + f.key + '」？\n该字段及其所有 attrs / 索引绑定都会丢失。',
                 confirmLabel: '删除',
                 danger: true,
             });
@@ -1184,7 +1184,7 @@ document.addEventListener('alpine:init', () => {
                     name: name,
                     desc: (this.newSchemaDesc || '').trim(),
                 });
-                this._toast('已创建 schema:' + key, 'success');
+                this._toast('已创建 schema：' + key, 'success');
                 this.cancelNewSchema();
                 setTimeout(() => { window.location.href = data.redirect_url; }, 600);
             } catch (e) {
@@ -1558,7 +1558,7 @@ document.addEventListener('alpine:init', () => {
             const label = (item && item.key) ? ('「' + item.key + '」') : '此项';
             const ok = await window.scaffoldConfirm({
                 title: '删除枚举项',
-                message: '确认删除' + label + '?',
+                message: '确认删除' + label + '？',
                 confirmLabel: '删除',
                 danger: true,
             });
@@ -1603,7 +1603,7 @@ document.addEventListener('alpine:init', () => {
             if (!field) return;
             const ok = await window.scaffoldConfirm({
                 title: '删除枚举组',
-                message: '确认删除枚举组「' + field + '」?\n该组所有 entries 都会丢失。',
+                message: '确认删除枚举组「' + field + '」？\n该组所有 entries 都会丢失。',
                 confirmLabel: '删除',
                 danger: true,
             });
@@ -1669,7 +1669,7 @@ document.addEventListener('alpine:init', () => {
             const name = this.multiIndexes[idx].name;
             const ok = await window.scaffoldConfirm({
                 title: '删除多字段索引',
-                message: '确认删除多字段索引「' + name + '」?',
+                message: '确认删除多字段索引「' + name + '」？',
                 confirmLabel: '删除',
                 danger: true,
             });
@@ -2027,7 +2027,7 @@ document.addEventListener('alpine:init', () => {
             if (!this.batchOpen) return;     // plan-37 后审 P1:visible 守护
             this.batchOpen = false;
         },
-        get batchDraftTitle() { return this.hasBatchDraft ? '上次有未完成的批量翻译草稿,点击恢复' : '批量从中文字段名生成 key(用 AI 翻译,需配 SCAFFOLD_AI_API_KEY)'; },
+        get batchDraftTitle() { return this.hasBatchDraft ? '上次有未完成的批量翻译草稿，点击恢复' : '批量从中文字段名生成 key（用 AI 翻译，需配 SCAFFOLD_AI_API_KEY）'; },
         // plan-35 B3:save 失败时给重试按钮用,Alpine CSP build 不能直接 === 比较
         get isSaveError() { return this.savingState === 'error'; },
         async translateAndAdd() {
@@ -2354,7 +2354,7 @@ document.addEventListener('alpine:init', () => {
                 }));
             } catch (e) {
                 if (e.code === 'SUSPECTED_RENAMES') {
-                    this._toast('可能存在改名，请用"改名"按钮明确标注后再生成', 'warning');
+            this._toast('可能存在改名，请用「改名」按钮明确标注后再生成', 'warning');
                 } else {
                     this._toast('preview 失败：' + (e.message || e.code), 'danger');
                 }

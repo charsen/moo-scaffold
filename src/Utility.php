@@ -374,7 +374,7 @@ class Utility
 
         $pkg = app(PackageRegistry::class)->get($target);
         if ($pkg === null) {
-            throw new InvalidArgumentException("未发现的扩展包:[{$target}](包根须带 scaffold/database/ 目录才会被自动发现)");
+            throw new InvalidArgumentException("未发现的扩展包：[{$target}]（包根须带 scaffold/database/ 目录才会被自动发现）");
         }
 
         $base = $pkg['base_path'];

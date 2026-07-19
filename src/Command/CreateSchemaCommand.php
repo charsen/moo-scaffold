@@ -52,7 +52,7 @@ class CreateSchemaCommand extends Command
         $force       = $this->isForced();
 
         if (str_contains($schema_name, '/')) {
-            $this->console()->error('暂不支持多级目录,请用单级名(如 System,不要 System/Sub)。');
+            $this->console()->error('暂不支持多级目录，请用单级名（如 System，不要 System/Sub）。');
 
             return;
         }

@@ -113,7 +113,7 @@ class CreateApiCommand extends Command
         $force     = $this->isForced();
         $staleMode = strtolower(trim((string) $this->option('stale')));
         if (! in_array($staleMode, ['keep', 'deprecate', 'delete'], true)) {
-            $this->console()->warn("--stale 选项无效 [{$staleMode}],回退为 [deprecate]。");
+            $this->console()->warn("--stale 选项无效 [{$staleMode}]，回退为 [deprecate]。");
             $staleMode = 'deprecate';
         }
         $syncNames = (bool) $this->option('sync-names');
@@ -184,7 +184,7 @@ class CreateApiCommand extends Command
             }
         }
 
-        $this->console()->info("完成:生成 {$done} 个 namespace,跳过 {$skipped} 个(无路由)");
+        $this->console()->info("完成：生成 {$done} 个 namespace，跳过 {$skipped} 个（无路由）");
 
         return $result;
     }

@@ -74,7 +74,7 @@ class CreateModelCommand extends Command
         // database/factories/{Folder}/ 落点不匹配,Laravel 工厂解析找不到 → db:seed 崩;包 model 也
         // 不进 host seeder(user 2026-07-05 拍板:包不需要 factory)。与 TS 同款 command 级 gate。
         if ($factory && $this->schemaOrigin($schema_name) !== null) {
-            $this->console()->info('moo:model -F:扩展包 schema 不生成 Factory(包不需要),跳过。');
+            $this->console()->info('moo:model -F：扩展包 schema 不生成 Factory（包不需要），跳过。');
             $factory = false;
         }
 
@@ -91,7 +91,7 @@ class CreateModelCommand extends Command
         if ($this->option('type-script') === null) {
             // plan-53:包 schema 跳过 TS(包无前端,与 moo:view 同款裁决 — 前端结合未设计,user 2026-07-03 拍板)
             if ($this->schemaOrigin($schema_name) !== null) {
-                $this->console()->info('moo:ts-model:扩展包 schema 无前端,跳过 TS Model 生成。');
+                $this->console()->info('moo:ts-model：扩展包 schema 无前端，跳过 TS Model 生成。');
             } else {
                 $this->tipCallCommand('moo:ts-model ' . $schema_name);
                 (new CreateTSModelGenerator($this, $this->filesystem, $this->utility))->start($schema_name, $force, $only_table);

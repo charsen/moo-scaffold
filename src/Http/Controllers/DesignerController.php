@@ -583,7 +583,7 @@ class DesignerController
                 }
             }
             if (! in_array($filename, $allowedFiles, true)) {
-                return $this->error('NOT_FOUND', "migration 不属于 schema {$schema}:{$filename}", 404);
+                return $this->error('NOT_FOUND', "migration 不属于 schema {$schema}：{$filename}", 404);
             }
         }
         // plan-53:按 schema 出身取 migration 目录(host / 扩展包)
@@ -718,12 +718,12 @@ class DesignerController
                 $migrationFile = $this->writer->writeRename($schema, $table, $data['new_key']);
                 // 迁 baseline:旧 key 在 current yaml 已不存在 → 从 snapshot 移除;新 key 吸入
                 $this->snapshot->captureTables($schema, [$table, $data['new_key']]);
-                $note = "已生成 rename migration:{$migrationFile}。跑 `php artisan migrate` 真改 DB 表名。";
+                $note = "已生成 rename migration：{$migrationFile}。跑 `php artisan migrate` 真改 DB 表名。";
             } catch (Throwable $e) {
                 Log::warning(
                     "renameTable auto-migration failed for {$schema}.{$table} → {$data['new_key']}: {$e->getMessage()}"
                 );
-                $note = '⚠ rename migration 自动生成失败 —— 请手写 Schema::rename 迁移并同步 snapshot,否则下次 diff 会把改名当删表+建表。';
+                $note = '⚠ rename migration 自动生成失败 —— 请手写 Schema::rename 迁移并同步 snapshot，否则下次 diff 会把改名当删表+建表。';
             }
         }
         $this->refreshSchemaCache($schema);

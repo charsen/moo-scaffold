@@ -77,7 +77,7 @@ class FreshStorageGenerator extends Generator
                 }
                 // schema 名跨源全局唯一(与 SchemaLoader::listSchemaFiles 同一条规则)
                 if (isset($seenSchemas[$file_name])) {
-                    throw new \InvalidArgumentException("schema 名跨源重名:[{$file_name}] 同时在 [" . ($seenSchemas[$file_name] ?? 'host') . '] 与 [' . ($origin ?? 'host') . '] —— schema 名全局唯一,请改名其一。');
+                    throw new \InvalidArgumentException("schema 名跨源重名：[{$file_name}] 同时在 [" . ($seenSchemas[$file_name] ?? 'host') . '] 与 [' . ($origin ?? 'host') . '] —— schema 名全局唯一，请改名其一。');
                 }
                 $seenSchemas[$file_name] = $origin;
 
@@ -136,7 +136,7 @@ class FreshStorageGenerator extends Generator
                     // table_name 键控,跨 schema(尤其跨源)同名表会静默 last-wins 覆盖 + origin 错挂 —
                     // 下游生成器取错字段/落错目录且无任何报错。与 schema 名重名同一待遇:直接抛。
                     if (isset($tables[$table_name])) {
-                        throw new \InvalidArgumentException("表名跨 schema 重复:[{$table_name}] 已在 [" . ($tables[$table_name]['origin'] ?? 'host') . '] 源定义,又出现于 [' . ($origin ?? 'host') . "] 的 {$file_name} —— 表名全局唯一,请改名其一。");
+                        throw new \InvalidArgumentException("表名跨 schema 重复：[{$table_name}] 已在 [" . ($tables[$table_name]['origin'] ?? 'host') . '] 源定义，又出现于 [' . ($origin ?? 'host') . "] 的 {$file_name} —— 表名全局唯一，请改名其一。");
                     }
 
                     // plan-51:formatFields 接受 index 块,反向派生 db_unique sugar
@@ -396,7 +396,7 @@ class FreshStorageGenerator extends Generator
             return ($nb <=> $na) ?: strcmp($a, $b);
         });
 
-        $lines = [count($conflicts) . ' 个同名字段在不同表里中文名不一致(按叫法数降序;生成缓存取字母序最后那张表的中文名;统一中文名或重命名列):'];
+        $lines = [count($conflicts) . ' 个同名字段在不同表里中文名不一致（按叫法数降序；生成缓存取字母序最后那张表的中文名；统一中文名或重命名列）：'];
         foreach ($conflicts as $field_name => $tableNames) {
             // 同一中文名归并它出现的表;叫法按使用的表数量降序,主流叫法在前
             $byName = [];
@@ -406,13 +406,13 @@ class FreshStorageGenerator extends Generator
             uasort($byName, static fn (array $x, array $y): int => count($y) <=> count($x));
 
             $lines[] = '';
-            $lines[] = '  ' . $field_name . ' (' . count($byName) . ' 种)';
+            $lines[] = '  ' . $field_name . '（' . count($byName) . ' 种）';
             foreach ($byName as $zh => $tables) {
                 // 表多时截断,避免主流叫法那行过长(要改的通常是少数派叫法,会完整列出)
                 $shown   = array_slice($tables, 0, 8);
                 $more    = count($tables) - count($shown);
-                $tail    = $more > 0 ? " …(+{$more})" : '';
-                $lines[] = '      ' . $zh . ': ' . implode(', ', $shown) . $tail;
+                $tail    = $more > 0 ? " …（+{$more}）" : '';
+                $lines[] = '      ' . $zh . '：' . implode(', ', $shown) . $tail;
             }
         }
 

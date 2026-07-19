@@ -108,7 +108,7 @@ class FreeCommand extends Command
         // plan-53 fail-fast:包 schema 固定 admin(交互路径已按 app 收窄列不出来;这里拦显式传参的矛盾组合)
         $schema_origin = $this->schemaOrigin($schema_name);
         if ($schema_origin !== null && $app !== 'admin') {
-            $this->console()->error("「{$schema_name}」是扩展包 [{$schema_origin}] 的 schema(固定 admin),不能用于 app 「{$app}」。");
+            $this->console()->error("「{$schema_name}」是扩展包 [{$schema_origin}] 的 schema（固定 admin），不能用于 app 「{$app}」。");
 
             return;
         }
@@ -130,7 +130,7 @@ class FreeCommand extends Command
         // moo:test 跟 i18n/auth 一样全量(不吃 -t;-t 只过滤 Model/Resource/Controller)。生成一次,-f 才覆盖。
         // plan-53:包 schema 暂不生成测试(测试脚手架路径/命名空间推导是 host 形态,包侧未设计)
         if ($schema_origin !== null) {
-            $this->console()->info('moo:test:扩展包 schema 暂不生成测试脚手架,跳过。');
+            $this->console()->info('moo:test：扩展包 schema 暂不生成测试脚手架，跳过。');
         } else {
             $this->tipCallCommand('moo:test');
             $test_gen = new CreateTestGenerator($this, $this->filesystem, $this->utility);
@@ -186,7 +186,7 @@ class FreeCommand extends Command
         try {
             $diff = $diffService->diff($schemaName);
         } catch (\Throwable $e) {
-            $this->console()->warn("migration 阶段:schema 加载失败 {$e->getMessage()},跳过");
+            $this->console()->warn("migration 阶段：schema 加载失败 {$e->getMessage()}，跳过");
 
             return 0;
         }
@@ -195,7 +195,7 @@ class FreeCommand extends Command
         if ($onlyTable !== null) {
             $filtered = SchemaDiffService::filterToTable($diff, $onlyTable);
             if ($filtered === null) {
-                $this->console()->warn("migration 阶段:表 [{$onlyTable}] 不在变更集,跳过");
+                $this->console()->warn("migration 阶段：表 [{$onlyTable}] 不在变更集，跳过");
 
                 return 0;
             }
@@ -203,7 +203,7 @@ class FreeCommand extends Command
         }
 
         if (! empty($diff['suspected_renames'])) {
-            $this->tipUseDesignerRename('确认后单独跑 moo:migration(本步已跳过)');
+            $this->tipUseDesignerRename('确认后单独跑 moo:migration（本步已跳过）');
 
             return 0;
         }
@@ -211,18 +211,18 @@ class FreeCommand extends Command
         try {
             $result = $writer->write($diff);
         } catch (EmptyDiffException) {
-            $this->console()->info('migration 阶段:无变更,跳过');
+            $this->console()->info('migration 阶段：无变更，跳过');
 
             return 0;
         } catch (\Throwable $e) {
-            $this->console()->warn("migration 阶段失败:{$e->getMessage()}");
+            $this->console()->warn("migration 阶段失败：{$e->getMessage()}");
 
             return 0;
         }
 
         $files = $result['files_written'] ?? [];
         if (count($files) === 0) {
-            $this->console()->info('migration 阶段:无文件生成');
+            $this->console()->info('migration 阶段：无文件生成');
 
             return 0;
         }
@@ -247,11 +247,11 @@ class FreeCommand extends Command
         $this->line("  <fg=black;bg=green;options=bold> ✓ moo:free </>  <options=bold>{$schema}</> → <options=bold>{$app}</>");
 
         if ($onlyTable !== null) {
-            $this->line('    单表 ' . $hi($onlyTable) . ' · model / resource / controller <fg=gray>(存在则跳过)</>');
+            $this->line('    单表 ' . $hi($onlyTable) . ' · model / resource / controller <fg=gray>（存在则跳过）</>');
         } else {
             $t = count($this->utility->getModels()[$schema] ?? []);
             $c = count($this->utility->getControllers(false)[$schema] ?? []);
-            $this->line('    ' . $hi($t) . ' model · ' . $hi($t) . ' resource · ' . $hi($c) . ' controller <fg=gray>(存在则跳过)</>');
+            $this->line('    ' . $hi($t) . ' model · ' . $hi($t) . ' resource · ' . $hi($c) . ' controller <fg=gray>（存在则跳过）</>');
         }
 
         $this->line('    i18n · auth 已更新 · migration 本次 <fg=green;options=bold>+' . $migrationCount . '</>' . ($api ? ' · API 文档已生成' : ''));

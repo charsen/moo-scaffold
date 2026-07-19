@@ -1225,7 +1225,7 @@
 
             $me.addClass("disabled").text("发送中");
             $body.html('<p class="requesting">Sending...</p>');
-            $("#header").html("等待响应头...");
+            $("#header").html("等待响应头……");
             $("#result_method").html(method);
             $("#result_uri").html(displayUri);
             $status.html("WAIT").attr("class", "status");
@@ -1513,7 +1513,7 @@
 
             var unmatched = Object.keys(data).filter(function (k) { return !consumedTop[k]; });
             var msg = "已应用 " + matched + " 项";
-            if (unmatched.length) msg += "（忽略 " + unmatched.length + " 个未匹配 key：" + unmatched.slice(0, 5).join(", ") + (unmatched.length > 5 ? "..." : "") + "）";
+            if (unmatched.length) msg += "（忽略 " + unmatched.length + " 个未匹配 key：" + unmatched.slice(0, 5).join(", ") + (unmatched.length > 5 ? "……" : "") + "）";
             $status.addClass(unmatched.length ? "is-err" : "is-ok").text(msg);
             return true;
         };

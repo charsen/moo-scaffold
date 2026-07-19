@@ -155,7 +155,7 @@ class MigrationWriter
                 return $this->relPath($migrationDir . '/' . $filename);
             }
         }
-        throw new \RuntimeException("无法创建 rename migration(撞名重试 60 次失败):{$oldKey} → {$newKey}");
+        throw new \RuntimeException("无法创建 rename migration（撞名重试 60 次失败）：{$oldKey} → {$newKey}");
     }
 
     // ---------------------------------------------------------------
@@ -582,7 +582,7 @@ class MigrationWriter
             $filename = $this->pickFilename($table, $status, $schema);
         }
         throw new \RuntimeException(
-            "无法 atomic 创建 migration 文件,撞名重试 {$maxRetry} 次失败:{$candidate}",
+            "无法 atomic 创建 migration 文件，撞名重试 {$maxRetry} 次失败：{$candidate}",
         );
     }
 
@@ -592,7 +592,7 @@ class MigrationWriter
             'created' => 'create',
             'updated' => 'update',
             'dropped' => 'drop',
-            default   => throw new \LogicException("非法 status: {$status}"),
+            default   => throw new \LogicException("非法 status：{$status}"),
         };
 
         // 2026-05-23:标准 Laravel migration 时间戳 Y_m_d_His(完整到秒,跟手写 migration

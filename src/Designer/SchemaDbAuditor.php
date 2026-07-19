@@ -106,7 +106,7 @@ class SchemaDbAuditor
             if (! isset($dbCols[$fieldName])) {
                 $rows[] = [
                     'table' => $tableKey, 'column' => $fieldName, 'kind' => 'missing-column',
-                    'yaml'  => (string) ($field['type'] ?? '?'), 'db' => '(列不存在)',
+                    'yaml'  => (string) ($field['type'] ?? '?'), 'db' => '（列不存在）',
                 ];
 
                 continue;

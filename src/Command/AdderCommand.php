@@ -92,7 +92,7 @@ class AdderCommand extends Command
         // extra_module 声明了但本机没发现软链包(如纯 vcs 环境)→ 明确拒绝,不 silent 落 host
         $origin = $this->resolveFolderOrigin($app, $folder);
         if ($origin === false) {
-            $this->console()->error("目录「{$folder}」来自 extra_modules,但本机未发现对应的软链扩展包 —— 无法增量(请在软链装该包的开发环境操作)。");
+            $this->console()->error("目录「{$folder}」来自 extra_modules，但本机未发现对应的软链扩展包 —— 无法增量（请在软链装该包的开发环境操作）。");
 
             return;
         }
@@ -108,10 +108,10 @@ class AdderCommand extends Command
             $controller     = $this->askPrompt('输入控制器名');
         }
 
-        $action_txt                    = $this->askPrompt('输入 action [request] [resource](空格分隔,后两项可留空)');
+        $action_txt                    = $this->askPrompt('输入 action [request] [resource]（空格分隔，后两项可留空）');
         [$action, $request, $resource] = $this->parseAction($action_txt);
         if ($action === '') {
-            $this->console()->warn('action 必填:至少输入一个 action 名(格式 action [request] [resource],空格分隔)。');
+            $this->console()->warn('action 必填：至少输入一个 action 名（格式 action [request] [resource]，空格分隔）。');
 
             return;
         }
@@ -121,7 +121,7 @@ class AdderCommand extends Command
             ->start($app, $folder, $controller, $new_controller, $action, $request, $resource, $origin);
 
         if ($make_controller) {
-            $route = $this->askPrompt('输入 method url(空格分隔;留空 = 不加路由)');
+            $route = $this->askPrompt('输入 method url（空格分隔；留空 = 不加路由）');
             if (! empty($route)) {
                 (new RouterAdder($this, $this->filesystem, $this->utility))->start($app, $make_controller, $route, $origin);
             } else {

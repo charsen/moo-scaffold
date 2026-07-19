@@ -278,8 +278,8 @@ PROMPT;
             // 用 Laravel log 记 full body 供 dev 排错,toast 只给 status code
             Log::warning("DeepSeek upstream {$resp->status()}: " . $resp->body());
             $status = $resp->status();
-            $hint   = $status === 429 ? '(限流,稍后重试)' : ($status >= 500 ? '(上游故障)' : '(请求被拒)');
-            throw new AiUpstreamErrorException("DeepSeek 返回 {$status} {$hint};详情见 Laravel log");
+            $hint   = $status === 429 ? '（限流，稍后重试）' : ($status >= 500 ? '（上游故障）' : '（请求被拒）');
+            throw new AiUpstreamErrorException("DeepSeek 返回 {$status} {$hint}；详情见 Laravel log");
         }
 
         $content = $resp->json('choices.0.message.content');
@@ -307,7 +307,7 @@ PROMPT;
             }
         }
         // plan-40 §四 B-5:JSON 不可解析也别 leak content 全文(可能含 prompt leak / 用户输入)
-        Log::warning('DeepSeek JSON 不可解析: ' . $content);
+        Log::warning('DeepSeek JSON 不可解析：' . $content);
         throw new AiUpstreamErrorException('DeepSeek 响应 JSON 不可解析；详情见 Laravel log');
     }
 
@@ -426,7 +426,7 @@ PROMPT;
             // 通用字段标记跳过整个 prefix 兜底分支
             if (! $isGeneric && $prefix !== '' && ! str_starts_with($output, $prefix . '_') && $output !== $prefix) {
                 if (str_contains($output, '_')) {
-                    $validated[] = ['input' => $input, 'output' => null, 'valid' => false, 'reason' => "AI 输出 {$output},未以 prefix {$prefix}_ 开头(检查表 prefix 是否拼写正确)"];
+                    $validated[] = ['input' => $input, 'output' => null, 'valid' => false, 'reason' => "AI 输出 {$output}，未以 prefix {$prefix}_ 开头（检查表 prefix 是否拼写正确）"];
 
                     continue;
                 }

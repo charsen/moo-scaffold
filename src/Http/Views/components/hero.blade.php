@@ -4,7 +4,7 @@
     用法:
         <x-scaffold::hero icon="file" title="接口文档">
             <x-slot:prefix><a class="scaffold-hero__back">← 返回</a></x-slot:prefix>
-            <x-slot:desc>读 scaffold/api/*.yaml 渲染的分层接口文档...</x-slot:desc>
+            <x-slot:desc>读 scaffold/api/*.yaml 渲染的分层接口文档……</x-slot:desc>
             <x-slot:badges><x-scaffold::badge tone="info">admin</x-scaffold::badge></x-slot:badges>
             <x-slot:meta>
                 <span>模块 <strong>14</strong></span>
