@@ -9,3 +9,5 @@
 - 包目录的 `vendor/` 独立于宿主且默认没装；跑 pint/pest 前先在包目录 `composer install`。
 - 本仓没有 phpstan/larastan 等静态类型检查；类型问题靠 Pest 测试 + 评审兜底，别去找不存在的配置。
 - e2e 一律用 `npm run test:e2e:safe`（结束自动回滚宿主 scaffold 数据）；裸 `test:e2e` 会把宿主数据跑脏。
+- Scaffold 自仓测试的 `vendor/charsen/moo-monitor-laravel` 可能是发布版而非相邻开发仓；涉及 Cloud 契约时必须临时用本地 Monitor 组合复跑，否则旧 `{ok,saved}` fake 会给出假绿。手动 Cloud push 的 partial 结果要先累计已确认/已隔离数量，再判断 `ok`，并使 summary 缓存失效。
+- `CloudSync::sync()` 返回 `skipped=true` 时，`reason` 是用户可见契约；控制器必须透传真实原因（例如同类型同步锁竞争），不能统一误报为分类型开关关闭。

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.4
+
+- Cloud 手动推送页面适配 Monitor 逐条确认契约：即使批次仍有待重试记录，也会如实累计并展示已确认、已隔离和本地回收数量，不再把 partial success 误报成整批失败。
+- `CloudSync::sync()` 的真实 skipped reason 会透传到页面；分类型关闭、同类型同步锁竞争等原因不再统一误报为配置关闭或“已确认 0 条”。
+- 只要本轮产生逐条确认或隔离结果，就立即失效首页 Cloud summary 缓存，避免页面继续展示旧状态。
+- 最低 `moo-monitor-laravel` 版本提升到 `^0.1.12`，锁定 partial ack、同步锁、open 累计锚点和 MCP 分页契约。
+- 与正式发布的 Monitor `v0.1.12` 组合回归通过：631 passed / 2042 assertions，3 skipped。
+
 ## 2.1.3
 
 - B-01 方案 B：新增 `Contracts\OperatorResolver` + 默认 `Support\GuardOperatorResolver`（auth()->id()，未登录 null），开出 host 操作人身份注入缝。

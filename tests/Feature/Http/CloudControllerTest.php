@@ -3,8 +3,10 @@
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Support\Facades\Http;
 use Mooeen\Monitor\Cloud\CloudClient;
+use Mooeen\Monitor\Cloud\CloudSync;
 use Mooeen\Monitor\Recorder\RuntimeErrorRecorder;
 use Mooeen\Monitor\Recorder\SqlSlowRecorder;
+use Mooeen\Scaffold\Http\Controllers\ScaffoldController;
 use Mooeen\Scaffold\Http\Middleware\EnforceScaffoldWritable;
 use Mooeen\Scaffold\Http\Middleware\ScaffoldAuthenticate;
 
@@ -12,8 +14,8 @@ use Mooeen\Scaffold\Http\Middleware\ScaffoldAuthenticate;
  * S-Cloud 页(/scaffold/cloud)回归锁(2026-06-10 三修):
  *   1. 手动推送也打心跳 —— 原先只有 moo:cloud:push 命令打,scheduler 没跑、全靠
  *      手动推送的 host 被云端「推送中断」哨兵长期误报。
- *   2. 推送反馈不失真 —— 部分成功(runtimes 推完 slow_sql 失败)不再报成整体失败;
- *      分类型开关全跳过时不再显示"已推送 0 条"假成功。
+ *   2. 推送反馈不失真 —— 跨类型或单批逐条 partial 都保留已确认 / 已隔离事实;
+ *      分类型开关全跳过时不再显示「已确认 0 条」假成功。
  *   3. open 空但 resolved 桶有待推时,缓冲卡不再谎报"缓冲为空"(推送推 open+resolved 两桶)。
  *
  * 采集/推送链路来自 moo-monitor-laravel(Mooeen\Monitor),数据缓冲在
@@ -70,7 +72,7 @@ function cloudCtrl_rrmdir(string $dir): void
 }
 
 it('手动推送也打心跳(原先只有调度命令打 → 纯手动推送的 host 被哨兵误报中断)', function () {
-    Http::fake(['*' => Http::response(['ok' => true, 'saved' => 1])]);
+    Http::fake(['*' => Http::response(['ok' => true, 'saved' => 1, 'filtered' => 0, 'skipped' => 0])]);
 
     app(RuntimeErrorRecorder::class)->record(new RuntimeException('boom'));
 
@@ -83,7 +85,7 @@ it('手动推送也打心跳(原先只有调度命令打 → 纯手动推送的 
 
 it('部分成功不报整体失败:runtimes 推完后 slow_sql 失败 → 消息带上已推计数与失败归属', function () {
     Http::fake([
-        'cloud.test/' . CloudClient::PATH_RUNTIMES     => Http::response(['ok' => true, 'saved' => 1]),
+        'cloud.test/' . CloudClient::PATH_RUNTIMES     => Http::response(['ok' => true, 'saved' => 1, 'filtered' => 0, 'skipped' => 0]),
         'cloud.test/' . CloudClient::PATH_SLOW_QUERIES => Http::response(['ok' => false, 'error' => '云端炸了'], 200),
         'cloud.test/' . CloudClient::PATH_HEARTBEAT    => Http::response(['ok' => true]),
     ]);
@@ -96,19 +98,80 @@ it('部分成功不报整体失败:runtimes 推完后 slow_sql 失败 → 消息
     $r->assertSessionHas('flash_error');
 
     $msg = (string) session('flash_error');
-    expect($msg)->toContain('已推送 1 条');       // bug 版本:只有"推送失败:云端炸了",已推事实全丢
+    expect($msg)->toContain('已确认 1 条');       // bug 版本:只有"推送失败:云端炸了",已确认事实全丢
     expect($msg)->toContain('慢 SQL');            // 失败归属到具体类型
     expect($msg)->toContain('云端炸了');
 });
 
-it('分类型开关全关 → 明确提示"被跳过",不再显示"已推送 0 条"假成功', function () {
+it('同批逐条 partial：已确认项不因 retryable skipped 被 UI 隐瞒，且 summary 缓存失效', function () {
+    Http::fake(['*' => Http::response(['ok' => true])]);
+    $sync = Mockery::mock(CloudSync::class);
+    $sync->shouldReceive('types')->once()->andReturn(['runtimes']);
+    $sync->shouldReceive('sync')->once()->with('runtimes', false, false)->andReturn([
+        'skipped'  => false,
+        'ok'       => false,
+        'error'    => '1 条记录等待重试；其余记录已确认，不会重复上报',
+        'pushed'   => 1,
+        'rejected' => 0,
+    ]);
+    app()->instance(CloudSync::class, $sync);
+    cache()->put(ScaffoldController::CLOUD_SUMMARY_CACHE_KEY, ['stale' => true], 60);
+
+    $this->post('/scaffold/cloud/push')->assertRedirect()->assertSessionHas('flash_error');
+
+    $msg = (string) session('flash_error');
+    expect($msg)->toContain('已确认 1 条')
+        ->and($msg)->toContain('运行时错误 推送未完成')
+        ->and($msg)->toContain('1 条记录等待重试')
+        ->and(cache()->has(ScaffoldController::CLOUD_SUMMARY_CACHE_KEY))->toBeFalse();
+});
+
+it('永久 skipped 的隔离数量进入成功反馈', function () {
+    Http::fake(['*' => Http::response(['ok' => true])]);
+    $sync = Mockery::mock(CloudSync::class);
+    $sync->shouldReceive('types')->once()->andReturn(['runtimes']);
+    $sync->shouldReceive('sync')->once()->with('runtimes', false, false)->andReturn([
+        'skipped'  => false,
+        'ok'       => true,
+        'error'    => null,
+        'pushed'   => 1,
+        'rejected' => 1,
+    ]);
+    $sync->shouldReceive('pruneLocal')->once()->andReturn(['purged' => 0, 'prunedOpen' => 0]);
+    app()->instance(CloudSync::class, $sync);
+
+    $this->post('/scaffold/cloud/push')->assertRedirect()->assertSessionHas('flash_message');
+
+    $msg = (string) session('flash_message');
+    expect($msg)->toContain('已确认 1 条')
+        ->and($msg)->toContain('已隔离 1 条');
+});
+
+it('分类型开关全关 → 明确提示「被跳过」，不再显示「已确认 0 条」假成功', function () {
     Http::fake(['*' => Http::response(['ok' => true])]);
     config(['moo-monitor.cloud.push.runtimes' => false, 'moo-monitor.cloud.push.slow_sql' => false]);
 
     $r = $this->post('/scaffold/cloud/push');
     $r->assertRedirect();
     $r->assertSessionHas('flash_error');
-    expect((string) session('flash_error'))->toContain('分类型开关');
+    expect((string) session('flash_error'))->toContain('运行时错误：runtimes 推送已关闭')
+        ->and((string) session('flash_error'))->toContain('慢 SQL：slow_sql 推送已关闭');
+});
+
+it('同类型同步锁被占用时，手动推送显示真实原因而非误报配置关闭', function () {
+    Http::fake(['*' => Http::response(['ok' => true])]);
+    $sync = Mockery::mock(CloudSync::class);
+    $sync->shouldReceive('types')->once()->andReturn(['runtimes']);
+    $sync->shouldReceive('sync')->once()->with('runtimes', false, false)->andReturn([
+        'skipped' => true,
+        'reason'  => 'runtimes 同类型推送正在执行',
+    ]);
+    app()->instance(CloudSync::class, $sync);
+
+    $this->post('/scaffold/cloud/push')->assertRedirect()->assertSessionHas('flash_error');
+
+    expect((string) session('flash_error'))->toContain('运行时错误：runtimes 同类型推送正在执行')
+        ->and((string) session('flash_error'))->not->toContain('分类型开关');
 });
 
 it('open 空但 resolved 桶有待推 → 缓冲卡显示待推,不谎报"缓冲为空"', function () {
