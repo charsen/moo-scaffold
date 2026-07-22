@@ -31,6 +31,7 @@ class CloudController extends Controller
         Filesystem $filesystem,
         private readonly RuntimeErrorRecorder $runtimeRecorder,
         private readonly SqlSlowRecorder $sqlSlowRecorder,
+        private readonly CloudSync $cloudSync,
     ) {
         parent::__construct($utility, $filesystem);
     }
@@ -44,7 +45,7 @@ class CloudController extends Controller
 
         $configured = $enabled && $baseUrl !== '' && $token !== '';
 
-        $sync    = new CloudSync;
+        $sync    = $this->cloudSync;
         $cursors = $sync->cursors();
 
         // 本地两类缓冲:计数(按桶 glob)+ 上次同步游标
@@ -378,12 +379,14 @@ class CloudController extends Controller
             return $this->back($request, false, 'cloud 未启用（MOO_MONITOR_CLOUD_ENABLED），或 MOO_MONITOR_CLOUD_TOKEN 未配置（URL 已有默认值）。');
         }
 
-        $sync      = new CloudSync;
+        $sync      = $this->cloudSync;
         $retention = (int) ($cfg['local_retention_days'] ?? 7);
         $labels    = ['runtimes' => '运行时错误', 'slow_sql' => '慢 SQL'];
-        $pushed    = 0;
+        $confirmed = 0;
+        $rejected  = 0;
         $recycled  = 0;
         $skipped   = 0;
+        $skipNotes = [];
         $failed    = null;
         $failedAt  = null;
 
@@ -391,15 +394,19 @@ class CloudController extends Controller
             $r = $sync->sync($type, all: false, dryRun: false);
             if ($r['skipped']) {
                 $skipped++;
+                $skipNotes[] = ($labels[$type] ?? $type) . '：' . ((string) ($r['reason'] ?? '') ?: '已跳过');
 
                 continue;
             }
+            // CloudSync 的 partial 结果即使 ok=false，也可能已经逐条确认或隔离了部分记录。
+            // 必须先累计事实再判断整体结果，否则 UI 会让用户误以为本轮一条都没处理。
+            $confirmed += (int) $r['pushed'];
+            $rejected  += (int) ($r['rejected'] ?? 0); // 兼容尚未提供逐条隔离计数的旧 Monitor。
             if (! $r['ok']) {
                 $failed   = $r['error'];
                 $failedAt = $labels[$type] ?? $type;
                 break;
             }
-            $pushed += (int) $r['pushed'];
 
             // 推送成功后回收本地(临时缓冲);失败即停,不回收未确认上云的。
             $p = $sync->pruneLocal($type, $retention);
@@ -411,27 +418,38 @@ class CloudController extends Controller
         // 常态)天天在推却被云端误报"推送中断"(2026-06-10 修)。best-effort,不影响结果。
         (new \Mooeen\Monitor\Cloud\CloudClient($cfg))->heartbeat();
 
-        if ($failed !== null) {
-            // 部分成功的事实不能丢:runtimes 已推完才在 slow_sql 失败时,原文案"推送失败"
-            // 让用户以为整体没推(2026-06-10 修)
-            $prefix = $pushed > 0 ? "已推送 {$pushed} 条" . ($recycled > 0 ? " · 本地回收 {$recycled} 条" : '') . '；' : '';
-
-            return $this->back($request, false, "{$prefix}{$failedAt} 推送失败：{$failed}");
-        }
-
-        if ($skipped > 0 && $pushed === 0 && $recycled === 0) {
-            // 两类都被分类型开关跳过时,原文案"已推送 0 条"像成功,实际一条没动
-            return $this->back($request, false, '推送被分类型开关跳过（MOO_MONITOR_CLOUD_PUSH_RUNTIMES / SLOW_SQL），没有任何记录被推送。');
-        }
-
-        // 推完即清首页云端汇总缓存,面板下次渲染立刻反映最新(否则要等 60s TTL)。
+        // 逐条 partial 也会改变云端数据；不能因整体仍有待重试项就保留旧 summary 60 秒。
         try {
             cache()->forget(ScaffoldController::CLOUD_SUMMARY_CACHE_KEY);
         } catch (\Throwable) {
             // 缓存不可用不影响推送结果
         }
 
-        $msg = "已推送 {$pushed} 条" . ($recycled > 0 ? " · 本地回收 {$recycled} 条" : '');
+        $progress = [];
+        if ($confirmed > 0) {
+            $progress[] = "已确认 {$confirmed} 条";
+        }
+        if ($rejected > 0) {
+            $progress[] = "已隔离 {$rejected} 条";
+        }
+        if ($recycled > 0) {
+            $progress[] = "本地回收 {$recycled} 条";
+        }
+
+        if ($failed !== null) {
+            // 部分完成事实不能丢：既包括前一类型完整成功，也包括当前类型逐条确认 / 隔离后仍有待重试项。
+            $prefix = $progress !== [] ? implode(' · ', $progress) . '；' : '';
+
+            return $this->back($request, false, "{$prefix}{$failedAt} 推送未完成：{$failed}");
+        }
+
+        if ($skipped > 0 && $confirmed === 0 && $rejected === 0 && $recycled === 0) {
+            // 分类型开关、同类型任务正在执行等跳过原因必须原样反馈；不能统一伪装成配置关闭，
+            // 也不能显示「已确认 0 条」假成功。
+            return $this->back($request, false, '推送未执行：' . implode('；', $skipNotes) . '。');
+        }
+
+        $msg = $progress !== [] ? implode(' · ', $progress) : '已确认 0 条';
 
         return $this->back($request, true, $msg);
     }
