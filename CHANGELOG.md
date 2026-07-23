@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.6
+
+- 新增 `Support\OperatorContext` 队列显式操作人上下文（`runAs()` / `current()` / `clear()`）：`Concerns\HasOperator` 优先消费上下文中显式设定的操作人，未设置时回落原 `OperatorResolver` 解析——无 context 时行为逐字节不变，向后兼容。
+- 新增 `Support\OperatorId::normalize()` 共享哨兵归一：无效操作人哨兵（`null` / 空串 / `0` / `'0'` / 全零串）统一归一为 `null`，其余原样透传；收敛 trail / attachment / radar 三包各自一份的哨兵判断口径，各包在其上保留自有额外处置（trail 的 `positiveId` 正数收紧、attachment / radar 的 `AuthenticationException`）。
+
 ## 2.1.5
 
 - Cloud 手动推送按类型独立执行；某一类出现 partial ack 或待重试记录时，仍继续尝试另一类，最后统一汇总已确认、已隔离和失败事实。
