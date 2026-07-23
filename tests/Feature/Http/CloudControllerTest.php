@@ -126,6 +126,38 @@ it('同批逐条 partial：已确认项不因 retryable skipped 被 UI 隐瞒，
         ->and(cache()->has(ScaffoldController::CLOUD_SUMMARY_CACHE_KEY))->toBeFalse();
 });
 
+it('运行时错误 partial 不阻断后续慢 SQL，跨类型分别完成后统一反馈', function () {
+    Http::fake(['*' => Http::response(['ok' => true])]);
+    $sync = Mockery::mock(CloudSync::class);
+    $sync->shouldReceive('types')->once()->andReturn(['runtimes', 'slow_sql']);
+    $sync->shouldReceive('sync')->once()->with('runtimes', false, false)->andReturn([
+        'skipped'  => false,
+        'ok'       => false,
+        'error'    => '1 条记录等待重试；其余记录已确认，不会重复上报',
+        'pushed'   => 1,
+        'rejected' => 0,
+    ]);
+    $sync->shouldReceive('sync')->once()->with('slow_sql', false, false)->andReturn([
+        'skipped'  => false,
+        'ok'       => true,
+        'error'    => null,
+        'pushed'   => 2,
+        'rejected' => 0,
+    ]);
+    $sync->shouldReceive('pruneLocal')->once()->with('slow_sql', Mockery::type('int'))->andReturn([
+        'purged'     => 0,
+        'prunedOpen' => 0,
+    ]);
+    app()->instance(CloudSync::class, $sync);
+
+    $this->post('/scaffold/cloud/push')->assertRedirect()->assertSessionHas('flash_error');
+
+    expect((string) session('flash_error'))
+        ->toContain('已确认 3 条')
+        ->and((string) session('flash_error'))->toContain('运行时错误 推送未完成')
+        ->and((string) session('flash_error'))->not->toContain('慢 SQL 推送未完成');
+});
+
 it('永久 skipped 的隔离数量进入成功反馈', function () {
     Http::fake(['*' => Http::response(['ok' => true])]);
     $sync = Mockery::mock(CloudSync::class);
@@ -150,12 +182,14 @@ it('永久 skipped 的隔离数量进入成功反馈', function () {
 it('分类型开关全关 → 明确提示「被跳过」，不再显示「已确认 0 条」假成功', function () {
     Http::fake(['*' => Http::response(['ok' => true])]);
     config(['moo-monitor.cloud.push.runtimes' => false, 'moo-monitor.cloud.push.slow_sql' => false]);
+    cache()->put(ScaffoldController::CLOUD_SUMMARY_CACHE_KEY, ['stable' => true], 60);
 
     $r = $this->post('/scaffold/cloud/push');
     $r->assertRedirect();
     $r->assertSessionHas('flash_error');
     expect((string) session('flash_error'))->toContain('运行时错误：runtimes 推送已关闭')
-        ->and((string) session('flash_error'))->toContain('慢 SQL：slow_sql 推送已关闭');
+        ->and((string) session('flash_error'))->toContain('慢 SQL：slow_sql 推送已关闭')
+        ->and(cache()->has(ScaffoldController::CLOUD_SUMMARY_CACHE_KEY))->toBeTrue();
 });
 
 it('同类型同步锁被占用时，手动推送显示真实原因而非误报配置关闭', function () {
