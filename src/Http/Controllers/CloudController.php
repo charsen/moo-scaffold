@@ -387,8 +387,7 @@ class CloudController extends Controller
         $recycled  = 0;
         $skipped   = 0;
         $skipNotes = [];
-        $failed    = null;
-        $failedAt  = null;
+        $failures  = [];
 
         foreach ($sync->types() as $type) {
             $r = $sync->sync($type, all: false, dryRun: false);
@@ -403,12 +402,14 @@ class CloudController extends Controller
             $confirmed += (int) $r['pushed'];
             $rejected  += (int) ($r['rejected'] ?? 0); // 兼容尚未提供逐条隔离计数的旧 Monitor。
             if (! $r['ok']) {
-                $failed   = $r['error'];
-                $failedAt = $labels[$type] ?? $type;
-                break;
+                $label      = $labels[$type] ?? $type;
+                $failures[] = "{$label} 推送未完成：{$r['error']}";
+
+                // 各类型有独立游标、确认水位与同步锁；一类存在待重试项，不应阻断另一类完成上报。
+                continue;
             }
 
-            // 推送成功后回收本地(临时缓冲);失败即停,不回收未确认上云的。
+            // 仅该类型完整成功后回收本地；失败类型不回收，但不影响下一类型继续尝试。
             $p = $sync->pruneLocal($type, $retention);
             $recycled += $p['purged'] + $p['prunedOpen'];
         }
@@ -418,11 +419,13 @@ class CloudController extends Controller
         // 常态)天天在推却被云端误报"推送中断"(2026-06-10 修)。best-effort,不影响结果。
         (new \Mooeen\Monitor\Cloud\CloudClient($cfg))->heartbeat();
 
-        // 逐条 partial 也会改变云端数据；不能因整体仍有待重试项就保留旧 summary 60 秒。
-        try {
-            cache()->forget(ScaffoldController::CLOUD_SUMMARY_CACHE_KEY);
-        } catch (\Throwable) {
-            // 缓存不可用不影响推送结果
+        // 逐条 partial 也会改变云端数据；但全跳过 / 无变化时无需制造一次额外 summary 回源。
+        if ($confirmed > 0 || $rejected > 0 || $recycled > 0) {
+            try {
+                cache()->forget(ScaffoldController::CLOUD_SUMMARY_CACHE_KEY);
+            } catch (\Throwable) {
+                // 缓存不可用不影响推送结果
+            }
         }
 
         $progress = [];
@@ -436,11 +439,11 @@ class CloudController extends Controller
             $progress[] = "本地回收 {$recycled} 条";
         }
 
-        if ($failed !== null) {
-            // 部分完成事实不能丢：既包括前一类型完整成功，也包括当前类型逐条确认 / 隔离后仍有待重试项。
+        if ($failures !== []) {
+            // 部分完成事实不能丢；各类型独立尝试后，再统一列出仍待重试的类型。
             $prefix = $progress !== [] ? implode(' · ', $progress) . '；' : '';
 
-            return $this->back($request, false, "{$prefix}{$failedAt} 推送未完成：{$failed}");
+            return $this->back($request, false, $prefix . implode('；', $failures));
         }
 
         if ($skipped > 0 && $confirmed === 0 && $rejected === 0 && $recycled === 0) {
