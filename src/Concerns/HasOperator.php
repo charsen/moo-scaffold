@@ -3,6 +3,7 @@
 namespace Mooeen\Scaffold\Concerns;
 
 use Mooeen\Scaffold\Contracts\OperatorResolver;
+use Mooeen\Scaffold\Support\OperatorContext;
 
 /**
  * 自动填充 creator_id / updater_id。
@@ -15,7 +16,7 @@ trait HasOperator
     {
         static::creating(function ($model): void {
             $fillable   = $model->getFillable();
-            $operatorId = app(OperatorResolver::class)->id();
+            $operatorId = OperatorContext::current() ?? app(OperatorResolver::class)->id();
 
             if (in_array('creator_id', $fillable, true)) {
                 $model->creator_id = $operatorId;
@@ -28,7 +29,7 @@ trait HasOperator
 
         static::updating(function ($model): void {
             if (in_array('updater_id', $model->getFillable(), true)) {
-                $model->updater_id = app(OperatorResolver::class)->id();
+                $model->updater_id = OperatorContext::current() ?? app(OperatorResolver::class)->id();
             }
         });
     }
