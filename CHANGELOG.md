@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.5
+
+- Cloud 手动推送按类型独立执行；某一类出现 partial ack 或待重试记录时，仍继续尝试另一类，最后统一汇总已确认、已隔离和失败事实。
+- 最低 `moo-monitor-laravel` 版本提升到 `^0.1.13`，锁定同一 Host 多 `.env.XXX` 项目的 YAML、cursor、partial ack、同步锁、回收范围与自动 scheduler 环境隔离。
+
 ## 2.1.4
 
 - Cloud 手动推送页面适配 Monitor 逐条确认契约：即使批次仍有待重试记录，也会如实累计并展示已确认、已隔离和本地回收数量，不再把 partial success 误报成整批失败。

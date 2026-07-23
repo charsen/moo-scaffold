@@ -29,7 +29,7 @@
   "require": {
     "php": "^8.2",
     "laravel/framework": "^10.0 || ^11.0 || ^12.0",
-    "charsen/moo-monitor-laravel": "^0.1.12",
+    "charsen/moo-monitor-laravel": "^0.1.13",
     "brick/varexporter": "^0.7.0",
     "symfony/yaml": "^7.0",
     "fakerphp/faker": "^1.23",
