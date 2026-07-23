@@ -15,6 +15,37 @@
     var $slug    = $('#doc_slug');
     var $preview = $('#doc_preview');
 
+    // ---------- 字号 A− / A+（与阅读页共用 localStorage 键,跨页/刷新记住;同时缩放源码框 + 预览）----------
+    // 放在 locked-return 之前:即便生产只读(按钮被 SCSS 禁点),存过的字号也先套到预览上。
+    (function wireEditorFontSize() {
+        var textarea = $content[0], preview = $preview[0];
+        var dec = document.getElementById('doc_edit_font_dec');
+        var inc = document.getElementById('doc_edit_font_inc');
+        if (!textarea || !preview || !dec || !inc) return;
+        var KEY = 'scaffold_docs_font_scale';   // 与阅读页(docs-center.js wireFontSize)同一键
+        var MIN = 0.85, MAX = 1.6, STEP = 0.1;
+        function clamp(v) { return Math.min(MAX, Math.max(MIN, Math.round(v * 10) / 10)); }
+        var scale = 1;
+        try { var saved = parseFloat(localStorage.getItem(KEY)); if (!isNaN(saved)) scale = clamp(saved); } catch (e) {}
+        function apply() {
+            textarea.style.setProperty('--doc-font-scale', String(scale));   // 源码框:calc(--font-base × 倍率)
+            preview.style.setProperty('--doc-font-scale', String(scale));    // 预览 .doc-article:同倍率
+            dec.disabled = scale <= MIN;
+            inc.disabled = scale >= MAX;
+            var pct = Math.round(scale * 100);
+            dec.setAttribute('title', '缩小字号（当前 ' + pct + '%）');
+            inc.setAttribute('title', '放大字号（当前 ' + pct + '%）');
+        }
+        function step(delta) {
+            scale = clamp(scale + delta);
+            try { localStorage.setItem(KEY, String(scale)); } catch (e) {}
+            apply();
+        }
+        apply();
+        dec.addEventListener('click', function () { step(-STEP); });
+        inc.addEventListener('click', function () { step(STEP); });
+    })();
+
     // plan-53 出身:文档落点源('' = host,否则扩展包 key)。
     // 只有真·新建未存(CFG.isNew)时读 #doc_src 下拉;身份一旦冻结(既有文档 / 首存成功后
     // CFG.src 赋值 + CFG.isNew=false)就认 CFG.src,不再读下拉。

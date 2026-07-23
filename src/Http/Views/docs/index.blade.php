@@ -33,6 +33,11 @@
                         <span class="p-docs-reader__title">{{ $doc['title'] }}</span>
                     </div>
                     <div class="p-docs-reader__actions">
+                        {{-- 正文字号 A− / A+(读类,生产只读也可用):docs-center.js 调 .doc-article 的 --doc-font-scale,偏好存 localStorage,跨文档/刷新记住 --}}
+                        <div class="p-docs-reader__font" role="group" aria-label="正文字号">
+                            <button type="button" class="btn btn--secondary btn--sm p-docs-reader__font-btn" id="doc_font_dec" aria-label="缩小正文字号">A−</button>
+                            <button type="button" class="btn btn--secondary btn--sm p-docs-reader__font-btn" id="doc_font_inc" aria-label="放大正文字号">A+</button>
+                        </div>
                         {{-- 正文宽度开关(读类,生产只读也可用):docs-center.js 切 .doc-article.is-wide,偏好存 localStorage --}}
                         <button type="button" class="btn btn--secondary btn--sm p-docs-reader__width" id="doc_width_toggle">限宽</button>
                         @unless ($locked || ! $src_writable)
@@ -77,6 +82,8 @@
     @endif
 
     <x-slot:scripts>
+        {{-- highlight.js 必须在 docs-center.js **之前**加载:wireCodeBlocks 里读 window.hljs 给代码块上色 --}}
+        <script src="/vendor/scaffold/javascript/highlight.min.js"></script>
         <script src="/vendor/scaffold/javascript/pages/docs-center.js?v={{ @filemtime(public_path('vendor/scaffold/javascript/pages/docs-center.js')) ?: time() }}"></script>
     </x-slot:scripts>
 
