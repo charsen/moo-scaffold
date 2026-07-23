@@ -150,6 +150,39 @@
         });
     }
 
+    // ----- 正文字号 A− / A+(读者偏好存 localStorage,跨文档/刷新记住)-----
+    // 调 .doc-article 的 --doc-font-scale 倍率(各级字号 = 原 token × 倍率,见 _docs-center.scss)。
+    function wireFontSize() {
+        var article = document.getElementById('doc_article');
+        var dec = document.getElementById('doc_font_dec');
+        var inc = document.getElementById('doc_font_inc');
+        if (!article || !dec || !inc) return;
+        var KEY = 'scaffold_docs_font_scale';
+        var MIN = 0.85, MAX = 1.6, STEP = 0.1;
+        function clamp(v) { return Math.min(MAX, Math.max(MIN, Math.round(v * 10) / 10)); }
+        var scale = 1;   // 默认 1.0(=正文 14px),只有显式存过才偏移
+        try {
+            var saved = parseFloat(localStorage.getItem(KEY));
+            if (!isNaN(saved)) scale = clamp(saved);
+        } catch (e) {}
+        function apply() {
+            article.style.setProperty('--doc-font-scale', String(scale));
+            dec.disabled = scale <= MIN;   // 触底/触顶禁掉对应按钮,别让读者以为还能再调
+            inc.disabled = scale >= MAX;
+            var pct = Math.round(scale * 100);
+            dec.setAttribute('title', '缩小正文字号（当前 ' + pct + '%）');
+            inc.setAttribute('title', '放大正文字号（当前 ' + pct + '%）');
+        }
+        function step(delta) {
+            scale = clamp(scale + delta);
+            try { localStorage.setItem(KEY, String(scale)); } catch (e) {}
+            apply();
+        }
+        apply();
+        dec.addEventListener('click', function () { step(-STEP); });
+        inc.addEventListener('click', function () { step(STEP); });
+    }
+
     // ----- 复制到剪贴板（localhost / https 走 Clipboard API,其它降级 execCommand）-----
     function copyText(text) {
         if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -187,6 +220,12 @@
             var lang = '';
             var m = (code.className || '').match(/language-([\w+#.-]+)/);
             if (m) lang = m[1];
+
+            // 语法高亮:highlight.js 就地上色(加 .hljs + <span class="hljs-*">,主题 CSS 在 _docs-center.scss)。
+            // 只染 hljs 认识的语言;未知/无语言块保持单色,不让它瞎猜。textContent 不变 → 复制按钮照旧拿原文。
+            if (window.hljs && lang && hljs.getLanguage(lang)) {
+                try { hljs.highlightElement(code); } catch (e) {}
+            }
 
             var wrap = document.createElement('div');
             wrap.className = 'doc-codeblock';
@@ -253,6 +292,7 @@
         buildToc();                           // 目录(读 textContent,须在注锚点前)
         wireHeadingAnchors();                 // 标题悬停锚点(buildToc 之后)
         wireWidthToggle();
+        wireFontSize();                       // 正文字号 A− / A+(偏好存 localStorage)
         highlightSearchHit(article);          // ?hl= 定位(目录页全文搜索跳转来的)
     }
 

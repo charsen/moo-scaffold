@@ -36,6 +36,11 @@
                 <span class="p-docs-editor__status" id="doc_save_status" aria-live="polite"></span>
             </div>
             <div class="p-docs-editor__tools">
+                {{-- 字号 A− / A+:同时缩放源码框 + 预览;偏好与阅读页共用 localStorage,跨页/刷新记住(docs-editor.js) --}}
+                <div class="p-docs-editor__font" role="group" aria-label="字号">
+                    <button type="button" class="btn btn--secondary btn--sm p-docs-editor__font-btn" id="doc_edit_font_dec" aria-label="缩小字号">A−</button>
+                    <button type="button" class="btn btn--secondary btn--sm p-docs-editor__font-btn" id="doc_edit_font_inc" aria-label="放大字号">A+</button>
+                </div>
                 <button type="button" class="btn btn--secondary btn--sm" id="doc_ins_api">
                     <x-scaffold::icon name="send" :size="13" /> 接口引用
                 </button>
@@ -112,6 +117,8 @@
             };
             $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });
         </script>
+        {{-- highlight.js 必须在 docs-center.js **之前**:wireCodeBlocks 给预览代码块上色(实时预览也复用) --}}
+        <script src="/vendor/scaffold/javascript/highlight.min.js"></script>
         <script src="/vendor/scaffold/javascript/pages/docs-center.js?v={{ @filemtime(public_path('vendor/scaffold/javascript/pages/docs-center.js')) ?: time() }}"></script>
         <script src="/vendor/scaffold/javascript/pages/docs-editor.js?v={{ @filemtime(public_path('vendor/scaffold/javascript/pages/docs-editor.js')) ?: time() }}"></script>
     </x-slot:scripts>

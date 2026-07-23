@@ -100,6 +100,9 @@
     gap: var(--space-2);
   }
   &__width { min-width: 52px; justify-content: center; }   // 「全宽/限宽」两字等宽,切换不抖
+  // 正文字号 A− / A+:两个小按钮成一组(比行 gap 更紧,当一个视觉单元),放在宽度开关左侧
+  &__font { display: inline-flex; align-items: center; gap: var(--space-1); }
+  &__font-btn { min-width: 34px; justify-content: center; font-weight: var(--weight-semibold); }
 
   // 右侧目录:sticky,顶距让出固定 header
   &__toc {
@@ -146,7 +149,10 @@
 
 // ---- Markdown 正文排版 --------------------------------------------------------
 .doc-article {
-  font-size: var(--font-base);
+  // 读者字号偏好:A− / A+ 调这个倍率(docs-center.js 写 inline style + localStorage),
+  // 下面各级字号都 = 原 token × 倍率,token 仍是单一事实源;line-height 用无单位比值,随字号自缩。
+  --doc-font-scale: 1;
+  font-size: calc(var(--font-base) * var(--doc-font-scale));
   line-height: var(--line-loose);
   color: var(--text-body);
   word-wrap: break-word;
@@ -167,22 +173,22 @@
     position: relative;                        // 容纳悬停锚点 .doc-anchor 的绝对定位
     &:first-child { margin-top: 0; }
   }
-  h1 { font-size: var(--font-2xl); }
+  h1 { font-size: calc(var(--font-2xl) * var(--doc-font-scale)); }
   h2 {
-    font-size: var(--font-lg);
+    font-size: calc(var(--font-lg) * var(--doc-font-scale));
     margin-top: var(--space-8);                 // 大节之间多留白,拉开层级节奏(h2 32 > h3 24 > h4 20)
     padding-bottom: var(--space-2);
     border-bottom: 1px solid var(--border-light);
   }
-  h3 { font-size: var(--font-md); margin-top: var(--space-6); }
-  h4 { font-size: var(--font-base); margin-top: var(--space-5); }
+  h3 { font-size: calc(var(--font-md) * var(--doc-font-scale)); margin-top: var(--space-6); }
+  h4 { font-size: calc(var(--font-base) * var(--doc-font-scale)); margin-top: var(--space-5); }
 
   p { margin: var(--space-3) 0; }
 
   // 导语:h1 后第一段略大 + 弱化,跟标题拉开层级(典型文档头部排版)
   h1 + p {
     margin-top: var(--space-4);
-    font-size: var(--font-md);
+    font-size: calc(var(--font-md) * var(--doc-font-scale));
     line-height: var(--line-base);
     color: var(--text-desc);
   }
@@ -224,12 +230,13 @@
   :is(h1, h2, h3, h4):hover .doc-anchor,
   .doc-anchor:focus-visible { opacity: 1; }
 
-  // 行内码:加发丝边 + 略深字色,从正文里「框」出来。原本只近白底(--bg-code)、字色继承正文 →
-  // 代码感几乎看不见(表格里 `service-hall` 这类路由名跟普通文字混作一团)。
+  // 行内码:加发丝边 + 强调字色,从正文里「框」出来。字色用品牌暖调 accent(亮暗都跟主题走),
+  // 让 `canApply` `operatorId` 这类标识符跳出来,又不撞蓝色链接;底/边保持中性,只染字。
+  // (围栏块由 highlight.js 逐 token 上色,不走这条;pre code 下面会把色重置回 inherit。)
   code {
     font-family: var(--font-family-mono);
     font-size: 0.9em;
-    color: var(--text-heading);
+    color: var(--accent-text);
     background: var(--bg-code);
     border: 1px solid var(--border-light);
     padding: 1px 5px;
@@ -246,7 +253,7 @@
     border-radius: var(--radius-md);
     overflow-x: auto;
     line-height: var(--line-base);
-    code { background: none; border: 0; color: inherit; padding: 0; font-size: var(--font-sm); }
+    code { background: none; border: 0; color: inherit; padding: 0; font-size: calc(var(--font-sm) * var(--doc-font-scale)); }
   }
 
   blockquote {
@@ -264,7 +271,7 @@
     width: 100%;
     border-collapse: collapse;
     margin: var(--space-4) 0;
-    font-size: var(--font-sm);
+    font-size: calc(var(--font-sm) * var(--doc-font-scale));
     th, td {
       padding: var(--space-2) var(--space-3);
       border: 1px solid var(--border-row);
@@ -362,6 +369,27 @@
 }
 // 提升特异性盖过 .doc-article pre 的 margin/radius（两者本同级,显式拔高更稳）
 .doc-article .doc-codeblock pre { margin: 0; border-radius: 0; }
+
+// ---- 语法高亮主题（highlight.js 客户端上色输出 .hljs-* span）-------------------
+// 代码面恒为深色(--code-snippet-bg 亮暗都暗),故高亮只需一套暗底配色(One Dark 系,贴 #0f172a)。
+// 未命中的 token 走 pre 的 --code-snippet-text 兜底。纯 class 着色、无内联样式 → CSP 干净。
+.doc-article {
+  .hljs-comment, .hljs-quote { color: #7f8ea3; font-style: italic; }            // 注释/引语:弱化压暗
+  .hljs-keyword, .hljs-selector-tag, .hljs-doctag, .hljs-formula,
+  .hljs-section, .hljs-name { color: #c792ea; }                                  // 关键字/标签名:紫
+  .hljs-literal, .hljs-number, .hljs-bullet { color: #f78c6c; }                  // 字面量/数字:橙
+  .hljs-string, .hljs-regexp, .hljs-addition, .hljs-symbol,
+  .hljs-meta .hljs-string { color: #c3e88d; }                                    // 字符串/正则/新增:绿
+  .hljs-title, .hljs-title.function_, .hljs-selector-id { color: #82aaff; }      // 函数名/选择器 id:蓝
+  .hljs-type, .hljs-class .hljs-title, .hljs-title.class_,
+  .hljs-built_in, .hljs-selector-class { color: #ffcb6b; }                       // 类型/内建/类名:黄
+  .hljs-variable, .hljs-template-variable, .hljs-attr, .hljs-attribute,
+  .hljs-property, .hljs-params, .hljs-tag .hljs-attr { color: #f07178; }         // 变量/属性/参数:红
+  .hljs-meta, .hljs-tag, .hljs-link, .hljs-selector-pseudo { color: #89ddff; }  // 元信息/标签/链接:青
+  .hljs-deletion { color: #f07178; }
+  .hljs-emphasis { font-style: italic; }
+  .hljs-strong { font-weight: var(--weight-bold); }
+}
 
 // ---- 深链 shortcode chip ------------------------------------------------------
 .doc-shortcode {
@@ -496,6 +524,9 @@
     &[readonly] { background: var(--bg-input-readonly); color: var(--text-secondary); }
   }
   &__tools { display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  // 字号 A− / A+:两个小按钮成一组(比行 gap 更紧,当一个视觉单元)
+  &__font { display: inline-flex; align-items: center; gap: var(--space-1); }
+  &__font-btn { min-width: 32px; justify-content: center; font-weight: var(--weight-semibold); }
 
   &__panes {
     flex: 1;
@@ -518,7 +549,8 @@
     border: 0;
     padding: var(--space-4);
     font-family: var(--font-family-mono);
-    font-size: var(--font-sm);
+    // 字号:基准从 13→14(--font-base)提一档(旧 --font-sm 编辑太吃力),再 × A−/A+ 倍率(docs-editor.js 写 inline)
+    font-size: calc(var(--font-base) * var(--doc-font-scale, 1));
     line-height: var(--line-loose);
     color: var(--text-body);
     background: var(--bg-input);

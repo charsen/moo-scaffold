@@ -10,6 +10,7 @@
         "test:e2e:auth": "playwright codegen --save-storage=tests/Browser/.auth/admin.json ${E2E_BASE_URL:-http://localhost}/scaffold"
     },
     "devDependencies": {
+        "@highlightjs/cdn-assets": "^11.11.1",
         "@playwright/test": "^1.60.0"
     }
 }
