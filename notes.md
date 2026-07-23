@@ -10,4 +10,5 @@
 - 本仓没有 phpstan/larastan 等静态类型检查；类型问题靠 Pest 测试 + 评审兜底，别去找不存在的配置。
 - e2e 一律用 `npm run test:e2e:safe`（结束自动回滚宿主 scaffold 数据）；裸 `test:e2e` 会把宿主数据跑脏。
 - Scaffold 自仓测试的 `vendor/charsen/moo-monitor-laravel` 可能是发布版而非相邻开发仓；涉及 Cloud 契约时必须临时用本地 Monitor 组合复跑，否则旧 `{ok,saved}` fake 会给出假绿。手动 Cloud push 要逐类型独立尝试，不能因一类 partial/retry `break` 阻断下一类；循环后统一汇总已确认/已隔离/失败事实，且仅在确有确认、隔离或本地回收时失效 summary 缓存。
+- 同一 Host 多 `.env.XXX` 项目必须依赖 Monitor `^0.1.13`：YAML、cursor、partial ack、同步锁、回收范围与 scheduler 子命令的 `--env` 需整体隔离，不能只升级 Scaffold 页面编排。
 - `CloudSync::sync()` 返回 `skipped=true` 时，`reason` 是用户可见契约；控制器必须透传真实原因（例如同类型同步锁竞争），不能统一误报为分类型开关关闭。
