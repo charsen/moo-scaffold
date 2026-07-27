@@ -119,19 +119,46 @@ class FormWidgetCollection extends ResourceCollection
         return $this->putMore("{$field}.tip", $val);
     }
 
+    /**
+     * 按 `field.attr` 点路径写入控件属性（default/disabled/options/... 全家的底座）。
+     *
+     * 2.1.7 起自包含实现：此前走 `Collection::putMore` 宏，而那个宏是**各 host 在自己的
+     * AppServiceProvider 里手抄注册的**（scaffold 自己不注册）—— 等于 scaffold 的类反过来
+     * 依赖每个 host 抄一份，漏抄就 `BadMethodCallException: Collection::putMore does not exist`，
+     * 且脱离 host 的包测试环境里根本跑不起来。现在直接 data_set，不再依赖任何全局宏。
+     * host 那份宏保留不动，仍服务 host 自己直接链在原生 Collection 上的调用。
+     *
+     * 原宏的「点路径最深 3 段」限制一并取消（控件属性本就可能嵌更深，如 `field.control.request.params`）。
+     *
+     * @param string $field 控件属性的点路径，层级不限
+     */
     public function putMore($field, $val)
     {
-        $this->collection->putMore($field, $val);
+        $items = $this->collection->all();
+        data_set($items, $field, $val);
+        $this->collection = collect($items);
 
         return $this;
     }
 
     /**
      * Remove specific fields from the collection.
+     *
+     * 同 putMore：自包含实现，不再依赖 host 注册的 `Collection::forgetMore` 宏，键层级同样不限。
+     *
+     * @param array<int, string>|string $keys 字段名数组，或逗号分隔的字符串
      */
     public function forget($keys): self
     {
-        $this->collection->forgetMore($keys);
+        if (! is_array($keys)) {
+            $keys = array_map('trim', explode(',', (string) $keys));
+        }
+
+        $items = $this->collection->all();
+        foreach ($keys as $key) {
+            data_forget($items, $key);
+        }
+        $this->collection = collect($items);
 
         return $this;
     }

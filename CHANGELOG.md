@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.7
+
+- `Foundation\FormWidgetCollection` 的 `putMore()` / `forget()` 改为自包含实现（`data_set` / `data_forget`），**不再依赖 host 注册的 `Collection::putMore` / `forgetMore` 宏**。此前 scaffold 的类反过来要求每个 host 在自己的 `AppServiceProvider` 里手抄一份宏（scaffold 自己不注册），漏抄即 `BadMethodCallException`，且脱离 host 的包测试环境里整条 `form_widgets` 链路根本跑不起来。`default` / `disabled` / `hidden` / `options` / `type` / `tip` / `isArray` / `setFilter` 全家与 host 侧 `->putMore(...)` 链式调用行为不变；host 那份宏保留不动，仍服务 host 自己直接链在原生 `Collection` 上的调用。
+- 顺带取消 `putMore()` / `forget()` 原宏的「点路径最深 3 段」限制——控件属性本就可能嵌更深（如 `field.control.params.scope`），层级不再受限。
+
 ## 2.1.6
 
 - 新增 `Support\OperatorContext` 队列显式操作人上下文（`runAs()` / `current()` / `clear()`）：`Concerns\HasOperator` 优先消费上下文中显式设定的操作人，未设置时回落原 `OperatorResolver` 解析——无 context 时行为逐字节不变，向后兼容。
