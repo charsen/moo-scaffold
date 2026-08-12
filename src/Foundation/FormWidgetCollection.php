@@ -218,8 +218,9 @@ class FormWidgetCollection extends ResourceCollection
                 $item['array'] = $item['array'] ?? false;
             } // 对 编辑器 的属性设置
             elseif ($item['type'] === 'editor') {
-                $item['imageUploadUrl'] = trim(action(config('image.editor'), [], false), '/');
-                $item['default']        = $item['default'] ?? '';
+                $item['imageUploadUrl'] = $item['imageUploadUrl']
+                                                    ?? trim(action(config('image.editor'), [], false), '/');
+                $item['default'] = $item['default'] ?? '';
             } elseif ($item['type'] === 'cropper-image' or $item['type'] === 'upload-image') {
                 $item['tip'] = $item['tip'] ?? '图片最小尺寸为： ' . $item['width'] . 'px * ' . $item['height'] . 'px';
             } elseif ($item['type'] === 'select') {
