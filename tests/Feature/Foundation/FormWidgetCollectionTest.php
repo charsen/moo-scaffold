@@ -71,3 +71,15 @@ it('forget 无宏也能删字段，支持数组与逗号分隔串', function () 
     expect(byField(widgets()->forget('role_remark, position_id')->toArray(request()))->keys()->all())
         ->toBe(['role_name']);
 });
+
+it('editor 保留业务显式指定的图片上传地址', function () {
+    $payload = byField(FormWidgetCollection::make([
+        'article_content' => [
+            'type'           => 'editor',
+            'imageUploadUrl' => 'api/admin/richtext/images',
+        ],
+    ])->toArray(request()));
+
+    expect($payload['article_content']['imageUploadUrl'])->toBe('api/admin/richtext/images')
+        ->and($payload['article_content']['default'])->toBe('');
+});
