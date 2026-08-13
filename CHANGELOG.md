@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.8
+
+- 应用端统一由 `config/scaffold.php` 的 `controller` 注册表驱动：默认端调整为 `admin`、`mobi`、`web`，Host 可继续注册 RPA、Screen 等自定义端；生成器按端配置解析 Controller、Request、Resource、Test、路由模式和显示名称，不再把 `api` 同时当作移动端目录名。
+- `moo:free`、`moo:controller`、`moo:resource`、`moo:test`、`moo:auth` 与 `moo:api` 对齐同一应用端契约；`route_mode = manual` 的业务端只扫描既有路由，不自动写入 `Route::iResource`，未注册的 Host 应用端会明确失败。
+- `moo:api --sync-names` 可从 Controller DocBlock 同步模块、控制器、动作名称与动作说明；空名称会按缺失回填，无方法注释时不会用 `index` / `show` 等方法名覆盖已有文案。
+- `Foundation\FormWidgetCollection` 的 editor 控件支持由业务包覆盖 `imageUploadUrl`，Host 可把富文本上传交给独立扩展包，而无需修改 Scaffold。
+
 ## 2.1.7
 
 - `Foundation\FormWidgetCollection` 的 `putMore()` / `forget()` 改为自包含实现（`data_set` / `data_forget`），**不再依赖 host 注册的 `Collection::putMore` / `forgetMore` 宏**。此前 scaffold 的类反过来要求每个 host 在自己的 `AppServiceProvider` 里手抄一份宏（scaffold 自己不注册），漏抄即 `BadMethodCallException`，且脱离 host 的包测试环境里整条 `form_widgets` 链路根本跑不起来。`default` / `disabled` / `hidden` / `options` / `type` / `tip` / `isArray` / `setFilter` 全家与 host 侧 `->putMore(...)` 链式调用行为不变；host 那份宏保留不动，仍服务 host 自己直接链在原生 `Collection` 上的调用。
