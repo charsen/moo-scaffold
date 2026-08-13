@@ -15,7 +15,7 @@ use Mooeen\Scaffold\Http\Middleware\ScaffoldAuthenticate;
  *     redirect 目标永远是 route('route.list'),app 参数取自 cookie 但只在 apps 白名单内才触发)
  *   - 无效 ?app= → 回退到第一个 app,不报错
  *
- * 不需要 fixture:getApps() 读 config('scaffold.controller'),testbench merge 后默认含 admin/api。
+ * 不需要 fixture:getApps() 读 config('scaffold.controller'),testbench merge 后默认含 admin/mobi/web。
  */
 beforeEach(function () {
     $this->withoutMiddleware([

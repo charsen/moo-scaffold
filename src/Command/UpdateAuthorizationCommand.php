@@ -57,7 +57,7 @@ class UpdateAuthorizationCommand extends Command
             return;
         }
 
-        $apps = $this->utility->getConfig('controller');
+        $apps = $this->utility->getAppTargets();
         $app  = $this->argument('app') ?: $this->chooseApp($apps);
 
         if (! isset($apps[$app])) {

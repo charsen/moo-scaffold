@@ -99,10 +99,10 @@ YAML 驱动的一条生成流水线。**生成类命令 dev-only**（非 local �
 | `moo:init "作者名"` | 初始化 | 建 scaffold 目录骨架，把作者名写入 `.env` 的 `SCAFFOLD_AUTHOR`（生成器在文件头注释署名） |
 | `moo:schema {Name}` | 新建模块 | 创建一个新的模块 schema 文件 `scaffold/database/{Name}.yaml` |
 | `moo:fresh` | 解析缓存 | 把 YAML 解析成 `storage/scaffold/` 下缓存（models.php / tables.php / fields.php / enums.php / controllers.php / model_ids.php），增量维护 `_fields.yaml`。**所有其它生成器的数据源** |
-| `moo:free {app} {schema} -a` | 一键流水线 | 顺序跑完：Fresh → Model → Resource → Controller → Multilingual → Auth → Migration →（可选）API。`{app}` 取自 `config/scaffold.php` 的 `controller` 段键名（默认提供 `admin` / `api` 两个 app，各自声明控制器路径与路由文件）；两个参数均为可选，省略时交互式选择 |
+| `moo:free {app} {schema} -a` | 一键流水线 | 顺序跑完：Fresh → Model → Resource → Controller → Test → Multilingual → Auth → Migration →（可选）API。`{app}` 取自 `config/scaffold.php` 的 `controller` 注册表（默认 `admin` / `mobi` / `web`）；只生成所选端的 Resource / Controller / Request / Test，两个参数均可省略后交互选择 |
 | `moo:model` | 生成 Model | Model / ModelFilter / ModelFactory / Trait / Enum，可选生成 TypeScript model（`Model.ts`）；`-F` 写 DatabaseSeeder |
 | `moo:resource` | 生成 Resource | 生成 API Resource 文件（基于 `BaseResource` 等 Foundation 基类） |
-| `moo:controller` | 生成 Controller | Controller / Request / Trait 文件，并把新路由插入宿主 `routes/admin.php`、`routes/api.php` 的 `// :insert_code_here:do_not_delete` 标记处 |
+| `moo:controller` | 生成 Controller | Controller / Request / Trait 文件；`--app=` 可只生成一个端，且只对 `route_mode = resource` 的端写入路由标记 |
 | `moo:migration` | 生成迁移 | 从 schema 生成 database migration（与设计器走**同一套** diff + writer，保证 CLI 与 GUI 口径一致） |
 | `moo:i18n` | 多语言同步 | 同步 i18n 语言文件：model 枚举、validation attributes、db 字段中文名 |
 | `moo:auth` | ACL 生成 | 从**真实路由**重建 ACL 配置、语言文件与可视化数据（按 app/模块/控制器/动作分层） |

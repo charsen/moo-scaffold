@@ -15,6 +15,7 @@ namespace Mooeen\Scaffold;
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Filesystem\Filesystem;
 use InvalidArgumentException;
+use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Support\ConsoleUi;
 use Mooeen\Scaffold\Support\PackageRegistry;
 use Mooeen\Scaffold\Support\TargetContext;
@@ -185,21 +186,17 @@ class Utility
      */
     public function getApps(): array
     {
-        $config = $this->getConfig('controller', []);
-        if (! is_array($config)) {
-            return [];
-        }
+        return app(AppTargetRegistry::class)->labels();
+    }
 
-        $res = [];
-        foreach ($config as $app => $controller) {
-            if (! is_array($controller)) {
-                continue;
-            }
-
-            $res[$app] = $controller['api_name'] ?? $controller['name']['zh-CN'];
-        }
-
-        return $res;
+    /**
+     * 获取按 sort 排序、并补齐旧配置默认值的应用端配置。
+     *
+     * @return array<string,array<string,mixed>>
+     */
+    public function getAppTargets(): array
+    {
+        return app(AppTargetRegistry::class)->all();
     }
 
     /**
@@ -227,7 +224,11 @@ class Utility
      */
     public function getAppResourcePath(string $app, bool $relative = false): string
     {
-        $path = $this->getConfig("controller.{$app}.resource_path", $this->getConfig('resource.path'));
+        $target = app(AppTargetRegistry::class)->get($app);
+        $path   = trim((string) ($target['resource_path'] ?? ''));
+        if ($path === '') {
+            throw new InvalidArgumentException("应用端 [{$app}] 未配置 resource_path。");
+        }
         $path = base_path($path);
 
         return $relative ? str_replace(base_path(), '.', $path) : $path;
@@ -566,11 +567,12 @@ class Utility
      */
     public function getControllerNamespaces(string $app = 'admin'): array
     {
-        $base_path = base_path($this->getConfig("controller.{$app}.path"));
-        $dirs      = $this->filesystem->directories($base_path);
-        array_unshift($dirs, $base_path);
-        if (empty($dirs)) {
-            return [];
+        $target    = app(AppTargetRegistry::class)->get($app);
+        $base_path = base_path((string) ($target['path'] ?? ''));
+        $dirs      = [];
+        if ($this->filesystem->isDirectory($base_path)) {
+            $dirs = $this->filesystem->directories($base_path);
+            array_unshift($dirs, $base_path);
         }
 
         foreach ($dirs as $path) {

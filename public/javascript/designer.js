@@ -31,8 +31,8 @@ document.addEventListener('alpine:init', () => {
         // plan 19 v11:Model / Controller / Resource 可编辑 state
         tableModelClass: '',
         tableCtrlClass: '',
-        tableCtrlApps: [],         // ['admin', 'api']
-        tableCtrlResources: [],    // ['api']
+        tableCtrlApps: [],         // ['admin', 'mobi', 'web']
+        tableCtrlResources: [],    // ['mobi', 'web']
         _allApps: [],              // 所有可能 app keys(从 server config 拉),chipClass getter 遍历用
         // preview state:openPreview fetch 后填充。view 模板 CSP 限制,预算 boolean / class string
         preview: {

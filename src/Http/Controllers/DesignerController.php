@@ -119,10 +119,10 @@ class DesignerController
 
         // plan 19 v11:Controller / Resource 可选 app 列表(从 scaffold.controller 配置拉出)
         $controllerApps = [];
-        foreach ((array) config('scaffold.controller', []) as $appKey => $appConf) {
+        foreach ($this->utility->getAppTargets() as $appKey => $appConf) {
             $controllerApps[$appKey] = [
                 'key'   => $appKey,
-                'label' => $appConf['name']['zh-CN'] ?? $appConf['name'] ?? $appKey,
+                'label' => $appConf['label'],
             ];
         }
 

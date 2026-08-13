@@ -34,6 +34,7 @@ class UpdateAuthorizationGenerator extends Generator
      */
     public function start(string $app, array $routes): bool
     {
+        $configuredApps    = array_keys($this->utility->getAppTargets());
         $this->generatedAt = date('Y-m-d H:i:s');
         $this->generatedBy = $this->utility->resolveCurrentLoginUser();
 
@@ -116,8 +117,8 @@ class UpdateAuthorizationGenerator extends Generator
             $original_actions[] = $meta;
         }
 
-        $this->buildActions($app, $config_actions, $whitelist);
-        $this->buildLangFiles($app, $config, $modules, $controllers, $original_actions);
+        $this->buildActions($app, $config_actions, $whitelist, $configuredApps);
+        $this->buildLangFiles($app, $config, $modules, $controllers, $original_actions, $configuredApps);
         $this->buildACLViewer($app, $config, $original_actions);
 
         return true;
@@ -126,9 +127,18 @@ class UpdateAuthorizationGenerator extends Generator
     /**
      * 配置文件生成
      */
-    private function buildActions(string $app, array $actions, array $whitelist): void
+    private function buildActions(string $app, array $actions, array $whitelist, array $configuredApps): void
     {
         $config = config('actions', []);
+
+        foreach (array_diff(array_keys($config), $configuredApps) as $staleApp) {
+            $section = $config[$staleApp] ?? null;
+            if (is_array($section)
+                && array_key_exists('whitelist', $section)
+                && array_key_exists('actions', $section)) {
+                unset($config[$staleApp]);
+            }
+        }
 
         foreach ($actions as $moduleKey => $controllers) {
             foreach ($controllers as $controllerKey => $actionKeys) {
@@ -152,7 +162,7 @@ class UpdateAuthorizationGenerator extends Generator
     /**
      * 生成多语言文件
      */
-    private function buildLangFiles(string $app, array $controller, array $modules, array $controllers, array $actions): void
+    private function buildLangFiles(string $app, array $controller, array $modules, array $controllers, array $actions, array $configuredApps): void
     {
         $languages = $this->utility->getConfig('languages');
         foreach ($languages as $lang) {
@@ -161,7 +171,13 @@ class UpdateAuthorizationGenerator extends Generator
                 $this->filesystem->put($file_path, '<?php return [];');
             }
 
-            $data                     = $this->filesystem->getRequire($file_path);
+            $data = $this->filesystem->getRequire($file_path);
+            foreach (array_diff(array_keys($data), $configuredApps) as $staleApp) {
+                if (is_array($data[$staleApp] ?? null)
+                    && array_key_exists("app-{$staleApp}", $data[$staleApp])) {
+                    unset($data[$staleApp]);
+                }
+            }
             $data[$app]               = [];
             $data[$app]["app-{$app}"] = $controller['name'][$lang];
 

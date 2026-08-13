@@ -18,6 +18,7 @@
 ```bash
 php artisan moo:api admin -a          # admin 下全部 namespace
 php artisan moo:api admin Light       # admin / Light 单 namespace
+php artisan moo:api web -a --sync-names # 用当前 Controller 注释同步既有名称
 ```
 
 输出到 `scaffold/api/{app}/{namespace}/{Controller}.yaml`(如 `scaffold/api/api/Light/Book.yaml`)。action key 格式 `{action}_{http_method}`(如 `index_get` / `update_put`),避免同名 action 多 method 冲突。
@@ -31,6 +32,28 @@ php artisan moo:api admin Light       # admin / Light 单 namespace
 | `delete` | 从 YAML 删掉 |
 
 > 扫描前提:controller 里**真实存在 public function** 且**有路由指向**,YAML 里的孤儿不算。
+
+控制器和动作的展示名称来自 Controller DocBlock：
+
+```php
+/**
+ * @module_name {zh-CN: 内容 | en: Content}
+ * @controller_name {zh-CN: 文章 | en: Article}
+ */
+class ArticleController
+{
+    /**
+     * 文章列表
+     *
+     * 返回已发布文章，支持按分类筛选。
+     */
+    public function index(): JsonResponse {}
+}
+```
+
+- `@module_name` 决定左侧 namespace 的显示名，`@controller_name` 决定控制器显示名。
+- 方法 DocBlock 第一行是 action 名称，第二行起是说明；`@param`、`@return` 等标签不会进入说明。
+- YAML 名称为空时会自动从 DocBlock 回填。已有非空名称默认保留；确认代码注释是当前真值后，使用 `--sync-names` 同步控制器名称、动作名称与动作说明。没有 DocBlock 名称的方法不会在同步时把既有文案降级成 `index` / `show` 等方法名。
 
 ## 2. 配 host 切换
 

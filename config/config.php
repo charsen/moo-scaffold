@@ -70,31 +70,54 @@ return [
      */
     'controller' => [
         'admin' => [
-            'name'          => ['zh-CN' => '后台管理', 'en' => 'Admin'],
-            'api_name'      => '后台管理',  // 接口调试工具中的显示名称
-            'path'          => 'app/Admin/Controllers/',
-            'requests'      => ['index', 'store', 'update', 'destroyBatch', 'create', 'edit'], // 默认的 action 对应的 request 定义
-            'request_path'  => 'app/Admin/Requests/',
-            'resource_path' => 'app/Admin/Resources/',
-            'stub'          => 'controller-admin',
-            'trait_stub'    => 'controller-admin-base-action-trait',
-            'route'         => 'routes/admin.php',
+            'sort'                  => 10,
+            'profile'               => 'admin-crud',
+            'name'                  => ['zh-CN' => '后台管理', 'en' => 'Admin'],
+            'api_name'              => '后台管理',  // 接口调试工具中的显示名称
+            'path'                  => 'app/Admin/Controllers/',
+            'requests'              => ['index', 'store', 'update', 'destroyBatch', 'create', 'edit'], // 默认的 action 对应的 request 定义
+            'request_path'          => 'app/Admin/Requests/',
+            'resource_path'         => 'app/Admin/Resources/',
+            'stub'                  => 'controller-admin',
+            'controller_trait_stub' => 'controller-admin-trait',
+            'trait_stub'            => 'controller-admin-base-action-trait',
+            'route'                 => 'routes/admin.php',
+            'route_mode'            => 'resource',
             // 包提供的额外 admin 模块：模块名 => 控制器命名空间（默认空）。这些控制器不在 host 的
             // controller.admin.path 下、生产环境又位于 vendor/，列在此处后即纳入 ACL（moo:auth）/
             // API 文档（moo:api）/ 路由调试 / 接口调试，并按此命名空间解析 FQCN。
             // 例：['System' => 'Mooeen\\System\\Http\\Controllers\\Admin']
             'extra_modules' => [],
         ],
-        'api' => [
-            'name'          => ['zh-CN' => '接口', 'en' => 'Api'],
-            'api_name'      => '客户端接口',  // 接口调试工具中的显示名称
-            'path'          => 'app/Api/Controllers/',
-            'requests'      => ['index'], // 默认的 action 对应的 request
-            'request_path'  => 'app/Api/Requests/',
-            'resource_path' => 'app/Api/Resources/',
-            'stub'          => 'controller-api',
-            'trait_stub'    => 'controller-api-base-action-trait',
-            'route'         => 'routes/api.php',
+        'mobi' => [
+            'sort'                  => 20,
+            'profile'               => 'readonly-api',
+            'name'                  => ['zh-CN' => '移动端', 'en' => 'Mobi'],
+            'api_name'              => '移动端接口',  // 接口调试工具中的显示名称
+            'path'                  => 'app/Mobi/Controllers/',
+            'requests'              => ['index'], // 默认的 action 对应的 request
+            'request_path'          => 'app/Mobi/Requests/',
+            'resource_path'         => 'app/Mobi/Resources/',
+            'stub'                  => 'controller-api',
+            'controller_trait_stub' => 'controller-api-trait',
+            'trait_stub'            => 'controller-api-base-action-trait',
+            'route'                 => 'routes/mobi.php',
+            'route_mode'            => 'resource',
+        ],
+        'web' => [
+            'sort'                  => 30,
+            'profile'               => 'readonly-api',
+            'name'                  => ['zh-CN' => 'Web 端', 'en' => 'Web'],
+            'api_name'              => 'Web 端接口',
+            'path'                  => 'app/Web/Controllers/',
+            'requests'              => ['index'],
+            'request_path'          => 'app/Web/Requests/',
+            'resource_path'         => 'app/Web/Resources/',
+            'stub'                  => 'controller-api',
+            'controller_trait_stub' => 'controller-api-trait',
+            'trait_stub'            => 'controller-api-base-action-trait',
+            'route'                 => 'routes/web.php',
+            'route_mode'            => 'resource',
         ],
     ],
 

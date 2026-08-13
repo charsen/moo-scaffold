@@ -34,6 +34,7 @@ class CreateTestCommand extends Command
     {
         return [
             ['force', '-f', InputOption::VALUE_OPTIONAL, 'Force overwrite existing test files.', false],
+            ['app', null, InputOption::VALUE_REQUIRED, 'Only generate one configured app target (Ex: mobi).', null],
         ];
     }
 
@@ -65,14 +66,16 @@ class CreateTestCommand extends Command
         }
 
         $force     = $this->isForced();
+        $targetApp = $this->option('app');
+        $targetApp = is_string($targetApp) && trim($targetApp) !== '' ? strtolower(trim($targetApp)) : null;
         $generator = new CreateTestGenerator($this, $this->filesystem, $this->utility);
 
         $this->tipCallCommand('moo:test ' . $schema_name);
         foreach (array_keys($all[$schema_name]) as $controller) {
-            $generator->start($schema_name, $controller, $force);
+            $generator->start($schema_name, $controller, $force, $targetApp);
         }
 
         $this->tipDone(true);
-        $this->tipRunTests($generator->testDirs($schema_name));
+        $this->tipRunTests($generator->testDirs($schema_name, $targetApp));
     }
 }

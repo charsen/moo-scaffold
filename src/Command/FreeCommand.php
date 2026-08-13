@@ -83,7 +83,7 @@ class FreeCommand extends Command
         $only_table = $this->resolveOnlyTable();
 
         // app 优先:名少、好记,作主锚;无法由表反推 → 显式给或交互选
-        $apps = $this->utility->getConfig('controller');
+        $apps = $this->utility->getAppTargets();
         $app  = $this->argument('app') ?: $this->chooseApp($apps);
         if (! isset($apps[$app])) {
             $this->reportAppNotConfigured($app, 'Please check the scaffold configuration and try again.');
@@ -118,14 +118,31 @@ class FreeCommand extends Command
             return;
         }
 
+        // 在任何业务代码落盘前确认目标端确实由当前生成范围声明，避免 `--app`
+        // 拼对了注册表、却选中了不含该端的 schema/table 后只生成半套文件。
+        $targetControllers = array_filter(
+            $this->utility->getControllers(false)[$schema_name] ?? [],
+            static fn (array $attr): bool => ($only_table === null || ($attr['table_name'] ?? null) === $only_table)
+                && in_array($app, (array) ($attr['app'] ?? []), true)
+        );
+        if ($targetControllers === []) {
+            $scope = $only_table === null ? "schema [{$schema_name}]" : "表 [{$only_table}]";
+            $this->console()->error("{$scope} 没有为应用端 [{$app}] 声明 controller.app，未生成业务代码。");
+
+            return;
+        }
+
         $this->tipCallCommand('moo:model');
         (new CreateModelGenerator($this, $this->filesystem, $this->utility))->start($schema_name, $force, false, $only_table);
 
         $this->tipCallCommand('moo:resource');
-        (new CreateResourceGenerator($this, $this->filesystem, $this->utility))->start($schema_name, $force, $only_table);
+        (new CreateResourceGenerator($this, $this->filesystem, $this->utility))->start($schema_name, $force, $only_table, $app);
 
         $this->tipCallCommand('moo:controller');
-        (new CreateControllerGenerator($this, $this->filesystem, $this->utility))->start($schema_name, $force, $only_table);
+        $controllerGenerator = new CreateControllerGenerator($this, $this->filesystem, $this->utility);
+        if (! $controllerGenerator->start($schema_name, $force, $only_table, $app)) {
+            return;
+        }
 
         // moo:test 跟 i18n/auth 一样全量(不吃 -t;-t 只过滤 Model/Resource/Controller)。生成一次,-f 才覆盖。
         // plan-53:包 schema 暂不生成测试(测试脚手架路径/命名空间推导是 host 形态,包侧未设计)
@@ -135,7 +152,7 @@ class FreeCommand extends Command
             $this->tipCallCommand('moo:test');
             $test_gen = new CreateTestGenerator($this, $this->filesystem, $this->utility);
             foreach (array_keys($this->utility->getControllers(false)[$schema_name] ?? []) as $controller) {
-                $test_gen->start($schema_name, $controller, $force);
+                $test_gen->start($schema_name, $controller, $force, $app);
             }
         }
 
@@ -170,7 +187,7 @@ class FreeCommand extends Command
         // 包 schema 走上面 if 分支跳过 moo:test,$test_gen 未定义 → tipRunTests 也只 host 路径调
         // (否则包 schema 全部生成完后 fatal:Call to a member function testDirs() on null)。
         if ($schema_origin === null) {
-            $this->tipRunTests($test_gen->testDirs($schema_name));
+            $this->tipRunTests($test_gen->testDirs($schema_name, $app));
         }
     }
 

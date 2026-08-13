@@ -84,6 +84,9 @@ class ScaffoldProvider extends ServiceProvider
         // plan-53 扩展包自动发现(installed.json 扫 scaffold/database marker);单例缓存发现结果
         $this->app->singleton(\Mooeen\Scaffold\Support\PackageRegistry::class);
 
+        // 应用端（admin / mobi / web / host 自定义端）统一注册与兼容归一。
+        $this->app->singleton(\Mooeen\Scaffold\Support\AppTargetRegistry::class);
+
         // plan 49 migration 合并(compact)— 注入 cwd 给 git push 检测用
         $this->app->singleton(\Mooeen\Scaffold\Designer\MigrationCompacter::class, fn ($app) => new \Mooeen\Scaffold\Designer\MigrationCompacter(
             loader: $app->make(\Mooeen\Scaffold\Designer\SchemaLoader::class),

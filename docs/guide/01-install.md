@@ -51,11 +51,21 @@ php artisan vendor:publish --provider="Mooeen\\Scaffold\\ScaffoldProvider" --tag
 
 ## 4. 留路由标记 + 注册宏(生成器依赖,必做)
 
-`routes/admin.php`、`routes/api.php` 各留一行标记(生成器往这里插路由,删了会失败):
+每个 `route_mode = resource` 的应用端路由文件（默认 `routes/admin.php`、`routes/mobi.php`、`routes/web.php`）都留一行标记：
 
 ```php
 // :insert_code_here:do_not_delete
 ```
+
+`config/scaffold.php` 的 `controller` 是应用端注册表。默认端为 `admin`、`mobi`、`web`；RPA、数据屏等业务端由 host 追加。端 key 表示消费者边界，不是 HTTP API 的同义词；API 文档仍使用独立的 `api` 配置段、`moo:api` 命令和 `/scaffold/api` 页面。
+
+每个端显式声明 `path`、Request/Resource 路径、stub 和 `route`。标准资源路由用 `route_mode = resource`；自定义业务路由用 `route_mode = manual`，生成器不会自动插入 `Route::iResource`。
+
+旧 host 若曾把 `api` 当作移动端，升级时应一次性改为 `mobi`，不保留双 key 兼容层：
+
+1. 将 `App\\Api`、`app/Api`、`routes/api.php` 分别改为 `App\\Mobi`、`app/Mobi`、`routes/mobi.php`。
+2. 同步修订 schema 的 `controller.app` / `controller.resource`、middleware group、limiter 与 host 路由引用。对外 URL 可继续使用 `/app`、`/api`等原有前缀；内部应用端名与 HTTP 前缀是两个概念。
+3. 运行 `composer dump-autoload`、`php artisan moo:fresh`、`php artisan moo:auth mobi`；需要接口文档时再运行 `php artisan moo:api mobi -a`。
 
 `AppServiceProvider::boot()` 注册后台路由用的 `iResource` 宏:
 
@@ -114,4 +124,4 @@ schema 写法见 [02-schema-codegen.md](02-schema-codegen.md),命令详解见 [0
 - **`php artisan list` 没 `moo:*`** → `composer dump-autoload`,确认没禁 package discovery。
 - **路由没插进去** → 检查 `:insert_code_here:do_not_delete` 标记还在。
 - **生产点保存报错** → 设计如此,生产只读(见 [12-security.md](12-security.md))。
-- **目录不一样** → 控制器/Resource/Request 默认 `app/{Admin,Api}/{Controllers,Requests,Resources}/`,改 `config/scaffold.php` 的 `controller.{app}.*`。
+- **目录不一样** → 控制器/Resource/Request 默认落在 `app/Admin`、`app/Mobi`、`app/Web` 对应目录，改 `config/scaffold.php` 的 `controller.{app}.*`。

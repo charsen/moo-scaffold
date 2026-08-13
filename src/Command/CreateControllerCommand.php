@@ -35,6 +35,7 @@ class CreateControllerCommand extends Command
         return [
             ['force', '-f', InputOption::VALUE_OPTIONAL, 'Force overwrite Controller, Request, and Trait files.', false],
             ['table', '-t', InputOption::VALUE_OPTIONAL, 'Only generate code for one table key (Ex: system_departments).', null],
+            ['app', null, InputOption::VALUE_REQUIRED, 'Only generate one configured app target (Ex: mobi).', null],
         ];
     }
 
@@ -46,8 +47,8 @@ class CreateControllerCommand extends Command
             return;
         }
 
-        // 创建 Admin 的 BaseActionTrait
-        (new CreateControllerGenerator($this, $this->filesystem, $this->utility))->checkAdminBaseAction();
+        $targetApp = $this->option('app');
+        $targetApp = is_string($targetApp) && trim($targetApp) !== '' ? strtolower(trim($targetApp)) : null;
 
         // 先刷缓存,再定位 schema —— `-t` 给的全局唯一表 key 能反查出 schema(读 models.php),无需再选模块
         (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start(false, true);
@@ -65,7 +66,7 @@ class CreateControllerCommand extends Command
 
         $this->tipCallCommand('moo:controller ' . $schema_name);
         $result = (new CreateControllerGenerator($this, $this->filesystem, $this->utility))
-            ->start($schema_name, $force, $only_table);
+            ->start($schema_name, $force, $only_table, $targetApp);
 
         $this->tipDone($result);
     }

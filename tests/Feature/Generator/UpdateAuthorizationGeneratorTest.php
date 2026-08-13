@@ -217,6 +217,26 @@ it('start() 全量重写:第二次跑只保留最新 routes(旧 action 不残留
     expect($flat)->not->toContain('authGen_ArticleController@store'); // 全量重建,store 没了
 });
 
+it('start() 清理已从 controller 注册表移除的旧 app 聚合键', function () {
+    app(Filesystem::class)->put(config_path('actions.php'), <<<'PHP'
+<?php return ['admin' => ['whitelist' => [], 'actions' => []], 'api' => ['whitelist' => ['old'], 'actions' => []], 'meta' => ['version' => 1]];
+PHP);
+    config()->set('actions', require config_path('actions.php'));
+    app(Filesystem::class)->ensureDirectoryExists(lang_path('en'));
+    app(Filesystem::class)->ensureDirectoryExists(lang_path('zh-CN'));
+    app(Filesystem::class)->put(lang_path('en/actions.php'), "<?php return ['api' => ['app-api' => 'Api'], 'meta' => ['version' => 1]];");
+    app(Filesystem::class)->put(lang_path('zh-CN/actions.php'), "<?php return ['api' => ['app-api' => '接口'], 'meta' => ['version' => 1]];");
+
+    authGen_make()->start('admin', [authGen_route(authGen_ArticleController::class, 'index')]);
+
+    expect(require config_path('actions.php'))->not->toHaveKey('api')
+        ->and(require lang_path('en/actions.php'))->not->toHaveKey('api')
+        ->and(require lang_path('zh-CN/actions.php'))->not->toHaveKey('api')
+        ->and(require config_path('actions.php'))->toHaveKey('meta')
+        ->and(require lang_path('en/actions.php'))->toHaveKey('meta')
+        ->and(require lang_path('zh-CN/actions.php'))->toHaveKey('meta');
+});
+
 /* ---------------------------------------------------------------------------
  * 纯方法 · getMd5 / isCrossControllerTransform
  * ------------------------------------------------------------------------ */

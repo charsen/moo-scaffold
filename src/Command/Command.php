@@ -95,7 +95,7 @@ class Command extends BaseCommand
 
     /**
      * plan-53:schema 选择带出身标注(`System〔moo-system 扩展包〕`),选了即定出身、无独立 host/pkg 问题;
-     * $forApp 非 admin 时按上下文收窄 —— 包 schema 固定 admin,api 等语境下不列(天然无矛盾)。
+     * $forApp 非 admin 时按上下文收窄 —— 包 schema 固定 admin,mobi/web 等语境下不列(天然无矛盾)。
      */
     protected function chooseSchema(array $schemas, string $question = '选择 schema（模块）', ?string $forApp = null): string
     {

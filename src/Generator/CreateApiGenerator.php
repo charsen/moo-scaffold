@@ -376,18 +376,19 @@ class CreateApiGenerator extends Generator
         $forceControllerDeprecated = $actions === [] && $this->staleMode === self::STALE_MODE_DEPRECATE && $staleActionKeys !== [];
 
         $names                 = $reflectionClass !== null ? $this->utility->parsePMCNames($reflectionClass) : [];
-        $controllerDisplayName = trim((string) ($controllerData['name'] ?? ($names['controller']['name']['zh-CN'] ?? '')));
+        $controllerDisplayName = $this->resolveControllerDisplayName($controllerName, $controllerData, $names);
         $controllerCode        = $controllerData['code'] ?? '';
         $controllerDesc        = $controllerData['desc'] ?? [];
 
-        $code   = ['###'];
-        $code[] = "# {$controllerName} Api";
-        $code[] = '#';
-        $code[] = '# @author ' . $this->utility->getConfig('author');
-        $code[] = '# @date ' . ($documentDate ?: $this->generatedAt);
-        $code[] = '##';
-        $code[] = 'controller:';
-        $code[] = $this->getTabs(1) . 'code: ' . (is_scalar($controllerCode) ? (string) $controllerCode : '');
+        $code                = ['###'];
+        $code[]              = "# {$controllerName} Api";
+        $code[]              = '#';
+        $code[]              = '# @author ' . $this->utility->getConfig('author');
+        $code[]              = '# @date ' . ($documentDate ?: $this->generatedAt);
+        $code[]              = '##';
+        $code[]              = 'controller:';
+        $controllerCodeValue = is_scalar($controllerCode) ? trim((string) $controllerCode) : '';
+        $code[]              = $this->getTabs(1) . 'code:' . ($controllerCodeValue === '' ? '' : ' ' . $controllerCodeValue);
         // plan-40 §二 F6:走 quoteYamlString — controller name/class 来自配置 yaml / reflection,
         // 不走 SchemaLoader 校验通道,含换行 / 单引号会撕裂 yaml(40-addendum-escape-coverage-audit.md F6)
         $code[] = $this->getTabs(1) . "class: '" . $this->quoteYamlString(trim((string) ($controllerData['class'] ?? $controllerName))) . "'";
@@ -528,15 +529,17 @@ class CreateApiGenerator extends Generator
         $meta             = $this->buildActionMeta($existingAction, $touchUpdatedMeta);
         // name/desc 来源:docblock(第 1 行 name / 第 2 行起 desc)。已有 action 默认保留 yaml 现值(手改优先);
         //   --sync-names 时用 docblock 覆盖。无论同步与否,docblock≠yaml 都记进 nameDiffs 由 start() 结尾汇报。
-        $docName         = trim((string) $this->getActionName($reflectionClass, $actionName));
-        $docDesc         = $this->getActionDesc($reflectionClass, $actionName);
-        $hasExistingName = array_key_exists('name', $existingAction);
-        $existingName    = $hasExistingName ? trim((string) $existingAction['name']) : null;
-        $diffKey         = ($this->diffControllerName !== '' ? $this->diffControllerName . '/' : '') . $actionKey;
+        $docName               = trim($this->getActionDocName($reflectionClass, $actionName));
+        $generatedName         = $docName !== '' ? $docName : $this->getActionFallbackName($actionName);
+        $docDesc               = $this->getActionDesc($reflectionClass, $actionName);
+        $hasExistingName       = array_key_exists('name', $existingAction);
+        $existingName          = $hasExistingName ? trim((string) $existingAction['name']) : null;
+        $hasUsableExistingName = $hasExistingName && $existingName !== '';
+        $diffKey               = ($this->diffControllerName !== '' ? $this->diffControllerName . '/' : '') . $actionKey;
 
-        if (! $hasExistingName) {
-            $name = $docName;                  // 新 action → docblock
-        } elseif ($this->syncNames) {
+        if (! $hasUsableExistingName) {
+            $name = $generatedName;             // 新 action / 空名称 → docblock，缺注释时才回退方法名
+        } elseif ($this->syncNames && $docName !== '') {
             $name = $docName;                  // 显式同步 → docblock 覆盖
             if ($docName !== '' && $docName !== $existingName) {
                 $this->nameDiffs[] = ['key' => $diffKey, 'old' => (string) $existingName, 'new' => $docName, 'synced' => true];
@@ -586,6 +589,36 @@ class CreateApiGenerator extends Generator
             'name'       => $name,
             'is_new'     => $existingActionKey === null,
         ];
+    }
+
+    /**
+     * 控制器名称与 action 名称采用同一覆盖边界：
+     * 空 YAML 值等同缺失，自动从 docblock 回填；非空手写值默认保留，
+     * 仅在 --sync-names 时由 @controller_name 覆盖。
+     */
+    private function resolveControllerDisplayName(string $controllerName, array $controllerData, array $names): string
+    {
+        $docName      = trim((string) ($names['controller']['name']['zh-CN'] ?? ''));
+        $existingName = trim((string) ($controllerData['name'] ?? ''));
+
+        if ($existingName === '') {
+            return $docName;
+        }
+
+        if (! $this->syncNames || $docName === '') {
+            return $existingName;
+        }
+
+        if ($docName !== $existingName) {
+            $this->nameDiffs[] = [
+                'key'    => $controllerName . '/@controller',
+                'old'    => $existingName,
+                'new'    => $docName,
+                'synced' => true,
+            ];
+        }
+
+        return $docName;
     }
 
     private function buildStoredAction(
@@ -932,24 +965,26 @@ class CreateApiGenerator extends Generator
     // 删私有版,所有 callsite 统一用 base helper + 外面手动 `'...'` 包(40-addendum F6/F7 修法)。
 
     /**
-     * 获取 action 中文名称
+     * 获取 action DocBlock 第一行；没有注释时返回空值，避免 --sync-names
+     * 把既有人工名称错误覆盖成 index/show 等方法名。
      */
-    private function getActionName(?\ReflectionClass $reflectionClass, string $actionName): string
+    private function getActionDocName(?\ReflectionClass $reflectionClass, string $actionName): string
+    {
+        if ($reflectionClass === null || ! $reflectionClass->hasMethod($actionName)) {
+            return '';
+        }
+
+        return $this->utility->parseActionName($reflectionClass->getMethod($actionName));
+    }
+
+    /**
+     * 新接口缺少 DocBlock 名称时的稳定兜底。
+     */
+    private function getActionFallbackName(string $actionName): string
     {
         $defaultNames = ['create' => '创建表单', 'edit' => '编辑表单'];
 
-        if (isset($defaultNames[$actionName])) {
-            return $defaultNames[$actionName];
-        }
-
-        if ($reflectionClass === null || ! $reflectionClass->hasMethod($actionName)) {
-            return $actionName;
-        }
-
-        $reflectionMethod = $reflectionClass->getMethod($actionName);
-        $name             = $this->utility->parseActionName($reflectionMethod);
-
-        return $name === '' ? $actionName : $name;
+        return $defaultNames[$actionName] ?? $actionName;
     }
 
     /**

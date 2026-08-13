@@ -78,7 +78,7 @@ class CreateApiCommand extends Command
             ['force', '-f', InputOption::VALUE_OPTIONAL, 'Force overwrite existing YAML files even if unchanged.', false],
             ['all', 'a', InputOption::VALUE_NONE, 'Generate API YAML for all namespaces of the selected app.'],
             ['stale', null, InputOption::VALUE_OPTIONAL, 'How to handle stale actions: keep, deprecate (default), delete.', 'deprecate'],
-            ['sync-names', null, InputOption::VALUE_NONE, 'Overwrite existing action name/desc from controller docblock (default keeps yaml, only reports diffs).'],
+            ['sync-names', null, InputOption::VALUE_NONE, 'Overwrite existing controller/action names and action descriptions from docblocks (default keeps non-empty YAML values).'],
         ];
     }
 
@@ -93,7 +93,7 @@ class CreateApiCommand extends Command
             return;
         }
 
-        $apps        = $this->utility->getConfig('controller');
+        $apps        = $this->utility->getAppTargets();
         $appArgument = $this->argument('app');
         $app         = $appArgument;
         if (empty($app)) {
