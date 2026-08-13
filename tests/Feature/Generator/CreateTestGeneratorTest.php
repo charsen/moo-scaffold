@@ -12,7 +12,7 @@ use Symfony\Component\Console\Output\NullOutput;
  *   ['name'=>, 'folder'=>]。早期用 'app'=>'admin'（字符串）写测 → 假绿，真机 "Array to string" 炸。
  *
  * 验：① 单 app → tests/Feature/{App}/{module}/{Controller}Test.php，占位符全替换，FQCN 推对；
- *     ② 多 app（admin+api）→ 各落一份，FQCN 各按 app 命名空间；
+ *     ② 多 app（admin+mobi）→ 各落一份，FQCN 各按 app 命名空间；
  *     ③ once 语义（已存在不带 -f 不覆盖）。
  */
 it('moo:test：逐 app 生成路由契约测，FQCN 推导 + 占位符 + once', function () {
@@ -35,7 +35,7 @@ it('moo:test：逐 app 生成路由契约测，FQCN 推导 + 占位符 + once', 
                 'model_class' => 'OrderService',
             ],
             'BothController' => [
-                'app'         => ['admin', 'api'],                   // 多 app → 各落一份
+                'app'         => ['admin', 'mobi'],                  // 多 app → 各落一份
                 'module'      => ['name' => '市场', 'folder' => 'Market'],
                 'model_class' => 'Both',
             ],
@@ -58,25 +58,33 @@ it('moo:test：逐 app 生成路由契约测，FQCN 推导 + 占位符 + once', 
         expect($c)->toContain('App\\Admin\\Controllers\\Market\\OrderServiceController@');
         expect($c)->toContain('tester');
 
-        // ── ② 多 app（admin + api）→ 两份，FQCN 各异 ───────────────
+        // ── ② 多 app（admin + mobi）→ 两份，FQCN 各异 ──────────────
         $gen->start('Market', 'BothController', true);
         $admin = $testsDir . 'Admin/Market/BothControllerTest.php';
-        $api   = $testsDir . 'Api/Market/BothControllerTest.php';
+        $mobi  = $testsDir . 'Mobi/Market/BothControllerTest.php';
         expect($fs->isFile($admin))->toBeTrue('多 app:admin 份未生成');
-        expect($fs->isFile($api))->toBeTrue('多 app:api 份未生成');
+        expect($fs->isFile($mobi))->toBeTrue('多 app:mobi 份未生成');
         expect($fs->get($admin))->toContain('App\\Admin\\Controllers\\Market\\BothController@');
-        expect($fs->get($api))->toContain('App\\Api\\Controllers\\Market\\BothController@');
+        expect($fs->get($mobi))->toContain('App\\Mobi\\Controllers\\Market\\BothController@');
 
-        // ── ③ once：不带 -f 再跑不覆盖 ─────────────────────────────
+        // ── ③ 单目标模式：只生成选中的 app ────────────────────────────
+        $fs->delete($admin);
+        $fs->delete($mobi);
+        $gen->start('Market', 'BothController', true, 'mobi');
+        expect($fs->isFile($admin))->toBeFalse('单目标模式不应生成 admin 测试');
+        expect($fs->isFile($mobi))->toBeTrue('单目标模式应生成 mobi 测试');
+
+        // ── ④ once：不带 -f 再跑不覆盖 ─────────────────────────────
         $mtime1 = $fs->lastModified($file);
         $gen->start('Market', 'OrderServiceController', false);
         expect($fs->lastModified($file))->toBe($mtime1);
 
-        // ── ④ testDirs：去重后给「择机跑」提示用的相对目录（admin + api 各一）──
+        // ── ⑤ testDirs：去重后给「择机跑」提示用的相对目录（admin + mobi 各一）─
         $dirs = $gen->testDirs('Market');
         expect($dirs)->toContain('tests/Feature/Admin/Market');
-        expect($dirs)->toContain('tests/Feature/Api/Market');
-        expect(count($dirs))->toBe(2);   // 两控制器同 module，去重后仅 Admin/Market + Api/Market
+        expect($dirs)->toContain('tests/Feature/Mobi/Market');
+        expect(count($dirs))->toBe(2);   // 两控制器同 module，去重后仅 Admin/Market + Mobi/Market
+        expect($gen->testDirs('Market', 'mobi'))->toBe(['tests/Feature/Mobi/Market']);
     } finally {
         $fs->deleteDirectory($sandbox);
         app()->useStoragePath($origStor);

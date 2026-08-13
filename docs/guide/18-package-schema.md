@@ -16,7 +16,7 @@
 schema 的**出身**在它躺在哪个 `scaffold/database/` 里时就定了:host 目录的是 host schema,包目录的是包 schema。没有「目标切换器」,不需要也不会问你「生成到哪」——选了 schema,落点即定。
 
 - **Web 端**:设计器 / 数据库文档 / 数据字典 / 开发文档中心的列表按出身**分块呈现**(包块带 📦 标识);包 schema / 包文档详情页带 `📦 包名` 徽标提醒「改动落包仓,commit 到该仓」;只读包(vendor 拷贝)整页写按钮灰化。开发文档中心的包文档要求包根有 `docs/` 目录(同 `scaffold/database/` 一样是发现标记)。
-- **CLI 端**:选 schema 的交互列表里包项标注 `System〔moo-system 扩展包〕`;包 schema 只支持 `admin` 端——选了 `api` 等其它 app 时列表不出现包 schema,显式传参 `moo:free api System` 会 fail-fast 报错。
+- **CLI 端**:选 schema 的交互列表里包项标注 `System〔moo-system 扩展包〕`;包 schema 只支持 `admin` 端——选了 `mobi`、`web` 等其它端时列表不出现包 schema,显式传参也会 fail-fast 报错。包内历史 schema 的端声明归包自身，不由 host 注册表反向否决。
 
 ## 落点约定:源资产随包,聚合随 host
 

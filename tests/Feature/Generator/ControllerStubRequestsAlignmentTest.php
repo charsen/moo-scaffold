@@ -38,19 +38,20 @@ it('controller-admin.stub 的 XxxRequest 全部覆盖于 config admin.requests',
     );
 });
 
-it('controller-api.stub 的 XxxRequest 全部覆盖于 config api.requests', function () {
-    $stubTokens = extractRequestTokens(__DIR__ . '/../../../stubs/controller-api.stub');
-    $configReqs = configRequests('api');
+it('每个默认应用端的显式 controller stub 与 requests 对齐', function () {
+    $cfg = require __DIR__ . '/../../../config/config.php';
 
-    $missing = array_diff($stubTokens, $configReqs);
-    expect($missing)->toBe(
-        [],
-        '以下 Request 在 controller-api.stub 里出现，但 config api.requests 缺：' . implode(', ', $missing)
-    );
+    foreach ($cfg['controller'] as $app => $target) {
+        $stubTokens = extractRequestTokens(__DIR__ . '/../../../stubs/' . $target['stub'] . '.stub');
+        $configReqs = configRequests($app);
 
-    $orphaned = array_diff($configReqs, $stubTokens);
-    expect($orphaned)->toBe(
-        [],
-        '以下 Request 在 config api.requests 里配了，但 controller-api.stub 没引用：' . implode(', ', $orphaned)
-    );
+        expect(array_diff($stubTokens, $configReqs))->toBe(
+            [],
+            "应用端 {$app} 的 controller stub 引用了未配置的 Request。"
+        );
+        expect(array_diff($configReqs, $stubTokens))->toBe(
+            [],
+            "应用端 {$app} 配置了 controller stub 未使用的 Request。"
+        );
+    }
 });

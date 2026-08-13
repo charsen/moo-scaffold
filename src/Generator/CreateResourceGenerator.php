@@ -12,6 +12,7 @@ namespace Mooeen\Scaffold\Generator;
 
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Support\Str;
+use Mooeen\Scaffold\Support\AppTargetRegistry;
 
 class CreateResourceGenerator extends Generator
 {
@@ -20,7 +21,7 @@ class CreateResourceGenerator extends Generator
     /**
      * @throws FileNotFoundException
      */
-    public function start(string $schema_name, bool $force = false, ?string $only_table = null): bool
+    public function start(string $schema_name, bool $force = false, ?string $only_table = null, ?string $target_app = null): bool
     {
         $all = $this->filesystem->getRequire($this->utility->getStoragePath() . 'models.php');
 
@@ -48,7 +49,7 @@ class CreateResourceGenerator extends Generator
 
             $table_attr = $this->utility->getOneTable($attr['table_name']);
 
-            foreach ($this->getResourceTargets($attr) as $target) {
+            foreach ($this->getResourceTargets($attr, $target_app) as $target) {
                 // 包平铺(无 module folder 段);host 按 folder 分层
                 $resource_path = ! empty($target['flat']) ? rtrim($target['path'], '/') : $target['path'] . $attr['module']['folder'];
                 $resource_file = $resource_path . "/{$class}Resource.php";
@@ -106,10 +107,14 @@ class CreateResourceGenerator extends Generator
     /**
      * 获取当前模型要输出的 resource 目标目录
      */
-    private function getResourceTargets(array $schema): array
+    private function getResourceTargets(array $schema, ?string $targetApp = null): array
     {
         // plan-53:包 schema 单一目标 — 包 src/Http/Resources(平铺,app 固定 admin)
         if ($this->originCtx !== null) {
+            if ($targetApp !== null && strtolower(trim($targetApp)) !== 'admin') {
+                throw new \InvalidArgumentException("扩展包 schema 的 Resource 固定 admin，不支持应用端 [{$targetApp}]。");
+            }
+
             $path = $this->originCtx->pathFor('resource');
 
             return [[
@@ -121,16 +126,19 @@ class CreateResourceGenerator extends Generator
             ]];
         }
 
-        $targets = [];
-        $apps    = $schema['resource'] ?? [];
+        $targets  = [];
+        $apps     = $schema['resource'] ?? [];
+        $registry = app(AppTargetRegistry::class);
+        $registry->assertConfigured((array) $apps, "{$schema['table_name']}.controller.resource");
+
+        if ($targetApp !== null) {
+            $targetApp = strtolower(trim($targetApp));
+            $registry->get($targetApp);
+            $apps = in_array($targetApp, $apps, true) ? [$targetApp] : [];
+        }
 
         foreach ($apps as $app) {
-            $config = $this->utility->getConfig("controller.{$app}");
-            if (empty($config)) {
-                $this->console()->error("未配置 Resource app \"{$app}\"。");
-
-                continue;
-            }
+            $registry->get((string) $app);
 
             $relativePath = $this->utility->getAppResourcePath($app, true);
             $targets[]    = [

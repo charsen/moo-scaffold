@@ -277,7 +277,7 @@ it('saveModule preserves system fields id/created_at/updated_at even when client
 });
 
 it('saveModule applyTableController persists app/resource even when class is empty (2026-05-20 bug)', function () {
-    // user 反馈:designer 选了「生成到:后台管理/接口」+「Resource 到:接口」toggle,
+    // user 反馈:designer 选了「生成到:后台管理/移动端」+「Resource 到:移动端」toggle,
     // 但 controller class 暂时未填(等代码生成时再填),save → 刷新页面后 toggle 状态丢失。
     // 根因:旧逻辑 if class === '' 提前 return,app/resource 数据不写盘。
     // 修法:class 跟 app/resource 解耦,都为空才整段 unset。
@@ -291,8 +291,8 @@ it('saveModule applyTableController persists app/resource even when class is emp
             'rename_hints' => [], 'multi_indexes' => [],
             'controller'   => [
                 'class'    => '',                  // 暂未填
-                'app'      => ['admin', 'api'],      // user 已选
-                'resource' => ['api'],          // user 已选
+                'app'      => ['admin', 'mobi'], // user 已选
+                'resource' => ['mobi'],          // user 已选
             ],
         ]],
     ];
@@ -301,9 +301,9 @@ it('saveModule applyTableController persists app/resource even when class is emp
     $content = file_get_contents($this->tmpDir . '/Demo.yaml');
     // app/resource 持久化(即使 class 空)
     expect($content)->toContain('app:');
-    expect($content)->toMatch('/app:\s*\[admin, api\]|admin\s*\n[\s-]+api/');
+    expect($content)->toMatch('/app:\s*\[admin, mobi\]|admin\s*\n[\s-]+mobi/');
     expect($content)->toContain('resource:');
-    expect($content)->toContain('api');
+    expect($content)->toContain('mobi');
     // class 字段不该写盘(因为空)
     expect($content)->not->toMatch('/controller:\s*\n\s+class:\s*\'?\'?/');
 });

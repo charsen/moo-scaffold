@@ -68,7 +68,7 @@ class AdderCommand extends Command
             return;
         }
 
-        $apps = $this->utility->getConfig('controller');
+        $apps = $this->utility->getAppTargets();
         $app  = $this->argument('app');
         if (empty($app)) {
             $app = $this->chooseApp($apps);

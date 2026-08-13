@@ -15,6 +15,7 @@ use Illuminate\Support\Str;
 use Mooeen\Scaffold\Foundation\FormRequest;
 use Mooeen\Scaffold\Rules\Mobile;
 use Mooeen\Scaffold\Rules\NumericArray;
+use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Utility;
 
 use function in_array;
@@ -27,7 +28,7 @@ class CreateControllerGenerator extends Generator
     /**
      * @throws FileNotFoundException
      */
-    public function start(string $schema_name, bool $force = false, ?string $only_table = null)
+    public function start(string $schema_name, bool $force = false, ?string $only_table = null, ?string $target_app = null)
     {
         $this->base_path = app_path('/');
         $all             = $this->utility->getControllers(false);
@@ -45,8 +46,15 @@ class CreateControllerGenerator extends Generator
         $this->originCtx = $this->originContext($origin);
 
         // 已生成的 controllers
-        $created = [];
-        $apps    = $this->utility->getApps();
+        $created          = [];
+        $registry         = app(AppTargetRegistry::class);
+        $targets          = $registry->all();
+        $matchedTargetApp = $target_app === null;
+
+        if ($target_app !== null) {
+            $target_app = strtolower(trim($target_app));
+            $targets    = [$target_app => $registry->codegen($target_app)];
+        }
 
         foreach ($all[$schema_name] as $class => $attr) {
             // moo:free --table 过滤:只生成指定表 key 的代码,其它表跳过
@@ -54,14 +62,22 @@ class CreateControllerGenerator extends Generator
                 continue;
             }
 
-            foreach ($apps as $app_folder => $app_name) {
+            if ($this->originCtx === null) {
+                $registry->assertConfigured((array) $attr['app'], "{$schema_name}.{$attr['table_name']}.controller.app");
+                $registry->assertConfigured((array) ($attr['resource'] ?? []), "{$schema_name}.{$attr['table_name']}.controller.resource");
+            }
+
+            foreach ($targets as $app_folder => $target) {
                 $app_folder    = strtolower($app_folder);
-                $uc_app_folder = ucfirst($app_folder);
+                $app_name      = $target['label'];
+                $uc_app_folder = Str::studly($app_folder);
 
                 // 控制器没配置的 app 不生产
                 if (! in_array($app_folder, $attr['app'], true)) {
                     continue;
                 }
+                $target           = $registry->codegen($app_folder);
+                $matchedTargetApp = true;
 
                 // 包 schema 固定 admin(包控制器挂 host admin 组,extra_modules 范式);其它 app 直接拒
                 if ($this->originCtx !== null && $app_folder !== 'admin') {
@@ -74,7 +90,8 @@ class CreateControllerGenerator extends Generator
                 if ($this->originCtx !== null) {
                     $path = rtrim($this->originCtx->pathFor('controller'), '/');
                 } else {
-                    $path = $this->utility->getConfig("controller.{$app_folder}.path");
+                    $this->checkAdminBaseAction($app_folder);
+                    $path = $target['path'];
                     $path = base_path($path) . $attr['module']['folder'];
                 }
                 $this->checkDirectory($path);
@@ -177,7 +194,7 @@ class CreateControllerGenerator extends Generator
                 }
 
                 // build controller
-                $stub    = $this->utility->getConfig('controller.' . $app_folder . '.stub');
+                $stub    = $target['stub'];
                 $content = $this->buildStub($meta, $this->getStub($stub));
                 // 2026-05-20 audit hook 占位符独立行(L107/L123)+ 周围空行 = hook 空时残留 3+ 连续 whitespace-only 行
                 // 折叠 3+ 连续空行(含 whitespace-only)为单个空行,保留 hook 有内容时的视觉间距
@@ -194,6 +211,12 @@ class CreateControllerGenerator extends Generator
                     'origin'      => $origin,
                 ];
             }
+        }
+
+        if (! $matchedTargetApp) {
+            $this->console()->error("schema [{$schema_name}] 没有为应用端 [{$target_app}] 声明 controller.app，未生成任何控制器。");
+
+            return false;
         }
 
         // 更新路由文件内容
@@ -432,7 +455,8 @@ class CreateControllerGenerator extends Generator
             return;
         }
 
-        $content = $this->buildStub($meta, $this->getStub("controller-{$app}-trait"));
+        $target  = app(AppTargetRegistry::class)->codegen($app);
+        $content = $this->buildStub($meta, $this->getStub($target['controller_trait_stub']));
         $this->putAndReport($trait_file, $trait_relative_file, $content);
     }
 
@@ -514,10 +538,20 @@ class CreateControllerGenerator extends Generator
     /**
      * 检查 BaseAction 是否存在，不存在则创建
      */
-    public function checkAdminBaseAction(): void
+    public function checkAdminBaseAction(?string $targetApp = null): void
     {
-        $config = $this->utility->getConfig('controller');
+        $registry = app(AppTargetRegistry::class);
+        $config   = $targetApp === null ? $registry->all() : [strtolower(trim($targetApp)) => $registry->codegen($targetApp)];
         foreach ($config as $app => $controller) {
+            try {
+                $controller = $registry->codegen($app);
+            } catch (\InvalidArgumentException $e) {
+                if ($targetApp !== null) {
+                    throw $e;
+                }
+
+                continue;
+            }
             $config_key    = 'controller.' . strtolower($app) . '.path';
             $path          = $this->utility->getControllerPath($config_key) . 'Traits';
             $relative_path = $this->utility->getControllerPath($config_key, true) . 'Traits';
@@ -826,9 +860,16 @@ class CreateControllerGenerator extends Generator
         $hostItems = array_filter($created, static fn (array $i): bool => ($i['origin'] ?? null) === null);
         $pkgItems  = array_filter($created, static fn (array $i): bool => ($i['origin'] ?? null) !== null);
 
-        $config = $this->utility->getConfig('controller');
+        $config = app(AppTargetRegistry::class)->all();
         foreach ($config as $app => $controller) {
             $items = array_values(array_filter($hostItems, static fn (array $i): bool => $i['app'] === $app));
+            if ($controller['route_mode'] === AppTargetRegistry::ROUTE_MODE_MANUAL) {
+                if ($items !== []) {
+                    $this->console()->info("应用端 [{$app}] 使用 manual 路由模式，已跳过自动写入路由；请手工注册控制器路由。");
+                }
+
+                continue;
+            }
             $this->insertRoutes(base_path('/') . $controller['route'], "./{$controller['route']}", $items);
         }
 

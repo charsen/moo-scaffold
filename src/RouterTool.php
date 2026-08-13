@@ -122,7 +122,7 @@ class RouterTool
 
     public function get()
     {
-        $apps = $this->utility->getConfig('controller');
+        $apps = $this->utility->getAppTargets();
 
         $this->filter_folder = ucfirst(rtrim($apps[$this->app]['path'] . $this->folder, '/'));
         // moo:api 时，$folder != ''，只获取指定目录下的控制器
@@ -238,6 +238,14 @@ class RouterTool
     protected function filterRoute(Route $route): array
     {
         $action_name = ltrim($route->getActionName(), '\\');
+
+        // Laravel invokable controller 的 route action 只有 FQCN，没有传统的 `@method`。
+        // 统一补成 `Controller@__invoke`，让命名空间过滤、ACL 与 API 文档复用同一条链路。
+        if (! str_contains($action_name, '@')
+            && class_exists($action_name)
+            && method_exists($action_name, '__invoke')) {
+            $action_name .= '@__invoke';
+        }
 
         // 当指定的是 控制器的根目录时，目录层级大于 4 的都不要
         if ($this->folder != '') {

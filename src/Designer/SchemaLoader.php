@@ -3,6 +3,7 @@
 namespace Mooeen\Scaffold\Designer;
 
 use Illuminate\Support\Facades\DB;
+use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Support\PackageRegistry;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Finder\Finder;
@@ -553,7 +554,7 @@ class SchemaLoader
             $yamlTable = $this->applyTableAttrs($yamlTable, $cTable);
             // plan 19 v11:Model / Controller / Resource 配置可编辑
             $yamlTable = $this->applyTableModel($yamlTable, $cTable);
-            $yamlTable = $this->applyTableController($yamlTable, $cTable);
+            $yamlTable = $this->applyTableController($yamlTable, $cTable, $this->originOf($schema));
 
             if (array_key_exists('fields', $cTable) && is_array($cTable['fields'])) {
                 $yamlFields = (array) ($yamlTable['fields'] ?? []);
@@ -681,7 +682,7 @@ class SchemaLoader
      * plan-37 后审 P1:class 清空时只删 class 这一个 key,保留 app/resource 等子配置,
      * 不再静默 unset 整个 controller 节点(数据丢失风险)。
      */
-    private function applyTableController(array $yamlTable, array $cTable): array
+    private function applyTableController(array $yamlTable, array $cTable, ?string $origin = null): array
     {
         if (! array_key_exists('controller', $cTable) || ! is_array($cTable['controller'])) {
             return $yamlTable;
@@ -706,6 +707,10 @@ class SchemaLoader
                 array_map('strval', $cCtrl['app']),
                 static fn ($s) => $s !== '',
             ));
+            // host schema 由 host 注册表约束；扩展包 schema 的端契约归包自身。
+            if ($origin === null) {
+                app(AppTargetRegistry::class)->assertConfigured($appList, 'controller.app');
+            }
             if ($appList === []) {
                 unset($existing['app']);
             } else {
@@ -717,6 +722,9 @@ class SchemaLoader
                 array_map('strval', $cCtrl['resource']),
                 static fn ($s) => $s !== '',
             )) : [];
+            if ($origin === null) {
+                app(AppTargetRegistry::class)->assertConfigured($resource, 'controller.resource');
+            }
             if ($resource === []) {
                 unset($existing['resource']);
             } else {

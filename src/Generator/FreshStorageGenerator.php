@@ -12,6 +12,7 @@ namespace Mooeen\Scaffold\Generator;
 
 use Brick\VarExporter\VarExporter;
 use Illuminate\Support\Str;
+use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Support\PackageRegistry;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Yaml\Yaml;
@@ -97,6 +98,12 @@ class FreshStorageGenerator extends Generator
                 foreach ($data['tables'] as $table_name => $config) {
                     $controllerApps = $this->normalizeAppConfig($config['controller']['app'] ?? []);
                     $resourceApps   = $this->normalizeAppConfig($config['controller']['resource'] ?? []);
+                    // host schema 的 app key 必须由 host 显式注册；扩展包 schema 的端契约归包自身，
+                    // 不能用某个 host 的注册表反向否决（包代码生成仍由 TargetContext 固定规则约束）。
+                    if ($origin === null) {
+                        app(AppTargetRegistry::class)->assertConfigured($controllerApps, "{$file_name}.{$table_name}.controller.app");
+                        app(AppTargetRegistry::class)->assertConfigured($resourceApps, "{$file_name}.{$table_name}.controller.resource");
+                    }
 
                     // 缓存 控制器 与 模型等的关系
                     if (isset($config['controller'])) {

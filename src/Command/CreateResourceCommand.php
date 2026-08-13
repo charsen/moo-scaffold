@@ -35,6 +35,7 @@ class CreateResourceCommand extends Command
         return [
             ['force', '-f', InputOption::VALUE_OPTIONAL, 'Overwrite resource files.', false],
             ['table', '-t', InputOption::VALUE_OPTIONAL, 'Only generate code for one table key (Ex: system_departments).', null],
+            ['app', null, InputOption::VALUE_REQUIRED, 'Only generate one configured app target (Ex: mobi).', null],
         ];
     }
 
@@ -58,11 +59,13 @@ class CreateResourceCommand extends Command
             return;
         }
 
-        $force = $this->isForced();
+        $force     = $this->isForced();
+        $targetApp = $this->option('app');
+        $targetApp = is_string($targetApp) && trim($targetApp) !== '' ? strtolower(trim($targetApp)) : null;
 
         $this->tipCallCommand('moo:resource ' . $schema_name);
         $result = (new CreateResourceGenerator($this, $this->filesystem, $this->utility))
-            ->start($schema_name, $force, $only_table);
+            ->start($schema_name, $force, $only_table, $targetApp);
 
         $this->tipDone($result);
     }

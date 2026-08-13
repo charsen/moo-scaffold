@@ -3,6 +3,8 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-08-13，症状：控制器已补 `@controller_name` 和 action DocBlock 后，重跑 `moo:api --sync-names` 仍可能保留 YAML 的空控制器名，且无 DocBlock 的方法会被同步成 `index/show`。根因：控制器名称没有纳入 `--sync-names`，空字符串被当作已有值；action 又把方法名兜底与 DocBlock 真值混为一体。解法：空名称统一按缺失回填，`--sync-names` 同步 controller/action；无方法注释时保留既有非空文案，只在新 action 上使用方法名兜底。
+- 2026-08-13，症状：`moo:free {app}` 虽已选择一个端，Controller/Resource/Test 生成器仍遍历 schema 的全部端，且模板名由 app key 拼接，新增 Web/RPA 会漏生成或找不到 stub；根因：app 同时被误当作 API 同义词、目录名和模板策略。解法：controller 配置统一进入 AppTargetRegistry，显式声明 profile/path/stub/route_mode；默认端用 admin/mobi/web，`manual` 端不自动写 iResource，host schema 未注册端直接报错，包 schema 的端契约由包自身管理。
 - HasOperator 已上移 Mooeen\Scaffold\Concerns\HasOperator（2026-07-16）；生成器直接引用共享 Trait，不再生成本地 stub。经 OperatorResolver 取 nullable 身份，无身份统一为 null。
 - grep 找「代码习语」会因空白对齐假阴性：`option('force') === null` 用单空格 grep 会漏掉双空格对齐的 `option('force')   === null`（2026-07-09 全仓改 isForced 时方案与我同时漏掉第 8 处 CreateModelCommand:70，靠 review 逮到）。全仓替换某习语时：要么 grep 宽松模式（`option\('force'\)\s*===\s*null`），要么把命中数跟预期数对一下，对不上就换模式复核。
 - plan-53 双路径(originCtx 三元 23 处)不再强收敛到 TargetContext：path 能干净参数化，但 namespace 前缀的 module-folder 插入散在多处下游、且 host 的 controller 路径随 app 变会逼 host context 存 app-keyed 嵌套 map——分支只是重定位进值对象、间接层更深，读得反不如现状 6 行 if/else 直白。2026-07-09 止损，维持现状（无新证据别重开）。

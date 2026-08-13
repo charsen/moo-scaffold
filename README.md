@@ -35,6 +35,8 @@ tables:
 
 **1. 代码生成** —— `moo:fresh` 解析 schema 到缓存,`moo:free` 一条流水线吐全套代码。模板即编码规范(`stubs/` + `src/Foundation/`),生成的是你愿意 commit 的代码。
 
+应用端由 `config/scaffold.php` 的 `controller` 注册表定义，默认提供 Admin、Mobi、Web；host 还可注册 RPA、Screen 等自定义端。`api` 专指接口文档/调试能力，不再兼作移动端目录名。
+
 **2. 开发后台 `/scaffold`** —— 数据库设计器(可视化改 schema)、接口调试器(类 Postman,按路由自动识别参数)、ACL 查看、配置可视化编辑、开发文档中心(Markdown + Mermaid 流程图 + 接口 / 表深链)。**只在开发环境可写,生产一律只读。**
 
 **3. 运行时监控** —— 异常 / 慢 SQL 自动捕获、缓冲、推送到云端统一看(由 [moo-monitor-laravel](https://github.com/charsen/moo-monitor-laravel) 提供,AI 可经 MCP 读取辅助修复)。

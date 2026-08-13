@@ -410,6 +410,19 @@ class ConfigManager
 
     private function groupPaths(): array
     {
+        $controllerPaths = [];
+        foreach (app(AppTargetRegistry::class)->all() as $app => $target) {
+            if (trim((string) ($target['path'] ?? '')) === '') {
+                continue;
+            }
+
+            $controllerPaths[] = [
+                'path'  => "controller.{$app}.path",
+                'label' => strtoupper($app) . ' controller 路径',
+                'type'  => self::TYPE_STRING,
+            ];
+        }
+
         return [
             'key'    => 'paths',
             'label'  => '路径配置',
@@ -419,8 +432,7 @@ class ConfigManager
                 ['path' => 'api.schema', 'label' => 'API schema 路径', 'type' => self::TYPE_STRING],
                 ['path' => 'api.history', 'label' => 'API 历史路径', 'type' => self::TYPE_STRING],
                 ['path' => 'model.path', 'label' => 'Model 输出路径', 'type' => self::TYPE_STRING],
-                ['path' => 'controller.admin.path', 'label' => 'Admin controller 路径', 'type' => self::TYPE_STRING],
-                ['path' => 'controller.api.path', 'label' => 'Api controller 路径', 'type' => self::TYPE_STRING],
+                ...$controllerPaths,
                 ['path' => 'frontend.src', 'label' => 'Frontend src', 'type' => self::TYPE_STRING],
                 ['path' => 'frontend.models', 'label' => 'Frontend models', 'type' => self::TYPE_STRING],
                 ['path' => 'frontend.views', 'label' => 'Frontend views', 'type' => self::TYPE_STRING],

@@ -12,7 +12,7 @@ tables:
         model:
             class: Department
         controller:
-            app: ['admin', 'api']
+            app: ['admin', 'mobi']
             class: DepartmentController
         attrs:
             name: 部门

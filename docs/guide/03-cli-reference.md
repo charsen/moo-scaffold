@@ -27,10 +27,10 @@
 | 命令 | 关键 flag | 说明 |
 |---|---|---|
 | `moo:model [schema]` | `-f` 覆盖 / `-F` Factory / `-T` TS / `-t {表key}` 单表 | 见 [02](02-schema-codegen.md) |
-| `moo:resource [schema]` | `-f` 覆盖 / `-t {表key}` 单表 | — |
-| `moo:controller [schema]` | `-f` 覆盖 / `-t {表key}` 单表 | 路由插到 `:insert_code_here:do_not_delete` 标记处,标记被删 = 插不进 |
+| `moo:resource [schema]` | `-f` 覆盖 / `-t {表key}` 单表 / `--app={端}` | `--app` 只生成一个已注册端 |
+| `moo:controller [schema]` | `-f` 覆盖 / `-t {表key}` 单表 / `--app={端}` | `resource` 端把路由插到标记处；`manual` 端不自动写路由 |
 | `moo:view [schema]` | `-f` 覆盖 | Vue 页面到 `config('scaffold.frontend.views')` |
-| `moo:test [schema]` | `-f` 覆盖 | 每个控制器一个路由契约冒烟测(Pest,B-lean:验路由插对 + 控制器能加载,不碰 DB/auth)到 `config('scaffold.tests.path')`;**已并入 `moo:free`** |
+| `moo:test [schema]` | `-f` 覆盖 / `--app={端}` | 每个控制器一个路由契约冒烟测到 `config('scaffold.tests.path')`;**已并入 `moo:free`** |
 | `moo:migration [schema]` | `-t {表key}` 单表 | 走 designer 同一套 diff + writer;`-t` 只为该表写 migration,其它表的变更不写 |
 | `moo:i18n` | — | 顺序:`moo:fresh` → 改 `_fields.yaml` → `moo:i18n` |
 | `moo:auth {app}` | `-r` 显示路由 | 见 [06-acl.md](06-acl.md) |
@@ -50,6 +50,7 @@
 
 ```bash
 php artisan moo:free admin Light -a
+php artisan moo:free mobi Light -a                 # 只生成 Mobi 端
 php artisan moo:free admin Light -t system_departments   # 只生成单张表的代码
 ```
 
@@ -62,6 +63,8 @@ php artisan moo:free admin Light -t system_departments   # 只生成单张表的
 | `-f` | 强制覆盖 Model / Resource / Controller / Request(慎用) |
 | `-a` | 加上 API YAML 生成步骤 |
 | `-t {表key}` | **单表模式**:只为这张表(yaml `tables:` 下的 key,如 `system_departments`)生成 Model / Resource / Controller / Request,**且 migration 只写这张表**。配 `-f` 时尤其有用——不会误覆盖同模块其它表手改过的文件。i18n / auth / api 仍全量(聚合级,跑全量才正确)。表 key 不存在会报错并列出可选项 |
+
+`{app}` 是必须已在 `scaffold.controller` 注册、且由当前 schema/table 的 `controller.app` 声明的单一目标端。`moo:free` 不再顺带生成其它端；目标不匹配时会在 Model/Controller 等业务代码落盘前报错。
 
 ## `moo:adder {app} {folder}` — 增量加 action
 

@@ -7,19 +7,22 @@
  * 测「codegen 把路由插对了 + 控制器能加载」，按控制器 FQCN 反查路由（不依赖资源 slug 命名约定），
  * 不碰 DB / auth / factory。生成一次（除非 -f）—— 用户可往生成的文件里继续补真业务断言。
  *
- * 注：一个控制器可挂多个 app（$attr['app'] 是数组，如 ['admin','api']）—— 每个 app 命名空间 / 路由
+ * 注：一个控制器可挂多个 app（$attr['app'] 是数组，如 ['admin','mobi']）—— 每个 app 命名空间 / 路由
  * 各异，逐 app 各落一份测到 tests/Feature/{App}/{module}/，跟 CreateControllerGenerator 逐 app 生成对齐。
  */
 
 namespace Mooeen\Scaffold\Generator;
 
+use Mooeen\Scaffold\Support\AppTargetRegistry;
+
 class CreateTestGenerator extends Generator
 {
-    public function start(string $schema_name, string $controller, bool $force = false): bool
+    public function start(string $schema_name, string $controller, bool $force = false, ?string $target_app = null): bool
     {
         $all    = $this->utility->getControllers(false);
         $attr   = $all[$schema_name][$controller];
         $module = $attr['module']['folder'];
+        app(AppTargetRegistry::class)->assertConfigured((array) $attr['app'], "{$schema_name}.{$controller}.controller.app");
 
         // 落点 base：tests.path（绝对 → 原样用；相对 → base_path() 前缀）。
         $configured = (string) $this->utility->getConfig('tests.path');
@@ -27,6 +30,9 @@ class CreateTestGenerator extends Generator
 
         foreach ((array) $attr['app'] as $app_raw) {
             $app_folder = strtolower((string) $app_raw);
+            if ($target_app !== null && $app_folder !== strtolower(trim($target_app))) {
+                continue;
+            }
             $config_key = 'controller.' . $app_folder . '.path';
 
             // 该 app 没配 controller.path → 推不出命名空间，跳过（防脏 FQCN）。
@@ -69,7 +75,7 @@ class CreateTestGenerator extends Generator
      *
      * @return list<string> 形如 ['tests/Feature/Admin/Market']
      */
-    public function testDirs(string $schema_name): array
+    public function testDirs(string $schema_name, ?string $target_app = null): array
     {
         $all  = $this->utility->getControllers(false)[$schema_name] ?? [];
         $dirs = [];
@@ -79,6 +85,9 @@ class CreateTestGenerator extends Generator
 
             foreach ((array) $attr['app'] as $app_raw) {
                 $app_folder = strtolower((string) $app_raw);
+                if ($target_app !== null && $app_folder !== strtolower(trim($target_app))) {
+                    continue;
+                }
 
                 if (empty($this->utility->getConfig('controller.' . $app_folder . '.path'))) {
                     continue;
