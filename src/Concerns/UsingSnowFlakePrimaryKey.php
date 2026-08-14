@@ -13,6 +13,10 @@ namespace Mooeen\Scaffold\Concerns;
  * 配置 config('scaffold.snowflake.*') 复用 host 已有的 SNOW_FLAKE_* env：
  *   SNOW_FLAKE_DATA_CENTER_ID 默认 1 / SNOW_FLAKE_WORKER_ID 默认 1 / SNOW_FLAKE_START_TIME 默认 '2021-10-10'
  * 【生产必须用跨进程共享 cache（Redis）】保证机内同毫秒序列号防撞。
+ *
+ * `newUniqueId()` 是框架 `HasUniqueIds` 的标准扩展点（与 `HasUuids` 同型），creating 钩子只委托它取值：
+ * 预分配主键的场景（如 host 的 withUploadedImages 先消费上传再落库）从模型本身取键，与钩子同源，
+ * 不直接摸 `scaffold.snowflake` 容器绑定。
  */
 trait UsingSnowFlakePrimaryKey
 {
@@ -20,9 +24,14 @@ trait UsingSnowFlakePrimaryKey
     {
         static::creating(function (self $model): void {
             if (empty($model->{$model->getKeyName()})) {
-                $model->{$model->getKeyName()} = (string) app('scaffold.snowflake')->id();
+                $model->{$model->getKeyName()} = $model->newUniqueId();
             }
         });
+    }
+
+    public function newUniqueId(): string
+    {
+        return (string) app('scaffold.snowflake')->id();
     }
 
     public function getIncrementing(): bool
