@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.9
+
+- `Concerns\UsingSnowFlakePrimaryKey` 的主键生成改走框架标准的 `newUniqueId()` 扩展点（与 `HasUuids` 同型），`creating` 钩子委托给它。需要预分配主键的场景（如 host 的 `withUploadedImages`）可直接从模型取值，不必再依赖 `scaffold.snowflake` 容器绑定。
+
 ## 2.1.8
 
 - 应用端统一由 `config/scaffold.php` 的 `controller` 注册表驱动：默认端调整为 `admin`、`mobi`、`web`，Host 可继续注册 RPA、Screen 等自定义端；生成器按端配置解析 Controller、Request、Resource、Test、路由模式和显示名称，不再把 `api` 同时当作移动端目录名。
