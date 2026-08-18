@@ -3,6 +3,7 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-08-18，症状：同时声明 `field` 数组规则与 `field.*` 子项规则时，生成的聚合表单控件会被子项再次覆盖，出现 nullable 字段被标必填、上传控件类型或显式默认值丢失，并把 `string` 等元素规则错误应用到整个数组。根因：`getFrontendRules()` 与 `formatFormConfig()` 都把 wildcard 键折成父键，后写子项覆盖父控件。解法：父规则存在时不再为 wildcard 生成同名控件或合并其前端规则；wildcard 只保留多选信号，父规则不存在的历史用法继续兼容。
 - 2026-08-13，症状：控制器已补 `@controller_name` 和 action DocBlock 后，重跑 `moo:api --sync-names` 仍可能保留 YAML 的空控制器名，且无 DocBlock 的方法会被同步成 `index/show`。根因：控制器名称没有纳入 `--sync-names`，空字符串被当作已有值；action 又把方法名兜底与 DocBlock 真值混为一体。解法：空名称统一按缺失回填，`--sync-names` 同步 controller/action；无方法注释时保留既有非空文案，只在新 action 上使用方法名兜底。
 - 2026-08-13，症状：`moo:free {app}` 虽已选择一个端，Controller/Resource/Test 生成器仍遍历 schema 的全部端，且模板名由 app key 拼接，新增 Web/RPA 会漏生成或找不到 stub；根因：app 同时被误当作 API 同义词、目录名和模板策略。解法：controller 配置统一进入 AppTargetRegistry，显式声明 profile/path/stub/route_mode；默认端用 admin/mobi/web，`manual` 端不自动写 iResource，host schema 未注册端直接报错，包 schema 的端契约由包自身管理。
 - HasOperator 已上移 Mooeen\Scaffold\Concerns\HasOperator（2026-07-16）；生成器直接引用共享 Trait，不再生成本地 stub。经 OperatorResolver 取 nullable 身份，无身份统一为 null。

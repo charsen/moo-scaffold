@@ -206,7 +206,13 @@ class FormRequest extends BaseFormRequest
 
         foreach ($all_rules as $field_name => $rules) {
             // 对 .* 规则的特殊处理
-            $field = str_contains($field_name, '.*') ? str_replace('.*', '', $field_name) : $field_name;
+            $is_wildcard = str_contains($field_name, '.*');
+            $field       = $is_wildcard ? str_replace('.*', '', $field_name) : $field_name;
+
+            // 父字段存在时，子项规则只约束数组元素，不能套到聚合控件本身。
+            if ($is_wildcard && array_key_exists($field, $all_rules)) {
+                continue;
+            }
 
             foreach ($rules as $k => $rule) {
                 if (! is_string($rule) || str_contains($rule, '$this->get') || str_contains($rule, 'exists:')) {
@@ -241,15 +247,28 @@ class FormRequest extends BaseFormRequest
             }
         }
 
+        $wildcard_fields = [];
+        foreach (array_keys($all_rules) as $field_name) {
+            if (str_contains($field_name, '.*')) {
+                $wildcard_fields[str_replace('.*', '', $field_name)] = true;
+            }
+        }
+
         $result = [];
         foreach ($all_rules as $field_name => $rules) {
             // 对 .* 规则的特殊处理
-            $field = str_contains($field_name, '.*') ? str_replace('.*', '', $field_name) : $field_name;
+            $is_wildcard = str_contains($field_name, '.*');
+            $field       = $is_wildcard ? str_replace('.*', '', $field_name) : $field_name;
 
             // 排除指定的字段
             if (in_array($field, $exclude, true) || in_array($field_name, $exclude, true)) {
                 unset($reset[$field]);
 
+                continue;
+            }
+
+            // 父字段已经代表聚合控件，不能再由子项规则生成同名控件并覆盖它。
+            if ($is_wildcard && array_key_exists($field, $all_rules)) {
                 continue;
             }
 
@@ -274,7 +293,7 @@ class FormRequest extends BaseFormRequest
                 $tmp['dictionary'] = true;
                 $tmp['options']    = $options;
 
-                if (str_contains($field_name, '.*')) {
+                if ($is_wildcard || isset($wildcard_fields[$field])) {
                     $tmp['multiple'] = true;
                 }
                 if ($with_default) {
