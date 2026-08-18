@@ -16,7 +16,7 @@
 
 ### `moo:fresh [-c]`
 
-解析 `scaffold/database/*.yaml` → 写 `storage/scaffold/`(`models.php` / `model_ids.php` / `controllers.php` / `tables.php` / `fields.php` / `enums.php`),同时增量维护 `_fields.yaml`。
+解析 `scaffold/database/*.yaml` → 写 `storage/scaffold/`(`models.php` / `model_ids.php` / `controllers.php` / `tables.php` / `fields.php` / `enums.php`),同时增量维护 `_fields.yaml`。其中 scaffold 运行时依赖的非数据库字段会自动补进 `append_fields`，已有的项目自定义翻译保持不变。
 
 **所有其它生成器读这份缓存,不是 YAML**。改了 schema 不跑 `moo:fresh` = 生成器看到旧数据。`-c` = 清空 `storage/scaffold/` 整目录后重建(默认增量)。
 

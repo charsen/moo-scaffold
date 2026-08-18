@@ -46,7 +46,7 @@ it('formatI18NFields · 已存在字段 zh-CN 跟随 schema name,en 润色保留
     expect($allFields['table_fields']['brand_new']['en'])->toBe('Brand New');
 });
 
-it('buildFields · 已存在字段同步 zh-CN(en 不丢)+ 删字段减量 + append_fields 保留', function () {
+it('buildFields · 同步 schema 字段并补齐系统 append_fields，已有自定义翻译不覆盖', function () {
     $gen = new FreshStorageGenerator(new NullOutput, app(Filesystem::class), app(Utility::class));
 
     $tmp = sys_get_temp_dir() . '/freshsync_' . uniqid() . '/';
@@ -61,6 +61,7 @@ it('buildFields · 已存在字段同步 zh-CN(en 不丢)+ 删字段减量 + app
     // 现存 _fields.yaml:手工 append_fields + 两个 table_fields(其中 drop_me 即将从 schema 移除)
     $existing = "append_fields:\n"
         . "    custom_field: { en: 'Custom', 'zh-CN': '自定义' }\n"
+        . "    please_enter: { en: 'Type ', 'zh-CN': '请填写' }\n"
         . "table_fields:\n"
         . "    user_name: { en: 'Username', 'zh-CN': '用户名' }\n"
         . "    drop_me: { en: 'Drop', 'zh-CN': '待删' }\n";
@@ -90,9 +91,59 @@ it('buildFields · 已存在字段同步 zh-CN(en 不丢)+ 删字段减量 + app
     // 新字段加入
     expect($parsed['table_fields']['added']['zh-CN'])->toBe('新增');
 
-    // append_fields(手工字段)原样保留
+    // append_fields(手工字段及同名系统字段的定制翻译)原样保留
     expect($parsed['append_fields']['custom_field']['en'])->toBe('Custom');
     expect($parsed['append_fields']['custom_field']['zh-CN'])->toBe('自定义');
+    expect($parsed['append_fields']['please_enter'])->toBe(['en' => 'Type ', 'zh-CN' => '请填写']);
+
+    // schema 不会出现、但 scaffold 运行时依赖的字段会自动补齐
+    expect($parsed['append_fields'])->toMatchArray([
+        'page'          => ['en' => 'Page', 'zh-CN' => '分页码'],
+        'page_limit'    => ['en' => 'Page Limit', 'zh-CN' => '查询数量'],
+        'options'       => ['en' => 'Options', 'zh-CN' => '操作'],
+        'ids'           => ['en' => 'IDs', 'zh-CN' => 'IDs'],
+        'please_select' => ['en' => 'Select ', 'zh-CN' => '请选择'],
+    ]);
+
+    // 再跑一次不重复、不改顺序，保证 fresh 幂等且 diff 稳定
+    $first = file_get_contents($tmp . '_fields.yaml');
+    $m->invoke($gen, $allFields);
+    expect(file_get_contents($tmp . '_fields.yaml'))->toBe($first);
+
+    (new Filesystem)->deleteDirectory(rtrim($tmp, '/'));
+});
+
+it('buildFields · 首次创建 _fields.yaml 时也包含 scaffold 系统 append_fields', function () {
+    $gen = new FreshStorageGenerator(new NullOutput, app(Filesystem::class), app(Utility::class));
+
+    $tmp = sys_get_temp_dir() . '/freshdefaults_' . uniqid() . '/';
+    @mkdir($tmp, 0777, true);
+
+    foreach (['db_schema_path' => $tmp, 'db_relative_schema_path' => './fresh/'] as $prop => $val) {
+        $p = new ReflectionProperty($gen, $prop);
+        $p->setAccessible(true);
+        $p->setValue($gen, $val);
+    }
+
+    $m = new ReflectionMethod($gen, 'buildFields');
+    $m->setAccessible(true);
+    $m->invoke($gen, [
+        'table_fields' => [
+            'title' => ['en' => 'Title', 'zh-CN' => '标题'],
+        ],
+    ]);
+
+    $parsed = Yaml::parseFile($tmp . '_fields.yaml');
+
+    expect(array_keys($parsed['append_fields']))->toBe([
+        'page',
+        'page_limit',
+        'options',
+        'ids',
+        'please_enter',
+        'please_select',
+    ]);
+    expect($parsed['table_fields']['title'])->toBe(['en' => 'Title', 'zh-CN' => '标题']);
 
     (new Filesystem)->deleteDirectory(rtrim($tmp, '/'));
 });
