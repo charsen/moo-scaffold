@@ -19,6 +19,21 @@ use Symfony\Component\Yaml\Yaml;
 
 class FreshStorageGenerator extends Generator
 {
+    /**
+     * Scaffold 运行时和生成代码依赖、但不会出现在数据库 schema 中的公共字段。
+     *
+     * moo:fresh 会把缺项补进 _fields.yaml 的 append_fields，供 moo:i18n 同时生成
+     * validation.attributes 与 db 翻译；项目已手工维护的同名翻译优先，不会被覆盖。
+     */
+    private const SYSTEM_APPEND_FIELDS = [
+        'page'          => ['en' => 'Page', 'zh-CN' => '分页码'],
+        'page_limit'    => ['en' => 'Page Limit', 'zh-CN' => '查询数量'],
+        'options'       => ['en' => 'Options', 'zh-CN' => '操作'],
+        'ids'           => ['en' => 'IDs', 'zh-CN' => 'IDs'],
+        'please_enter'  => ['en' => 'Enter ', 'zh-CN' => '请输入'],
+        'please_select' => ['en' => 'Select ', 'zh-CN' => '请选择'],
+    ];
+
     protected string $db_schema_path;
 
     protected string $storage_path;
@@ -461,11 +476,13 @@ class FreshStorageGenerator extends Generator
             $all_fields = $yaml_data;
         }
 
+        $all_fields = $this->withSystemAppendFields($all_fields);
+
         $code = [
             '###',
             '# 润色，手动修改翻译（生成时不会被替换）',
             '#',
-            '# append_fields: 为手工添加字段，一直保存',
+            '# append_fields: 非数据库字段；scaffold 公共缺项会自动补齐，手工翻译一直保存',
             '# table_fields: 数据库里的字段，会自动做增量、减量',
             '# duplicate_fields: 数据库里重复出现的，有可能是重名了',
             '##',
@@ -493,6 +510,30 @@ class FreshStorageGenerator extends Generator
         $yaml_exists = $this->filesystem->isFile($yaml_file);
         $put         = $this->filesystem->put($yaml_file, implode("\n", $code));
         $this->reportPutResult($yaml_relative_file, $put, $yaml_exists);
+    }
+
+    /**
+     * 补齐 scaffold 公共非数据库字段，同时保留项目已有的顺序和自定义翻译。
+     */
+    private function withSystemAppendFields(array $fields): array
+    {
+        $appendFields = is_array($fields['append_fields'] ?? null) ? $fields['append_fields'] : [];
+
+        foreach (self::SYSTEM_APPEND_FIELDS as $field => $translations) {
+            if (! array_key_exists($field, $appendFields)) {
+                $appendFields[$field] = $translations;
+
+                continue;
+            }
+
+            $appendFields[$field] = is_array($appendFields[$field])
+                ? array_replace($translations, $appendFields[$field])
+                : $translations;
+        }
+
+        unset($fields['append_fields']);
+
+        return ['append_fields' => $appendFields] + $fields;
     }
 
     /**

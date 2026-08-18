@@ -46,7 +46,7 @@ tables:
 
 四个易踩点:
 
-- **`id: {}`** 空对象 = 用 `_fields.yaml` 的默认定义。`_fields.yaml` 由 `moo:fresh` 增量维护,字段中文名集中润色一次,所有 schema 共享。
+- **`id: {}`** 空对象 = 用 `_fields.yaml` 的默认定义。`_fields.yaml` 由 `moo:fresh` 增量维护,字段中文名集中润色一次,所有 schema 共享。scaffold 自身依赖但不属于数据库设计的 `page`、`page_limit`、`ids`、`options`、`please_enter`、`please_select` 会自动补进 `append_fields`;项目可改其翻译,后续刷新不会覆盖。
 - **`controller.app`** 是数组,同一张表的 controller 可同时落在 `admin`、`mobi`、`web` 或 host 注册的其它端。未注册 key 会 fail-fast，不再静默少生成文件。
 - **`enums`** 写在表里,生成 `Enums/FieldName.php`,可在 Model 里 `cast`。
 - **`size: '2,128'`** 形如 `'最小,最大'`,同时作用于 DB 列长度 + Request 校验。

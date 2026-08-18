@@ -153,6 +153,32 @@ it('start() 写 validation.attributes 段(只替换 attributes,保留其余结�
     expect($zh)->toHaveKey('custom');
 });
 
+it('start() 将 append_fields 同步到 validation.attributes 与 db', function () {
+    mlGen_seedEnums([]);
+    mlGen_seedFieldsYaml(
+        tableFields: [],
+        appendFields: [
+            'options'       => ['en' => 'Options', 'zh-CN' => '操作'],
+            'please_enter'  => ['en' => 'Enter ', 'zh-CN' => '请输入'],
+            'please_select' => ['en' => 'Select ', 'zh-CN' => '请选择'],
+        ],
+    );
+
+    expect(mlGen_make()->start())->toBeTrue();
+
+    $enDb         = require lang_path('en/db.php');
+    $zhDb         = require lang_path('zh-CN/db.php');
+    $enValidation = require lang_path('en/validation.php');
+    $zhValidation = require lang_path('zh-CN/validation.php');
+
+    expect($enDb['options'])->toBe('Options')
+        ->and($zhDb['options'])->toBe('操作')
+        ->and($enValidation['attributes']['please_enter'])->toBe('Enter ')
+        ->and($zhValidation['attributes']['please_enter'])->toBe('请输入')
+        ->and($enValidation['attributes']['please_select'])->toBe('Select ')
+        ->and($zhValidation['attributes']['please_select'])->toBe('请选择');
+});
+
 it('compileValidation · 翻译值含 $数字 不被当反向引用损坏(preg_replace_callback,2026-06-09 修)', function () {
     mlGen_seedEnums([]);
     mlGen_seedFieldsYaml(
