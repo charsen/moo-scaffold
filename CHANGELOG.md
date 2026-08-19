@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.10
+
+- `Foundation\FormRequest` 隔离数组子项与聚合控件规则：同时声明 `field` 数组规则与 `field.*` 子项规则时，`getFrontendRules()` 与 `formatFormConfig()` 都会把 wildcard 键折成父键，导致后写的子项规则覆盖父控件——表现为 nullable 字段被标必填、上传控件类型或显式默认值丢失、`string` 等元素规则被错误套到整个数组。现在父规则存在时不再为 wildcard 生成同名控件或合并其前端规则，wildcard 只保留 `multiple` 多选信号；父规则不存在的历史用法继续兼容。
+  > ⚠ **对 Host 是可见变化**：同时声明父子规则的 Request，其 `form_widgets` 输出会由「重复/被覆盖的控件」变为单个正确的聚合控件。升级后若有 form 相关 baseline，需重跑并逐项归因——变化方向应是修复。
+- `Generator\FreshStorageGenerator` 补齐 scaffold 公共非数据库字段：`page`、`page_limit`、`options`、`ids`、`please_enter`、`please_select` 六个运行时字段不出现在数据库 schema 中，此前需各项目手工维护翻译。现在 `moo:fresh` 会把缺项自动补进 `_fields.yaml` 的 `append_fields`，供 `moo:i18n` 同时生成 `validation.attributes` 与 db 翻译；**项目已手工维护的同名翻译优先，不会被覆盖**，字段顺序也保留。
+
 ## 2.1.9
 
 - `Concerns\UsingSnowFlakePrimaryKey` 的主键生成改走框架标准的 `newUniqueId()` 扩展点（与 `HasUuids` 同型），`creating` 钩子委托给它。需要预分配主键的场景（如 host 的 `withUploadedImages`）可直接从模型取值，不必再依赖 `scaffold.snowflake` 容器绑定。
