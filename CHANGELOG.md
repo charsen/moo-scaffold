@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.12
+
+- `Concerns\Optional` 新增 `optionsAllowShowPage()` 标准扩展点，模型覆写并返回 `true` 后，会在正常列表与回收站的默认操作中增加 `type: show-page`；它与 `optionsAllowShow()` 相互独立且默认关闭，现有模型的操作集合保持不变。前端消费者需将 `show-page` 强制路由到独立详情页，`show` 原有的通用详情弹窗与 `showRoute` 兼容行为不变。
+
 ## 2.1.11
 
 - `Concerns\Optional` 新增 `optionsAllowShow()` 标准扩展点，模型覆写并返回 `true` 后，会在正常列表与回收站的默认操作首位增加 `type: show`；默认值为 `false`，现有模型的操作集合保持不变。前端仍通过 Scaffold 的 `showRoute` 决定该动作打开通用详情弹窗还是跳转独立详情路由。

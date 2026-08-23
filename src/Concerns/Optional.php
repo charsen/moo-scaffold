@@ -8,7 +8,8 @@ namespace Mooeen\Scaffold\Concerns;
  * `getOptionsAttribute()` 默认按 soft-delete 状态返回 edit/destroy 或 restore/force-destroy。
  * model 可定义 `getOptions()` 返回额外动作数组，会前缀到默认动作。
  *
- * 详情动作由 `optionsAllowShow()` 控制（默认 false），开启后同时出现在正常与回收站列表；
+ * 弹窗详情动作由 `optionsAllowShow()` 控制（默认 false），独立页面详情动作由
+ * `optionsAllowShowPage()` 控制（默认 false），开启后同时出现在正常与回收站列表；
  * 软删后是否提供「彻底删除」由 `optionsAllowForceDestroy()` 控制（默认 true）；
  * model override 返回 false = 只 restore、不 force-destroy（旧 OptionalSimple 行为）。
  */
@@ -19,6 +20,9 @@ trait Optional
         $res = [];
         if ($this->optionsAllowShow()) {
             $res[] = ['type' => 'show'];
+        }
+        if ($this->optionsAllowShowPage()) {
+            $res[] = ['type' => 'show-page'];
         }
 
         if ($this->deleted_at === null) {
@@ -47,6 +51,14 @@ trait Optional
      * 是否提供「查看详情」动作。默认 false。
      */
     protected function optionsAllowShow(): bool
+    {
+        return false;
+    }
+
+    /**
+     * 是否提供「独立页面查看详情」动作。默认 false。
+     */
+    protected function optionsAllowShowPage(): bool
     {
         return false;
     }
