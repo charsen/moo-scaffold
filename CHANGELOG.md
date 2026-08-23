@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.11
+
+- `Concerns\Optional` 新增 `optionsAllowShow()` 标准扩展点，模型覆写并返回 `true` 后，会在正常列表与回收站的默认操作首位增加 `type: show`；默认值为 `false`，现有模型的操作集合保持不变。前端仍通过 Scaffold 的 `showRoute` 决定该动作打开通用详情弹窗还是跳转独立详情路由。
+
 ## 2.1.10
 
 - `Foundation\FormRequest` 隔离数组子项与聚合控件规则：同时声明 `field` 数组规则与 `field.*` 子项规则时，`getFrontendRules()` 与 `formatFormConfig()` 都会把 wildcard 键折成父键，导致后写的子项规则覆盖父控件——表现为 nullable 字段被标必填、上传控件类型或显式默认值丢失、`string` 等元素规则被错误套到整个数组。现在父规则存在时不再为 wildcard 生成同名控件或合并其前端规则，wildcard 只保留 `multiple` 多选信号；父规则不存在的历史用法继续兼容。
