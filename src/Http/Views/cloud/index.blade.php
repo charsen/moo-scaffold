@@ -83,9 +83,7 @@
             <div class="p-cloud-buffer-actions">
                 @if (($is_local ?? false) && ! $is_readonly && $configured && ($discard_supported ?? false))
                     <form method="POST" action="{{ route('cloud.discard') }}"
-                          data-confirm="将清理当前项目的 local 开发噪音：Cloud 中未解决的运行时错误 / 慢 SQL 移入「已删除」，已解决记录保持不动；本地只丢弃待推记录。"
-                          data-challenge="清理 local 开发噪音"
-                          data-challenge-label="请输入「清理 local 开发噪音」确认">
+                          data-confirm="将清理当前项目的 local 开发噪音：Cloud 中未解决的运行时错误 / 慢 SQL 移入「已删除」，已解决记录保持不动；本地只丢弃待推记录。">
                         @csrf
                         <x-scaffold::btn type="submit" variant="danger" size="sm">清理开发噪音</x-scaffold::btn>
                     </form>
