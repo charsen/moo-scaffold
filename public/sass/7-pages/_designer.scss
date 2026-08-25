@@ -12,10 +12,25 @@
   // min 240 → 300px:宽屏 5 列 → 4 列,卡内 4 行内容呼吸感更稳(2026-05-22 user 拍板加宽)
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: var(--space-3);
+}
 
-  // plan-53 出身分块:多块时相邻网格之间留段距(块标题自带上间距,首块标题贴 module-head)
-  + .p-designer-grid__group-title {
-    margin-top: var(--space-5);
+// host 保持全宽模块网格;扩展包作为同级响应式单元排列。
+// 包通常只有一个 schema,宽屏可并列呈现;多 schema 的包仍在自己的分组内纵向堆叠。
+.p-designer-origin-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-5) var(--space-3);
+}
+
+.p-designer-origin-group {
+  min-width: 0;
+
+  &--host {
+    grid-column: 1 / -1;
+  }
+
+  &--package .p-designer-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -23,6 +38,7 @@
 .p-designer-grid__group-title {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
   margin: 0 0 var(--space-2);
   font-size: var(--font-sm);
