@@ -66,6 +66,47 @@
                 <x-scaffold::icon name="chevron-right" :size="14" />
             </a>
         </div>
+        {{-- 紧跟 sidebar DOM 执行,避免页面先画到顶部、下一帧再恢复造成闪动。 --}}
+        <script nonce="{{ $cspNonce ?? '' }}">
+        (function () {
+            var aside = document.getElementById('aside_container');
+            if (!aside) return;
+
+            var scrollKey = 'scaffold:db-docs:aside-scroll';
+            var savedScroll = null;
+            try {
+                savedScroll = sessionStorage.getItem(scrollKey);
+                sessionStorage.removeItem(scrollKey);
+            } catch (e) {}
+
+            var parsedScroll = savedScroll === null ? NaN : Number(savedScroll);
+            if (Number.isFinite(parsedScroll) && parsedScroll >= 0) {
+                aside.scrollTop = parsedScroll;
+            } else {
+                // 直接打开深链时没有前一页位置:只滚 sidebar,让当前模块进入可视区。
+                var active = aside.querySelector('.p-dbdoc-module.is-active');
+                if (active) {
+                    var asideRect = aside.getBoundingClientRect();
+                    var activeRect = active.getBoundingClientRect();
+                    var gutter = 12;
+                    if (activeRect.top < asideRect.top + gutter) {
+                        aside.scrollTop -= asideRect.top + gutter - activeRect.top;
+                    } else if (activeRect.bottom > asideRect.bottom - gutter) {
+                        aside.scrollTop += activeRect.bottom - asideRect.bottom + gutter;
+                    }
+                }
+            }
+
+            document.addEventListener('click', function (event) {
+                if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                var link = event.target.closest('.p-dbdoc-module, .p-dbdoc-tlink');
+                if (!link) return;
+                try {
+                    sessionStorage.setItem(scrollKey, String(aside.scrollTop));
+                } catch (e) {}
+            });
+        })();
+        </script>
     </x-slot:aside>
 
     {{-- 中:当前模块的表列表 --}}
