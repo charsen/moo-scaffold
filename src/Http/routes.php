@@ -270,14 +270,17 @@ Route::prefix($prefix)->middleware(array_merge($middleware, [SecurityHeaders::cl
         // Todos 已整体移出 scaffold:Chrome 扩展直发 moo-scaffold-cloud,查看也在云端。
         // scaffold 不再有 todo 路由/控制器/存储。
 
-        // 云端汇聚控制台:本地两类缓冲(runtime / 慢 SQL)状态总览 + 运行环境 + 云端入口 + 手动推送。
+        // 云端汇聚控制台:本地两类缓冲(runtime / 慢 SQL)状态总览 + 运行环境 + 云端入口 + 手动推送 / 开发噪音清理。
         //   - index 只读,所有已登录 scaffold 用户可看;
-        //   - push 是写类,进 EnforceScaffoldWritable::LOCKED_PATTERNS(scaffold/cloud/push),
-        //     生产/只读拒绝(手动推送只适用于本地)。throttle 防连点重复推。
+        //   - push / discard 是写类,进 EnforceScaffoldWritable::LOCKED_PATTERNS,
+        //     生产/只读拒绝;discard 额外只允许 local。throttle 防连点重复操作。
         Route::get('/cloud', CloudController::class . '@index')->name('cloud.index');
         Route::post('/cloud/push', CloudController::class . '@push')
             ->middleware('throttle:10,1')
             ->name('cloud.push');
+        Route::post('/cloud/discard', CloudController::class . '@discard')
+            ->middleware('throttle:5,1')
+            ->name('cloud.discard');
     });
 
     // plan-22: scaffold prefix 内的兜底 404,跟随主题(替代 Laravel 默认 dark 强制 404)

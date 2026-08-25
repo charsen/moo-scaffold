@@ -19,7 +19,7 @@ use Illuminate\Http\Request;
  *     · /scaffold/db/designer/*  - 改 yaml / 写 migration / 新建删除 schema 表
  *     · /scaffold/accounts*      - 改账号(密码/启停/删)
  *     · /scaffold/config*        - 改 scaffold 自身配置
- *     · /scaffold/cloud/push     - 手动推送 + 回收本地缓冲(只适用于本地)
+ *     · /scaffold/cloud/{push,discard} - 手动推送 / 清理 local 开发噪音
  *   - 放行(即使 production / readonly):
  *     · api/cache + proxy          - 调试日常
  *     · csp-report                          - 日志
@@ -46,6 +46,7 @@ class EnforceScaffoldWritable
         // 手动触发 moo:cloud:push:推送 + 回收本地缓冲属写类,只适用于本地;生产/只读拒绝。
         // (GET /scaffold/cloud 状态页是 safe method,永远放行,任何环境可看。)
         'cloud/push',
+        'cloud/discard',
         // plan-52 文档中心:新建/编辑/删除/实时预览全是写类(团队本地编辑),生产只读预览。
         // (GET /docs、/docs/{path}、/docs/_diagram 是 safe method,永远放行,生产可看可点深链。)
         'docs',
