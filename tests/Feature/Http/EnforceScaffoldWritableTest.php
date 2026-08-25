@@ -39,6 +39,11 @@ it('readonly: locked cloud push (POST) → 403', function () {
     expect(runWritableMiddleware('/scaffold/cloud/push', 'POST')->getStatusCode())->toBe(403);
 });
 
+it('readonly: locked cloud discard (POST) → 403', function () {
+    config(['scaffold.config_ui.readonly' => true]);
+    expect(runWritableMiddleware('/scaffold/cloud/discard', 'POST')->getStatusCode())->toBe(403);
+});
+
 it('readonly: GET /scaffold/cloud 状态页(非锁路径)放行', function () {
     config(['scaffold.config_ui.readonly' => true]);
     expect(runWritableMiddleware('/scaffold/cloud', 'GET')->getStatusCode())->toBe(200);

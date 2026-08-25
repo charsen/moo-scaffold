@@ -55,6 +55,7 @@ MOO_MONITOR_CLOUD_SCHEDULE=true                    # 自动挂每分钟调度
 **怎么跑**:
 - **自动**:`cloud.enabled + cloud.schedule` 为真 → MonitorProvider 把 `moo:cloud:push` 挂进 scheduler(每分钟、`withoutOverlapping` 10 分钟)。**宿主已跑 `schedule:run` 就零额外 cron。**
 - **手动**:`php artisan moo:cloud:push`(`--dry-run` 只数不发 / `--all` 忽略游标全量重推)。
+- **清理本地开发噪音**:`APP_ENV=local` 时可在 `/scaffold/cloud` 点「清理开发噪音」。Cloud 中当前项目 `env=local` 的 runtime / 慢 SQL `open / in_progress` 会移入「已删除」，`resolved` 与其它环境保持不动；本地只丢弃 cursor / partial ack 判定的待推记录，已同步 open 聚合锚点保留。后续同 hash 再次真实发生并上报时仍可重新打开。其他环境不显示该按钮，后端也会拒绝调用。
 
 ---
 

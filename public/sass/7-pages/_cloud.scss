@@ -49,12 +49,18 @@
     flex-shrink: 0;
 }
 
-// 「立即推送」表单：放在「本地缓冲」区段标题行右端。margin-left:auto 推到最右，
-// align-self:center 在 baseline 对齐的 header 里把按钮垂直居中（否则按钮坐在基线上偏高）。
-.p-cloud-pushform {
-    margin: 0;
+// 本地缓冲操作：local 清空 + 立即推送同组靠右，危险操作保留 outline-red 次级层级。
+.p-cloud-buffer-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
     margin-left: auto;
     align-self: center;
+
+    form { margin: 0; }
+}
+.p-cloud-pushform {
+    margin: 0;
     display: inline-flex;
 }
 
