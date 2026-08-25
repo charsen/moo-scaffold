@@ -60,7 +60,7 @@
         <p class="p-cloud-intro__desc">
             本地仅作<strong>临时采集缓冲</strong>，运行时错误 / 慢 SQL 经 <code>moo:cloud:push</code>
             汇聚到 <strong>Moo Scaffold Cloud</strong> 集中查看 + 处置。<br>
-            处置（解决 / 删除）统一在 Moo Scaffold Cloud，本页只看本地缓冲与手动推送。
+            日常处置（解决 / 删除）统一在 Moo Scaffold Cloud；local 环境可在本页清理开发噪音。
         </p>
         @if ($base_url !== '')
             <a href="{{ $base_url }}/app" target="_blank" rel="noopener noreferrer" class="btn btn--secondary btn--sm p-cloud-no-lock">进入 Moo Scaffold Cloud →</a>
@@ -80,12 +80,23 @@
         <header class="p-cloud-section__hd">
             <h3 class="p-cloud-section__title">本地缓冲</h3>
             <span class="p-cloud-section__sub">推送成功后回收 · open 保留 {{ $retention }} 天作聚合锚点</span>
-            @if ($editable && $configured)
-                <form method="POST" action="{{ route('cloud.push') }}" class="p-cloud-pushform">
-                    @csrf
-                    <x-scaffold::btn type="submit" variant="primary" size="sm">立即推送</x-scaffold::btn>
-                </form>
-            @endif
+            <div class="p-cloud-buffer-actions">
+                @if (($is_local ?? false) && ! $is_readonly && $configured && ($discard_supported ?? false))
+                    <form method="POST" action="{{ route('cloud.discard') }}"
+                          data-confirm="将清理当前项目的 local 开发噪音：Cloud 中未解决的运行时错误 / 慢 SQL 移入「已删除」，已解决记录保持不动；本地只丢弃待推记录。"
+                          data-challenge="清理 local 开发噪音"
+                          data-challenge-label="请输入「清理 local 开发噪音」确认">
+                        @csrf
+                        <x-scaffold::btn type="submit" variant="danger" size="sm">清理开发噪音</x-scaffold::btn>
+                    </form>
+                @endif
+                @if ($editable && $configured)
+                    <form method="POST" action="{{ route('cloud.push') }}" class="p-cloud-pushform">
+                        @csrf
+                        <x-scaffold::btn type="submit" variant="primary" size="sm">立即推送</x-scaffold::btn>
+                    </form>
+                @endif
+            </div>
         </header>
 
         <div class="p-cloud-buffers">

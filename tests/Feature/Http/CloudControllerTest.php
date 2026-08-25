@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Support\Facades\Http;
 use Mooeen\Monitor\Cloud\CloudClient;
@@ -25,11 +26,13 @@ beforeEach(function () {
     $this->withoutMiddleware([
         ScaffoldAuthenticate::class,
         VerifyCsrfToken::class,
+        ValidateCsrfToken::class,
         EnforceScaffoldWritable::class,
     ]);
 
     $this->origBase    = base_path();
     $this->origStorage = storage_path();
+    $this->origEnv     = app()->environment();
     $this->sandbox     = sys_get_temp_dir() . '/scaffold_cloudctrl_' . uniqid();
     @mkdir($this->sandbox . '/storage', 0755, true);
     // Blade 组件编译走 Application::getNamespace() 读 base_path/composer.json —— 沙箱
@@ -53,6 +56,7 @@ beforeEach(function () {
 afterEach(function () {
     app()->setBasePath($this->origBase);
     app()->useStoragePath($this->origStorage);
+    app()->instance('env', $this->origEnv);
     cloudCtrl_rrmdir($this->sandbox);
 });
 
@@ -236,4 +240,57 @@ it('S-Cloud 页展示运行环境与心跳版本信息', function () {
     expect($html)->toContain('PHP');
     expect($html)->toContain('Runtime 采集');
     expect($html)->toContain('数据库');
+});
+
+it('local 可清理 Cloud 未解决噪音 + 本地 pending，并失效 summary 缓存', function () {
+    app()->instance('env', 'local');
+    $sync = Mockery::mock(CloudSync::class);
+    $sync->shouldReceive('types')->once()->andReturn(['runtimes', 'slow_sql']);
+    $sync->shouldReceive('discardLocalNoise')->once()->with('runtimes')->andReturn([
+        'skipped' => false, 'ok' => true, 'cloud_deleted' => 3, 'local_discarded' => 2,
+    ]);
+    $sync->shouldReceive('discardLocalNoise')->once()->with('slow_sql')->andReturn([
+        'skipped' => false, 'ok' => true, 'cloud_deleted' => 4, 'local_discarded' => 1,
+    ]);
+    app()->instance(CloudSync::class, $sync);
+    cache()->put(ScaffoldController::CLOUD_SUMMARY_CACHE_KEY, ['stale' => true], 60);
+
+    $this->post('/scaffold/cloud/discard')->assertRedirect()->assertSessionHas('flash_message');
+
+    expect((string) session('flash_message'))
+        ->toContain('Cloud 已删除 7 条未解决记录')
+        ->toContain('本地已丢弃 3 条待推记录')
+        ->toContain('已解决记录保持不动')
+        ->and(cache()->has(ScaffoldController::CLOUD_SUMMARY_CACHE_KEY))->toBeFalse();
+});
+
+it('非 local 环境拒绝清理且不调用 Monitor', function () {
+    app()->instance('env', 'staging');
+    $sync = Mockery::mock(CloudSync::class);
+    $sync->shouldNotReceive('discardLocalNoise');
+    app()->instance(CloudSync::class, $sync);
+
+    $this->post('/scaffold/cloud/discard')->assertRedirect()->assertSessionHas('flash_error');
+
+    expect((string) session('flash_error'))->toContain('仅 local 开发环境');
+});
+
+it('清理按钮只在 local + 可用 Monitor + 已接入 Cloud 时显示', function () {
+    $sync = Mockery::mock(CloudSync::class);
+    $sync->shouldReceive('cursors')->twice()->andReturn([]);
+    $sync->shouldReceive('sync')->times(4)->andReturn([
+        'ok' => true, 'skipped' => false, 'changed' => 0,
+    ]);
+    $sync->shouldReceive('discardLocalNoise')->zeroOrMoreTimes();
+    app()->instance(CloudSync::class, $sync);
+
+    app()->instance('env', 'local');
+    $localHtml = $this->get('/scaffold/cloud')->assertOk()->getContent();
+    app()->instance('env', 'staging');
+    $stagingHtml = $this->get('/scaffold/cloud')->assertOk()->getContent();
+
+    expect($localHtml)->toContain('清理开发噪音')
+        ->and($localHtml)->toContain('清理 local 开发噪音')
+        ->and($localHtml)->toContain('data-challenge="清理 local 开发噪音"')
+        ->and($stagingHtml)->not->toContain('data-challenge="清理 local 开发噪音"');
 });
