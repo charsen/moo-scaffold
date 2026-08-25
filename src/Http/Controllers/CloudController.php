@@ -62,20 +62,24 @@ class CloudController extends Controller
             }
         }
 
+        $discardSupported = is_callable([$sync, 'discardLocalNoise']);
+
         return $this->view('cloud.index', [
-            'enabled'       => $enabled,
-            'base_url'      => $baseUrl,
-            'token_masked'  => $this->maskToken($token),
-            'configured'    => $configured,
-            'retention'     => (int) ($cfg['local_retention_days'] ?? 7),
-            'schedule'      => (bool) ($cfg['schedule'] ?? true),
-            'config_rows'   => $this->configRows($cfg, $baseUrl, $token),
-            'version_info'  => $this->versionInfo($cfg, $baseUrl),
-            'buffers'       => $buffers,
-            'is_prod'       => function_exists('app') && app()->environment('production'),
-            'is_readonly'   => (bool) config('scaffold.config_ui.readonly', false),
-            'flash_message' => $request->hasSession() ? $request->session()->pull('flash_message') : null,
-            'flash_error'   => $request->hasSession() ? $request->session()->pull('flash_error') : null,
+            'enabled'           => $enabled,
+            'base_url'          => $baseUrl,
+            'token_masked'      => $this->maskToken($token),
+            'configured'        => $configured,
+            'retention'         => (int) ($cfg['local_retention_days'] ?? 7),
+            'schedule'          => (bool) ($cfg['schedule'] ?? true),
+            'config_rows'       => $this->configRows($cfg, $baseUrl, $token),
+            'version_info'      => $this->versionInfo($cfg, $baseUrl),
+            'buffers'           => $buffers,
+            'discard_supported' => $discardSupported,
+            'is_local'          => function_exists('app') && app()->environment('local'),
+            'is_prod'           => function_exists('app') && app()->environment('production'),
+            'is_readonly'       => (bool) config('scaffold.config_ui.readonly', false),
+            'flash_message'     => $request->hasSession() ? $request->session()->pull('flash_message') : null,
+            'flash_error'       => $request->hasSession() ? $request->session()->pull('flash_error') : null,
         ]);
     }
 
@@ -455,6 +459,72 @@ class CloudController extends Controller
         $msg = $progress !== [] ? implode(' · ', $progress) : '已确认 0 条';
 
         return $this->back($request, true, $msg);
+    }
+
+    /** 清理 local 开发噪音：Cloud 软删未解决项，本地丢弃 pending；已解决与已同步锚点不动。 */
+    public function discard(Request $request)
+    {
+        if (! app()->environment('local')) {
+            return $this->back($request, false, '仅 local 开发环境允许清理开发噪音。');
+        }
+        if ((bool) config('scaffold.config_ui.readonly', false)) {
+            return $this->back($request, false, '当前为只读模式，禁止清理开发噪音。');
+        }
+
+        $cfg = (array) config('moo-monitor.cloud', []);
+        if (! ($cfg['enabled'] ?? false) || empty($cfg['base_url']) || empty($cfg['token'])) {
+            return $this->back($request, false, 'Cloud 未启用或 URL / Token 未配置，无法联动清理 local 开发噪音。');
+        }
+
+        $sync = $this->cloudSync;
+        if (! is_callable([$sync, 'discardLocalNoise'])) {
+            return $this->back($request, false, '当前 moo-monitor-laravel 版本不支持清理开发噪音，请先升级。');
+        }
+
+        $labels         = ['runtimes' => '运行时错误', 'slow_sql' => '慢 SQL'];
+        $cloudDeleted   = 0;
+        $localDiscarded = 0;
+        $failures       = [];
+        foreach ($sync->types() as $type) {
+            $r = $sync->discardLocalNoise($type);
+            $cloudDeleted   += (int) ($r['cloud_deleted'] ?? 0);
+            $localDiscarded += (int) ($r['local_discarded'] ?? 0);
+            if ($r['skipped'] ?? false) {
+                $failures[] = ($labels[$type] ?? $type) . '：' . ((string) ($r['reason'] ?? '') ?: '已跳过');
+
+                continue;
+            }
+            if (! ($r['ok'] ?? false)) {
+                $failures[] = ($labels[$type] ?? $type) . '：' . ((string) ($r['error'] ?? '') ?: '清理失败');
+            }
+        }
+
+        if ($cloudDeleted > 0) {
+            try {
+                cache()->forget(ScaffoldController::CLOUD_SUMMARY_CACHE_KEY);
+            } catch (\Throwable) {
+                // 缓存不可用不影响清理结果
+            }
+        }
+
+        if ($failures !== []) {
+            $progress = [];
+            if ($cloudDeleted > 0) {
+                $progress[] = "Cloud 已删除 {$cloudDeleted} 条未解决记录";
+            }
+            if ($localDiscarded > 0) {
+                $progress[] = "本地已丢弃 {$localDiscarded} 条待推记录";
+            }
+            $prefix = $progress !== [] ? implode(' · ', $progress) . '；' : '';
+
+            return $this->back($request, false, $prefix . implode('；', $failures));
+        }
+
+        $message = ($cloudDeleted > 0 || $localDiscarded > 0)
+            ? "已清理 local 开发噪音：Cloud 已删除 {$cloudDeleted} 条未解决记录，本地已丢弃 {$localDiscarded} 条待推记录；已解决记录保持不动。"
+            : '没有需要清理的 local 开发噪音。';
+
+        return $this->back($request, true, $message);
     }
 
     /** @return array{label:string,dir:string,icon:string,open:int,cursor:?string,pending:?int} */
