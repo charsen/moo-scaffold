@@ -62,7 +62,12 @@ it('GET /scaffold renders the cloud summary panel when configured', function () 
         ->assertSee('https://cloud.test/app/wc/runtimes');
 });
 
-// 注:/scaffold/db 数据库文档功能 5f8250d 已砍(留设计器 + 字典两入口),原 reachability test 已删除。
+it('GET /scaffold/db/docs renders database docs with sidebar scroll restoration', function () {
+    $this->get('/scaffold/db/docs')->assertOk();
+
+    $view = file_get_contents(__DIR__ . '/../../../src/Http/Views/db/docs.blade.php');
+    expect($view)->toContain('scaffold:db-docs:aside-scroll');
+});
 
 it('GET /scaffold/dictionaries is reachable (200 or 500 from missing cache)', function () {
     $r = $this->get('/scaffold/dictionaries');
