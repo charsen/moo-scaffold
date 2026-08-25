@@ -74,9 +74,11 @@
                     </x-scaffold::btn>
                 </div>
 
-                {{-- plan-53 出身分块:仅 host(单块)时不渲染块标题,视觉与旧版一致;有扩展包时 host / 各包各一块 --}}
+                {{-- host 独占全宽;扩展包分组进入同一响应式网格,避免单 schema 的包各占一整行 --}}
                 @php $originGroups = $designer_module_groups ?? ['' => ['origin' => null, 'label' => '宿主项目', 'writable' => true, 'modules' => $designer_modules]]; @endphp
+                <div class="p-designer-origin-groups">
                 @foreach ($originGroups as $group)
+                <section class="p-designer-origin-group {{ $group['origin'] === null ? 'p-designer-origin-group--host' : 'p-designer-origin-group--package' }}">
                 @if (count($originGroups) > 1)
                     <h4 class="p-designer-grid__group-title">
                         <x-scaffold::icon :name="$group['origin'] === null ? 'database' : 'package'" :size="13" />
@@ -147,7 +149,9 @@
                         </a>
                     @endforeach
                 </div>
+                </section>
                 @endforeach
+                </div>
 
                 {{-- v9 update:0 模块时显示 ghost onboarding 卡(避免首屏纯空白);非 0 时主入口在右上 button --}}
                 @if (count($designer_modules) === 0)
