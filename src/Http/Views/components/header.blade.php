@@ -37,7 +37,7 @@ $isHome = request()->routeIs('scaffold.home');
            aria-label="首页"
            @if($isHome) aria-current="page" @endif
         >
-            <img src="/vendor/scaffold/images/logo.png" alt="Scaffold" width="280" height="40">
+            <x-scaffold::brand-logo class="header__brand-logo" :decorative="true" />
         </a>
     @endif
 

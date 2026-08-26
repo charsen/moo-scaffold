@@ -41,22 +41,8 @@
 }
 
 .p-login__logo {
-  height: 40px;
-  width: auto;
-  object-fit: contain;
+  --brand-logo-width: 292px;
   align-self: flex-start;
-}
-
-// dark 主题:logo.png 是深色字 wordmark,在深棕品牌栏上糊。无法改 raster、滤白又会丢橙 S
-// → 给彩色 logo 垫一张白底片(content-box 保 40px 图高,padding 出底片边距),深底上既清晰又保住品牌橙。
-// (header 同款 logo.png 在 dark 也有此问题,属 shell 层另案,本次只收 login。)
-[data-theme="dark"] .p-login__logo {
-  box-sizing: content-box;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  // 微灰底片:纯白(--text-inverse)略掺暗卡色(--bg-card)压成柔和浅灰,不刺眼又托得住深色字。
-  // 无现成"浅底片"token,且禁反用 text-* 当底色 → 用 color-mix 由两个语义 token 现调,零硬编码。
-  background: color-mix(in srgb, var(--text-inverse) 90%, var(--bg-card));
 }
 
 .p-login__headline {
