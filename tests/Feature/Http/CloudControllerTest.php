@@ -290,7 +290,7 @@ it('清理按钮只在 local + 可用 Monitor + 已接入 Cloud 时显示', func
     $stagingHtml = $this->get('/scaffold/cloud')->assertOk()->getContent();
 
     expect($localHtml)->toContain('清理开发噪音')
-        ->and($localHtml)->toContain('清理 local 开发噪音')
-        ->and($localHtml)->toContain('data-challenge="清理 local 开发噪音"')
-        ->and($stagingHtml)->not->toContain('data-challenge="清理 local 开发噪音"');
+        ->and($localHtml)->toContain('data-confirm="将清理当前项目的 local 开发噪音')
+        ->and($localHtml)->not->toContain('data-challenge=')
+        ->and($stagingHtml)->not->toContain('data-confirm="将清理当前项目的 local 开发噪音');
 });
