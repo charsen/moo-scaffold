@@ -1,0 +1,13 @@
+// 主题品牌图：只下载当前 data-theme 命中的资源；手动切换主题时由 CSS 原位换图，零 JS / 零闪烁。
+.brand-logo {
+    display: block;
+    width: var(--brand-logo-width, 160px);
+    max-width: 100%;
+    aspect-ratio: 4041 / 552;
+    flex-shrink: 0;
+    background: url("../images/logo-light.png") left center / contain no-repeat;
+}
+
+[data-theme="dark"] .brand-logo {
+    background-image: url("../images/logo-moon.png");
+}
