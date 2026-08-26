@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.13
+
+- Cloud 控制台在 `APP_ENV=local` 新增「清理开发噪音」：Cloud 仅把当前项目 local 环境中未解决的 Runtime / 慢 SQL 移入「已删除」，已解决记录与其它环境保持不动；本地只丢弃 cursor / partial ack 判定的待推记录，保留已同步 open 聚合锚点，同 hash 后续真实复发仍可重新打开。危险操作保留一次确认，不再要求输入确认文字。
+- 最低 `moo-monitor-laravel` 版本提升到 `^0.1.14`，锁定 Cloud 联动清理、分类型同步锁、本地 pending 精确丢弃与 recorder cache 失效契约。
+- 数据库设计器的扩展包列表改为响应式多列网格，充分利用横向空间；数据库文档侧栏切换菜单时保持原滚动位置，并消除恢复过程的顶部闪动。
+- 顶栏与登录页统一使用主题感知品牌组件：亮色加载 `logo-light.png`，暗色加载 `logo-moon.png`，切换主题时尺寸不跳动；同步保留 SVG / Illustrator 设计源文件。
+- 仓库发布改为 Gitee `origin` 与 GitHub `github` 两个远端分别直推并逐项核对，不再依赖定时镜像工作流。
+
 ## 2.1.12
 
 - `Concerns\Optional` 新增 `optionsAllowShowPage()` 标准扩展点，模型覆写并返回 `true` 后，会在正常列表与回收站的默认操作中增加 `type: show-page`；它与 `optionsAllowShow()` 相互独立且默认关闭，现有模型的操作集合保持不变。前端消费者需将 `show-page` 强制路由到独立详情页，`show` 原有的通用详情弹窗与 `showRoute` 兼容行为不变。
