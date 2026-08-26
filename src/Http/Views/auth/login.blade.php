@@ -15,7 +15,7 @@
     <div class="p-login__split">
         <aside class="p-login__brand-panel">
             <div class="p-login__brand-inner">
-                <img class="p-login__logo" src="/vendor/scaffold/images/logo.png" alt="Scaffold" width="280" height="40">
+                <x-scaffold::brand-logo class="p-login__logo" />
                 <h1 class="p-login__headline">Schema 驱动代码生成</h1>
                 <p class="p-login__tagline">一份 YAML schema，一条命令铺出 Model · Resource · Controller · Request · Migration。</p>
 
