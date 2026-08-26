@@ -31,15 +31,13 @@
   flex-shrink: 0;
 }
 
-.header__logo img {
-  height: 22px;
-  width: auto;
-  display: block;
+.header__brand-logo {
+  --brand-logo-width: 160px;
   opacity: 0.9;
   transition: opacity var(--transition-fast);
 }
 
-.header__logo:hover img {
+.header__logo:hover .header__brand-logo {
   opacity: 1;
 }
 
