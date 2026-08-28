@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.14
+
+- Composer `dev` 分支新增 `dev-dev → 2.x-dev` branch alias，Host 测试 profile 可直接依赖 `dev-dev`，无需 root inline alias。
+
 ## 2.1.13
 
 - Cloud 控制台在 `APP_ENV=local` 新增「清理开发噪音」：Cloud 仅把当前项目 local 环境中未解决的 Runtime / 慢 SQL 移入「已删除」，已解决记录与其它环境保持不动；本地只丢弃 cursor / partial ack 判定的待推记录，保留已同步 open 聚合锚点，同 hash 后续真实复发仍可重新打开。危险操作保留一次确认，不再要求输入确认文字。
