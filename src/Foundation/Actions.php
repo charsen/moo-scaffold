@@ -14,7 +14,7 @@ namespace Mooeen\Scaffold\Foundation;
  * ACL 权限点组装（host 消费面）。
  *
  * @api 本类由**宿主项目**实例化消费（ACL 角色/权限页），moo-scaffold 仓内 0 调用属正常——
- *      勿因 grep 无引用判为死码（见 notes.md「grep 缺失≠死键」教训）。
+ *      勿因 grep 无引用判为死码（见 NOTES.md「grep 缺失≠死键」教训）。
  */
 class Actions
 {
