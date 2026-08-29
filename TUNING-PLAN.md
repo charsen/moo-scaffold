@@ -21,7 +21,7 @@
 - ✅ **P1 全做**：1.3 琐碎（`099427d6`）→ 1.4 删 `rebuild()`（`0d2a4227`）→ 1.1 `putAndReport` 收编 11 处（`82287806`）→ 1.2 `isForced()` 统一（`8803056d`，收尾迁第 8 处 + VALUE_NONE 脚手枪警告 `b9af34f5`）。
 - ✅ **P3.1**（`0c9679e1`）：proxy 段析出 `ApiProxyController`（173 行，plan 注释逐字随迁，路由只换目标类）。
 - ✅ **P3.2**（`7dbad16b`）：拆 `Utility→SchemaLoader` 反向依赖环，知识挪到 `Command` 编排层（`schemaNames/schemaOrigin/hostSchemaNames`），删 Utility 两方法，`CodegenOriginTest` 迁真源。
-- ⛔ **P2 已放弃（止损条款生效）**：真做后判定「收敛」只是把分支重定位进更深的值对象——namespace 的 module-folder 插入散在下游、host controller 路径随 app 变会逼 context 存 app-keyed 嵌套 map，读得反不如现状 6 行 if/else 直白。**2026-07-09 止损，维持现状**（详见 `notes.md`）。无新证据不重开；`originCtx` 三元仍留在 4 个生成器 + `ResolvesOriginContext`。
+- ⛔ **P2 已放弃（止损条款生效）**：真做后判定「收敛」只是把分支重定位进更深的值对象——namespace 的 module-folder 插入散在下游、host controller 路径随 app 变会逼 context 存 app-keyed 嵌套 map，读得反不如现状 6 行 if/else 直白。**2026-07-09 止损，维持现状**（详见 `NOTES.md`）。无新证据不重开；`originCtx` 三元仍留在 4 个生成器 + `ResolvesOriginContext`。
 - 🧪 **测试**：新增 `IsForcedTest` / `PutAndReportTest`，`CodegenOriginTest` 迁真源；HEAD `pest` 全绿（597 passed / 3 skipped）。
 - 📌 **遗留**：`CreateModelGenerator.php` 全仓唯一 `TODO: check in vue3` —— vue3 模板未做，用户 2026-07-09 决定原样留着。
 
@@ -48,7 +48,7 @@
 4. **不动 `stubs/`**（模板即编码规范，本方案范围外）；不动 Blade 视图（前端另案）。
 5. 保留全部"why 注释"（plan 编号/日期/决策理由）；迁移代码时注释跟着走。
 6. 遇到方案未列的"顺手可改"，停下报告，不擅动（CLAUDE.md 红线第 6 条）。
-7. **文档 commit 隔离**（复盘补充）：仓根三个未跟踪文档不得混进任何调优 commit——`CLAUDE.md` + `notes.md` 用户已批入仓，开工前单独发一个 docs commit；`TUNING-PLAN.md` **保持未跟踪**（工作文档，入仓与否等用户定）。
+7. **文档 commit 隔离**（复盘补充）：仓根三个未跟踪文档不得混进任何调优 commit——`CLAUDE.md` + `NOTES.md` 用户已批入仓，开工前单独发一个 docs commit；`TUNING-PLAN.md` **保持未跟踪**（工作文档，入仓与否等用户定）。
 8. **零行为变更不变量**（用户 2026-07-09 明确要求）：本方案全部条目都是**纯重构，业务功能一丝不变**。执行中观察到任何行为差异（输出、报错、路由响应、生成物）——那不是"顺手修"的机会，是**停手报告**的信号；哪怕现状看着像 bug，也原样保持、另行报告（与红线 6 同源）。
 9. **测试钉现状先行**：动到的逻辑若现有测试没钉住，**先补"钉死现状"的测试、跑绿，再动手改**——改完同一批测试原样全绿即为行为不变的机器证明。已核对的覆盖现状：P3.1 无需补（proxy 已有 7 项特征测试，见 §3.1）；P2 **必须补**（TargetContextTest 现有 6 例不含新方法，见 §三验证）；P3.2 按 §3.2 第 4 步迁移即可。
 
