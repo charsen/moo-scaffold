@@ -3,12 +3,15 @@
 namespace Mooeen\Scaffold\Http\Controllers;
 
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Mooeen\Monitor\Cloud\CloudClient;
 use Mooeen\Scaffold\Designer\SchemaLoader;
+use Mooeen\Scaffold\Http\Requests\ContextRequest;
+use Mooeen\Scaffold\Http\Requests\Scaffold\CspReportRequest;
+use Mooeen\Scaffold\Http\Requests\Scaffold\DashboardRequest;
+use Mooeen\Scaffold\Http\Requests\Scaffold\DbDocsRequest;
 use Mooeen\Scaffold\Support\ApiSchemaService;
 use Mooeen\Scaffold\Utility;
 
@@ -35,12 +38,13 @@ class ScaffoldController extends Controller
      *
      * @return View
      */
-    public function index(Request $req)
+    public function index(DashboardRequest $req)
     {
+        $validated    = $req->validated();
         $data         = [];
         $data['uri']  = $req->getPathInfo();
         $data['apps'] = $this->utility->getApps();
-        $data         = array_merge($data, $this->getDashboardStats($req, $data['apps']));
+        $data         = array_merge($data, $this->getDashboardStats($validated, $data['apps']));
         $data         = array_merge($data, $this->getCloudPanelData());
 
         return $this->view('dashboard', $data);
@@ -128,7 +132,7 @@ class ScaffoldController extends Controller
      * 原 DatabaseController 在 2026-05-23 数据库文档功能砍掉(5f8250d)后只剩这一 method,
      * 整 file 69 行托一个 method 不划算 → 合并到 ScaffoldController(同 extends Controller)。
      */
-    public function dictionaries(Request $req)
+    public function dictionaries(ContextRequest $req)
     {
         $menus    = $this->utility->getTables();
         $allEnums = $this->utility->getEnums(false);
@@ -187,18 +191,19 @@ class ScaffoldController extends Controller
      * 旧的只读 doc)。读 SchemaLoader(yaml 源,跟 designer 同一份,始终是当前设计),3 栏:
      * 模块(aside)→ 表(middle)→ 表详情 doc(right,字段/索引/枚举)。?schema/?table 服务端选中。
      */
-    public function dbDocs(Request $req, SchemaLoader $loader)
+    public function dbDocs(DbDocsRequest $req, SchemaLoader $loader)
     {
-        $modules = $loader->listModules();   // [schema => {name, tables_count, fields_count, desc, ...}]
+        $validated = $req->validated();
+        $modules   = $loader->listModules();   // [schema => {name, tables_count, fields_count, desc, ...}]
 
-        $schema = (string) $req->query('schema', '');
+        $schema = (string) ($validated['schema'] ?? '');
         if ($schema === '' || ! isset($modules[$schema])) {
             $schema = (string) (array_key_first($modules) ?? '');
         }
 
         $tables = $schema !== '' ? $loader->loadModuleTables($schema) : [];
 
-        $tableKey = (string) $req->query('table', '');
+        $tableKey = (string) ($validated['table'] ?? '');
         $detail   = null;
         if ($tableKey !== '' && isset($tables[$tableKey])) {
             try {
@@ -221,14 +226,14 @@ class ScaffoldController extends Controller
     /**
      * 首页统计数据
      */
-    private function getDashboardStats(Request $request, array $apps): array
+    private function getDashboardStats(array $validated, array $apps): array
     {
         $tables               = $this->getTablesSafely();
         $controllers          = $this->getControllersSafely();
         $apiStats             = $this->summarizeAppsCached($apps);
         $publishHistory       = $this->getApiPublishHistory($apps);
         $publishHistoryGroups = $this->groupApiPublishHistory($publishHistory);
-        $paginatedHistory     = $this->paginatePublishHistoryGroup($request, $publishHistoryGroups);
+        $paginatedHistory     = $this->paginatePublishHistoryGroup($validated, $publishHistoryGroups);
 
         $tableCount = 0;
         foreach ($tables as $item) {
@@ -661,7 +666,7 @@ class ScaffoldController extends Controller
     /**
      * 按 app 对首页发布历史分页
      */
-    private function paginatePublishHistoryGroup(Request $request, array $publishHistoryGroups): array
+    private function paginatePublishHistoryGroup(array $validated, array $publishHistoryGroups): array
     {
         if (empty($publishHistoryGroups)) {
             return [
@@ -678,7 +683,7 @@ class ScaffoldController extends Controller
         $defaultKey = (string) ($publishHistoryGroups[0]['key'] ?? 'unknown');
         // query 参数可被构造成数组(?history_app[]=x),(string) 强转数组 → ErrorException
         // 整页 500 —— 非字符串一律回落默认 tab(2026-06-10 修)
-        $rawApp    = $request->query('history_app');
+        $rawApp    = $validated['history_app'] ?? null;
         $activeKey = is_string($rawApp) ? $rawApp : $defaultKey;
         if (! isset($groupsByKey[$activeKey])) {
             $activeKey = $defaultKey;
@@ -689,7 +694,7 @@ class ScaffoldController extends Controller
         $perPage     = self::PUBLISH_HISTORY_PER_PAGE;
         $total       = count($items);
         $lastPage    = max(1, (int) ceil($total / $perPage));
-        $rawPage     = $request->query('history_page', 1);
+        $rawPage     = $validated['history_page'] ?? 1;
         $currentPage = min(max(1, (int) (is_scalar($rawPage) ? $rawPage : 1)), $lastPage);
 
         $paginator = new LengthAwarePaginator(
@@ -703,7 +708,7 @@ class ScaffoldController extends Controller
             ]
         );
 
-        $query                = $request->query();
+        $query                = $validated;
         $query['history_app'] = $activeKey;
         unset($query['history_page']);
         $paginator->appends($query);
@@ -773,18 +778,14 @@ class ScaffoldController extends Controller
      * 公开无登录(浏览器发 CSP 报告不带 cookie),已挂 throttle:60,1 防 DDoS。
      * 这里再加 payload size cap 8KB,防有人灌大包炸 fpm worker。
      */
-    public function cspReport(Request $req)
+    public function cspReport(CspReportRequest $req)
     {
-        if (strlen($req->getContent()) > 8192) {
-            return response('payload too large', 413);
-        }
-
-        $payload = $req->isJson() ? $req->json()->all() : $req->all();
+        $validated = $req->validated();
         Log::channel(config('logging.default'))
             ->warning('scaffold.csp.violation', [
-                'report' => $payload,
-                'ua'     => $req->userAgent(),
-                'ip'     => $req->ip(),
+                'report' => $validated['_report']     ?? [],
+                'ua'     => $validated['_user_agent'] ?? null,
+                'ip'     => $validated['_ip']         ?? null,
             ]);
 
         return response()->noContent();

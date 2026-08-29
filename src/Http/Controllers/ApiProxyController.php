@@ -9,9 +9,10 @@ declare(strict_types=1);
 
 namespace Mooeen\Scaffold\Http\Controllers;
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Mooeen\Scaffold\Foundation\FormRequest;
+use Mooeen\Scaffold\Http\Requests\Api\ProxyRequest;
 
 /**
  * 接口调试器的 HTTP 转发代理（解决跨域）。
@@ -24,18 +25,15 @@ class ApiProxyController extends Controller
     /**
      * 代理转发接口请求（解决跨域）
      */
-    public function proxy(Request $req)
+    public function proxy(ProxyRequest $req)
     {
         // plan-40 §五 F3:url + method 上 validate 作为白名单的第二防线
         // (isAllowedProxyUrl 是主防线,但代码迁移 / 异步队列重组时容易绕开,validate 永远先跑)
-        $req->validate([
-            '_proxy_url'    => 'required|string|url|max:2000',
-            '_proxy_method' => 'nullable|string|in:GET,POST,PUT,PATCH,DELETE,get,post,put,patch,delete',
-        ]);
-        $url            = $req->input('_proxy_url');
-        $method         = strtoupper($req->input('_proxy_method', 'GET'));
-        $headers        = $req->input('_proxy_headers', []);
-        $params         = $req->input('_proxy_params', []);
+        $validated      = $req->validated();
+        $url            = $validated['_proxy_url'];
+        $method         = strtoupper((string) ($validated['_proxy_method'] ?? 'GET'));
+        $headers        = $validated['_proxy_headers'] ?? [];
+        $params         = $validated['_proxy_params']  ?? [];
         $allowedMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
         if (empty($url)) {
@@ -114,7 +112,7 @@ class ApiProxyController extends Controller
             ->withOptions(['allow_redirects' => false]);
     }
 
-    private function isAllowedProxyUrl(Request $req, string $url): bool
+    private function isAllowedProxyUrl(FormRequest $req, string $url): bool
     {
         // plan-22 安全审计 Q3:显式协议白名单(原靠 origin match 隐含挡 file/gopher,显式写出来更稳)
         $scheme = strtolower((string) parse_url(trim($url), PHP_URL_SCHEME));
@@ -130,7 +128,7 @@ class ApiProxyController extends Controller
         return in_array($targetOrigin, $this->getAllowedProxyOrigins($req), true);
     }
 
-    private function getAllowedProxyOrigins(Request $req): array
+    private function getAllowedProxyOrigins(FormRequest $req): array
     {
         $origins = [];
         foreach (array_values($this->config('hosts') ?: []) as $hostUrl) {
