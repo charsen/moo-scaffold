@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.15
+
+- 内置研发后台 action 全面使用 Scaffold FormRequest，所有用户输入经 `validated()` 消费，并新增路由反射与源码门禁防止退回通用 Request 或原始输入读取。
+- 统一根目录协作文档命名为 `NOTES.md` 与 `TODOS.md`。
+
 ## 2.1.14
 
 - Composer `dev` 分支新增 `dev-dev → 2.x-dev` branch alias，Host 测试 profile 可直接依赖 `dev-dev`，无需 root inline alias。
