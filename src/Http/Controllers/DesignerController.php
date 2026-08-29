@@ -5,7 +5,6 @@ namespace Mooeen\Scaffold\Http\Controllers;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Mooeen\Scaffold\Designer\AiNotConfiguredException;
@@ -19,7 +18,22 @@ use Mooeen\Scaffold\Designer\SchemaLoader;
 use Mooeen\Scaffold\Designer\SchemaLoadException;
 use Mooeen\Scaffold\Designer\SnapshotStore;
 use Mooeen\Scaffold\Designer\TranslationService;
+use Mooeen\Scaffold\Foundation\FormRequest;
 use Mooeen\Scaffold\Generator\FreshStorageGenerator;
+use Mooeen\Scaffold\Http\Requests\ContextRequest;
+use Mooeen\Scaffold\Http\Requests\Designer\CompactExecuteRequest;
+use Mooeen\Scaffold\Http\Requests\Designer\CompactPreviewRequest;
+use Mooeen\Scaffold\Http\Requests\Designer\ConfirmRequest;
+use Mooeen\Scaffold\Http\Requests\Designer\CreateSchemaRequest;
+use Mooeen\Scaffold\Http\Requests\Designer\CreateTableRequest;
+use Mooeen\Scaffold\Http\Requests\Designer\DeleteMigrationRequest;
+use Mooeen\Scaffold\Http\Requests\Designer\MigrateRequest;
+use Mooeen\Scaffold\Http\Requests\Designer\MigrationContentRequest;
+use Mooeen\Scaffold\Http\Requests\Designer\RenameSchemaRequest;
+use Mooeen\Scaffold\Http\Requests\Designer\RenameTableRequest;
+use Mooeen\Scaffold\Http\Requests\Designer\SaveRequest;
+use Mooeen\Scaffold\Http\Requests\Designer\ShowRequest;
+use Mooeen\Scaffold\Http\Requests\Designer\TranslateRequest;
 use Mooeen\Scaffold\Support\AccountStore;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Console\Output\NullOutput;
@@ -45,9 +59,9 @@ class DesignerController
      * 当前登录用户能否设计数据库(designer 写权限):admin / 有 can_design_db 的 member → true。
      * auth 关闭 / 无登录用户(单用户开放模式)→ true(不锁)。决定 designer_locked 的 per-user 维度。
      */
-    private function userCanDesign(): bool
+    private function userCanDesign(FormRequest $request): bool
     {
-        $user = request()->attributes->get('scaffold_auth_user');
+        $user = $request->attributes->get('scaffold_auth_user');
         if (! is_string($user) || $user === '') {
             return true;
         }
@@ -56,12 +70,12 @@ class DesignerController
     }
 
     // ─── GET /scaffold/db/designer ────────────────────────────────────
-    public function index(): View
+    public function index(ContextRequest $req): View
     {
         // 2026-05-23:index 也喂 is_prod/is_readonly,避免"新建 Schema"按钮在 production 还能点
         $designerIsProd     = function_exists('app') && app()->environment('production');
         $designerIsReadonly = (bool) config('scaffold.config_ui.readonly', false);
-        $designerCanDesign  = $this->userCanDesign();     // per-user 设计权限(admin / can_design_db),无权限 = 只读
+        $designerCanDesign  = $this->userCanDesign($req);     // per-user 设计权限(admin / can_design_db),无权限 = 只读
 
         // plan-53 出身分块:host 一块 + 每个扩展包一块(schema 属于谁一眼可辨;仅 host 时不渲染块标题,视觉不变)
         $modules = $this->loader->listModules();
@@ -100,8 +114,9 @@ class DesignerController
     }
 
     // ─── GET /scaffold/db/designer/{schema} ──────────────────────────
-    public function show(Request $req, string $schema): View|RedirectResponse
+    public function show(ShowRequest $req, string $schema): View|RedirectResponse
     {
+        $validated = $req->validated();
         try {
             $module = $this->loader->loadModule($schema);
             $tables = $this->loader->loadModuleTables($schema);
@@ -111,7 +126,7 @@ class DesignerController
                 ->withErrors(['schema' => "schema {$schema} 加载失败：{$e->getMessage()}"]);
         }
 
-        $tableKey = $req->query('table') ?: array_key_first($tables) ?: '';
+        $tableKey = ($validated['table'] ?? null) ?: array_key_first($tables) ?: '';
         if ($tableKey !== '' && ! isset($tables[$tableKey])) {
             $tableKey = array_key_first($tables) ?: '';
         }
@@ -131,7 +146,7 @@ class DesignerController
         // 双层守护规则:后端中间件兜底 + 前端锁定态置灰。
         $designerIsProd     = function_exists('app') && app()->environment('production');
         $designerIsReadonly = (bool) config('scaffold.config_ui.readonly', false);
-        $designerCanDesign  = $this->userCanDesign();     // per-user 设计权限(admin / can_design_db),无权限 = 只读
+        $designerCanDesign  = $this->userCanDesign($req);     // per-user 设计权限(admin / can_design_db),无权限 = 只读
 
         // plan-53 出身:包 schema 详情页挂 git 归属高亮;vcs 拷贝包(非软链)整页只读(写权硬线的 UI 层)
         $origin         = $this->loader->originOf($schema);
@@ -176,12 +191,9 @@ class DesignerController
     }
 
     // ─── POST /scaffold/db/designer/{schema}/save ────────────────────
-    public function save(Request $req, string $schema): JsonResponse
+    public function save(SaveRequest $req, string $schema): JsonResponse
     {
-        $payload = $req->validate([
-            'module' => 'nullable|array',
-            'tables' => 'required|array',
-        ]);
+        $payload = $req->validated();
 
         // 暂存 rename hints 到 session
         $renameHints = [];
@@ -216,26 +228,12 @@ class DesignerController
     }
 
     // ─── POST /scaffold/db/designer/translate ────────────────────────
-    public function translate(Request $req): JsonResponse
+    public function translate(TranslateRequest $req): JsonResponse
     {
-        $scene = $req->input('scene');
+        $data  = $req->validated();
+        $scene = $data['scene'];
         try {
             if ($scene === 'fields') {
-                $data = $req->validate([
-                    'table' => 'required|string',
-                    // 2026-05-21 bug:Order/order_plans 等没配 attrs.prefix 的表 frontend 传 prefix=""
-                    // → engine 全局 ConvertEmptyStringsToNull 把 "" 转 null → required/string 全拒返 422
-                    // → JSON 无 error 字段 → frontend toast "请求失败"。
-                    // 改 present + nullable(字段必传 / 允许 null & 空字符串),controller 下方 rtrim((string)...) 把 null 转 ""。
-                    // TranslationService::validateFieldsResponse 内部 $prefix !== '' 守卫已经能处理空 prefix(跳过 prefix 拼接整条逻辑)。
-                    'prefix'            => 'present|nullable|string',
-                    'existing_fields'   => 'array',
-                    'existing_fields.*' => 'string|max:64',
-                    // plan-37 后审 P1:限 50 项,避免 DDoS DeepSeek + token 烧空
-                    'inputs'   => 'required|array|max:50',
-                    'inputs.*' => 'string|max:64',
-                    'lenient'  => 'sometimes|boolean',
-                ]);
                 // 2026-05-20 bug:user 表 prefix 含尾下划线(yaml.attrs.prefix=op_)时,
                 // backend $prefix.'_' 拼成 op__(双下划线),AI 合法输出 op_xxx 全被误判 invalid。
                 // 统一 strip 末尾 `_`,跟 designer.js batch translate(_buildAddPayload line 1388)一致。
@@ -252,11 +250,6 @@ class DesignerController
                 return $this->ok($results);
             }
             if ($scene === 'enums') {
-                $data = $req->validate([
-                    'field'    => 'required|string',
-                    'inputs'   => 'required|array|max:50',     // plan-37 后审 P1
-                    'inputs.*' => 'string|max:64',
-                ]);
                 // 2026-05-21:喂 enum 样本(全仓 enum 条目)— 不再用 field naming samples,维度不对
                 $results = $this->translator->translateEnumKeys(
                     $data['field'],
@@ -267,20 +260,11 @@ class DesignerController
                 return $this->ok($results);
             }
             if ($scene === 'spell_check') {
-                $data = $req->validate([
-                    'inputs'   => 'required|array|max:200',     // 200 字段上限够大表用,DDoS 守住
-                    'inputs.*' => 'string|max:64',
-                ]);
                 $results = $this->translator->spellCheckFields($data['inputs']);
 
                 return $this->ok($results);
             }
             if ($scene === 'table_short') {
-                $data = $req->validate([
-                    'module'   => 'required|string',
-                    'inputs'   => 'required|array|max:5',
-                    'inputs.*' => 'string|max:64',
-                ]);
                 $result = $this->translator->translateTableShort($data['module'], $data['inputs'][0] ?? '');
 
                 return $this->ok(['result' => $result]);
@@ -300,7 +284,7 @@ class DesignerController
     }
 
     // ─── GET /scaffold/db/designer/{schema}/preview ──────────────────
-    public function preview(Request $req, string $schema): JsonResponse
+    public function preview(ContextRequest $req, string $schema): JsonResponse
     {
         $hints = (array) $req->session()->get("designer.rename_hints.{$schema}", []);
 
@@ -362,8 +346,9 @@ class DesignerController
     // C 方案:user 测试 / 误生成的 migration 文件清理入口。
     // 前置:migrations 表无该 record(prod 没跑过),否则拒删。不动 snapshot —
     // user 自己决定要不要让 designer 重生成(需手动改 .snapshots/{Schema}.yaml)。
-    public function deleteMigration(Request $req, string $schema, string $stem): JsonResponse
+    public function deleteMigration(DeleteMigrationRequest $req, string $schema, string $stem): JsonResponse
     {
+        $validated = $req->validated();
         // 1) 文件名 stem 严校验(URL 不带 .php 后缀,避免 nginx 拦截走 fastcgi),routes regex 已限 [0-9a-zA-Z_]+
         if (! preg_match('/^[0-9a-zA-Z_]+$/', $stem)) {
             return $this->error('INVALID_FILE', '文件名格式非法', 422);
@@ -401,8 +386,8 @@ class DesignerController
         //    DB 还有该表时,SchemaDiffService 走 baseline_drift 守护 → 不会误生成 create_table
         //    仅在 user 确认 DB 没跑过此 migration 时勾选(警示已在前端 modal 给)
         $baselineCleared = false;
-        if ($req->boolean('clear_baseline')) {
-            $tableKey = trim((string) $req->input('table_key', ''));
+        if ($validated['clear_baseline'] ?? false) {
+            $tableKey = trim((string) ($validated['table_key'] ?? ''));
             if ($tableKey !== '' && preg_match('/^[a-z][a-z0-9_]*$/', $tableKey)) {
                 try {
                     app(SnapshotStore::class)->unsetTables($schema, [$tableKey]);
@@ -427,11 +412,9 @@ class DesignerController
 
     // ─── POST /scaffold/db/designer/{schema}/migrations/compact-preview ─
     // plan-49:dry-run,扫文件 + 重渲 create + drift 检测 + git push 检测,不动磁盘
-    public function compactMigrationsPreview(Request $req, string $schema): JsonResponse
+    public function compactMigrationsPreview(CompactPreviewRequest $req, string $schema): JsonResponse
     {
-        $data = $req->validate([
-            'table' => 'required|string|max:64|regex:/^[a-z][a-z0-9_]*$/',
-        ]);
+        $data = $req->validated();
         try {
             $preview = $this->compacter->preview($schema, $data['table']);
 
@@ -447,13 +430,9 @@ class DesignerController
 
     // ─── POST /scaffold/db/designer/{schema}/migrations/compact ─────
     // plan-49:execute,真删 update 文件 + 真改写 create 文件 + 可选清 migrations 表
-    public function compactMigrationsExecute(Request $req, string $schema): JsonResponse
+    public function compactMigrationsExecute(CompactExecuteRequest $req, string $schema): JsonResponse
     {
-        $data = $req->validate([
-            'table'    => 'required|string|max:64|regex:/^[a-z][a-z0-9_]*$/',
-            'clean_db' => 'nullable|boolean',
-            'force'    => 'nullable|boolean',     // 绕开 git_pushed 兜底:GUI 在已 push 时勾「未部署」确认框后传 true
-        ]);
+        $data = $req->validated();
         try {
             $result = $this->compacter->execute($schema, $data['table'], [
                 'clean_db' => (bool) ($data['clean_db'] ?? false),
@@ -471,11 +450,9 @@ class DesignerController
     }
 
     // ─── POST /scaffold/db/designer/{schema}/migrate ─────────────────
-    public function migrate(Request $req, string $schema): JsonResponse
+    public function migrate(MigrateRequest $req, string $schema): JsonResponse
     {
-        $data = $req->validate([
-            'only_table' => 'nullable|string',
-        ]);
+        $data = $req->validated();
 
         $hints = (array) $req->session()->get("designer.rename_hints.{$schema}", []);
 
@@ -564,15 +541,16 @@ class DesignerController
     }
 
     // ─── GET /scaffold/db/designer/{schema}/migration-content?file=xxx.php ─
-    public function migrationContent(Request $req, string $schema): JsonResponse
+    public function migrationContent(MigrationContentRequest $req, string $schema): JsonResponse
     {
-        $filename = (string) $req->query('file', '');
+        $validated = $req->validated();
+        $filename  = (string) ($validated['file'] ?? '');
         // 安全:只允许 basename + .php,禁 path traversal
         if ($filename === '' || basename($filename) !== $filename || ! str_ends_with($filename, '.php')) {
             return $this->error('INVALID_FILENAME', '文件名非法', 400);
         }
         // plan-37 后审 P1:文件必须属于该 schema 的 migration 列表,避免跨 schema 读
-        $allowedFiles = array_column($this->loader->loadMigrationsFor($schema, $req->query('table', '') ?: ''), 'file');
+        $allowedFiles = array_column($this->loader->loadMigrationsFor($schema, ($validated['table'] ?? '') ?: ''), 'file');
         if (! in_array($filename, $allowedFiles, true)) {
             // 如果没指定 table,扫该 schema 所有 table 的 migration 文件
             $tables       = $this->loader->loadModuleTables($schema);
@@ -599,16 +577,11 @@ class DesignerController
     }
 
     // ─── POST /scaffold/db/designer/{schema}/tables ───────────────────
-    public function createTable(Request $req, string $schema): JsonResponse
+    public function createTable(CreateTableRequest $req, string $schema): JsonResponse
     {
         // plan-40 §五 F4:跟 routes.php where regex / SchemaLoader 抛 throw 三处一致,
         // controller validate 早 reject 422 比 SchemaLoadException 更友好
-        $data = $req->validate([
-            'table_key' => 'required|string|regex:/^[a-z][a-z0-9_]*$/|max:64',
-            'name'      => 'required|string|max:100',
-            'desc'      => 'nullable|string|max:500',
-            'prefix'    => 'nullable|string|max:30',     // plan 19 v8 D4
-        ]);
+        $data   = $req->validated();
         $author = (string) $req->attributes->get('scaffold_auth_user', '');
         try {
             $this->loader->createTable(
@@ -630,14 +603,10 @@ class DesignerController
     }
 
     // #4:POST /scaffold/db/designer/schemas — 新建 schema
-    public function createSchema(Request $req): JsonResponse
+    public function createSchema(CreateSchemaRequest $req): JsonResponse
     {
         // plan-40 §五 F4:schema PascalCase 跟 routes.php where regex 一致
-        $data = $req->validate([
-            'schema' => 'required|string|regex:/^[A-Z][A-Za-z0-9]*$/|max:64',
-            'name'   => 'required|string|max:100',
-            'desc'   => 'nullable|string|max:500',
-        ]);
+        $data = $req->validated();
         try {
             $this->loader->createSchema($data['schema'], $data['name'], $data['desc'] ?? '');
         } catch (SchemaLoadException $e) {
@@ -651,11 +620,9 @@ class DesignerController
     }
 
     // DELETE /scaffold/db/designer/schemas/{schema} — 删 schema(只草稿态,锁定态拒绝)
-    public function deleteSchema(Request $req, string $schema): JsonResponse
+    public function deleteSchema(ConfirmRequest $req, string $schema): JsonResponse
     {
-        $data = $req->validate([
-            'confirm_key' => 'required|string',
-        ]);
+        $data = $req->validated();
         if ($data['confirm_key'] !== $schema) {
             return $this->error('CONFIRM_MISMATCH', '确认输入的 schema 名跟当前不一致，删除取消', 422);
         }
@@ -672,11 +639,9 @@ class DesignerController
     }
 
     // PUT /scaffold/db/designer/schemas/{schema} — 改名 schema(只草稿态)
-    public function renameSchema(Request $req, string $schema): JsonResponse
+    public function renameSchema(RenameSchemaRequest $req, string $schema): JsonResponse
     {
-        $data = $req->validate([
-            'new_name' => 'required|string|regex:/^[A-Z][A-Za-z0-9]*$/|max:64',
-        ]);
+        $data = $req->validated();
         try {
             $this->loader->renameSchema($schema, $data['new_name']);
             $this->refreshSchemaCache($data['new_name']);
@@ -695,11 +660,9 @@ class DesignerController
     // controller / acl 命名不源于表 key,不受影响。若已生成 Model,其 $table 下次 moo:model 重生成对齐。
     // 2026-07-04 闭环(ship 清单 #10):已生成 migration 的表不再拒绝 —— 接力写 Schema::rename
     // migration + captureTables 迁 snapshot baseline(旧 key 移出 / 新 key 吸入,防 diff 误判成删表+建表)。
-    public function renameTable(Request $req, string $schema, string $table): JsonResponse
+    public function renameTable(RenameTableRequest $req, string $schema, string $table): JsonResponse
     {
-        $data = $req->validate([
-            'new_key' => 'required|string|regex:/^[a-z][a-z0-9_]*$/|max:64',
-        ]);
+        $data = $req->validated();
 
         // 改名前先记录旧表是否已有 migration(改完 yaml 后旧 key 查不到了)
         $hadMigration = (bool) ($this->loader->loadModuleTables($schema)[$table]['locked'] ?? false);
@@ -739,11 +702,9 @@ class DesignerController
     // v6.2 round 7:DELETE /scaffold/db/designer/{schema}/tables/{table}
     // 2026-05-22:删 yaml 节点后自动跑 diff+write 流程生成 drop migration(等同 moo:migration),
     // 跟 MigrationWriter::ship captureTables 联动自动清 snapshot 里的此表。user 跑 migrate 真删 DB。
-    public function deleteTable(Request $req, string $schema, string $table): JsonResponse
+    public function deleteTable(ConfirmRequest $req, string $schema, string $table): JsonResponse
     {
-        $data = $req->validate([
-            'confirm_key' => 'required|string',
-        ]);
+        $data = $req->validated();
         if ($data['confirm_key'] !== $table) {
             return $this->error('CONFIRM_MISMATCH', '确认输入的表 key 跟当前不一致，删除取消', 422);
         }

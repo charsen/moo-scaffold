@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Mooeen\Scaffold\Http\Controllers;
 
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
+use Mooeen\Scaffold\Http\Requests\Route\IndexRequest;
 use Mooeen\Scaffold\Support\AclActionResolver;
 use Mooeen\Scaffold\Support\AclDocumentLoader;
 use Mooeen\Scaffold\Utility;
@@ -31,14 +31,15 @@ class RouteController extends Controller
         parent::__construct($utility, $filesystem);
     }
 
-    public function index(Request $req)
+    public function index(IndexRequest $req)
     {
+        $validated  = $req->validated();
         $apps       = $this->utility->getApps();
-        $currentApp = (string) $req->input('app', '');
+        $currentApp = (string) ($validated['app'] ?? '');
 
         // plan-22 P1-U3:ACL/routes picker 加 cookie 30 天,跟 api doc/debug 两 picker 对齐
         // 入口无 ?app= 且 cookie 命中 → redirect 让 URL 反映上次选(sidebar / sub-nav active 才能对)
-        if ($currentApp === '' && isset($apps[$lastApp = (string) $req->cookie('scaffold_routes_app', '')]) && $lastApp !== '') {
+        if ($currentApp === '' && isset($apps[$lastApp = (string) ($validated['_last_app'] ?? '')]) && $lastApp !== '') {
             return redirect()->route('route.list', ['app' => $lastApp]);
         }
 
@@ -54,8 +55,8 @@ class RouteController extends Controller
             ];
         }
 
-        $currentModule = (string) $req->input('m', '');
-        $keyword       = trim((string) $req->input('keyword', ''));
+        $currentModule = (string) ($validated['m'] ?? '');
+        $keyword       = trim((string) ($validated['keyword'] ?? ''));
 
         // plan-22 P1-U3:选定 app 后写 cookie 30 天(raw 对称读写,scaffold routes 不进 EncryptCookies)
         return response()->view('scaffold::route.index', [

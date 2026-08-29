@@ -15,9 +15,11 @@ namespace Mooeen\Scaffold\Http\Controllers;
 use Faker\Factory as Faker;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
+use Mooeen\Scaffold\Http\Requests\Api\CacheRequest;
+use Mooeen\Scaffold\Http\Requests\Api\EndpointRequest;
+use Mooeen\Scaffold\Http\Requests\Api\IndexRequest;
 use Mooeen\Scaffold\Support\AclActionResolver;
 use Mooeen\Scaffold\Support\ApiSchemaService;
 use Mooeen\Scaffold\Utility;
@@ -42,15 +44,16 @@ class ApiController extends Controller
     /**
      * 接口文档列表
      */
-    public function index(Request $req)
+    public function index(IndexRequest $req)
     {
-        $app  = $req->input('app');
-        $apps = $this->utility->getApps();
+        $validated = $req->validated();
+        $app       = $validated['app'] ?? null;
+        $apps      = $this->utility->getApps();
 
         // 2026-06-19:取消"选应用"落地页 —— 无 app(或非法 app)直接进默认应用:
         //   优先 cookie 上次选(30 天),否则第一个 app。应用切换走 subnav 的 app-tabs。
         if ($app === null || $app === '' || ! isset($apps[$app])) {
-            $lastApp = (string) $req->cookie('scaffold_api_doc_app', '');
+            $lastApp = (string) ($validated['_doc_app'] ?? '');
             $target  = (isset($apps[$lastApp]) && $lastApp !== '') ? $lastApp : array_key_first($apps);
             if ($target !== null) {
                 return redirect()->route('api.list', ['app' => $target]);
@@ -78,9 +81,9 @@ class ApiController extends Controller
         $data['uri']                = $req->getPathInfo();
         $data['apps']               = $apps;
         $data['current_app']        = $app;
-        $data['current_folder']     = $req->input('f', null);
-        $data['current_controller'] = $req->input('c', null);
-        $data['current_action']     = $req->input('a', null);
+        $data['current_folder']     = $validated['f'] ?? null;
+        $data['current_controller'] = $validated['c'] ?? null;
+        $data['current_action']     = $validated['a'] ?? null;
         $data['first_menu_active']  = false;
         $data['first_table_active'] = $data['current_controller'] !== null;
 
@@ -92,9 +95,9 @@ class ApiController extends Controller
     /**
      * 接口详情 (AJAX)
      */
-    public function show(Request $req)
+    public function show(EndpointRequest $req)
     {
-        $data = $this->getOneApi($req);
+        $data = $this->getOneApi($req->validated());
 
         return $this->view('api.show', $data);
     }
@@ -102,14 +105,15 @@ class ApiController extends Controller
     /**
      * 接口调试页面
      */
-    public function request(Request $req)
+    public function request(IndexRequest $req)
     {
-        $app  = $req->input('app');
-        $apps = $this->utility->getApps();
+        $validated = $req->validated();
+        $app       = $validated['app'] ?? null;
+        $apps      = $this->utility->getApps();
 
         // 2026-06-20:取消"选应用"落地页 —— 无 app(或非法)直接进默认应用(cookie 上次/首个),切换走 subnav app-tabs。
         if ($app === null || $app === '' || ! isset($apps[$app])) {
-            $lastApp = (string) $req->cookie('scaffold_api_debug_app', '');
+            $lastApp = (string) ($validated['_debug_app'] ?? '');
             $target  = (isset($apps[$lastApp]) && $lastApp !== '') ? $lastApp : array_key_first($apps);
             if ($target !== null) {
                 return redirect()->route('api.request', ['app' => $target]);
@@ -141,9 +145,9 @@ class ApiController extends Controller
         $data['apps']               = $apps;
         $data['current_app']        = $app;
         $data['api_index']          = 1;
-        $data['current_folder']     = $req->input('f', null);
-        $data['current_controller'] = $req->input('c', null);
-        $data['current_action']     = $req->input('a', null);
+        $data['current_folder']     = $validated['f'] ?? null;
+        $data['current_controller'] = $validated['c'] ?? null;
+        $data['current_action']     = $validated['a'] ?? null;
         $data['first_menu_active']  = false;
         $data['current_method']     = false;
         $data['hosts']              = $this->config('hosts') ?: [];
@@ -165,9 +169,10 @@ class ApiController extends Controller
     /**
      * 接口调试参数表单 (AJAX)
      */
-    public function param(Request $req)
+    public function param(EndpointRequest $req)
     {
-        $data = $this->getOneApi($req);
+        $validated = $req->validated();
+        $data      = $this->getOneApi($validated);
 
         $params = ($data['request'][0] === 'GET') ? $data['url_params'] : $data['body_params'];
 
@@ -182,8 +187,8 @@ class ApiController extends Controller
         ]));
         $data['cache_key'] = $this->buildScopedDebugCacheKey(
             $data['cache_key_base'],
-            (string) $req->input('host_scope', ''),
-            (string) $req->input('client_id', '')
+            (string) ($validated['host_scope'] ?? ''),
+            (string) ($validated['client_id'] ?? '')
         );
         $cache_params = Cache::store('file')->get($data['cache_key'] . '_params');
 
@@ -210,15 +215,12 @@ class ApiController extends Controller
      * 缓存"上次填了啥"的请求参数(用户切换接口后恢复表单状态)。
      * 不缓存响应——调试器永远走真实请求,不让用户看到旧数据。
      */
-    public function cache(Request $req)
+    public function cache(CacheRequest $req)
     {
         // plan-40 §五 F1 同精神:key/params 此前零校验 — key 任意串直拼 cache key,
         // params 不限类型不限体积(file cache 30 天过期,反复塞大 payload 可膨胀磁盘)。
         // 正常 key 是 md5|host_scope|client_id(< 150 字符),200 cap 足够。
-        $validated = $req->validate([
-            'key'    => 'nullable|string|max:200',
-            'params' => 'nullable|array',
-        ]);
+        $validated = $req->validated();
         $cache_key = $validated['key']    ?? null;
         $params    = $validated['params'] ?? null;
 
@@ -400,13 +402,13 @@ class ApiController extends Controller
     /**
      * 获取单个 API 的详细数据（从 YAML 读取 + 合并 FormRequest 规则）
      */
-    private function getOneApi(Request $req): array
+    private function getOneApi(array $validated): array
     {
-        $app             = $req->input('app', 'admin');
-        $folderName      = $req->input('f', 'Index');
+        $app             = $validated['app'] ?? 'admin';
+        $folderName      = $validated['f']   ?? 'Index';
         $folderPath      = $folderName === 'Index' ? '' : $folderName;
-        $controllerClass = $req->input('c');
-        $actionName      = $req->input('a');
+        $controllerClass = $validated['c'] ?? null;
+        $actionName      = $validated['a'] ?? null;
 
         // 形状守护:缺 c(控制器)时 null 会传进 isApiFileExist(string $fileName) → 500 TypeError;
         // 畸形 / 缺参请求(如误用 controller= 长参名)应干净 404 而非 500(与本方法其它 abort(404) 同口径)

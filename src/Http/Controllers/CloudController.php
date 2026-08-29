@@ -4,12 +4,13 @@ namespace Mooeen\Scaffold\Http\Controllers;
 
 use Composer\InstalledVersions;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Mooeen\Monitor\Cloud\CloudSync;
 use Mooeen\Monitor\MonitorProvider;
 use Mooeen\Monitor\Recorder\RuntimeErrorRecorder;
 use Mooeen\Monitor\Recorder\SqlSlowRecorder;
+use Mooeen\Scaffold\Foundation\FormRequest;
+use Mooeen\Scaffold\Http\Requests\ContextRequest;
 use Mooeen\Scaffold\Utility;
 use Throwable;
 
@@ -36,7 +37,7 @@ class CloudController extends Controller
         parent::__construct($utility, $filesystem);
     }
 
-    public function index(Request $request): View
+    public function index(ContextRequest $request): View
     {
         $cfg     = (array) config('moo-monitor.cloud', []);
         $enabled = (bool) ($cfg['enabled'] ?? false);
@@ -376,7 +377,7 @@ class CloudController extends Controller
         return '—';
     }
 
-    public function push(Request $request)
+    public function push(ContextRequest $request)
     {
         $cfg = (array) config('moo-monitor.cloud', []);
         if (! ($cfg['enabled'] ?? false) || empty($cfg['base_url']) || empty($cfg['token'])) {
@@ -462,7 +463,7 @@ class CloudController extends Controller
     }
 
     /** 清理 local 开发噪音：Cloud 软删未解决项，本地丢弃 pending；已解决与已同步锚点不动。 */
-    public function discard(Request $request)
+    public function discard(ContextRequest $request)
     {
         if (! app()->environment('local')) {
             return $this->back($request, false, '仅 local 开发环境允许清理开发噪音。');
@@ -555,7 +556,7 @@ class CloudController extends Controller
         return substr($token, 0, 6) . '••••••' . substr($token, -4);
     }
 
-    private function back(Request $request, bool $ok, string $message)
+    private function back(FormRequest $request, bool $ok, string $message)
     {
         if ($request->ajax() || $request->expectsJson()) {
             return response()->json(['ok' => $ok, 'message' => $message], $ok ? 200 : 422);
