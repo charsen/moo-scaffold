@@ -6,9 +6,14 @@ namespace Mooeen\Scaffold\Http\Controllers;
 
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Mooeen\Scaffold\Designer\SchemaLoader;
+use Mooeen\Scaffold\Http\Requests\Docs\DeleteRequest;
+use Mooeen\Scaffold\Http\Requests\Docs\PreviewRequest;
+use Mooeen\Scaffold\Http\Requests\Docs\ReadRequest;
+use Mooeen\Scaffold\Http\Requests\Docs\ReorderRequest;
+use Mooeen\Scaffold\Http\Requests\Docs\SaveRequest;
+use Mooeen\Scaffold\Http\Requests\Docs\SearchRequest;
 use Mooeen\Scaffold\Support\DocsRepository;
 use Mooeen\Scaffold\Support\Markdown\DocMarkdownRenderer;
 use Mooeen\Scaffold\Utility;
@@ -38,10 +43,11 @@ class DocsController extends Controller
         parent::__construct($utility, $filesystem);
     }
 
-    public function index(Request $req): View
+    public function index(ReadRequest $req): View
     {
-        $src  = $this->resolveSrc($req);
-        $slug = trim((string) $req->query('doc', ''));
+        $validated = $req->validated();
+        $src       = $this->resolveSrc($validated);
+        $slug      = trim((string) ($validated['doc'] ?? ''));
 
         // 裸 /docs(无 doc 参数)→ 目录主页(不再自动跳第一篇);阅读深链 ?doc= 不受影响
         if ($slug === '') {
@@ -81,9 +87,9 @@ class DocsController extends Controller
      * 全文搜索(目录主页搜索框):跨全源(host + 📦包)扫标题/slug/正文,JSON 返回。
      * 只读端点,生产可用;总量截断到 50 条,截断时置 truncated 让前端提示细化关键词。
      */
-    public function search(Request $req): JsonResponse
+    public function search(SearchRequest $req): JsonResponse
     {
-        $data = $req->validate(['q' => 'required|string|min:2|max:100']);
+        $data = $req->validated();
         $q    = trim($data['q']);
 
         $results   = [];
@@ -108,7 +114,7 @@ class DocsController extends Controller
      * 目录主页:按源(host / 📦包)分节 → 组块 → 行,组内行拖 + 组块整体拖调序。
      * 只读源(生产/强制只读/vendor 拷贝包)照列,拖拽禁用。
      */
-    private function home(Request $req): View
+    private function home(ReadRequest $req): View
     {
         $lock     = $this->lockFlags();
         $sections = [];
@@ -144,13 +150,9 @@ class DocsController extends Controller
         ]));
     }
 
-    public function reorder(Request $req): JsonResponse
+    public function reorder(ReorderRequest $req): JsonResponse
     {
-        $data = $req->validate([
-            'slugs'   => 'required|array|min:1',
-            'slugs.*' => 'required|string|max:200',
-            'src'     => 'nullable|string|max:100',
-        ]);
+        $data = $req->validated();
 
         $src = $this->normalizeSrc($data['src'] ?? '');
         if ($src !== null && ! $this->repo->isKnownSource($src)) {
@@ -165,12 +167,13 @@ class DocsController extends Controller
         return response()->json(['ok' => true, 'changed' => $changed]);
     }
 
-    public function edit(Request $req): View
+    public function edit(ReadRequest $req): View
     {
-        $src   = $this->resolveSrc($req);
-        $slug  = trim((string) $req->query('doc', ''));
-        $doc   = $slug !== '' ? $this->repo->find($slug, $src) : null;
-        $isNew = $doc === null;
+        $validated = $req->validated();
+        $src       = $this->resolveSrc($validated);
+        $slug      = trim((string) ($validated['doc'] ?? ''));
+        $doc       = $slug !== '' ? $this->repo->find($slug, $src) : null;
+        $isNew     = $doc === null;
 
         // 新建时可选落点源:host + 可写(软链)包;只读包不进列表
         $writableSources = array_values(array_filter($this->repo->sources(), static fn ($s) => $s['writable']));
@@ -192,13 +195,9 @@ class DocsController extends Controller
         ]));
     }
 
-    public function save(Request $req): JsonResponse
+    public function save(SaveRequest $req): JsonResponse
     {
-        $data = $req->validate([
-            'slug'    => 'required|string|max:200',
-            'content' => 'present|string',
-            'src'     => 'nullable|string|max:100',
-        ]);
+        $data = $req->validated();
 
         $src = $this->normalizeSrc($data['src'] ?? '');
         if ($src !== null && ! $this->repo->isKnownSource($src)) {
@@ -217,20 +216,17 @@ class DocsController extends Controller
         ]);
     }
 
-    public function preview(Request $req): JsonResponse
+    public function preview(PreviewRequest $req): JsonResponse
     {
-        $data = $req->validate(['content' => 'present|string']);
+        $data = $req->validated();
         $body = $this->repo->parseRaw((string) $data['content'])['body'];
 
         return response()->json(['html' => $this->renderer->render($body)]);
     }
 
-    public function delete(Request $req): JsonResponse
+    public function delete(DeleteRequest $req): JsonResponse
     {
-        $data = $req->validate([
-            'slug' => 'required|string|max:200',
-            'src'  => 'nullable|string|max:100',
-        ]);
+        $data = $req->validated();
 
         $src = $this->normalizeSrc($data['src'] ?? '');
         if ($src !== null && ! $this->repo->isKnownSource($src)) {
@@ -256,9 +252,9 @@ class DocsController extends Controller
     /**
      * 读路径的 ?src=(文档出身源,plan-53):只接受 sources() 里已发现的源,非法回退 host。
      */
-    private function resolveSrc(Request $req): ?string
+    private function resolveSrc(array $validated): ?string
     {
-        $src = $this->normalizeSrc((string) $req->query('src', ''));
+        $src = $this->normalizeSrc((string) ($validated['src'] ?? ''));
 
         return ($src !== null && $this->repo->isKnownSource($src)) ? $src : null;
     }

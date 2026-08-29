@@ -6,7 +6,11 @@ namespace Mooeen\Scaffold\Http\Controllers;
 
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
+use Mooeen\Scaffold\Foundation\FormRequest;
+use Mooeen\Scaffold\Http\Requests\Account\StoreRequest;
+use Mooeen\Scaffold\Http\Requests\Account\UpdateRequest;
+use Mooeen\Scaffold\Http\Requests\Account\UsernameRequest;
+use Mooeen\Scaffold\Http\Requests\ContextRequest;
 use Mooeen\Scaffold\Support\AccountStore;
 use Mooeen\Scaffold\Support\AccountWriteForbiddenException;
 use Mooeen\Scaffold\Support\ConfigManager;
@@ -33,7 +37,7 @@ class AccountController extends Controller
         parent::__construct($utility, $filesystem);
     }
 
-    public function index(Request $request)
+    public function index(ContextRequest $request)
     {
         $accounts = $this->store->exists() ? $this->store->all() : [];
         $meta     = $this->store->exists() ? $this->store->meta() : [];
@@ -53,12 +57,13 @@ class AccountController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StoreRequest $request): RedirectResponse
     {
         try {
             $this->assertCanWrite();
-            $payload = $this->extractPayload($request);
-            $row     = $this->store->create($payload, $this->currentUser($request));
+            $payload             = $request->validated();
+            $payload['username'] = trim((string) ($payload['username'] ?? ''));
+            $row                 = $this->store->create($payload, $this->currentUser($request));
             $request->session()->flash('flash_message', "新增账号 [{$row['username']}] 成功");
         } catch (AccountWriteForbiddenException $e) {
             $request->session()->flash('flash_error', $e->getMessage());
@@ -69,11 +74,11 @@ class AccountController extends Controller
         return redirect()->route('scaffold.accounts');
     }
 
-    public function update(Request $request, string $username): RedirectResponse
+    public function update(UpdateRequest $request, string $username): RedirectResponse
     {
         try {
             $this->assertCanWrite();
-            $payload = $this->extractPayload($request, includeUsername: false);
+            $payload = $request->validated();
             $this->store->update($username, $payload, $this->currentUser($request));
             $request->session()->flash('flash_message', "更新 [{$username}] 成功");
         } catch (AccountWriteForbiddenException $e) {
@@ -85,8 +90,9 @@ class AccountController extends Controller
         return redirect()->route('scaffold.accounts');
     }
 
-    public function toggle(Request $request, string $username): RedirectResponse
+    public function toggle(UsernameRequest $request): RedirectResponse
     {
+        $username = $request->validated()['username'];
         try {
             $this->assertCanWrite();
             $me = $this->currentUser($request);
@@ -108,8 +114,9 @@ class AccountController extends Controller
         return redirect()->route('scaffold.accounts');
     }
 
-    public function destroy(Request $request, string $username): RedirectResponse
+    public function destroy(UsernameRequest $request): RedirectResponse
     {
+        $username = $request->validated()['username'];
         try {
             $this->assertCanWrite();
             $me = $this->currentUser($request);
@@ -127,36 +134,6 @@ class AccountController extends Controller
         return redirect()->route('scaffold.accounts');
     }
 
-    // -------------------------------------------------------------------------
-
-    /**
-     * 从 request 抽取允许的字段，过滤未知 key。
-     */
-    private function extractPayload(Request $request, bool $includeUsername = true): array
-    {
-        $payload = [];
-        if ($includeUsername) {
-            $payload['username'] = trim((string) $request->input('username', ''));
-            // plan-40 §五 F10(精简版):跟 routes.php / store 命名约定一致,422 比 store throw 友好
-            if ($payload['username'] !== '' && ! preg_match('/^[A-Za-z0-9._-]{1,64}$/', $payload['username'])) {
-                throw new \InvalidArgumentException('username 必须是 [A-Za-z0-9._-]+ 且长度 ≤ 64');
-            }
-        }
-        foreach (['password', 'phone', 'role'] as $k) {
-            if ($request->has($k)) {
-                $payload[$k] = (string) $request->input($k, '');
-            }
-        }
-        if ($request->has('enabled')) {
-            $payload['enabled'] = filter_var($request->input('enabled'), FILTER_VALIDATE_BOOL);
-        }
-        if ($request->has('can_design_db')) {
-            $payload['can_design_db'] = filter_var($request->input('can_design_db'), FILTER_VALIDATE_BOOL);
-        }
-
-        return $payload;
-    }
-
     private function assertCanWrite(): void
     {
         if (app()->environment('production')) {
@@ -172,7 +149,7 @@ class AccountController extends Controller
         return app()->environment('production') || (bool) config('scaffold.config_ui.readonly', false);
     }
 
-    private function currentUser(Request $request): string
+    private function currentUser(FormRequest $request): string
     {
         // 'unknown' fallback:account 写操作的 by 字段不接受 null。username 解析见 base Controller::currentOperator。
         return $this->currentOperator($request) ?? 'unknown';
