@@ -29,8 +29,8 @@ class UpdateAuthorizationGenerator extends Generator
     private ?AclActionResolver $aclActionResolver = null;
 
     /**
-     * 全量重建 config/actions.php 和 lang 文件；
-     * ACL YAML 也全量重写，内容完全由路由决定，不支持手动润色
+     * 依据路由全量重算 config/actions.php、lang/{lang}/actions.php 和 scaffold/acl/{app}.yaml；
+     * 内容完全由路由决定，不支持手动润色，但三类产物都在内容无变化时跳过写入(不刷生成戳)
      */
     public function start(string $app, array $routes): bool
     {
@@ -151,11 +151,15 @@ class UpdateAuthorizationGenerator extends Generator
             'actions'   => $actions,
         ];
 
-        $php_code = '<?php' . PHP_EOL
-            . 'return ' . VarExporter::export($config) . ';'
-            . PHP_EOL;
+        $file = config_path('actions.php');
 
-        $this->filesystem->put(config_path('actions.php'), $php_code);
+        if ($this->requireArray($file) === $config && $this->hasGenerationStamp($file)) {
+            $this->console()->unchanged('./config/actions.php');
+
+            return;
+        }
+
+        $this->filesystem->put($file, $this->buildPhpArrayFile($config, 'ACL 授权字典：app > whitelist / module > controller > action keys'));
         $this->console()->updated('./config/actions.php');
     }
 
@@ -167,11 +171,10 @@ class UpdateAuthorizationGenerator extends Generator
         $languages = $this->utility->getConfig('languages');
         foreach ($languages as $lang) {
             $file_path = lang_path($lang . '/actions.php');
-            if (! $this->filesystem->isFile($file_path)) {
-                $this->filesystem->put($file_path, '<?php return [];');
-            }
 
-            $data = $this->filesystem->getRequire($file_path);
+            $data     = $this->requireArray($file_path) ?? [];
+            $original = $data;
+
             foreach (array_diff(array_keys($data), $configuredApps) as $staleApp) {
                 if (is_array($data[$staleApp] ?? null)
                     && array_key_exists("app-{$staleApp}", $data[$staleApp])) {
@@ -202,13 +205,72 @@ class UpdateAuthorizationGenerator extends Generator
                 }
             }
 
-            $php_code = '<?php' . PHP_EOL
-                . 'return ' . VarExporter::export($data) . ';'
-                . PHP_EOL;
+            if ($original === $data && $this->hasGenerationStamp($file_path)) {
+                $this->console()->unchanged("./lang/{$lang}/actions.php");
 
-            $this->filesystem->put($file_path, $php_code);
+                continue;
+            }
+
+            $this->filesystem->put($file_path, $this->buildPhpArrayFile($data, "ACL 授权文案（{$lang}）：app / module / controller / action 的显示名与描述"));
             $this->console()->updated("./lang/{$lang}/actions.php");
         }
+    }
+
+    /**
+     * 渲染「带生成戳的 PHP 数组产物」。
+     *
+     * 头部注释只记录本次运行的信息，**不参与**「有没有变化」的判定 —— 判定只比 return 的
+     * 数组本身（见 requireArray 的调用点）。所以内容没变时既不重写文件，也不会刷新时间戳。
+     * 开头形态按 host Pint 口径（declare_strict_types + linebreak_after_opening_tag=false）
+     * 写死，避免产物一落地就被格式化工具改一遍。
+     */
+    private function buildPhpArrayFile(array $data, string $description): string
+    {
+        return '<?php declare(strict_types=1);' . PHP_EOL
+            . PHP_EOL
+            . '/*' . PHP_EOL
+            . ' * ' . $description . PHP_EOL
+            . ' *' . PHP_EOL
+            . ' * 由 moo:auth 依据路由与 controller 的 @acl 注解生成，请勿手改。' . PHP_EOL
+            . ' *' . PHP_EOL
+            . ' * @generated_by ' . $this->generatedBy . PHP_EOL
+            . ' * @generated_at ' . $this->generatedAt . PHP_EOL
+            . ' */' . PHP_EOL
+            . PHP_EOL
+            . 'return ' . VarExporter::export($data) . ';' . PHP_EOL;
+    }
+
+    /**
+     * 读取 PHP 数组产物用于内容比对；文件缺失、损坏或返回非数组时给 null，交由调用方重写
+     */
+    private function requireArray(string $file): ?array
+    {
+        if (! $this->filesystem->isFile($file)) {
+            return null;
+        }
+
+        try {
+            $data = $this->filesystem->getRequire($file);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return is_array($data) ? $data : null;
+    }
+
+    /**
+     * 产物是否已带生成戳头部。
+     *
+     * 头部不参与内容比对，所以 2.1.16 之前留下的无头部产物光靠比数组永远补不上；
+     * 这个条件让它们被重写一次补齐，补完之后就一直命中，不会反复刷时间戳。
+     */
+    private function hasGenerationStamp(string $file): bool
+    {
+        if (! $this->filesystem->isFile($file)) {
+            return false;
+        }
+
+        return str_contains((string) $this->filesystem->get($file), '@generated_at ');
     }
 
     /**
@@ -301,9 +363,57 @@ class UpdateAuthorizationGenerator extends Generator
         $dir = $this->utility->getAclPath();
         $this->checkDirectory($dir);
 
-        $file = $dir . $app . '.yaml';
+        $file         = $dir . $app . '.yaml';
+        $relativeFile = $this->utility->getAclPath(true) . $app . '.yaml';
+
+        if ($this->isAclDocumentUnchanged($file, $document)) {
+            $this->console()->unchanged($relativeFile);
+
+            return;
+        }
+
         $this->filesystem->put($file, Yaml::dump($document, 8, 4, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
-        $this->console()->updated($this->utility->getAclPath(true) . $app . '.yaml');
+        $this->console()->updated($relativeFile);
+    }
+
+    /**
+     * ACL 文档除生成戳外是否与磁盘上的一致。
+     *
+     * `generated_at` / `generated_by` 记的是「谁在什么时候跑了命令」，不是 ACL 内容本身；
+     * 无条件重写会让每次 moo:auth 都刷出一条只有时间戳变化的假 diff。文件缺失或解析失败
+     * 时返回 false，走正常重写。
+     */
+    private function isAclDocumentUnchanged(string $file, array $document): bool
+    {
+        if (! $this->filesystem->isFile($file)) {
+            return false;
+        }
+
+        try {
+            $existing = Yaml::parse((string) $this->filesystem->get($file));
+        } catch (\Throwable) {
+            return false;
+        }
+
+        if (! is_array($existing)) {
+            return false;
+        }
+
+        return $this->stripAclGenerationStamp($existing) === $this->stripAclGenerationStamp($document);
+    }
+
+    /**
+     * 去掉只反映「本次运行」的 meta 字段，供内容比对使用
+     */
+    private function stripAclGenerationStamp(array $document): array
+    {
+        if (! is_array($document['meta'] ?? null)) {
+            return $document;
+        }
+
+        unset($document['meta']['generated_at'], $document['meta']['generated_by']);
+
+        return $document;
     }
 
     private function resolveAuthorizationInfo(array $acl, array $fallback): array
