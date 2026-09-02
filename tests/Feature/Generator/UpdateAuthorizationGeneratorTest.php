@@ -238,9 +238,123 @@ PHP);
 });
 
 /* ---------------------------------------------------------------------------
- * 纯方法 · getMd5 / isCrossControllerTransform
+ * 产物 · 内容无变化时不重写(避免只刷生成戳的假 diff)
  * ------------------------------------------------------------------------ */
 
+/** moo:auth 的三类产物 */
+function authGen_artifacts(): array
+{
+    return [
+        base_path('scaffold/acl/admin.yaml'),
+        config_path('actions.php'),
+        lang_path('en/actions.php'),
+        lang_path('zh-CN/actions.php'),
+    ];
+}
+
+/** 把已生成产物的生成戳改老,模拟"上一次跑命令留下的文件";返回改后内容 */
+function authGen_ageStamp(string $file): string
+{
+    $content = (string) file_get_contents($file);
+
+    $aged = str_ends_with($file, '.yaml')
+        ? preg_replace(
+            ["/generated_at: '.+'/", "/generated_by: '.+'/"],
+            ["generated_at: '2026-01-01 00:00:00'", "generated_by: 'previous-runner'"],
+            $content,
+        )
+        : preg_replace(
+            ['/@generated_at .+/', '/@generated_by .+/'],
+            ['@generated_at 2026-01-01 00:00:00', '@generated_by previous-runner'],
+            $content,
+        );
+
+    file_put_contents($file, (string) $aged);
+
+    return (string) $aged;
+}
+
+it('php 产物带生成戳注释头,且 require 回来仍是数组', function () {
+    authGen_make()->start('admin', [authGen_route(authGen_ArticleController::class, 'index')]);
+
+    foreach ([config_path('actions.php'), lang_path('en/actions.php'), lang_path('zh-CN/actions.php')] as $file) {
+        $content = (string) file_get_contents($file);
+
+        // 开头形态按 host Pint 口径钉死:declare_strict_types + linebreak_after_opening_tag=false
+        expect($content)->toStartWith('<?php declare(strict_types=1);' . PHP_EOL . PHP_EOL . '/*')
+            ->toContain(' * @generated_by ')
+            ->toContain(' * @generated_at ')
+            ->toContain('请勿手改')
+            ->and(require $file)->toBeArray()->toHaveKey('admin');
+    }
+});
+
+it('三类产物 · 同一组 routes 重跑全部不重写,生成戳保持原值', function () {
+    $routes = [
+        authGen_route(authGen_ArticleController::class, 'index'),
+        authGen_route(authGen_TagController::class, 'index'),
+    ];
+
+    authGen_make()->start('admin', $routes);
+
+    $before = [];
+    foreach (authGen_artifacts() as $file) {
+        $before[$file] = authGen_ageStamp($file);
+    }
+
+    authGen_make()->start('admin', $routes);
+
+    foreach (authGen_artifacts() as $file) {
+        expect(file_get_contents($file))->toBe($before[$file], $file . ' 不该被重写');
+    }
+});
+
+it('三类产物 · routes 真变化时全部重写并刷新生成戳', function () {
+    authGen_make()->start('admin', [authGen_route(authGen_ArticleController::class, 'index')]);
+
+    $before = [];
+    foreach (authGen_artifacts() as $file) {
+        $before[$file] = authGen_ageStamp($file);
+    }
+
+    authGen_make()->start('admin', [
+        authGen_route(authGen_ArticleController::class, 'index'),
+        authGen_route(authGen_ArticleController::class, 'store'),
+    ]);
+
+    foreach (authGen_artifacts() as $file) {
+        expect(file_get_contents($file))->not->toBe($before[$file], $file . ' 应被重写')
+            ->not->toContain('2026-01-01 00:00:00')
+            ->not->toContain('previous-runner');
+    }
+
+    // 新 action 确实落进了 config 与 acl(不只是时间戳变了)
+    expect(file_get_contents(config_path('actions.php')))->toContain('authGen_ArticleController@store')
+        ->and(file_get_contents(base_path('scaffold/acl/admin.yaml')))->toContain('authGen_ArticleController@store');
+});
+
+it('2.1.16 之前的无头部产物被补写一次头部,补完后保持稳定', function () {
+    $routes = [authGen_route(authGen_ArticleController::class, 'index')];
+    authGen_make()->start('admin', $routes);
+
+    // 退回旧格式:只有 <?php + return,没有生成戳头部
+    $file   = config_path('actions.php');
+    $legacy = '<?php' . PHP_EOL . 'return ' . VarExporter::export(require $file) . ';' . PHP_EOL;
+    file_put_contents($file, $legacy);
+
+    // 数组内容一致但缺头部 → 补写一次
+    authGen_make()->start('admin', $routes);
+    expect(file_get_contents($file))->not->toBe($legacy)->toContain('@generated_at ');
+
+    // 补完之后不再反复刷
+    $stamped = authGen_ageStamp($file);
+    authGen_make()->start('admin', $routes);
+    expect(file_get_contents($file))->toBe($stamped);
+});
+
+/* ---------------------------------------------------------------------------
+ * 纯方法 · getMd5 / isCrossControllerTransform
+ * ------------------------------------------------------------------------ */
 it('getMd5 · md5 开关 on → 16 位截断,off → 原样返回', function () {
     $gen = authGen_make();
     $ref = new ReflectionMethod($gen, 'getMd5');

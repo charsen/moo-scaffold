@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.16
+
+- `moo:api` 与 `moo:auth` 在内容无变化时不再重写产物文件。此前 `CreateApiGenerator` 用整文件字节比对判定「无变化」，生成器任何一次排版调整（例如空 `code` 去掉尾空格）都会让全部历史 yaml 差一个字节而被整体重写、`@date` 集体刷新；`UpdateAuthorizationGenerator` 则无条件重写 `scaffold/acl/{app}.yaml`、`config/actions.php` 和 `lang/{lang}/actions.php`。现在全部改为语义比对：API schema 比较 `Yaml::parse()` 后的结构（注释与排版差异不算变化），ACL 文档比较剔除 `generated_at` / `generated_by` 后的内容，两类 PHP 产物比较 `return` 的数组本身，等价则跳过写入并报 `No changes`。解析失败（含重复 action key）仍按「有变化」重写，损坏文件不会被静默跳过。
+  > 既有 yaml 的历史排版会原样保留，直到该 controller 真有接口变动时顺带规范化；需要立即全量归一用 `moo:api {app} -a -f`。
+- `config/actions.php` 与 `lang/{lang}/actions.php` 新增生成戳注释头，记录用途、`@generated_by`、`@generated_at` 与「请勿手改」说明。头部不参与内容比对，所以内容没变时时间戳也不会被刷新。开头按 `<?php declare(strict_types=1);` 同行形态输出，比旧格式少触发 `declare_strict_types` 与 `blank_line_before_statement` 两条 Pint 规则。
+  > **升级后第一次跑 `moo:auth` 会把这两类文件各重写一次**（补头部，`return` 的数组内容逐字节不变），之后保持稳定。
+
 ## 2.1.15
 
 - 内置研发后台 action 全面使用 Scaffold FormRequest，所有用户输入经 `validated()` 消费，并新增路由反射与源码门禁防止退回通用 Request 或原始输入读取。

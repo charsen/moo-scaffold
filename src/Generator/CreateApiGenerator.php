@@ -214,13 +214,12 @@ class CreateApiGenerator extends Generator
             );
         }
 
-        $documentDate = $fileExists ? $this->extractDocumentDate((string) $this->filesystem->get($yamlFile)) : $this->generatedAt;
-        $payload      = $this->buildControllerSchemaContent($controllerName, $actions, $reflectionClass, $existingData, $documentDate);
-        $content      = $payload['content'];
+        $payload = $this->buildControllerSchemaContent($controllerName, $actions, $reflectionClass, $existingData);
+        $content = $payload['content'];
 
         if ($fileExists) {
             $currentContent = (string) $this->filesystem->get($yamlFile);
-            if (! $force && $duplicateActionKeys === [] && $currentContent === $content) {
+            if (! $force && $duplicateActionKeys === [] && $this->isSchemaEquivalent($currentContent, $content)) {
                 if ($staleActionKeys !== [] && $this->staleMode === self::STALE_MODE_KEEP) {
                     $this->console()->warn(
                         $relativeYaml . ' still contains stale actions: [' . implode(', ', $staleActionKeys) . ']'
@@ -230,9 +229,6 @@ class CreateApiGenerator extends Generator
 
                 return;
             }
-
-            $payload = $this->buildControllerSchemaContent($controllerName, $actions, $reflectionClass, $existingData);
-            $content = $payload['content'];
         }
 
         $put = $this->filesystem->put($yamlFile, $content);
@@ -301,19 +297,15 @@ class CreateApiGenerator extends Generator
                 continue;
             }
 
-            $documentDate   = $this->extractDocumentDate((string) $this->filesystem->get($yamlFile));
-            $payload        = $this->buildControllerSchemaContent($controllerName, [], null, $existingData, $documentDate);
+            $payload        = $this->buildControllerSchemaContent($controllerName, [], null, $existingData);
             $content        = $payload['content'];
             $currentContent = (string) $this->filesystem->get($yamlFile);
 
-            if ($currentContent === $content) {
+            if ($this->isSchemaEquivalent($currentContent, $content)) {
                 $this->console()->unchanged($relativeYaml);
 
                 continue;
             }
-
-            $payload = $this->buildControllerSchemaContent($controllerName, [], null, $existingData);
-            $content = $payload['content'];
 
             $put = $this->filesystem->put($yamlFile, $content);
             if (! $put) {
@@ -460,15 +452,20 @@ class CreateApiGenerator extends Generator
         ];
     }
 
-    private function extractDocumentDate(string $content): string
+    /**
+     * 判断磁盘上的 yaml 与新生成内容是否语义等价。
+     *
+     * 只比解析后的结构：`@date` 之类的注释、`code:` 后的尾空格等纯排版差异不算变化，
+     * 免得生成器改一次输出格式就把全部 yaml 刷成「假更新」。任一侧解析失败(含重复 key)
+     * 时返回 false，让坏文件走重写而不是被静默跳过。
+     */
+    private function isSchemaEquivalent(string $currentContent, string $newContent): bool
     {
-        if (preg_match('/^#\s*@date\s+(.+)$/m', $content, $matches) !== 1) {
-            return $this->generatedAt;
+        try {
+            return Yaml::parse($currentContent) === Yaml::parse($newContent);
+        } catch (\Throwable) {
+            return false;
         }
-
-        $date = trim((string) ($matches[1] ?? ''));
-
-        return $date !== '' ? $date : $this->generatedAt;
     }
 
     private function resolveOrderedActiveActionNames(array $actions, array $existingActions): array
