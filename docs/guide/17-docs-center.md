@@ -72,3 +72,13 @@ flowchart TD
 - 不在生产环境写入——团队本地编辑、push、互相 pull。
 
 （导出 HTML PPT 是后续计划，当前未实现。）
+
+## 发版日志
+
+主菜单「发版日志」进入 `/scaffold/release-records`，登录后只读浏览 Host 的 Markdown 发版记录。默认读取 Laravel 根目录下的 `release-records/**/*.md`，不提供新建、编辑、删除或重排操作。
+
+目录通过 `scaffold.release_records.path` 配置（环境变量 `SCAFFOLD_RELEASE_RECORDS_PATH`）。若 Laravel 工程在仓库的 `engine/` 子目录、记录在仓库根目录，设置 `SCAFFOLD_RELEASE_RECORDS_PATH=../release-records`；也可配置绝对路径。目录不存在时显示空态，不自动创建目录。
+
+推荐结构为 `release-records/YYYY-MMDD-描述/tag.md`，也支持 `YYYY-MM-DD-描述`。按目录日期倒序，同日多份记录分别保留并按路径稳定倒序；未标注日期的文件排在末尾，不使用文件修改时间推断发布日期。标题取 Markdown 一级标题，没有标题则显示相对文件路径。默认打开最新一篇，侧栏可过滤标题，正文支持现有 Markdown 表格、代码高亮与 Mermaid。编辑器 HTML 注释在阅读时隐藏，源文件保持原样。
+
+只读取配置目录内的 Markdown，隐藏目录/文件、下划线开头的草稿和指向目录外的软链不显示。发版记录内容代表文件中的记录，不自动核验 Git 标签或服务器部署状态。
