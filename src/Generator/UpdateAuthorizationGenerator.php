@@ -70,6 +70,7 @@ class UpdateAuthorizationGenerator extends Generator
                     'key'         => $this->getMd5($route_action_key),
                     'plain_key'   => $route_action_key,
                     'targets'     => [$controller . '::' . $action],
+                    'target_keys' => [$controller . '::' . $action => $this->getMd5($route_action_key)],
                     'target'      => $controller . '::' . $action,
                     'transformed' => false,
                 ];
@@ -89,6 +90,7 @@ class UpdateAuthorizationGenerator extends Generator
                 'action_key'        => $acl['key'],
                 'action_keys'       => $acl['keys'],
                 'acl_targets'       => $acl['targets'],
+                'acl_target_keys'   => $acl['target_keys'],
                 'acl_transformed'   => $acl['transformed'],
                 'name'              => $action_name,
                 'lang'              => $action_info['name'],
@@ -197,11 +199,17 @@ class UpdateAuthorizationGenerator extends Generator
                     continue;
                 }
                 foreach ($attr['action_keys'] as $actionKey) {
+                    // 多目标转换逐 key 读取目标动作的文案，不能把 preview 等入口名称
+                    // 写给 store/update。这里只修展示，路由文档与白名单判定保持原口径。
+                    $authInfo = $this->resolveAuthorizationInfo(
+                        ['targets' => [array_search($actionKey, $attr['acl_target_keys'], true) ?: '']],
+                        ['name' => $attr['auth_lang'], 'desc' => $attr['auth_desc']],
+                    );
                     // 下游走 VarExporter::export(本就正确转义引号和反斜杠),原来这里把撇号替换成
                     // &apos; 字面量,多此一举且有害:权限树里所有撇号永久变成 &apos;(Tom's→Tom&apos;s)。
                     // 直接存原始值,转义交给 VarExporter(2026-06-11 修)。
-                    $data[$app][$actionKey]          = $attr['auth_lang'][$lang] ?? $attr['lang'][$lang] ?? '';
-                    $data[$app]["{$actionKey}-desc"] = $attr['auth_desc']        ?? $attr['desc'] ?? '';
+                    $data[$app][$actionKey]          = $authInfo['name'][$lang] ?? $attr['lang'][$lang] ?? '';
+                    $data[$app]["{$actionKey}-desc"] = $authInfo['desc']        ?? $attr['desc'] ?? '';
                 }
             }
 

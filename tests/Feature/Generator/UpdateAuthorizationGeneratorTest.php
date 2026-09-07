@@ -2,7 +2,9 @@
 
 use Brick\VarExporter\VarExporter;
 use Illuminate\Filesystem\Filesystem;
+use Mooeen\Scaffold\Foundation\Controller;
 use Mooeen\Scaffold\Generator\UpdateAuthorizationGenerator;
+use Mooeen\Scaffold\Support\AclActionResolver;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\Yaml\Yaml;
@@ -56,7 +58,7 @@ class authGen_ArticleController
     {
         [$cls, $m] = explode('::', $target);
 
-        return $plain ? strtolower(class_basename($cls)) . '-' . $m : $cls . '@' . $m;
+        return $plain ? strtolower(class_basename($cls)) . '-' . strtolower($m) : $cls . '@' . strtolower($m);
     }
 }
 
@@ -81,10 +83,83 @@ class authGen_TagController
     }
 }
 
+/**
+ * @module_name en:Content|zh-CN:内容|
+ * @controller_name en:Preview|zh-CN:预览|
+ */
+class authGen_PreviewController extends authGen_ArticleController
+{
+    /**
+     * 更新文章
+     *
+     * @acl en:Update Article|zh-CN:更新文章|desc:修改一篇|
+     */
+    public function update() {}
+
+    /**
+     * 预览文章
+     *
+     * @acl en:Preview Article|zh-CN:预览文章|desc:预览不保存|
+     */
+    public function preview() {}
+
+    /**
+     * 跨控制器预览
+     *
+     * @acl en:Cross Preview|zh-CN:跨控制器预览|desc:预览不保存|
+     */
+    public function crossPreview() {}
+
+    public function getTransformMethods(): array
+    {
+        return [
+            'preview'      => ['store', 'Store', 'update'],
+            'crossPreview' => [authGen_ArticleController::class . '::store', authGen_TagController::class . '::index'],
+        ];
+    }
+}
+
 function authGen_make(): UpdateAuthorizationGenerator
 {
     return new UpdateAuthorizationGenerator(new NullOutput, app(Filesystem::class), app(Utility::class));
 }
+
+/**
+ * @module_name en:Content|zh-CN:内容|
+ * @controller_name en:Normalized|zh-CN:归一化|
+ */
+class authGen_NormalizedController extends Controller
+{
+    protected array $transform_methods = ['preview' => ['store', 'Store', 'update']];
+
+    /**
+     * @acl {en: Create Entry, zh-CN: 创建条目, desc: 创建描述}
+     */
+    public function store() {}
+
+    /**
+     * @acl {en: Update Entry, zh-CN: 更新条目, desc: 更新描述}
+     */
+    public function update() {}
+
+    /**
+     * @acl {en: Preview Entry, zh-CN: 预览条目, desc: 预览描述}
+     */
+    public function preview() {}
+}
+
+it('真实 Controller key 归一化去重后仍按目标关联取文案', function (bool $md5) {
+    config(['scaffold.authorization.md5' => $md5]);
+    $resolver = new AclActionResolver;
+    $acl      = $resolver->resolve(authGen_NormalizedController::class, 'preview');
+    expect($acl['targets'])->toHaveCount(3)->and($acl['keys'])->toHaveCount(2);
+    authGen_make()->start('admin', [authGen_route(authGen_NormalizedController::class, 'preview')]);
+    $labels = (require lang_path('zh-CN/actions.php'))['admin'];
+    foreach (['store' => '创建', 'update' => '更新'] as $method => $label) {
+        $key = $resolver->resolve(authGen_NormalizedController::class, $method)['key'];
+        expect($labels[$key])->toBe($label . '条目')->and($labels[$key . '-desc'])->toBe($label . '描述');
+    }
+})->with([false, true]);
 
 function authGen_route(string $fqcn, string $method, ?string $name = null): array
 {
@@ -92,6 +167,8 @@ function authGen_route(string $fqcn, string $method, ?string $name = null): arra
 }
 
 beforeEach(function () {
+    app(Filesystem::class)->ensureDirectoryExists(lang_path('en'));
+    app(Filesystem::class)->ensureDirectoryExists(lang_path('zh-CN'));
     config()->set('scaffold.languages', ['en', 'zh-CN']);
     config()->set('scaffold.author', 'tester');
     config()->set('scaffold.authorization.md5', false); // 关 md5,key 保持可读字面便于断言
@@ -251,6 +328,49 @@ function authGen_artifacts(): array
         lang_path('zh-CN/actions.php'),
     ];
 }
+
+it('多目标转换逐 key 采用目标文案，不被别名路由或路由顺序覆盖', function (bool $reverse, bool $onlyAlias) {
+    $routes = [
+        authGen_route(authGen_PreviewController::class, 'store'),
+        authGen_route(authGen_PreviewController::class, 'update'),
+        authGen_route(authGen_ArticleController::class, 'store'),
+        authGen_route(authGen_TagController::class, 'index'),
+    ];
+    if ($onlyAlias) {
+        $routes = [];
+    }
+    $routes[] = authGen_route(authGen_PreviewController::class, 'preview');
+    $routes[] = authGen_route(authGen_PreviewController::class, 'crossPreview');
+    if ($reverse) {
+        $routes = array_reverse($routes);
+    }
+    authGen_make()->start('admin', $routes);
+    $en = (require lang_path('en/actions.php'))['admin'];
+    $zh = (require lang_path('zh-CN/actions.php'))['admin'];
+    foreach ([
+        'authGen_PreviewController@store'  => ['Create Article', '创建文章', '新增一篇'],
+        'authGen_PreviewController@update' => ['Update Article', '更新文章', '修改一篇'],
+        'authGen_ArticleController@store'  => ['Create Article', '创建文章', '新增一篇'],
+        'authGen_TagController@index'      => ['List Tags', '标签列表', '列出标签'],
+    ] as $key => [$english, $chinese, $description]) {
+        expect($en[$key])->toBe($english)
+            ->and($zh[$key])->toBe($chinese)
+            ->and($zh[$key . '-desc'])->toBe($description);
+    }
+    $config = (require config_path('actions.php'))['admin'];
+    expect($config['whitelist'])->toBe([]);
+    expect(json_encode($config['actions']))->not->toContain('@preview')->not->toContain('@crossPreview');
+    $document = Yaml::parseFile(base_path('scaffold/acl/admin.yaml'));
+    $actions  = collect($document['modules'])->flatMap(fn ($module) => $module['controllers'])
+        ->flatMap(fn ($controller) => $controller['actions']);
+    $preview = $actions->firstWhere('action', 'preview');
+    expect($preview['name']['zh-CN'])->toBe('预览文章')
+        ->and($preview['keys'])->toBe(['authGen_PreviewController@store', 'authGen_PreviewController@update'])
+        ->and($preview['whitelist'])->toBeFalse();
+    $before = array_map('file_get_contents', authGen_artifacts());
+    authGen_make()->start('admin', $routes);
+    expect(array_map('file_get_contents', authGen_artifacts()))->toBe($before);
+})->with([false, true])->with([false, true]);
 
 /** 把已生成产物的生成戳改老,模拟"上一次跑命令留下的文件";返回改后内容 */
 function authGen_ageStamp(string $file): string

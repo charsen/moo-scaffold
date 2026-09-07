@@ -24,12 +24,13 @@ class AclActionResolver
             $controller = $this->makeController($controllerClass);
             $this->bootWithoutAuthorization($controller);
 
-            $targets   = $this->resolveTargetActions($controller, $controllerClass, $actionName);
-            $keys      = [];
-            $plainKeys = [];
+            $targets    = $this->resolveTargetActions($controller, $controllerClass, $actionName);
+            $keys       = [];
+            $plainKeys  = [];
+            $targetKeys = [];
 
             foreach ($targets as $target) {
-                $keys[]      = $this->formatAclName($controller, $target, false);
+                $keys[]      = $targetKeys[$target] = $this->formatAclName($controller, $target, false);
                 $plainKeys[] = $this->formatAclName($controller, $target, true);
             }
 
@@ -37,11 +38,13 @@ class AclActionResolver
             $plainKeys = array_values(array_filter(array_unique($plainKeys)));
 
             return [
-                'keys'        => $keys,
-                'plain_keys'  => $plainKeys,
-                'key'         => implode(' | ', $keys),
-                'plain_key'   => implode(' | ', $plainKeys),
-                'targets'     => $targets,
+                'keys'       => $keys,
+                'plain_keys' => $plainKeys,
+                'key'        => implode(' | ', $keys),
+                'plain_key'  => implode(' | ', $plainKeys),
+                'targets'    => $targets,
+                // keys 会独立去重，调用方不可再用 keys 的下标配对 targets。
+                'target_keys' => $targetKeys,
                 'target'      => implode(' | ', $targets),
                 'transformed' => $targets !== [$controllerClass . '::' . $actionName],
             ];
@@ -188,6 +191,7 @@ class AclActionResolver
             'key'         => '',
             'plain_key'   => '',
             'targets'     => [],
+            'target_keys' => [],
             'target'      => '',
             'transformed' => false,
         ];
