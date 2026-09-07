@@ -18,6 +18,7 @@ $defaultMenu = [
     ['route' => 'route.list',    'label' => '接口路由',  'icon' => 'protocol', 'matches' => ['route.list', 'acl.list']],
     // plan-52:文档中心(MD + 深链 + Mermaid 流程图;本地编辑,生产只读预览)
     ['route' => 'docs.index',    'label' => '开发文档',  'icon' => 'book', 'matches' => ['docs.*']],
+    ['route' => 'plans.index', 'label' => '研发计划', 'icon' => 'book', 'matches' => ['plans.*']],
     ['route' => 'release-records.index', 'label' => '发版日志', 'icon' => 'file', 'matches' => ['release-records.*']],
     // 云端汇聚:本地两类缓冲状态 + 云端控制台入口 + 手动推送(详见 /scaffold/cloud)。
     // 运行时错误 / 慢 SQL / Todos 查看器已退役 → 处置统一在 moo-scaffold-cloud,顶栏只留这一个云端入口。

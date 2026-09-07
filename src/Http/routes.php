@@ -10,6 +10,7 @@ use Mooeen\Scaffold\Http\Controllers\CloudRedirectController;
 use Mooeen\Scaffold\Http\Controllers\ConfigController;
 use Mooeen\Scaffold\Http\Controllers\DesignerController;
 use Mooeen\Scaffold\Http\Controllers\DocsController;
+use Mooeen\Scaffold\Http\Controllers\PlansController;
 use Mooeen\Scaffold\Http\Controllers\ReleaseRecordsController;
 use Mooeen\Scaffold\Http\Controllers\RouteController;
 use Mooeen\Scaffold\Http\Controllers\ScaffoldController;
@@ -191,6 +192,8 @@ Route::prefix($prefix)->middleware(array_merge($middleware, [SecurityHeaders::cl
 
         // 接口路由
         Route::get('/routes', RouteController::class . '@index')->name('route.list');
+
+        Route::get('/plans', PlansController::class . '@index')->name('plans.index');
 
         // Host 发版记录：独立只读入口，沿用 Scaffold 登录保护。
         Route::get('/release-records', ReleaseRecordsController::class . '@index')->name('release-records.index');
