@@ -230,7 +230,11 @@ return [
         'yaml_path' => 'scaffold/ai.yaml',
     ],
 
-    // 相对 Laravel base_path；工程位于仓库子目录时可配置 ../release-records。仅供登录后阅读。
+    // 只读文档目录相对 Laravel base_path；工程位于子目录时可配置 ../plans 等路径。
+    'plans' => [
+        'path' => env('SCAFFOLD_PLANS_PATH', 'plans'),
+    ],
+
     'release_records' => [
         'path' => env('SCAFFOLD_RELEASE_RECORDS_PATH', 'release-records'),
     ],
