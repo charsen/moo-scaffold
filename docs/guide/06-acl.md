@@ -79,6 +79,8 @@ return [
 
 文案来源是 docblock 的 `@acl` 标签。`lang/{locale}/actions.php` 每次 `moo:auth` **全量重写**,手改下次必被覆盖 —— 改注释再重跑是唯一稳的路,没有"自定义覆盖层"文件。
 
+当 `transform_methods` 复用其他动作的权限时，权限字典按每个目标动作的 `@acl` 分别取名。例如 `preview => ['store', 'update']` 仍显示“创建 / 更新”，不能把两个写权限都标成“预览”；路由查看器保留 preview 自身的说明和全部目标 key。文案修复不改变运行时授权关系。内容未变化时重复生成不会重写产物或刷新生成戳。
+
 ## 常见踩坑
 
 - **`moo:auth` 没扫到 action** — 必须是 controller 里**真实 public function** 且**路由真实指向**,YAML 孤儿不算

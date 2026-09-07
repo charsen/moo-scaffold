@@ -84,6 +84,10 @@ it('自定义 getTransformMethods：数组多目标 → 多 key', function () {
         'aclresolvermapcontroller-store',
         'aclresolvermapcontroller-update',
     ]);
+    expect($res['target_keys'])->toBe([
+        AclResolverMapController::class . '::store'  => AclResolverMapController::class . '@store',
+        AclResolverMapController::class . '::update' => AclResolverMapController::class . '@update',
+    ]);
     expect($res['plain_key'])->toBe('aclresolvermapcontroller-store | aclresolvermapcontroller-update');
     expect($res['transformed'])->toBeTrue();
 });
@@ -98,6 +102,7 @@ it('不存在的类 → 安全空结果', function () {
         'key'         => '',
         'plain_key'   => '',
         'targets'     => [],
+        'target_keys' => [],
         'target'      => '',
         'transformed' => false,
     ]);

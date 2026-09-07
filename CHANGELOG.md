@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.17
+
+- ACL 生成器按目标动作解析授权显示名，避免辅助上传动作覆盖被引用的办理、审批等业务动作文案；授权键与路由权限语义不变。
+- 补齐目标动作、跨控制器引用和既有文案回归；包测试 706 项通过，3 项既有环境跳过。
+
 ## 2.1.16
 
 - `moo:api` 与 `moo:auth` 在内容无变化时不再重写产物文件。此前 `CreateApiGenerator` 用整文件字节比对判定「无变化」，生成器任何一次排版调整（例如空 `code` 去掉尾空格）都会让全部历史 yaml 差一个字节而被整体重写、`@date` 集体刷新；`UpdateAuthorizationGenerator` 则无条件重写 `scaffold/acl/{app}.yaml`、`config/actions.php` 和 `lang/{lang}/actions.php`。现在全部改为语义比对：API schema 比较 `Yaml::parse()` 后的结构（注释与排版差异不算变化），ACL 文档比较剔除 `generated_at` / `generated_by` 后的内容，两类 PHP 产物比较 `return` 的数组本身，等价则跳过写入并报 `No changes`。解析失败（含重复 action key）仍按「有变化」重写，损坏文件不会被静默跳过。
