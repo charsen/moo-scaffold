@@ -230,6 +230,11 @@ return [
         'yaml_path' => 'scaffold/ai.yaml',
     ],
 
+    // 相对 Laravel base_path；工程位于仓库子目录时可配置 ../release-records。仅供登录后阅读。
+    'release_records' => [
+        'path' => env('SCAFFOLD_RELEASE_RECORDS_PATH', 'release-records'),
+    ],
+
     /**
      * plan-52：文档中心。MD 文档存 docs.path（相对 base_path，入 git，随仓同步）。
      * 团队在本地编辑、生产环境只读预览（写路由走 EnforceScaffoldWritable 的 docs/* 锁）。
