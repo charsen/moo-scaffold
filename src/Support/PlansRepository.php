@@ -14,7 +14,7 @@ final class PlansRepository
     /** @return list<array{slug:string,title:string,group:string,body:string}> */
     public function all(): array
     {
-        $path = (string) config('scaffold.plans.path', 'plans');
+        $path = (string) config('scaffold.plans.path');
         if ($path === '') {
             return [];
         }

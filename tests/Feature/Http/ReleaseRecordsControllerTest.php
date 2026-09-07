@@ -85,3 +85,18 @@ it('resolves a relative directory outside the Laravel engine root and ignores no
         app()->setBasePath($original);
     }
 });
+
+it('does not fall back from an explicit missing or empty path', function () {
+    $original = base_path();
+    mkdir($this->directory . '/engine');
+    writeReleaseRecord($this->directory, 'release-records/record.md', '# Repository release');
+    app()->setBasePath($this->directory . '/engine');
+    try {
+        foreach (['release-records', 'missing', ''] as $path) {
+            config(['scaffold.release_records.path' => $path]);
+            expect(app(ReleaseRecordsRepository::class)->all())->toBe([]);
+        }
+    } finally {
+        app()->setBasePath($original);
+    }
+});
