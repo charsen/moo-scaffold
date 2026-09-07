@@ -75,9 +75,9 @@ flowchart TD
 
 ## 发版日志
 
-主菜单「发版日志」进入 `/scaffold/release-records`，登录后只读浏览 Host 的 Markdown 发版记录。默认读取 Laravel 根目录下的 `release-records/**/*.md`，不提供新建、编辑、删除或重排操作。
+主菜单「发版日志」进入 `/scaffold/release-records`，登录后只读浏览 Host 的 Markdown 发版记录。默认配置为 `../release-records`：Laravel 工程位于 `engine/` 时直接读取仓库根目录的 `release-records/**/*.md`，无需设置环境变量。不提供新建、编辑、删除或重排操作。
 
-目录通过 `scaffold.release_records.path` 配置（环境变量 `SCAFFOLD_RELEASE_RECORDS_PATH`）。若 Laravel 工程在仓库的 `engine/` 子目录、记录在仓库根目录，设置 `SCAFFOLD_RELEASE_RECORDS_PATH=../release-records`；也可配置绝对路径。目录不存在时显示空态，不自动创建目录。
+自定义目录可通过 `scaffold.release_records.path` 配置（环境变量 `SCAFFOLD_RELEASE_RECORDS_PATH`），支持相对 Laravel 根目录或绝对路径。读取类只使用配置值，不探测或回退到 `engine/release-records`，不合并多个目录。目录不存在时显示空态，不自动创建目录。Laravel 工程直接位于仓库根目录的其他布局，可显式配置 `release-records`。
 
 推荐结构为 `release-records/YYYY-MMDD-描述/tag.md`，也支持 `YYYY-MM-DD-描述`。按目录日期倒序，同日多份记录分别保留并按路径稳定倒序；未标注日期的文件排在末尾，不使用文件修改时间推断发布日期。标题取 Markdown 一级标题，没有标题则显示相对文件路径。默认打开最新一篇，侧栏可过滤标题，正文支持现有 Markdown 表格、代码高亮与 Mermaid。编辑器 HTML 注释在阅读时隐藏，源文件保持原样。
 
@@ -85,7 +85,7 @@ flowchart TD
 
 ## 研发计划
 
-主菜单「研发计划」进入 `/scaffold/plans`，登录后只读浏览 Host 的 `plans/**/*.md`。通过 `scaffold.plans.path`（环境变量 `SCAFFOLD_PLANS_PATH`）配置目录，默认相对 Laravel 根目录；若工程位于 `engine/`、计划位于仓库根目录，设置 `SCAFFOLD_PLANS_PATH=../plans`。
+主菜单「研发计划」进入 `/scaffold/plans`，登录后只读浏览 Host 的 `plans/**/*.md`。`scaffold.plans.path` 默认值为 `../plans`，Laravel 工程位于 `engine/` 时直接读取仓库根目录的计划，无需设置环境变量。读取类不探测或回退到 `engine/plans`，即使该目录存在旧副本也不会读取。自定义时可通过 `SCAFFOLD_PLANS_PATH` 指定相对 Laravel 根目录或绝对路径；Laravel 工程直接位于仓库根目录的其他布局，可显式配置 `plans`。
 
 默认打开根 `README.md`；缺少索引时打开排序后的第一篇。侧栏按目录分组、文件名自然排序（2 在 10 前），支持标题过滤，`archive/` 等子目录独立展示。空目录或目录不存在时显示空态，不创建文件。
 

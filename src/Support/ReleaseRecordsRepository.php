@@ -14,7 +14,7 @@ final class ReleaseRecordsRepository
     /** @return list<array{slug:string,title:string,date:string,body:string}> */
     public function all(): array
     {
-        $path = (string) config('scaffold.release_records.path', 'release-records');
+        $path = (string) config('scaffold.release_records.path');
         if ($path === '') {
             return [];
         }

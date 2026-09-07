@@ -230,13 +230,14 @@ return [
         'yaml_path' => 'scaffold/ai.yaml',
     ],
 
-    // 只读文档目录相对 Laravel base_path；工程位于子目录时可配置 ../plans 等路径。
+    // Host 的 Laravel 工程位于 engine/，只读文档默认位于仓库根目录。
+    // 自定义路径仍相对 Laravel base_path，也可配置绝对路径。
     'plans' => [
-        'path' => env('SCAFFOLD_PLANS_PATH', 'plans'),
+        'path' => env('SCAFFOLD_PLANS_PATH', '../plans'),
     ],
 
     'release_records' => [
-        'path' => env('SCAFFOLD_RELEASE_RECORDS_PATH', 'release-records'),
+        'path' => env('SCAFFOLD_RELEASE_RECORDS_PATH', '../release-records'),
     ],
 
     /**
