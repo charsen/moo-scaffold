@@ -59,6 +59,13 @@ class EnforceScaffoldWritable
             return $next($request);
         }
 
+        // 计划 / 发版日志仅 local 可编辑；即使 staging 也保持只读。
+        $prefix = trim((string) config('scaffold.route.prefix', 'scaffold'), '/');
+        if ($request->is($prefix . '/plans/*', $prefix . '/release-records/*')
+            && (! app()->environment('local') || config('scaffold.config_ui.readonly', false))) {
+            return $this->forbidden($request, '仅本地且未开启强制只读时允许编辑。');
+        }
+
         $isProduction = app()->environment('production');
         $isReadonly   = (bool) config('scaffold.config_ui.readonly', false);
 

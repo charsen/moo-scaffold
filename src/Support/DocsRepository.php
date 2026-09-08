@@ -7,7 +7,6 @@ namespace Mooeen\Scaffold\Support;
 use Illuminate\Filesystem\Filesystem;
 use InvalidArgumentException;
 use Mooeen\Scaffold\Utility;
-use Symfony\Component\Yaml\Yaml;
 
 /**
  * plan-52 文档中心存储层。
@@ -457,21 +456,9 @@ class DocsRepository
      */
     private function parse(string $raw): array
     {
-        $raw = str_replace("\r\n", "\n", $raw);
-        if (preg_match('/^---\n(.*?)\n---\n?(.*)$/s', $raw, $m)) {
-            try {
-                $meta = Yaml::parse($m[1]) ?: [];
-            } catch (\Throwable) {
-                $meta = [];
-            }
-            if (! is_array($meta)) {
-                $meta = [];
-            }
+        $parsed = (new MarkdownFrontmatter)->parse($raw);
 
-            return ['meta' => $meta, 'body' => $m[2]];
-        }
-
-        return ['meta' => [], 'body' => $raw];
+        return ['meta' => $parsed['meta'], 'body' => $parsed['body']];
     }
 
     /**
