@@ -15,8 +15,15 @@
                         <span class="p-docs-reader__group">{{ $record['group'] }}</span>
                         <x-scaffold::icon name="chevron-right" :size="13" />
                         <span class="p-docs-reader__title">{{ $record['title'] }}</span>
+                        @foreach ($record['tags'] as $tag)
+                            <x-scaffold::badge tone="info" size="sm">{{ $tag }}</x-scaffold::badge>
+                        @endforeach
                     </div>
-                    <x-scaffold::badge tone="info" size="sm">只读</x-scaffold::badge>
+                    @if ($writable)
+                        <a href="{{ route('plans.edit', ['slug' => $record['slug']]) }}" class="btn btn--secondary btn--sm">编辑</a>
+                    @else
+                        <x-scaffold::badge tone="info" size="sm">只读</x-scaffold::badge>
+                    @endif
                 </div>
                 <article class="doc-article" id="doc_article">{!! $html !!}</article>
             @else

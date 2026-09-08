@@ -194,9 +194,19 @@ Route::prefix($prefix)->middleware(array_merge($middleware, [SecurityHeaders::cl
         Route::get('/routes', RouteController::class . '@index')->name('route.list');
 
         Route::get('/plans', PlansController::class . '@index')->name('plans.index');
+        Route::get('/plans/edit', PlansController::class . '@edit')->name('plans.edit');
+        Route::post('/plans/save', PlansController::class . '@save')
+            ->middleware('throttle:30,1')->name('plans.save');
+        Route::post('/plans/preview', PlansController::class . '@preview')
+            ->middleware('throttle:120,1')->name('plans.preview');
 
-        // Host 发版记录：独立只读入口，沿用 Scaffold 登录保护。
+        // Host 发版记录：沿用 Scaffold 登录保护，本地可编辑既有文件。
         Route::get('/release-records', ReleaseRecordsController::class . '@index')->name('release-records.index');
+        Route::get('/release-records/edit', ReleaseRecordsController::class . '@edit')->name('release-records.edit');
+        Route::post('/release-records/save', ReleaseRecordsController::class . '@save')
+            ->middleware('throttle:30,1')->name('release-records.save');
+        Route::post('/release-records/preview', ReleaseRecordsController::class . '@preview')
+            ->middleware('throttle:120,1')->name('release-records.preview');
 
         // plan-52 文档中心。slug 一律走 ?doc= query（不进路由 path，避开 unicode 路由正则坑;
         // 入口 DocsRepository::isValidSlug + realpath 收敛双层防穿越)。写类(save/preview/delete)
