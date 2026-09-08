@@ -1,3 +1,8 @@
+---
+title: 14 · 跨设备 / 多人协同工作流
+group: Scaffold 操作手册
+order: 150
+---
 # 14 · 跨设备 / 多人协同工作流
 
 > 多台设备或多人改同一套 schema。核心一句:改 schema 时 yaml、快照(`.snapshots/`)、migration **三个文件一起 commit**,任一落单都会让别人 pull 后产生假性漂移。

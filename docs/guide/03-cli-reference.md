@@ -1,3 +1,8 @@
+---
+title: 03 · 命令速查
+group: Scaffold 操作手册
+order: 60
+---
 # 03 · 命令速查
 
 > 所有 `moo:*` 命令 + 关键 flag 一页。业务说明(何时用、产物结构)在各模块手册:[02](02-schema-codegen.md) / [05](05-api-debugger.md) / [06](06-acl.md)。

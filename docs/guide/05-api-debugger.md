@@ -1,3 +1,8 @@
+---
+title: 05 · API 文档与调试
+group: Scaffold 操作手册
+order: 80
+---
 # 05 · API 文档与调试
 
 > `moo:api` 把真实路由扫成接口 YAML,`/scaffold/api/*` 负责浏览 + 类 Postman 调试。文档是开发期"边写边试"用的,不是对外 API 门户。

@@ -1,3 +1,8 @@
+---
+title: 06 · ACL 生成与查看
+group: Scaffold 操作手册
+order: 90
+---
 # 06 · ACL 生成与查看
 
 > `moo:auth` 把 controller 注释里的 `@acl` 声明汇总成配置表 + Web 查看器,代码一改权限文档跟着更新。`/scaffold/routes` 看(旧 `/scaffold/acl` 会 302 跳过来)。

@@ -1,3 +1,8 @@
+---
+title: Scaffold 项目总览
+group: Scaffold 开发工具
+order: 10
+---
 # moo-scaffold 项目总览
 
 > 文档用途：面向准备接入或评估 moo-scaffold 的 Laravel 开发者，说明本工具**是什么、解决什么问题、由哪些模块构成、提供哪些功能点**。
