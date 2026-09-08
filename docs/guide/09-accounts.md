@@ -1,3 +1,8 @@
+---
+title: 09 · 账号管理
+group: Scaffold 操作手册
+order: 100
+---
 # 09 · 账号管理
 
 > 谁能登录 `/scaffold`,以及账号怎么增删改启停。**首个账号走 CLI,其余全走 Web UI**。

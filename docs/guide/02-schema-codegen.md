@@ -1,3 +1,8 @@
+---
+title: 02 · Schema 与代码生成
+group: Scaffold 操作手册
+order: 50
+---
 # 02 · Schema 与代码生成
 
 > Schema YAML 是模块的唯一事实源,`moo:*` 生成器照它派生 Model / Resource / Controller。命令清单查 [03-cli-reference.md](03-cli-reference.md)。

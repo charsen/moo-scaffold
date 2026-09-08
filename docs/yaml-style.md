@@ -1,3 +1,8 @@
+---
+title: Scaffold YAML 风格约定
+group: Scaffold 开发工具
+order: 20
+---
 # Scaffold YAML 风格约定
 
 > 无论是 designer GUI 还是人工编写,yaml 都该长成同一个样子——这份约定就是那个"样子"。GUI save 走 `src/Designer/YamlFormatter::dumpPreservingComments()`,只要人工也照此写,两边落盘天然一致。

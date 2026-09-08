@@ -1,3 +1,8 @@
+---
+title: 17 · 开发文档中心
+group: Scaffold 操作手册
+order: 170
+---
 # 17 · 开发文档中心
 
 Web 入口：`/scaffold/docs`　|　存储：`scaffold/docs/**/*.md`（入 git，随仓同步）
