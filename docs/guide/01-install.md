@@ -1,3 +1,8 @@
+---
+title: 01 · 安装与初始化
+group: Scaffold 操作手册
+order: 40
+---
 # 01 · 安装与初始化
 
 > 从零到打开 `/scaffold`、生成第一套 CRUD。按顺序走 7 步。环境:Laravel 12 · PHP 8.2+。

@@ -1,3 +1,8 @@
+---
+title: 16 · 云端汇聚(moo-scaffold-cloud × moo-monitor-laravel)
+group: Scaffold 操作手册
+order: 160
+---
 # 16 · 云端汇聚(moo-scaffold-cloud × moo-monitor-laravel)
 
 > 把本地 **运行时错误 / 慢 SQL / Todos** 汇到 moo-scaffold-cloud 集中查看 + 处置。

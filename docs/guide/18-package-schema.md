@@ -1,3 +1,8 @@
+---
+title: 18 · 扩展包 schema 管理与代码生成(出身模型)
+group: Scaffold 操作手册
+order: 180
+---
 # 18 · 扩展包 schema 管理与代码生成(出身模型)
 
 > 在 host 项目里,用 scaffold 直接管理**软链安装的扩展包**(如 moo-system / moo-radar)的 schema 与 docs:设计器可视化编辑、`moo:*` 生成的代码全部落到**包自己的仓库目录**,host 一个字节不动。

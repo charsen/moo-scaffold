@@ -1,3 +1,8 @@
+---
+title: Scaffold 操作手册
+group: Scaffold 操作手册
+order: 30
+---
 # 操作手册
 
 按业务模块组织。"用过但忘了具体怎么用"时来这里找,一页目录速查,不必再回去翻主 README。

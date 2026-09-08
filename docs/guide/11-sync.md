@@ -1,3 +1,8 @@
+---
+title: 11 · 多端 git 同步
+group: Scaffold 操作手册
+order: 120
+---
 # 11 · 多端 git 同步
 
 用 git 在多端同步 scaffold 的可入库数据（API 发布历史 / 账号 / ai.yaml）。runtime 错误 / 慢 SQL 走云端（见 [`16-cloud-push.md`](16-cloud-push.md)），todo 走云端 Chrome 扩展,均**不在** git 同步范围。

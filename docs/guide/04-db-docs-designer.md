@@ -1,3 +1,8 @@
+---
+title: 04 · 数据库设计器(Designer)
+group: Scaffold 操作手册
+order: 70
+---
 # 04 · 数据库设计器(Designer)
 
 > `/scaffold/db/designer` 可视化改 schema(自动生成 migration)。`/scaffold/dictionaries` 看字典(按模块章节展开所有枚举,锚点导航,找枚举值就来这)。**写类操作 dev 专用**,production / readonly 下整页只读(红 banner + 写按钮全灰)。
