@@ -1,3 +1,8 @@
+---
+title: 10 · 配置 UI
+group: Scaffold 操作手册
+order: 110
+---
 # 10 · 配置 UI
 
 > 可视化编辑 `config/scaffold.php` 和 `.env` 的 scaffold 相关项,省得翻文件、记 key。仅开发环境可写,生产只读。
