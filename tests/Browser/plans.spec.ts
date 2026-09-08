@@ -20,6 +20,6 @@ test('plans index, internal links, archive grouping and filtering', async ({ pag
     await expect(page.locator('.p-docs-reader__title')).toHaveText(title);
     await page.getByRole('searchbox', { name: '过滤' }).fill(title);
     await expect(page.locator('.side-tree__item-link:visible').first()).toContainText(title);
-    await expect(page.getByRole('link', { name: '编辑', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: '编辑', exact: true })).toBeVisible();
     expect(errors).toEqual([]);
 });

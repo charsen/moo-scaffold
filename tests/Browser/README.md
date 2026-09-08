@@ -65,3 +65,16 @@ npm run test:e2e:ui
 | `E2E_HOST_SCAFFOLD_DB_PATH` | 宿主 `scaffold/database/` 目录,供 `test:e2e:safe` 跑完还原 + 真写类 test 清理 | 无(相关 test 自动 skip) |
 
 > `designer.spec` 还有 `E2E_TABLE_DROPDOWN` / `E2E_SCHEMAS_CSV` / `E2E_AI_LIVE` 等 fixture override，见该文件顶部注释。
+
+## 计划与发版日志编辑验收
+
+`local-markdown-editing.spec.ts` 在配置目录中以独占文件名创建隔离 Markdown 和目录内软链，验证原文/BOM/换行保存、frontmatter 预览与错误提示、软链只读、未保存提醒与冲突拒绝，以及断网、保存响应丢失、15 秒超时后的重试；结束只清理本次创建的文件。需要已登录、允许本地编辑且通过 path repository 接入当前 Scaffold 的 Host，并同步当前 `public/` 资源。
+
+```bash
+E2E_BASE_URL=http://127.0.0.1:8088 \
+E2E_HOST_PLANS_PATH=/path/to/host/plans \
+E2E_HOST_RELEASE_RECORDS_PATH=/path/to/host/release-records \
+npm run test:e2e:safe -- tests/Browser/local-markdown-editing.spec.ts
+```
+
+两个目录参数必须对应 Host 当前 `scaffold.plans.path` / `scaffold.release_records.path` 的真实路径；未配置时对应测试明确跳过。这组测试不需要 `E2E_HOST_SCAFFOLD_DB_PATH`，也不操作数据库设计文件。
