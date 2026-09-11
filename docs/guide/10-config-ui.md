@@ -38,7 +38,17 @@ POST 在以下任一情况被拒(403 + flash),`EnforceScaffoldWritable` 中间�
 
 ## 敏感字段
 
-`config_ui.sensitive_keys`(默认 `['PASSWORD', 'SECRET', 'KEY', 'TOKEN']`)按子串匹配 env 名,命中即认定 `sensitive`;也可在字段定义里显式写 `'sensitive' => true`。标了 `sensitive` 的字段在表单和 env 镜像页自动掩码,点"显示"才看明文。
+`config_ui.sensitive_keys`(默认 `['PASSWORD', 'SECRET', 'KEY', 'TOKEN']`)做**子串匹配**:字段表单里比字段 `path`,`/scaffold/config/env` 镜像页里比 env key;也可在字段定义里显式写 `'sensitive' => true`。
+
+标了 `sensitive` 的字段**源值永不进浏览器**(2026-09-11 收口,此前表单的可编辑分支直接回显未掩码值):
+
+- 表单渲染**空白输入** + 占位「已配置,留空保持原值 / 未配置」,`string` 用 `password` 型控件;
+  当前值 / 默认值 / 保存后的 diff 一律显示 `****`,env 镜像页同样掩码。
+- **留空 = 不修改**:写入侧对敏感字段的空白提交直接跳过,所以「改了同组别的字段顺手保存」不会把敏感值清空。
+- 要改就填新值;要**清空**只能直接编辑源文件 / `.env`。
+- `bool` 类型例外:布尔没有「空」这个表单态(checkbox 必发 `0`/`1`,hidden 兜底也发 `0`),
+  空白化会把真值写成 `false`,而布尔本身也承载不了秘密 → 敏感 `bool` 退化为只读展示。
+- **没有「点显示看明文」这回事** —— 明文只存在于源文件里,不在 HTML 里。
 
 ## `.env` 镜像页
 

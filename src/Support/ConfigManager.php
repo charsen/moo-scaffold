@@ -113,6 +113,15 @@ class ConfigManager
             if (! array_key_exists($path, $values)) {
                 continue;
             }
+
+            // 2026-09-11 敏感字段：视图不回显明文、也不回填掩码，渲染的是空白输入。
+            // 空白提交一律按"未修改"处理 —— 否则用户改同组别的字段顺手保存，会把敏感字段的
+            // 真值覆盖成空串 / 空数组（静默 data loss）。要真正清空敏感字段请直接改源文件 / .env
+            // （口径同 config/ai.blade.php 的 API Key："留空保持原值"）。
+            if ($field['sensitive'] && $this->isEmptySubmission($values[$path])) {
+                continue;
+            }
+
             $newVal = $this->castValueForField($values[$path], $field['type']);
             // cast 返回 null 一律视为"用户没动 / 非法形状按未动处理":map 没传任何行、
             // int 清空(原 (int)'' = 0 会把 ttl/timeout 写成毒药 0)、标量字段被喂数组等
@@ -162,7 +171,12 @@ class ConfigManager
                 $fileWrites[$path] = $newVal;
             }
 
-            $diff[$path] = [$oldVal, $newVal];
+            // 敏感字段的 diff 也掩码：config/config.php 的 `sensitive_keys` 注释早就写明
+            // 「env 镜像页 / diff 里需要掩码」，但此前 diff 两侧都是明文 —— 而 diff 会经
+            // flash_diff 直接渲染进页面，等于改一次敏感字段就在 flash 里回显一遍旧值。
+            $diff[$path] = $field['sensitive']
+                ? [$this->maskValue($oldVal), $this->maskValue($newVal)]
+                : [$oldVal, $newVal];
             $written++;
         }
 
@@ -280,15 +294,17 @@ class ConfigManager
             ?? $this->isSensitiveKey($path, (array) $this->config->get('scaffold.config_ui.sensitive_keys', [])));
 
         return [
-            'path'            => $path,
-            'label'           => $field['label'] ?? $path,
-            'desc'            => $field['desc']  ?? '',
-            'type'            => $field['type']  ?? self::TYPE_STRING,
-            'value'           => $sensitive ? $this->maskValue($currentValue) : $currentValue,
-            'raw_value'       => $currentValue,
-            'source'          => $source,
-            'env_key'         => $envKey,
-            'default'         => $packageDefault,
+            'path'      => $path,
+            'label'     => $field['label'] ?? $path,
+            'desc'      => $field['desc']  ?? '',
+            'type'      => $field['type']  ?? self::TYPE_STRING,
+            'value'     => $sensitive ? $this->maskValue($currentValue) : $currentValue,
+            'raw_value' => $currentValue,
+            'source'    => $source,
+            'env_key'   => $envKey,
+            // 默认值同样掩码：`packageDefault()` 是直接 require 包的 config.php，字段写成
+            // `env('SOME_SECRET', '')` 时它会把部署环境里的真值带出来 → 默认列变明文回显。
+            'default'         => $sensitive ? $this->maskValue($packageDefault) : $packageDefault,
             'sensitive'       => $sensitive,
             'options'         => $field['options']         ?? null,
             'value_validator' => $field['value_validator'] ?? null,
@@ -350,6 +366,49 @@ class ConfigManager
         }
 
         return false;
+    }
+
+    /**
+     * 「用户没在敏感字段里填新值」判定（2026-09-11）。
+     *
+     * 视图对敏感字段渲染空白输入，所以下面这些都等于"没填"：
+     *   - 标量空串 / 纯空白 / null / 空数组
+     *   - map 表单只有 `__present` 哨兵（零行）
+     *   - map / list 的每一行 k、v 都为空
+     *
+     * 注意两层各自挡住一部分，不能互相替代：
+     *   - HTTP 层 Laravel 的 `ConvertEmptyStringsToNull` 已把 `''` 变 null，撞上
+     *     `castValueForField(null) === null` 那条既有规则，标量/list 本来就跳过了。
+     *   - 但本方法是 `ConfigManager::write()` 的**公开 API 契约**，非 HTTP 调用方
+     *     （CLI / 其他包 / 测试）直接传 `''` 会真写进去；HTTP 层也挡不住纯空白 `'   '`
+     *     与 map 哨兵。所以这里必须自己判，不能依赖中间件。
+     */
+    private function isEmptySubmission(mixed $raw): bool
+    {
+        if ($raw === null || $raw === '' || $raw === []) {
+            return true;
+        }
+        if (is_bool($raw)) {
+            return false;                                         // false 是合法 bool 值,不是"没填"
+        }
+        if (! is_array($raw)) {
+            return trim((string) $raw) === '';                    // '   ' 视觉上就是空输入
+        }
+
+        foreach ($raw as $k => $v) {
+            if ($k === '__present') {
+                continue;
+            }
+            if (is_array($v)) {                                   // map 行：['k'=>..,'v'=>..]
+                if (trim((string) ($v['k'] ?? '')) !== '' || trim((string) ($v['v'] ?? '')) !== '') {
+                    return false;
+                }
+            } elseif (trim((string) $v) !== '') {                 // list 元素
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function mask(string $value): string
