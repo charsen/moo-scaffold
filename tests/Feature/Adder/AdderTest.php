@@ -325,3 +325,217 @@ it('getControllers:列表项 = folder/name(Market/BaseServiceController),不再�
     expect($list)->not->toContain('MarketBaseServiceController');     // 不再糊一起
     expect($list)->toContain('<NEW_ONE>');                           // 仍保留新建项
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// 2026-09-11 错误路径守卫：Adder 之前只在 happy path 上正确 —— 目标文件缺失会崩在
+// count(false) 的 TypeError；锚点（use / 类闭合 } / 插入标记）找不到时会写进 $codes[-1]
+// 负下标或原样写回，却依然打印「added / 生成成功」。以下 6 条把「必须中止且零写入」钉死。
+// ════════════════════════════════════════════════════════════════════════════
+
+it('Adder::getEndLine 无闭合 } 或空数组时返回 -1，且不触发越界 warning', function () {
+    $adder = adder_makeControllerAdder();
+    $ref   = new ReflectionMethod($adder, 'getEndLine');
+    $ref->setAccessible(true);
+
+    // 无 `}` 的行集合：旧实现在 while($start_line-- >= 0) 归 0 后仍进循环体，读 $codes[-1]
+    $noClose = ["<?php declare(strict_types=1);\n", "\n", "class Foo\n", "{\n"];
+
+    set_error_handler(static function ($errno, $errstr) {
+        throw new ErrorException($errstr, 0, $errno);
+    });
+    try {
+        $endNoClose = $ref->invoke($adder, $noClose);
+        $endEmpty   = $ref->invoke($adder, []);
+        $endFalse   = $ref->invoke($adder, false);
+    } finally {
+        restore_error_handler();
+    }
+
+    expect($endNoClose)->toBe(-1);
+    expect($endEmpty)->toBe(-1);
+    expect($endFalse)->toBe(-1);
+});
+
+it('Adder::getFirstUseLine 无 use 或空数组时返回 -1，且不触发越界 warning', function () {
+    $adder = adder_makeControllerAdder();
+    $ref   = new ReflectionMethod($adder, 'getFirstUseLine');
+    $ref->setAccessible(true);
+
+    $noUse = ["<?php declare(strict_types=1);\n", "\n", "class Foo\n", "{\n", "}\n"];
+
+    set_error_handler(static function ($errno, $errstr) {
+        throw new ErrorException($errstr, 0, $errno);
+    });
+    try {
+        $lineNoUse = $ref->invoke($adder, $noUse);
+        $lineEmpty = $ref->invoke($adder, []);
+    } finally {
+        restore_error_handler();
+    }
+
+    expect($lineNoUse)->toBe(-1);
+    expect($lineEmpty)->toBe(-1);
+});
+
+it('ControllerAdder:目标控制器文件不存在时返回 false，不崩在 count(false)', function () {
+    $result = adder_makeControllerAdder()->start('admin', 'Light', 'Light/GhostController', false, 'edit', '', '');
+
+    expect($result)->toBeFalse();
+    expect($this->adderSandbox . '/app/Admin/Controllers/Light/GhostController.php')->not->toBeFile();
+});
+
+it('ControllerAdder:源文件缺 use 锚点又需注入时中止，controller 一字未改（不写负下标）', function () {
+    $dir = $this->adderSandbox . '/app/Admin/Controllers/Light';
+    @mkdir($dir, 0777, true);
+    // 刻意不含任何 use 行 → getFirstUseLine 返回 -1，而 resource 需要注入 use
+    $body = "<?php declare(strict_types=1);\n\nnamespace App\\Admin\\Controllers\\Light;\n\nclass MemoController extends Controller\n{\n}\n";
+    file_put_contents($dir . '/MemoController.php', $body);
+
+    $result = adder_makeControllerAdder()->start('admin', 'Light', 'Light/MemoController', false, 'edit', '', 'memo');
+
+    expect($result)->toBeFalse();
+    expect(file_get_contents($dir . '/MemoController.php'))->toBe($body); // 未被改写
+});
+
+it('RouterAdder:路由串只有一段时返回 false，路由文件不改动', function () {
+    $body = "<?php\n\n    // :insert_code_here:do_not_delete\n";
+    adder_seedRoutes($body);
+
+    $controller = ['class' => 'App\\Admin\\Controllers\\Light\\MemoController', 'action' => 'index'];
+
+    // 旧实现 explode 只解出 1 段 → $url 未定义 warning + 生成残缺路由串
+    $ok = adder_makeRouterAdder()->start('admin', $controller, 'get');
+
+    expect($ok)->toBeFalse();
+    expect(file_get_contents($this->adderSandbox . '/routes/admin.php'))->toBe($body);
+});
+
+it('RouterAdder:路由文件不存在时返回 false，不抛 FileNotFoundException', function () {
+    $controller = ['class' => 'App\\Admin\\Controllers\\Light\\MemoController', 'action' => 'index'];
+
+    // beforeEach 只建了 routes/ 目录，未铺 admin.php
+    $ok = adder_makeRouterAdder()->start('admin', $controller, 'get light/memos');
+
+    expect($ok)->toBeFalse();
+});
+
+it('RouterAdder:缺插入标记时返回 false 且文件保持原样（不再原样写回却报 added）', function () {
+    $body = "<?php\n\nRoute::get('x', [Foo::class, 'index']);\n";
+    adder_seedRoutes($body);
+
+    $controller = ['class' => 'App\\Admin\\Controllers\\Light\\MemoController', 'action' => 'index'];
+
+    $ok = adder_makeRouterAdder()->start('admin', $controller, 'get light/memos');
+
+    expect($ok)->toBeFalse();
+    expect(file_get_contents($this->adderSandbox . '/routes/admin.php'))->toBe($body);
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// 2026-09-11 输入守卫 + 共享转义：moo:adder 的 action / 控制器名 / 路由串全是人敲的，
+// 原先零校验就被拼进生成的 PHP。以下锚定「非法即中止且零写入」+「url 走 escapePhpString」。
+// ════════════════════════════════════════════════════════════════════════════
+
+it('Adder 经 SharedCodegenHelpers 获得 escapePhpString / sanitizeDocblock（原先完全没有）', function () {
+    $adder = adder_makeControllerAdder();
+
+    expect(method_exists($adder, 'escapePhpString'))->toBeTrue();
+    expect(method_exists($adder, 'sanitizeDocblock'))->toBeTrue();
+    expect(method_exists($adder, 'quoteYamlString'))->toBeTrue();
+    expect(method_exists($adder, 'getStub'))->toBeTrue();
+
+    $esc = new ReflectionMethod($adder, 'escapePhpString');
+    $esc->setAccessible(true);
+    expect($esc->invoke($adder, "a'b\\c"))->toBe("a\\'b\\\\c");   // ' 与 \ 都被反斜杠转义
+
+    $doc = new ReflectionMethod($adder, 'sanitizeDocblock');
+    $doc->setAccessible(true);
+    expect($doc->invoke($adder, 'x */ y'))->toBe('x * / y');      // 不提前闭合 docblock
+});
+
+it('ControllerAdder:非法 action（含分号 / 引号）被拒且不碰目标文件', function () {
+    $dir = $this->adderSandbox . '/app/Admin/Controllers/Light';
+    @mkdir($dir, 0777, true);
+    $body = "<?php declare(strict_types=1);\n\nnamespace App\\Admin\\Controllers\\Light;\n\nuse Mooeen\\Scaffold\\Foundation\\Controller;\n\nclass MemoController extends Controller\n{\n}\n";
+    file_put_contents($dir . '/MemoController.php', $body);
+
+    $result = adder_makeControllerAdder()->start(
+        'admin', 'Light', 'Light/MemoController', false, "index; system('id'); //", '', ''
+    );
+
+    expect($result)->toBeFalse();
+    expect(file_get_contents($dir . '/MemoController.php'))->toBe($body);
+});
+
+it('ControllerAdder:控制器名含 ../ 被拒（否则会改写穿越后的真实文件）', function () {
+    // 关键：穿越路径上每一段都必须真实存在，否则 is_file 先失败、第 1 项的「文件不可读即中止」
+    // 守卫会先把结果兜成 false，这条用例就测不到校验器本身。
+    // `Light/../MemoController` 需要 Light/ 目录存在才会解析到 Controllers/MemoController.php。
+    $dir = $this->adderSandbox . '/app/Admin/Controllers';
+    @mkdir($dir . '/Light', 0777, true);
+    $body = "<?php declare(strict_types=1);\n\nnamespace App\\Admin\\Controllers;\n\nuse Mooeen\\Scaffold\\Foundation\\Controller;\n\nclass MemoController extends Controller\n{\n}\n";
+    file_put_contents($dir . '/MemoController.php', $body);
+
+    $result = adder_makeControllerAdder()->start('admin', 'Light', 'Light/../MemoController', false, 'edit', '', '');
+
+    expect($result)->toBeFalse();
+    expect(file_get_contents($dir . '/MemoController.php'))->toBe($body);   // 穿越目标未被追加
+});
+
+it('ControllerAdder:非法 Request 名被拒', function () {
+    $result = adder_makeControllerAdder()->start('admin', 'Light', 'Memo', true, 'store', 'Store"; system("id");', 'memo');
+
+    expect($result)->toBeFalse();
+    expect($this->adderSandbox . '/app/Admin/Controllers/Light/MemoController.php')->not->toBeFile();
+});
+
+it('RouterAdder:非法 method 被拒且路由文件不改动', function () {
+    $body = "<?php\n\n    // :insert_code_here:do_not_delete\n";
+    adder_seedRoutes($body);
+
+    $controller = ['class' => 'App\\Admin\\Controllers\\Light\\MemoController', 'action' => 'index'];
+
+    $ok = adder_makeRouterAdder()->start('admin', $controller, 'ge-t light/memos');
+
+    expect($ok)->toBeFalse();
+    expect(file_get_contents($this->adderSandbox . '/routes/admin.php'))->toBe($body);
+});
+
+it('RouterAdder:非法 action 被拒且路由文件不改动', function () {
+    $body = "<?php\n\n    // :insert_code_here:do_not_delete\n";
+    adder_seedRoutes($body);
+
+    $controller = ['class' => 'App\\Admin\\Controllers\\Light\\MemoController', 'action' => "index'); system('id'); //"];
+
+    $ok = adder_makeRouterAdder()->start('admin', $controller, 'get light/memos');
+
+    expect($ok)->toBeFalse();
+    expect(file_get_contents($this->adderSandbox . '/routes/admin.php'))->toBe($body);
+});
+
+it('RouterAdder:非法控制器全限定名被拒', function () {
+    $body = "<?php\n\n    // :insert_code_here:do_not_delete\n";
+    adder_seedRoutes($body);
+
+    $controller = ['class' => "App\\Admin\\Memo::class, 'x'", 'action' => 'index'];
+
+    $ok = adder_makeRouterAdder()->start('admin', $controller, 'get light/memos');
+
+    expect($ok)->toBeFalse();
+    expect(file_get_contents($this->adderSandbox . '/routes/admin.php'))->toBe($body);
+});
+
+it('RouterAdder:合法 url 含单引号时走 escapePhpString 落盘（而不是裸拼）', function () {
+    $marker = '// :insert_code_here:do_not_delete';
+    adder_seedRoutes("<?php\n\n    {$marker}\n");
+
+    $controller = ['class' => 'App\\Admin\\Controllers\\Light\\MemoController', 'action' => 'index'];
+
+    $ok = adder_makeRouterAdder()->start('admin', $controller, "get light/o'brien");
+
+    expect($ok)->toBeTrue();
+
+    $written = file_get_contents($this->adderSandbox . '/routes/admin.php');
+    expect($written)->toContain("light/o\\'brien");                                     // 单引号被转义
+    expect($written)->not->toContain("Route::get('light/o'brien'");                     // 未裸拼
+});
