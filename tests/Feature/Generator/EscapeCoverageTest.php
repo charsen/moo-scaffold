@@ -200,10 +200,21 @@ test('SchemaLoader::sanitizeFieldAttrs 应对 default + format 内容 sanitize',
  * 锚点:escape helper API 不可变(防误删 / 重命名导致测试假绿)
  * ------------------------------------------------------------------------ */
 
-test('escapePhpString / quoteYamlString / sanitizeDocblock helper 存在于 Generator base class', function () {
-    $abs = __DIR__ . '/../../../src/Generator/Generator.php';
-    $src = file_get_contents($abs);
+test('escapePhpString / quoteYamlString / sanitizeDocblock 存在于 SharedCodegenHelpers 且两个基类都组合了它', function () {
+    // 2026-09-11：三个 helper 从 Generator 搬进 SharedCodegenHelpers trait（Generator / Adder
+    // 共用）。锚点随之指到 trait，并**追加**两条组合断言 —— 只断言 trait 里存在会在
+    // 「trait 在但没人 use」时假绿。Generator / Adder 任一方漏组合即失败。
+    $trait = __DIR__ . '/../../../src/Support/Concerns/SharedCodegenHelpers.php';
+    expect(is_file($trait))->toBeTrue('escape helper 应在 SharedCodegenHelpers trait 内');
+
+    $src = file_get_contents($trait);
     expect($src)->toContain('protected function escapePhpString');
     expect($src)->toContain('protected function quoteYamlString');
     expect($src)->toContain('protected function sanitizeDocblock');
+
+    $base = file_get_contents(__DIR__ . '/../../../src/Generator/Generator.php');
+    expect($base)->toContain('use SharedCodegenHelpers;');
+
+    $adder = file_get_contents(__DIR__ . '/../../../src/Adder/Adder.php');
+    expect($adder)->toContain('use SharedCodegenHelpers;');
 });
