@@ -6,6 +6,7 @@ namespace Mooeen\Scaffold\Support;
 
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
 
@@ -58,8 +59,31 @@ class AccountStore
             return ['meta' => [], 'accounts' => []];
         }
 
-        $raw  = $this->fs->get($this->path());
-        $data = Yaml::parse($raw) ?: [];
+        $raw = $this->fs->get($this->path());
+
+        // 2026-09-11：accounts.yaml 入 git、随仓多机同步，冲突标记(<<<<<<<) / 手改坏形是现实事件。
+        // 裸 parse 抛异常会 500 掉整条鉴权链路（ScaffoldAuthenticate 每次请求都 load），
+        // 而修复入口 /scaffold/accounts 本身也在鉴权之后 → 面板彻底锁死，只能上磁盘改文件。
+        // 解析失败统一降级为空集，口径同 AiSettingStore::load()。
+        //
+        // ⚠️ 已知边界（本次刻意未处理，见 NOTES.md）：降级为空集后，任何一次写操作
+        // （create / update / toggle / delete 内部都走 load → persist）都会以「空账号集」
+        // 重写整个文件，即覆盖掉原内容。本文件入 git，回滚靠 git；若需要挡住这个覆盖面，
+        // 应在写入口加「损坏即拒写 / 先隔离坏文件」的守卫。
+        try {
+            $parsed = Yaml::parse($raw);
+        } catch (\Throwable $e) {
+            Log::warning('scaffold.accounts.parse_failed', [
+                'path'  => $this->path(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['meta' => [], 'accounts' => []];
+        }
+
+        // YAML 合法但根节点不是映射（例如整文件就是一句标量）时同样按降级处理，
+        // 否则 `$data['accounts']` 会在字符串上取下标。
+        $data = is_array($parsed) ? $parsed : [];
 
         $accounts = [];
         foreach ((array) ($data['accounts'] ?? []) as $row) {
