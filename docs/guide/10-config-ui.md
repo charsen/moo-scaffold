@@ -33,6 +33,11 @@ POST 在以下任一情况被拒(403 + flash),`EnforceScaffoldWritable` 中间�
 
 1. **`APP_ENV=production`** — 生产一律只读。
 2. **`SCAFFOLD_CONFIG_READONLY=true`** — 强制只读总开关(local 也只读)。
+3. **登录角色** — 配置**写**仅 admin(`EnforceAdminOnly`),`member` 提交任何分组都 403。
+   页面 `GET` 不拦:只读、敏感字段已掩码。为什么单独把配置的写权限收紧:配置里的
+   `scaffold.hosts` 同时是接口调试代理的 **SSRF 白名单来源**(`/scaffold/api/proxy`),
+   改白名单的权限不该和用白名单的权限一样低。角色口径见 [12-security.md](12-security.md) 与
+   `docs/overview.md` 的角色表。
 
 页面顶部显示当前状态(可编辑 / 强制只读 / 生产·只读)。详见 [12-security.md](12-security.md)。
 
