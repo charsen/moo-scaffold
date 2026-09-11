@@ -2456,6 +2456,10 @@ document.addEventListener('alpine:init', () => {
                 });
                 const files = data.files_written || [];
                 this._toast('migration 已生成 ' + files.length + ' 个文件，记得自己 commit', 'success');
+                // 2026-09-11:baseline 没按请求推进，或快照损坏被从零重建时，服务端在 data.note 给了说明。
+                // 只报成功会误导：migration 文件已经落盘，但 baseline 没动 → 下次预览会重报本次变更，
+                // 用户再点一次生成就产出重复 migration。
+                if (data.note) this._toast(data.note, 'warning');
                 this.closePreview();
                 scaffoldReload(800);
             } catch (e) {
