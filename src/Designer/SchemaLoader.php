@@ -5,6 +5,7 @@ namespace Mooeen\Scaffold\Designer;
 use Illuminate\Support\Facades\DB;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Support\Concerns\AtomicFileWrite;
+use Mooeen\Scaffold\Support\FieldTypes;
 use Mooeen\Scaffold\Support\PackageRegistry;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Finder\Finder;

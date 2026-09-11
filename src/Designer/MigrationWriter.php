@@ -3,6 +3,7 @@
 namespace Mooeen\Scaffold\Designer;
 
 use Illuminate\Filesystem\Filesystem;
+use Mooeen\Scaffold\Support\FieldTypes;
 
 /**
  * Render & write Laravel migrations from a SchemaDiffService::diff() result.

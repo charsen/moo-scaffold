@@ -17,6 +17,7 @@ use Mooeen\Scaffold\Rules\Mobile;
 use Mooeen\Scaffold\Rules\NumericArray;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Support\FieldName;
+use Mooeen\Scaffold\Support\FieldTypes;
 use Mooeen\Scaffold\Utility;
 
 use function in_array;
@@ -608,9 +609,11 @@ class CreateControllerGenerator extends Generator
             }
 
             // 2026-06-11 修:原来只认 int/tinyint/bigint,漏 smallint/mediumint/decimal/float/double
-            // → 生成的 Request 对这些数值列零类型校验。inline 列表跟本文件其它类型判断保持一致风格。
-            $isIntType   = in_array($attr['type'], ['tinyint', 'smallint', 'mediumint', 'int', 'bigint'], true);
-            $isFloatType = in_array($attr['type'], ['decimal', 'float', 'double'], true);
+            // → 生成的 Request 对这些数值列零类型校验。
+            // 2026-09-11:改为 FieldTypes 单一来源 —— 这类"漏一个成员"的事故本仓复发过两次,
+            // 只有把成员收到一处才谈得上"改一处不漏四处"。
+            $isIntType   = in_array($attr['type'], FieldTypes::INT, true);
+            $isFloatType = in_array($attr['type'], FieldTypes::FLOAT, true);
             if ($isIntType || $isFloatType) {
                 // decimal/float/double → numeric;整数列 format float: → numeric;雪花 bigint → numeric;其余整型 → integer
                 if ($isFloatType || (isset($attr['format']) && str_contains($attr['format'], 'float:'))) {
@@ -637,23 +640,23 @@ class CreateControllerGenerator extends Generator
 
             // 字符串类型都加 string 规则;text 系列(text/tinytext/mediumtext/longtext)同样是字符串,
             // 原先漏掉 → 生成的 Request 里 text 字段缺 'string' 验证。max/min 仍只给 char/varchar(text 无 size)。
-            if (in_array($attr['type'], ['char', 'varchar', 'tinytext', 'text', 'mediumtext', 'longtext'])) {
+            if (in_array($attr['type'], FieldTypes::STRING)) {
                 $filed_rules[] = 'string';
             }
 
-            if ($attr['type'] === 'boolean' || $attr['type'] === 'bool') {
+            if (in_array($attr['type'], FieldTypes::BOOL, true)) {
                 $filed_rules[] = 'in:0,1';
             }
 
-            if (in_array($attr['type'], ['date', 'datetime', 'timestamp'])) {
+            if (in_array($attr['type'], FieldTypes::DATE)) {
                 $filed_rules[] = 'date';
             }
 
-            if (isset($attr['min_size']) && in_array($attr['type'], ['char', 'varchar'])) {
+            if (isset($attr['min_size']) && in_array($attr['type'], FieldTypes::STRING_SIZE)) {
                 $filed_rules[] = "min:{$attr['min_size']}";
             }
 
-            if (isset($attr['size']) && in_array($attr['type'], ['char', 'varchar'])) {
+            if (isset($attr['size']) && in_array($attr['type'], FieldTypes::STRING_SIZE)) {
                 $filed_rules[] = "max:{$attr['size']}";
             }
 
@@ -753,7 +756,7 @@ class CreateControllerGenerator extends Generator
         }
 
         // 大文本类型不进列表查询字段（避免 SELECT 拖累、列表回包过大）
-        $excluded_types = ['text', 'mediumtext', 'longtext'];
+        $excluded_types = FieldTypes::TEXT_LARGE;
 
         $fields = array_filter(
             $fields,
