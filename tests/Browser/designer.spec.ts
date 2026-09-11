@@ -48,21 +48,62 @@ async function findFieldRowIdx(page: Page, key: string): Promise<number> {
     }, key);
 }
 
+// 「index 列为空、且 select 未被禁用」的字段行 idx。
+// 索引 round-trip 类用例需要一行可以自由改 index 的字段;原先写死 nth(2)
+// 是在依赖 LLE platform_regions 的字段顺序(id/parent_id/_lft/_rgt),
+// 换宿主后第 3 行可能是 parent_id(已是 index) → selectOption 找不到可用项。
+async function findIndexFreeRowIdx(page: Page): Promise<number> {
+    return await page.evaluate(() => {
+        const trs = Array.from(document.querySelectorAll('table.p-designer-fields tbody tr'));
+        for (let i = 0; i < trs.length; i++) {
+            const sel = trs[i].querySelector('select[name="field_index"]') as HTMLSelectElement | null;
+            if (sel && !sel.disabled && sel.value === '') return i;
+        }
+        return -1;
+    });
+}
+
+// 侧栏表链接定位。**不要**用 getByRole('link', { name: /^<key>/ }) ——
+// 链接的可访问名是「1. platform_regions 12」(序号 + key + 字段数三个 span 拼成),
+// 前缀正则永远不会命中(踩过:该用例在任何宿主都超时)。视图已给 <a> 加 data-table-key。
+function tableSidebarLink(page: Page, key: string) {
+    return page.locator(`a.route-sidebar-item[data-table-key="${key}"]`);
+}
+
 // ─── plan-33: scaffold 包独立化后,fixture override ─────────────────
 //
-// 当前 spec 默认用维护者本地 fixture 项目自带的 schema 名(Platform / Laravel 等),
-// **这是 fixture-bound,跟特定 yaml 内容强耦合**(spec 内多处 hardcoded 表名 / 字段顺序)。
+// 默认值照维护者本地 fixture 项目(LLE)写:**跟那份 yaml 强耦合**(schema 名 / 表名 /
+// 字段属性 / 索引配置)。换宿主**只覆盖 env,不用改 spec**。
 //
-// 其他项目接 scaffold 时,2 个选择:
-//   A) git fork 改 spec body 用自己 schema(spec 内有 ~10 处 hardcoded,grep 'Platform' / 'Laravel'/ 'platform_' / 'cache')
-//   B) 准备 fixture schema(可参考 docs/schema_demo.yaml),然后下面 5 个 env 注入:
+// 2026-09-11:原先散在用例里的宿主数据绑定已全部收成下面的 env(含「按字段 key 定位行」
+// 替代写死行号、「按 data-table-key / data-schema-key 定位」替代前缀正则),所以
+// 「git fork 改 spec body」这条路已不需要。
 //
-// 用法(B):E2E_SCHEMA=Demo E2E_TABLE=demo_users E2E_TABLE_DROPDOWN=demo_orders ... npm run test:e2e
+// 用法:E2E_SCHEMA=Demo E2E_TABLE=demo_users E2E_TABLE_DROPDOWN=demo_orders \
+//       E2E_TABLE_IN_LIST=demo_pages E2E_SCHEMAS_CSV=Demo,Demo2 ... npm run test:e2e
+// 完整清单 + 换宿主实例见 .env.e2e.example 与 ./README.md。
 const SCHEMA          = process.env.E2E_SCHEMA           || 'Platform';
 const TABLE           = process.env.E2E_TABLE            || 'platform_regions';
 const TABLE_DROPDOWN  = process.env.E2E_TABLE_DROPDOWN   || 'platform_medias';
-// 默认 = LLE 当前 UI 显示的 schema 模块名(Laravel.yaml → UI Infrastructure);其他下游 env override
+// 首页「模块」断言接受的标识,两种语义都认(key 或 UI 显示名):断言先看 a[data-schema-key],
+// 再看 heading 文本,命中任一即过。默认值 = LLE 的 UI 显示名(Laravel.yaml → Infrastructure)。
+// 换宿主推荐直接传 schema key 列表(更稳,不随 module.folder 变化)。
 const SCHEMAS_LIST    = (process.env.E2E_SCHEMAS_CSV     || 'Infrastructure,Light,Order,Platform,Tagging,User').split(',');
+
+// 「侧栏切表」用例点开的表(须是 SCHEMA 下真实存在的表)。默认 = LLE 的 platform_pages。
+const SIDEBAR_TABLE   = process.env.E2E_TABLE_IN_LIST    || 'platform_pages';
+
+// 「索引段」用例断言的字段:索引卡片里的删除按钮 title 含字段名。默认 = LLE 的 Platform.platform_regions
+// 索引配置(parent_id + region_name);宿主索引不同则 override(如只有 parent_id)。
+const INDEX_FIELDS    = (process.env.E2E_INDEX_FIELDS_CSV || 'parent_id,region_name')
+    .split(',').map(s => s.trim()).filter(Boolean);
+
+// 「字段表渲染」用例:按字段 key 定位行(不写死行号),三个属性期望可逐个覆盖。
+// FORMAT 留空 = 跳过该列断言 —— 宿主该字段本就没有 format 属性时不该硬断。
+const FIELD_DECIMAL   = process.env.E2E_FIELD_DECIMAL_KEY || 'media_duration';
+const FIELD_PRECISION = process.env.E2E_FIELD_PRECISION   || '6';
+const FIELD_SIZE      = process.env.E2E_FIELD_SIZE        || '10';
+const FIELD_FORMAT    = process.env.E2E_FIELD_FORMAT ?? 'float:1000000';   // '' ⇒ 跳过
 
 // ─── 1. Navigation ──────────────────────────────────────────────────
 
@@ -70,7 +111,14 @@ test.describe('Navigation', () => {
     test('designer 首页列出 SCHEMAS_LIST 全部模块', async ({ page }) => {
         await page.goto('/scaffold/db/designer');
         for (const s of SCHEMAS_LIST) {
-            await expect(page.getByRole('heading', { name: s, exact: true })).toBeVisible();
+            // 卡片标题渲的是 module.folder(UI 显示名),不一定等于 schema key
+            // → data-schema-key 与 heading 文本两种标识都认,命中任一即过
+            const byKey = page.locator(`a.p-designer-card[data-schema-key="${s}"]`);
+            const byName = page.getByRole('heading', { name: s, exact: true });
+            expect(
+                (await byKey.count()) + (await byName.count()),
+                `首页应有模块 ${s}(按 data-schema-key 或显示名匹配)`,
+            ).toBeGreaterThan(0);
         }
     });
 
@@ -83,34 +131,37 @@ test.describe('Navigation', () => {
 
     test('sidebar 切表 URL 加 ?table=X + 表 key 同步', async ({ page }) => {
         await page.goto(`/scaffold/db/designer/${SCHEMA}`);
-        await page.getByRole('link', { name: /^platform_pages/ }).click();
-        await expect(page).toHaveURL(/table=platform_pages/);
-        await expect(page.getByRole('textbox', { name: '表 key' })).toHaveValue('platform_pages');
+        await tableSidebarLink(page, SIDEBAR_TABLE).click();
+        await expect(page).toHaveURL(new RegExp(`table=${SIDEBAR_TABLE}`));
+        await expect(page.getByRole('textbox', { name: '表 key' })).toHaveValue(SIDEBAR_TABLE);
     });
 });
 
 // ─── 2. Table view ──────────────────────────────────────────────────
 
 test.describe('Table view', () => {
-    test('字段表渲染:precision/format/unsigned 列存在', async ({ page }) => {
+    test('字段表渲染:precision/format 列存在(按字段 key 定位行)', async ({ page }) => {
         await gotoDesigner(page, `/scaffold/db/designer/${SCHEMA}?table=${TABLE_DROPDOWN}`);
-        // Alpine x-model 不写 DOM value attr,用 row index 定位(TABLE_DROPDOWN 字段顺序 cf yaml)
-        // 0=id, 1=personnel_id, 2=user_id, 3=media_capable_type, 4=media_capable_id,
-        // 5=media_capable_field, 6=media_thumb, 7=media_type, 8=media_width, 9=media_height,
-        // 10=media_bit_rate, 11=media_duration(decimal)
+        // Alpine x-model 不写 DOM value attr → 用字段 key 反查行号,不依赖 yaml 里的字段顺序
         const rows = page.locator('table.p-designer-fields tbody tr');
-        const mediaDurationRow = rows.nth(11);
-        await expect(mediaDurationRow.getByRole('textbox', { name: /字段 key/ })).toHaveValue('media_duration');
-        await expect(mediaDurationRow.getByRole('textbox', { name: /字段精度/ })).toHaveValue('6');
-        await expect(mediaDurationRow.getByRole('textbox', { name: /字段大小/ })).toHaveValue('10');
-        await expect(mediaDurationRow.getByRole('textbox', { name: /字段 format/ })).toHaveValue('float:1000000');
+        const idx = await findFieldRowIdx(page, FIELD_DECIMAL);
+        expect(idx, `表 ${TABLE_DROPDOWN} 应有字段 ${FIELD_DECIMAL}`).toBeGreaterThanOrEqual(0);
+        const row = rows.nth(idx);
+        await expect(row.getByRole('textbox', { name: /字段 key/ })).toHaveValue(FIELD_DECIMAL);
+        await expect(row.getByRole('textbox', { name: /字段精度/ })).toHaveValue(FIELD_PRECISION);
+        await expect(row.getByRole('textbox', { name: /字段大小/ })).toHaveValue(FIELD_SIZE);
+        // format 属宿主 yaml 字段属性:该字段没有 format 时(E2E_FIELD_FORMAT='')跳过本条断言
+        if (FIELD_FORMAT !== '') {
+            await expect(row.getByRole('textbox', { name: /字段 format/ })).toHaveValue(FIELD_FORMAT);
+        }
     });
 
-    test('索引段显示已配置索引(parent_id + region_name)', async ({ page }) => {
+    test('索引段显示已配置索引', async ({ page }) => {
         await gotoDesigner(page, `/scaffold/db/designer/${SCHEMA}?table=${TABLE}`);
         // 删按钮的 title 属性包含字段名(a11y name 只是 "×")
-        await expect(page.locator('button[title*="parent_id"]')).toHaveCount(1);
-        await expect(page.locator('button[title*="region_name"]')).toHaveCount(1);
+        for (const f of INDEX_FIELDS) {
+            await expect(page.locator(`button[title*="${f}"]`)).toHaveCount(1);
+        }
     });
 
     test('yaml 原文 toggle + 复制按钮', async ({ page }) => {
@@ -440,7 +491,9 @@ test.describe('Create table (real write)', () => {
     const TEMP_KEY = `e2e_temp_videos_${Date.now()}`;
 
     test('新建表 → 写 yaml → redirect → sidebar 出现新表 → 字段表渲染 → 测后 DELETE 清理', async ({ page }) => {
-        await page.goto(`/scaffold/db/designer/${SCHEMA}?table=${TABLE}`);
+        // 用 gotoDesigner 而非裸 goto:后者只等 load,不等 Alpine init —— 而「+ 新建」是
+        // x-on:click 绑定,Alpine 没起来时点了不发请求(表现为 waitForResponse 超时,极易误判成后端坏)
+        await gotoDesigner(page, `/scaffold/db/designer/${SCHEMA}?table=${TABLE}`);
         await page.getByRole('button', { name: '+ 新建', exact: true }).click();
         const modal = page.getByRole('dialog').filter({ hasText: '新建表' }).first();
         await expect(modal).toBeVisible({ timeout: 3000 });
@@ -448,17 +501,19 @@ test.describe('Create table (real write)', () => {
         await modal.locator('input[name="new_table_key"]').fill(TEMP_KEY);
         await modal.locator('input[name="new_table_name"]').fill('E2E 测试视频');
         await modal.locator('input[name="new_table_desc"]').fill('e2e 临时表');
-        // 拦截 createTable POST + 跟随 redirect
+        // 拦截 createTable POST + 跟随 redirect。
+        // 超时 15s(非 6s):这条是「真写 yaml + 重建 schema 缓存 + 服务端 redirect」,
+        // 冷态(视图首编译 / 缓存失效)下 6s 会偶发不够 —— 实测同代码两次跑一红一绿。
         const respPromise = page.waitForResponse(r =>
             r.url().includes(`/db/designer/${SCHEMA}/tables`) && r.request().method() === 'POST',
-            { timeout: 6000 });
+            { timeout: 15000 });
         await modal.getByRole('button', { name: '创建', exact: false }).click();
         const resp = await respPromise;
         expect(resp.status()).toBe(200);
         // redirect 后 URL 含新表 key
         await expect(page).toHaveURL(new RegExp(`table=${TEMP_KEY}`), { timeout: 5000 });
-        // sidebar 应出现新表 link
-        await expect(page.getByRole('link', { name: new RegExp(`^${TEMP_KEY}`) })).toBeVisible();
+        // sidebar 应出现新表 link(按 data-table-key 定位:可访问名带序号前缀,前缀正则失配)
+        await expect(tableSidebarLink(page, TEMP_KEY)).toBeVisible();
         // 表 key input 同步
         await expect(page.getByRole('textbox', { name: '表 key' })).toHaveValue(TEMP_KEY);
 
@@ -619,8 +674,8 @@ test.describe('Delete table (round-trip)', () => {
     test('+ 新建表 → 真"删表" → confirm 输入 key → DELETE 200 → 跳回 list', async ({ page }) => {
         const TEMP_KEY = `e2e_del_tmp_${Date.now()}`;
 
-        // 1. 加表
-        await page.goto(`/scaffold/db/designer/${SCHEMA}?table=${TABLE}`);
+        // 1. 加表(同 5b:必须先等 Alpine ready,否则「+ 新建」的 x-on:click 未绑定)
+        await gotoDesigner(page, `/scaffold/db/designer/${SCHEMA}?table=${TABLE}`);
         await page.getByRole('button', { name: '+ 新建', exact: true }).click();
         const modal = page.getByRole('dialog').filter({ hasText: '新建表' }).first();
         await expect(modal).toBeVisible({ timeout: 3000 });
@@ -629,7 +684,7 @@ test.describe('Delete table (round-trip)', () => {
         await modal.locator('input[name="new_table_desc"]').fill('round-trip');
         const createResp = page.waitForResponse(r =>
             r.url().includes(`/db/designer/${SCHEMA}/tables`) && r.request().method() === 'POST',
-            { timeout: 6000 });
+            { timeout: 15000 });
         await modal.getByRole('button', { name: '创建', exact: false }).click();
         expect((await createResp).status()).toBe(200);
         await expect(page).toHaveURL(new RegExp(`table=${TEMP_KEY}`), { timeout: 5000 });
@@ -656,7 +711,7 @@ test.describe('Delete table (round-trip)', () => {
         // 5. 800ms 后 redirect 回 schema 设计页(无 table param)
         await page.waitForURL(new RegExp(`/designer/${SCHEMA}(?!\\?table=${TEMP_KEY})`), { timeout: 3000 });
         // sidebar 不再有该表
-        await expect(page.getByRole('link', { name: new RegExp(`^${TEMP_KEY}`) })).toHaveCount(0);
+        await expect(tableSidebarLink(page, TEMP_KEY)).toHaveCount(0);
     });
 });
 
@@ -905,11 +960,13 @@ test.describe('Write ops', () => {
 
     test('改字段索引列(行内 select)→ debounce 500ms → POST /save 200(改完恢复原值)', async ({ page }) => {
         await page.goto(`/scaffold/db/designer/${SCHEMA}?table=${TABLE}`);
-        // _lft 行索引:platform_regions 字段顺序 0=id, 1=parent_id, 2=_lft, 3=_rgt
-        // _lft 默认 index="—",改成 "index" 测一次 save round-trip
+        // 挑一行「index 为空、select 未禁用」的字段当靶(不写死字段顺序 ——
+        // 原先写死 nth(2) 是在依赖 LLE platform_regions 的 id/parent_id/_lft/_rgt 顺序)
         const rows = page.locator('table.p-designer-fields tbody tr');
-        const lftRow = rows.nth(2);
-        const indexSelect = lftRow.getByRole('combobox', { name: /字段索引/ });
+        const freeIdx = await findIndexFreeRowIdx(page);
+        expect(freeIdx, `${TABLE} 应有一行 index 可自由改动的字段`).toBeGreaterThanOrEqual(0);
+        const targetRow = rows.nth(freeIdx);
+        const indexSelect = targetRow.getByRole('combobox', { name: /字段索引/ });
         await expect(indexSelect).toBeVisible();
         const original = await indexSelect.inputValue();
         // 拦截下一次 POST /save
@@ -927,15 +984,18 @@ test.describe('Write ops', () => {
         await restorePromise;
     });
 
-    test('单字段索引三态切换:none → index → unique → none(每步 POST 200)', async ({ page }) => {
-        // designer_index_options = ['', 'primary', 'unique', 'index']
-        // 不测 primary(platform_regions.id 已是 primary,多 primary 不合法);其他 3 态轮一遍
+    test('单字段索引三态切换:none → index → unique-db → none(每步 POST 200)', async ({ page }) => {
+        // designer_index_options(plan-51 之后)= ['', primary, unique-app, unique-db, index]
+        // —— 旧的 'unique' 已拆成 unique-app / unique-db 并移除,传 'unique' 会 selectOption 找不到 option。
+        // 不测 primary(首列通常已是 primary,多 primary 不合法)。
         await page.goto(`/scaffold/db/designer/${SCHEMA}?table=${TABLE}`);
         const rows = page.locator('table.p-designer-fields tbody tr');
-        const lftRow = rows.nth(2);  // _lft 默认 index=''(none)
-        const indexSelect = lftRow.getByRole('combobox', { name: /字段索引/ });
+        const freeIdx = await findIndexFreeRowIdx(page);
+        expect(freeIdx, `${TABLE} 应有一行 index 可自由改动的字段`).toBeGreaterThanOrEqual(0);
+        const targetRow = rows.nth(freeIdx);
+        const indexSelect = targetRow.getByRole('combobox', { name: /字段索引/ });
         const original = await indexSelect.inputValue();
-        const transitions: Array<string> = ['index', 'unique', original];
+        const transitions: Array<string> = ['index', 'unique-db', original];
         for (const next of transitions) {
             const savePromise = page.waitForResponse(r =>
                 r.url().includes(`/db/designer/${SCHEMA}/save`) && r.request().method() === 'POST',

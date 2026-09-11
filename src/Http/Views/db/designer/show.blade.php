@@ -183,6 +183,9 @@
                                 <a href="{{ route('db.designer.show', ['schema' => $schema ?? 'User']) }}?table={{ $tKey }}"
                                    class="route-sidebar-item is-mono {{ $isActive ? 'active' : '' }}"
                                    title="{{ $t['name'] }}{{ $t['locked'] ? '（migration 已生成）' : '' }}"
+                                   {{-- 给 e2e 一个稳定锚点:链接的可访问名是「1. table_key 12」(序号+key+字段数),
+                                        拿 ^key 前缀正则去匹配 role=link 的 name 永远失配。data-schema-key 同理。 --}}
+                                   data-table-key="{{ $tKey }}"
                                 >
                                     <span class="sidebar-index">{{ $loop->iteration }}.</span>
                                     <span class="sidebar-tname">{{ $tKey }}</span>
