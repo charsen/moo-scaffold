@@ -13,6 +13,7 @@ namespace Mooeen\Scaffold\Generator;
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Support\FieldName;
+use Mooeen\Scaffold\Support\FieldTypes;
 
 class CreateResourceGenerator extends Generator
 {
@@ -198,7 +199,7 @@ class CreateResourceGenerator extends Generator
                 continue;
             }
 
-            if (in_array($attr['type'], ['date', 'datetime', 'timestamp']) && $field_name !== 'updated_at') {
+            if (in_array($attr['type'], FieldTypes::DATE) && $field_name !== 'updated_at') {
                 $code[] = $this->getTabs(3) . "'{$field_name}' => \$this->whenDate('{$field_name}'),";
 
                 continue;

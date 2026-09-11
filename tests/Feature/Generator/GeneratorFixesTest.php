@@ -2,6 +2,7 @@
 
 use Illuminate\Filesystem\Filesystem;
 use Mooeen\Scaffold\Generator\CreateControllerGenerator;
+use Mooeen\Scaffold\Support\FieldTypes;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Console\Output\NullOutput;
 
@@ -180,19 +181,26 @@ it('④ UpdateMultilingualGenerator escapeLangValue 不再用 &apos;,改 escapeP
 // ─── ⑥ smallint/mediumint 整型漂移收口(2026-06-11 sweep,与 ① 同类)─────────────
 // ① 之外,CreateModelGenerator 的 filter/factory/@property + CreateTSModelGenerator 的 TS 类型判断
 // 同样漏 smallint/mediumint → 这些字段拿不到整型处理(无 filter scope / 错 factory / @property string / TS string)。
-it('⑥ 整型判断列表都含 smallint/mediumint(filter/factory/@property/TS);UNSIGNED_DEFAULT 故意窄表不动', function () {
+it('⑥ 整型判断统一走 FieldTypes;TS 的 number 分支用 INT_NO_BIGINT;UNSIGNED_DEFAULT 故意窄', function () {
     $model = genfix_src('Generator/CreateModelGenerator.php');
     $ts    = genfix_src('Generator/CreateTSModelGenerator.php');
+    $fresh = genfix_src('Generator/FreshStorageGenerator.php');
 
-    // CreateModelGenerator 三处整型判断(filter whereIn / factory random_int / @property int)规整成全集
-    expect(substr_count($model, "['tinyint', 'smallint', 'mediumint', 'int', 'bigint']"))->toBe(3);
-    // decimal 补进 float-filter(与 float/double 同等待遇)
-    expect($model)->toContain("['decimal', 'float', 'double']");
-    // TS number 分支含 smallint/mediumint(bigint 仍走独立 'bigint | string' 分支,不并入)
-    expect($ts)->toContain("['tinyint', 'smallint', 'mediumint', 'int']");
+    // 2026-09-11:三处整型判断(filter whereIn / factory random_int / @property int)从内联字面
+    // 收口到 FieldTypes::INT。本条原先把"字面长什么样"当锚点;收口后改断"接线到单一来源",
+    // 成员是否含 smallint/mediumint 由 FieldTypesTest 的成员锁负责(两层各管一段,别互相替代)。
+    expect(substr_count($model, 'FieldTypes::INT'))->toBe(3);
+    // decimal 与 float/double 同等待遇
+    expect($model)->toContain('FieldTypes::FLOAT');
 
-    // 锚:FreshStorageGenerator::getSize 的列表 = FieldTypes::UNSIGNED_DEFAULT,**故意**排除
-    // smallint/mediumint/double(unsigned 默认窄表),不属本次 sweep,防未来"顺手补全"误改语义。
-    expect(genfix_src('Generator/FreshStorageGenerator.php'))
-        ->toContain("['int', 'bigint', 'tinyint', 'decimal', 'float']");
+    // TS 的 number 分支必须是 INT_NO_BIGINT —— bigint 仍走独立 'bigint | string'
+    // (JS number 装不下 64 位),不是漏写。
+    expect($ts)->toContain('FieldTypes::INT_NO_BIGINT');
+    expect($ts)->toContain("=== 'bigint'");
+    expect($ts)->toContain("'bigint | string'");
+
+    // FreshStorageGenerator::getSize 用 UNSIGNED_DEFAULT —— **故意**比 NUMERIC 窄
+    // (排除 smallint/mediumint/double),防未来"顺手补全"误改语义。
+    expect($fresh)->toContain('FieldTypes::UNSIGNED_DEFAULT');
+    expect(FieldTypes::UNSIGNED_DEFAULT)->toBe(['tinyint', 'int', 'bigint', 'decimal', 'float']);
 });

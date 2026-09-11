@@ -13,6 +13,7 @@ namespace Mooeen\Scaffold\Generator;
 use Brick\VarExporter\VarExporter;
 use Illuminate\Support\Str;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
+use Mooeen\Scaffold\Support\FieldTypes;
 use Mooeen\Scaffold\Support\PackageRegistry;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Yaml\Yaml;
@@ -321,7 +322,7 @@ class FreshStorageGenerator extends Generator
     private function getSize(array &$attr, string $field_name): void
     {
         $attr['size'] = $attr['size'] ?? '';
-        if (in_array($attr['type'], ['int', 'bigint', 'tinyint', 'decimal', 'float'])) {
+        if (in_array($attr['type'], FieldTypes::UNSIGNED_DEFAULT)) {
             // 添加 unsigned 属性
             $attr['unsigned'] = $attr['unsigned'] ?? true;
 
@@ -332,7 +333,7 @@ class FreshStorageGenerator extends Generator
             } else {
                 $attr['size'] = empty($attr['size']) ? 10 : $attr['size'];
             }
-        } elseif (in_array($attr['type'], ['char', 'varchar'])) {
+        } elseif (in_array($attr['type'], FieldTypes::STRING_SIZE)) {
             $attr['size'] = empty($attr['size']) ? 32 : $attr['size'];
             if (is_string($attr['size']) && str_contains($attr['size'], ',')) {
                 // 保存最小长度，用于生成检验时使用

@@ -13,6 +13,7 @@ namespace Mooeen\Scaffold\Generator;
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Support\Arr;
 use Mooeen\Scaffold\Support\FieldName;
+use Mooeen\Scaffold\Support\FieldTypes;
 
 use function in_array;
 
@@ -332,7 +333,7 @@ class CreateModelGenerator extends Generator
             $codes[] = ''; // 空一行
 
             // 处理 id 和数字类型(smallint/mediumint 同属整型,2026-06-11 补)
-            if (in_array($config['type'], ['tinyint', 'smallint', 'mediumint', 'int', 'bigint'])) {
+            if (in_array($config['type'], FieldTypes::INT)) {
                 $codes[] = $this->getTabs() . "public function {$field_name}(\$int)";
                 $codes[] = $this->getTabs() . '{';
                 $codes[] = $this->getTabs(2) . '$int = is_array($int) ? $int : [$int];';
@@ -340,28 +341,28 @@ class CreateModelGenerator extends Generator
                 $codes[] = $this->getTabs() . '}';
             }
 
-            if (in_array($config['type'], ['varchar', 'char', 'text', 'tinytext'])) {
+            if (in_array($config['type'], FieldTypes::STRING)) {
                 $codes[] = $this->getTabs() . "public function {$field_name}(\$str)";
                 $codes[] = $this->getTabs() . '{';
                 $codes[] = $this->getTabs(2) . "return \$this->where('{$fn}', 'LIKE', \"%{\$str}%\");";
                 $codes[] = $this->getTabs() . '}';
             }
 
-            if (in_array($config['type'], ['date', 'datetime', 'timestamp'])) {
+            if (in_array($config['type'], FieldTypes::DATE)) {
                 $codes[] = $this->getTabs() . "public function {$field_name}(\$date)";
                 $codes[] = $this->getTabs() . '{';
                 $codes[] = $this->getTabs(2) . "return \$this->whereDate('{$fn}', \$date);";
                 $codes[] = $this->getTabs() . '}';
             }
 
-            if (in_array($config['type'], ['bool', 'boolean'])) {
+            if (in_array($config['type'], FieldTypes::BOOL)) {
                 $codes[] = $this->getTabs() . "public function {$field_name}(\$bool)";
                 $codes[] = $this->getTabs() . '{';
                 $codes[] = $this->getTabs(2) . "return \$this->where('{$fn}', \$bool);";
                 $codes[] = $this->getTabs() . '}';
             }
 
-            if (in_array($config['type'], ['decimal', 'float', 'double'])) {
+            if (in_array($config['type'], FieldTypes::FLOAT)) {
                 $codes[] = $this->getTabs() . "public function {$field_name}(\$float)";
                 $codes[] = $this->getTabs() . '{';
                 $codes[] = $this->getTabs(2) . "return \$this->where('{$fn}', \$float);";
@@ -461,7 +462,7 @@ class CreateModelGenerator extends Generator
                 $rule = "fake()->name(Arr::random(['male', 'female']))";
             } elseif (str_contains($field_name, '_code')) {
                 $rule = "fake()->numerify('C####')";
-            } elseif (in_array($attr['type'], ['tinyint', 'smallint', 'mediumint', 'int', 'bigint'])) {
+            } elseif (in_array($attr['type'], FieldTypes::INT)) {
                 $rule = 'random_int(0, 1)';
             } elseif ($attr['type'] === 'varchar' || $attr['type'] === 'char') {
                 $rule = "implode(' ', fake()->words(2))";
@@ -529,11 +530,11 @@ class CreateModelGenerator extends Generator
         $code = [];
 
         foreach ($fields as $field_name => $attr) {
-            if (in_array($attr['type'], ['tinyint', 'smallint', 'mediumint', 'int', 'bigint'])) {
+            if (in_array($attr['type'], FieldTypes::INT)) {
                 $type = 'int';
-            } elseif (in_array($attr['type'], ['bool', 'boolean'])) {
+            } elseif (in_array($attr['type'], FieldTypes::BOOL)) {
                 $type = 'bool';
-            } elseif (in_array($attr['type'], ['date', 'datetime', 'timestamp'])) {
+            } elseif (in_array($attr['type'], FieldTypes::DATE)) {
                 $type = 'Carbon|null';
             } elseif ($attr['type'] === 'array') {
                 $type = 'array';
@@ -636,7 +637,7 @@ class CreateModelGenerator extends Generator
                 $code[] = $this->getTabs(2) . "'{$field_name}' => 'boolean',";
             }
 
-            if (in_array($attr['type'], ['datetime', 'timestamp'])) {
+            if (in_array($attr['type'], FieldTypes::DATETIME)) {
                 $code[] = $this->getTabs(2) . "'{$field_name}' => 'datetime:Y-m-d H:i:s',";
             }
 
