@@ -12,7 +12,7 @@ namespace Mooeen\Scaffold\Generator;
 
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
+use Mooeen\Scaffold\Support\FieldName;
 
 use function in_array;
 
@@ -230,7 +230,7 @@ class CreateModelGenerator extends Generator
             $case_codes    = [];
             $case_labels   = [];
             $trait_type    = 'int';     // 默认 backing 类型;防空 enum 块({})时未初始化 / 泄漏上一字段的值
-            $enum_class    = str_replace(' ', '', ucwords(str_replace('_', ' ', $field_name)));
+            $enum_class    = FieldName::studly((string) $field_name);
             $enum_file     = $enum_path . $enum_class . '.php';
             $relative_file = $this->relDisplay($enum_file, $this->originCtx);
             $file_exists   = $this->filesystem->isFile($enum_file);
@@ -314,7 +314,7 @@ class CreateModelGenerator extends Generator
         $enum_fields   = array_keys($enums);
         $enum_fields[] = 'id';
         foreach ($fields as $field_name => $config) {
-            if (in_array($field_name, $enum_fields, true) or Str::startsWith($field_name, '_') or str_contains($field_name, 'password')) {
+            if (in_array($field_name, $enum_fields, true) || FieldName::isHidden((string) $field_name)) {
                 continue;
             }
 
@@ -575,7 +575,7 @@ class CreateModelGenerator extends Generator
     {
         $hidden = [];
         foreach ($fields as $field_name => $attr) {
-            if (Str::startsWith($field_name, '_') or str_contains($field_name, 'password')) {
+            if (FieldName::isHidden((string) $field_name)) {
                 $hidden[] = "'{$field_name}'";
             }
         }
@@ -678,7 +678,7 @@ class CreateModelGenerator extends Generator
         foreach ($fields as $field_name => $attr) {
             if (isset($attr['format']) && str_contains($attr['format'], 'float:')) {
                 [$float, $divisor] = explode(':', trim($attr['format']));
-                $function_name     = str_replace(' ', '', ucwords(str_replace('_', ' ', $field_name)));
+                $function_name     = FieldName::studly((string) $field_name);
 
                 $code[] = $this->getTabs(1) . '/**';
                 $code[] = $this->getTabs(1) . " * {$fields[$field_name]['name']} 浮点数转整数 互转";
@@ -767,7 +767,7 @@ class CreateModelGenerator extends Generator
 
             $appends_code[] = "'{$field_name}_txt'";
 
-            $function_name = str_replace(' ', '', ucwords(str_replace('_', ' ', $field_name)));
+            $function_name = FieldName::studly((string) $field_name);
 
             $trait_use_class[] = "use {$namespace}\Enums\\{$function_name};";
 
