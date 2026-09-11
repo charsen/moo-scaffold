@@ -32,7 +32,9 @@ E2E_BASE_URL=http://127.0.0.1:8088 npm run test:e2e:auth
 # 弹 codegen 窗口 → 登录（账号见宿主 scaffold/accounts.yaml）→ 关窗，admin.json 自动保存
 ```
 
-或设 `E2E_USERNAME` / `E2E_PASSWORD`，`global-setup.ts` 会自动登录一次。
+或设 `E2E_USERNAME` / `E2E_PASSWORD`，`global-setup.ts` 会自动登录一次 —— 它会等"离开 `/scaffold/login`"
+并确认拿到 `scaffold_auth`（cookie 名可用 `E2E_AUTH_COOKIE` 覆盖）后才写 state；任一步不满足就**报错退出**，
+不会写一份空会话进去（写空会话会让整套 spec 以「未登录」形态假失败，极难排查）。
 
 > headless / agent 无窗口时：在宿主里 tinker 铸一个**双层** EncryptCookies cookie 注入即可（`ScaffoldAuth::makeCookie('admin')` → 套 `CookieValuePrefix` + `encrypter->encrypt` → `rawurlencode` 写进 `admin.json` 的 `scaffold_auth`，domain `127.0.0.1` / path `/`）。`/scaffold` 挂 `web` 组，直接注单层 makeCookie 值会被 EncryptCookies 解坏、一直跳登录。
 
@@ -47,8 +49,11 @@ E2E_BASE_URL=http://127.0.0.1:8088 npm run test:e2e
 E2E_BASE_URL=http://127.0.0.1:8088 E2E_API_APP=admin \
   npx playwright test tests/Browser/api-request.spec.ts
 
-# fixture 被污染(designer save round-trip 会微改 yaml)→ 跑完自动 git checkout 还原
-E2E_HOST_SCAFFOLD_DB_PATH=/path/to/host/scaffold/database npm run test:e2e:safe
+# 跑完自动还原宿主：回滚已跟踪文件 + 删掉本次**新增**的未跟踪产物
+#   （新建 schema yaml / .snapshots/*.yaml / database/migrations/*.php 都是未跟踪文件，
+#     只 git checkout 删不掉它们，见 tests/Browser/safe-run.sh 顶部说明）
+# ⚠ 路径要指到 scaffold/database/（不是 scaffold/）
+E2E_HOST_SCAFFOLD_DB_PATH=/path/to/host/engine/scaffold/database npm run test:e2e:safe
 
 # 调单个 spec / 看回放
 npm run test:e2e:ui
