@@ -3,6 +3,20 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-11，**本机可跑 e2e 的宿主是 `H1`**（`http://H1`），不是 LLE：LLE 虽是这套 spec 的原生宿主（`designer.spec` 的 schema 默认值取自它），但本机**没建它的库**（`/scaffold/login` 直接 500 `Unknown database 'DB_NAME'`）。H1 三个前置都天然满足：`vendor/charsen/moo-scaffold` 是**指向本仓的软链**、`public/vendor/scaffold` 已发布（且被 gitignore）、有可用账号 + DB 正常。
+  推荐跑法（`E2E_API_SCHEMAS_CSV` 要按宿主实际 schema 覆盖，默认值是 LLE 的）：
+  ```bash
+  E2E_BASE_URL=http://H1 \
+  E2E_HOST_SCAFFOLD_DB_PATH=/path/to/H1/engine/scaffold/database \
+  E2E_API_SCHEMAS_CSV='Laravel,Platform,Tagging,Crm,Finance,Market,Perform,Property,Solution,WorkItem' \
+  no_proxy='H1,localhost,127.0.0.1' npm run test:e2e:safe
+  ```
+  （本机有 HTTP 代理，脚本外的 `curl` 探测本地端口要 `--noproxy '*'`。）
+  **在该宿主上的稳定基线：40 passed / 7 failed / 7 skipped**，7 条失败**与本仓代码无关**（见下条 A/B），逐条根因：`designer:70` 期望的 heading 是 schema **key** 而页面渲的是中文名（用宿主真实 key 覆盖 `E2E_SCHEMAS_CSV` 仍失败 → env 修不了）；`designer:95` 期望 `media_duration.format = float:1000000`，而宿主 `Platform.yaml` **整份没有 `format` 属性**（已逐字核过）；`designer:109` 期望 `region_name` 索引，宿主 `platform_regions` 没有该索引；`designer:84`/`442`/`930` 是 sidebar 链接名 / 新表出现时机 / POST 触发时机与宿主数据不吻合；`theme-logo` 登录页没有 `img[alt=Scaffold]`。
+- 2026-09-11，**「改完跑 e2e」要用 A/B 对照而不是只看红绿**（这次靠它把「有回归」证伪）：
+  做法——把宿主指向本仓（软链天然满足）→ 在**当前 master** 跑一遍 → `git checkout -b tmp 上一轮基线提交` 让宿主自动换成改动前的代码 → 用**完全相同的 env** 再跑一遍 → 对比**失败集合**（不是只对比 passed 数）→ 切回 master、删临时分支。
+  实测结论：master 第 1 次 39 passed/8 failed、第 2 次 40/7、baseline 40/7，**第 2 次的失败集与 baseline 逐条一致**；唯一差异 `designer:569` 是**偶发**（同代码两次跑一次红一次绿）。所以「本轮改动零回归」是有证据的结论，而不是"看起来没报错"。
+  **注意**：A/B 时若用基线分支的 `test:e2e:safe`，它还是旧实现（不会删未跟踪产物）→ 要么直连 `npx playwright test` 再自己按差值清，要么记得手动清 `git status` 里的新增未跟踪项。
 - 2026-09-11，e2e 脚手架两处缺陷已修（都属于「会让人误判成功能坏了」的那类）：
   **① `global-setup.ts` 的自动登录存态是坏的**：原先用 `page.waitForURL(/\/scaffold(\/|$)/)` 等登录完成 —— 而 `/scaffold/login` 自身就匹配这个正则，于是它**立刻返回**，在登录 POST 回来之前就 `storageState()`，存出一份**没有 `scaffold_auth`** 的空会话。症状：整轮 spec 以「未登录」形态失败（等不到任何菜单项），看起来像功能被改坏了。现改为等「离开 `/scaffold/login`」（`waitForFunction`），并在写 state 前**断言 cookie 存在**（`E2E_AUTH_COOKIE` 可覆盖名字），任一步不满足就 fail fast 并提示"多半是账号不存在/密码不对；用 `moo:account:add` 造账号或 `npm run test:e2e:auth` 手登"。修完实测：`✓ saved storage state` 且后续 spec 大面积转绿。
   **② `test:e2e:safe` 只回滚已跟踪文件**：旧实现是 `git checkout .`，而 designer 的「真写」用例新增的是**未跟踪**文件（新建 schema yaml / `.snapshots/*.yaml` / `database/migrations/*.php`）→ 一个都删不掉（实测一轮残留 8 个 migration + yaml + snapshot）。现抽到 `tests/Browser/safe-run.sh` 并改用**差值法**：跑前记一份未跟踪清单，跑后只删「本次新出现的」。为什么不用 `git clean -fd`：那会把宿主**本来就有**的未跟踪文件（典型：本地自写的 `scaffold/accounts.yaml`）一起删掉。实测在生产：一轮清掉 4 个新 migration、且保留了宿主原有未跟踪文件。附带：路径写错（指到 `scaffold/` 而非 `scaffold/database/`）时会明确警告 —— 这个坑我自己踩过。
