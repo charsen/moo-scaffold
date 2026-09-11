@@ -2,6 +2,11 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+// 本用例要停在登录页,但全局 storageState 带**有效**登录态时 Laravel 会把已登录用户
+// 从 /scaffold/login 302 到 /scaffold → 页面里没有 login logo,断言报 element(s) not found
+// (不是 not visible,很容易误判成 UI 坏了)。显式用空登录态隔离。
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test('login brand logo follows the active theme without layout shift', async ({ page }) => {
     // Host 的 public/vendor/scaffold 是发布副本；验收包分支时让其原 CSS 请求返回本仓构建产物，
     // 等价于 vendor:publish 后的资源形态，也不会触发页面 CSP 的 inline-style 限制。
