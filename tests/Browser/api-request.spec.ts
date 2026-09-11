@@ -127,4 +127,50 @@ test.describe('接口调试器 tab 编排回归', () => {
             return e ? { f: e.folder, c: e.controller, a: e.action } : null;
         }, app), { timeout: 5000 }).toEqual({ f: A.f, c: A.c, a: A.a });
     });
+
+    /**
+     * 表单预览的类型白名单来源回归(2026-09-11 收口)。
+     *
+     * 收口前 `pages/api-request.js` 内联一份 19 项清单，注释写"对齐下游 former/config.ts"，
+     * 实际等于 renderControl() 的 case 集 —— 缺 `text-amount`。只含该类型的表单会被 shape
+     * 检测判成"不是表单"，预览 tab 静默隐藏。收口后清单由视图注入
+     * (`Support\FormWidgetTypes::detectable()`，FORMER ∪ DEBUGGER_RENDERABLE)。
+     *
+     * 本用例同时锁两件事：
+     *   1. 页面确实注入了并集（含 FORMER-only 的 text-amount 与 debugger-only 的 date）；
+     *   2. 一份"只有 text-amount 控件"的响应能被识别为表单、预览 tab 可见。
+     * 用 revert 验证过：把发布态 JS 换回内联清单版本，本用例在第 2 步失败。
+     */
+    test('表单预览:后端注入的类型词表让 FORMER-only 类型(text-amount)也被识别', async ({ page }) => {
+        await openApiDebugger(page);
+        const eps = await discoverTwoEndpoints(page);
+        test.skip(eps.length < 1, '当前 app 没有可用接口,无法测表单预览');
+        await openTab(page, eps[0]);
+
+        const injected = await page.evaluate(() => (
+            window as unknown as { ScaffoldConfig?: { knownWidgetTypes?: string[] } }
+        ).ScaffoldConfig?.knownWidgetTypes || []);
+        expect(injected).toContain('text-amount');   // FORMER-only
+        expect(injected).toContain('date');          // DEBUGGER_RENDERABLE-only
+
+        // 拦截 /api/proxy:回一份只含 text-amount 控件的 create 表单响应。
+        // 旧内联清单没有 text-amount ⇒ 检测不通过 ⇒ tab 隐藏;注入并集后 ⇒ 识别并渲染。
+        await page.route('**/api/proxy', async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    _proxy_status: 200,
+                    _proxy_headers: {},
+                    data: [[{ field: 'amount', label: '只读金额', type: 'text-amount' }]],
+                }),
+            });
+        });
+
+        await page.locator('#send').click();
+        await page.unroute('**/api/proxy');
+
+        await expect(page.locator('#form_preview_tab')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#form_preview_main')).toContainText('只读金额');
+    });
 });
