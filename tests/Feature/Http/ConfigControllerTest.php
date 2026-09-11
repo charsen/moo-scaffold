@@ -250,3 +250,119 @@ it('POST /scaffold/config/ai base_url 非法 URL → flash_error 拒写(url:http
     }
     expect(is_file(base_path($rel)))->toBeFalse();
 });
+
+// ─── 敏感字段不回显明文(2026-09-11 收口)──────────────────────────────────
+//
+// 背景:ConfigManager::resolveField 一直把**未掩码**的 raw_value 交给视图,而视图 6 个可编辑
+// 分支全渲染它 → 字段一旦命中 config_ui.sensitive_keys(默认 PASSWORD/SECRET/KEY/TOKEN,按
+// path 子串匹配),真值就明文进 HTML。现在改成渲染空白输入 + 「留空 = 不修改」。
+// 当前 20 个字段无一命中,故测试用 sensitive_keys 覆盖把 author 变成 sensitive。
+
+/** 造 env 链路沙箱(config/scaffold.php 认 author 为 env 来源 + .env 存真值),返回还原句柄 */
+function sensitiveSandboxOn(): array
+{
+    $cfgFile  = config_path('scaffold.php');
+    $envFile  = base_path('.env');
+    $mapCache = base_path('scaffold/.local/config-env-map.json');
+
+    $bak = [
+        'cfg' => is_file($cfgFile) ? file_get_contents($cfgFile) : null,
+        'env' => is_file($envFile) ? file_get_contents($envFile) : null,
+    ];
+
+    @unlink($mapCache);   // 防同套件先行测试在同一秒留下的 scanner 缓存
+    file_put_contents($cfgFile, "<?php\n\nreturn [\n    'author' => env('SCAFFOLD_AUTHOR', ''),\n];\n");
+    file_put_contents($envFile, "SCAFFOLD_AUTHOR=old_author\n");
+
+    return [$cfgFile, $envFile, $mapCache, $bak];
+}
+
+function sensitiveSandboxOff(array $handle): void
+{
+    [$cfgFile, $envFile, $mapCache, $bak] = $handle;
+    $bak['cfg'] === null ? @unlink($cfgFile) : file_put_contents($cfgFile, $bak['cfg']);
+    $bak['env'] === null ? @unlink($envFile) : file_put_contents($envFile, $bak['env']);
+    @unlink($mapCache);
+}
+
+it('敏感字段不回显明文:GET /scaffold/config 里既无真值、也无掩码回填', function () {
+    // 把 author 变成 sensitive(按 path 子串匹配)
+    config([
+        'scaffold.config_ui.sensitive_keys' => ['AUTHOR'],
+        'scaffold.author'                   => 'top-secret-author',
+    ]);
+
+    $r = $this->get('/scaffold/config');
+    $r->assertOk();
+
+    // bug 版本:可编辑分支渲染 $f['raw_value'] → value="top-secret-author" 明文进 HTML
+    $r->assertDontSee('top-secret-author');
+    // 掩码串也不能回填:回填 **** 后用户不动直接保存会把真值覆盖成 ****
+    $r->assertDontSee('****');
+    // 改为空白输入 + 占位提示
+    $r->assertSee('留空保持原值');
+});
+
+it('敏感字段留空提交 = 不修改:map 空行不会把已有映射清空(HTTP 层不可替代的路径)', function () {
+    // 为什么必须用 map 而不是标量驱动:
+    //   标量表单提交的 '' / 纯空白会被 Laravel 全局中间件的 TrimStrings + ConvertEmptyStringsToNull
+    //   提前中和成 null,撞上 castValueForField(null) === null 那条**既有**规则直接跳过 ——
+    //   拿标量驱动测的是旧规则、不是本守卫(实测:把守卫打哑,标量版用例照样通过 = 假绿)。
+    //   map 提交的是**数组**:'' 只在元素层被转成 null,顶层仍是数组,既有 null 规则兜不住,
+    //   castValueForField 会返回 [] 并把已有映射整个写掉。
+    $cfgFile = config_path('scaffold.php');
+    $bak     = is_file($cfgFile) ? file_get_contents($cfgFile) : null;
+
+    @unlink(base_path('scaffold/.local/config-env-map.json'));
+    file_put_contents($cfgFile, "<?php\n\nreturn [\n    'hosts' => [\n        '开发' => 'http://wn.test',\n    ],\n];\n");
+    config([
+        'scaffold.config_ui.sensitive_keys' => ['HOSTS'],
+        'scaffold.hosts'                    => ['开发' => 'http://wn.test'],
+    ]);
+
+    try {
+        // 场景:用户点了「+ 添加」却留空(或误操作),然后保存别的字段
+        $r = $this->post('/scaffold/config/hosts', ['fields' => ['hosts' => [
+            'r0'        => ['k' => '', 'v' => ''],
+            '__present' => '1',
+        ]]]);
+        $r->assertRedirect();
+        $r->assertSessionMissing('flash_error');
+        // 守卫命中 → 按"没有变更"处理(不是 skipped 警告,与"值未变"同口径)
+        $r->assertSessionHas('flash_message', '没有变更被写入');
+        $r->assertSessionMissing('flash_skipped');
+        // 打哑守卫的版本:castValueForField → [] → 与 ['开发'=>...] 不等 → 写 hosts => [],映射被清空
+        expect(file_get_contents($cfgFile))->toContain('wn.test');
+    } finally {
+        $bak === null ? @unlink($cfgFile) : file_put_contents($cfgFile, $bak);
+        @unlink(base_path('scaffold/.local/config-env-map.json'));
+    }
+});
+
+it('敏感字段 diff 掩码:改了值也不在 flash 里回显新旧明文', function () {
+    $sandbox = sensitiveSandboxOn();
+    config([
+        'scaffold.config_ui.sensitive_keys' => ['AUTHOR'],
+        'scaffold.author'                   => 'old_author',
+    ]);
+    [, $envFile] = $sandbox;
+
+    try {
+        $r = $this->post('/scaffold/config/basic', ['fields' => ['author' => 'brand-new-secret']]);
+        $r->assertRedirect();
+        $r->assertSessionMissing('flash_error');
+        $r->assertSessionHas('flash_message');
+
+        // 真的写进去了
+        expect(file_get_contents($envFile))->toContain('SCAFFOLD_AUTHOR=brand-new-secret');
+
+        // 但 flash_diff 两侧都得是掩码(config/config.php 的 sensitive_keys 注释
+        // 早写明「env 镜像页 / diff 里需要掩码」,此前只有镜像页实现了)
+        $diff = (string) json_encode(session('flash_diff'), JSON_UNESCAPED_UNICODE);
+        expect($diff)->toContain('****');
+        expect($diff)->not->toContain('brand-new-secret');
+        expect($diff)->not->toContain('old_author');
+    } finally {
+        sensitiveSandboxOff($sandbox);
+    }
+});

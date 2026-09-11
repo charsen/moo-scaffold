@@ -121,8 +121,21 @@
                         <tbody>
                         @foreach ($group['fields'] as $f)
                             @php
-                                $fieldEditable = $editable && in_array($f['type'], ['string', 'int', 'bool', 'text', 'list', 'map'], true);
-                                $inputName = 'fields['.$f['path'].']';
+                                // 2026-09-11 敏感字段不回显明文：原先 6 个可编辑分支全都渲染
+                                // $f['raw_value']（未掩码），而掩码版是 $f['value'] —— 字段一旦命中
+                                // config_ui.sensitive_keys（或显式 sensitive:true），源值就明文进 HTML。
+                                // 现在渲染空白输入 + 占位提示，「留空 = 不修改」（写入侧同口径跳过）。
+                                // 掩码串本身也绝不能回填：用户不动直接保存会把真值覆盖成 ****。
+                                $isSensitive   = (bool) $f['sensitive'];
+                                $fieldEditable = $editable
+                                    && in_array($f['type'], ['string', 'int', 'bool', 'text', 'list', 'map'], true)
+                                    // bool 没有"空"这个表单态（checkbox 必发 0/1，hidden 兜底也发 0），
+                                    // 空白化会把真值写成 false；而布尔本身承载不了秘密 → 退化为只读展示。
+                                    && ! ($isSensitive && $f['type'] === 'bool');
+                                $inputName    = 'fields['.$f['path'].']';
+                                $shownValue   = $isSensitive ? null : $f['raw_value'];
+                                $isConfigured = $f['raw_value'] !== '' && $f['raw_value'] !== null && $f['raw_value'] !== [];
+                                $maskTip      = $isConfigured ? '已配置，留空保持原值' : '未配置';
                             @endphp
                             <tr>
                                 <td>
@@ -134,6 +147,9 @@
                                     @if (! empty($f['desc']))
                                         <div class="p-config-field-desc">{{ $f['desc'] }}</div>
                                     @endif
+                                    @if ($isSensitive)
+                                        <div class="p-config-field-desc">敏感字段：不回显原值，留空表示不修改；要清空请直接编辑源文件 / <code>.env</code>。</div>
+                                    @endif
                                 </td>
                                 <td>
                                     @if (! $fieldEditable)
@@ -144,22 +160,25 @@
                                                 <label class="p-config-bool">
                                                     {{-- hidden 兜底：未勾选时 checkbox 不发字段，靠 hidden 送 0 --}}
                                                     <input type="hidden" name="{{ $inputName }}" value="0">
-                                                    <input type="checkbox" name="{{ $inputName }}" value="1" {{ $f['raw_value'] ? 'checked' : '' }}
+                                                    <input type="checkbox" name="{{ $inputName }}" value="1" {{ $shownValue ? 'checked' : '' }}
                                                         aria-label="{{ $f['label'] }}({{ $f['path'] }})">
                                                     <span>启用</span>
                                                 </label>
                                                 @break
                                             @case('int')
-                                                <input type="number" name="{{ $inputName }}" value="{{ $f['raw_value'] }}" class="p-config-input p-config-input--narrow"
+                                                <input type="number" name="{{ $inputName }}" value="{{ $shownValue }}" class="p-config-input p-config-input--narrow"
+                                                    @if ($isSensitive) placeholder="{{ $maskTip }}" @endif
                                                     aria-label="{{ $f['label'] }}({{ $f['path'] }})">
                                                 @break
                                             @case('list')
-                                                <input type="text" name="{{ $inputName }}" value="{{ is_array($f['raw_value']) ? implode(',', $f['raw_value']) : $f['raw_value'] }}" class="p-config-input" placeholder="逗号分隔"
+                                                <input type="text" name="{{ $inputName }}" value="{{ is_array($shownValue) ? implode(',', $shownValue) : $shownValue }}" class="p-config-input"
+                                                    placeholder="{{ $isSensitive ? $maskTip : '逗号分隔' }}"
                                                     aria-label="{{ $f['label'] }}（{{ $f['path'] }}，逗号分隔）">
                                                 @break
                                             @case('text')
                                                 <textarea name="{{ $inputName }}" rows="3" class="p-config-input"
-                                                    aria-label="{{ $f['label'] }}({{ $f['path'] }})">{{ $f['raw_value'] }}</textarea>
+                                                    @if ($isSensitive) placeholder="{{ $maskTip }}" @endif
+                                                    aria-label="{{ $f['label'] }}({{ $f['path'] }})">{{ $shownValue }}</textarea>
                                                 @break
                                             @case('map')
                                                 {{-- 服务端直接渲染初始行；Alpine 仅用于 add/remove 按钮。
@@ -167,12 +186,12 @@
                                                 <div class="p-config-map-editor"
                                                      data-scaffold-map
                                                      data-map-path="{{ $f['path'] }}"
-                                                     data-map-seq="{{ is_array($f['raw_value']) ? count($f['raw_value']) : 0 }}"
+                                                     data-map-seq="{{ is_array($shownValue) ? count($shownValue) : 0 }}"
                                                      data-map-validator="{{ $f['value_validator'] ?? '' }}"
                                                      data-map-field-label="{{ $f['label'] }}">
                                                     <div class="p-config-map-rows" data-map-rows>
-                                                        @if (is_array($f['raw_value']))
-                                                            @foreach ($f['raw_value'] as $mk => $mv)
+                                                        @if (is_array($shownValue))
+                                                            @foreach ($shownValue as $mk => $mv)
                                                                 @php $rid = 'r'.$loop->index; @endphp
                                                                 @php $isUrl = ($f['value_validator'] ?? null) === 'url'; @endphp
                                                                 <div class="p-config-map-row" data-map-row>
@@ -189,13 +208,18 @@
                                                             @endforeach
                                                         @endif
                                                     </div>
+                                                    @if ($isSensitive)
+                                                        <div class="p-config-field-desc">{{ $maskTip }}；填写新值会整体替换（不回显原有行）。</div>
+                                                    @endif
                                                     <x-scaffold::btn variant="ghost" size="sm" class="p-config-map-add" data-map-add>+ 添加</x-scaffold::btn>
                                                     {{-- 空 map 兜底：行全删光时让服务端知道"用户操作过但留空"--}}
                                                     <input type="hidden" name="fields[{{ $f['path'] }}][__present]" value="1">
                                                 </div>
                                                 @break
                                             @default
-                                                <input type="text" name="{{ $inputName }}" value="{{ $f['raw_value'] }}" class="p-config-input"
+                                                {{-- 敏感 string 用 password 型：输入新值时也不明文上屏（同 config/ai.blade.php 的 API Key） --}}
+                                                <input type="{{ $isSensitive ? 'password' : 'text' }}" name="{{ $inputName }}" value="{{ $shownValue }}" class="p-config-input"
+                                                    @if ($isSensitive) placeholder="{{ $maskTip }}" autocomplete="new-password" @endif
                                                     aria-label="{{ $f['label'] }}({{ $f['path'] }})">
                                         @endswitch
                                     @endif
