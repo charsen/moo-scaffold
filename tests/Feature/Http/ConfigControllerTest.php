@@ -297,8 +297,12 @@ it('敏感字段不回显明文:GET /scaffold/config 里既无真值、也无掩
 
     // bug 版本:可编辑分支渲染 $f['raw_value'] → value="top-secret-author" 明文进 HTML
     $r->assertDontSee('top-secret-author');
-    // 掩码串也不能回填:回填 **** 后用户不动直接保存会把真值覆盖成 ****
-    $r->assertDontSee('****');
+    // 掩码串也不能回填进输入控件:回填 **** 后用户不动直接保存会把真值覆盖成 ****。
+    // 注意「默认值」列按 2026-09-11 的口径**有意**渲染 <code>****</code>（NOTES「三处现均掩码」），
+    // 所以这里只断输入控件，不做「整页无 ****」的全页断言 —— 全页断言会把有意的掩码当成 bug。
+    $r->assertDontSee('value="****"');
+    // 反向锚点:默认值列仍按口径掩码,避免有人把上面那条读成「要清掉页面上所有 ****」
+    $r->assertSee('<code>****</code>', false);
     // 改为空白输入 + 占位提示
     $r->assertSee('留空保持原值');
 });
