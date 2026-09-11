@@ -49,8 +49,41 @@ it('member 改 accounts(POST delete)→ 403', function () {
     expect(runAdminOnly($this->mw, '/scaffold/accounts/x/delete', 'POST', 'dev')->getStatusCode())->toBe(403);
 });
 
-it('member 访问非 accounts 路径放行(只锁人员管理)', function () {
+it('member 访问非 accounts / config 路径放行(不误伤其它模块)', function () {
     expect(runAdminOnly($this->mw, '/scaffold/db/designer/Demo', 'GET', 'dev')->getStatusCode())->toBe(200);
+});
+
+// ─── 配置写权限(2026-09-11)─────────────────────────────────────────────────
+// 依据 docs/overview.md 的角色表「admin 可改任何账号 / 配置 / member 仅自管资料」。
+// 这条缺口有实际后果:`scaffold.hosts` 是 /scaffold/api/proxy 的 **SSRF 白名单来源**,
+// member 能改它 = 能把任意 origin 塞进白名单再打出去 —— 改白名单的权限不该和用白名单同低。
+
+it('member 改配置(POST /config/hosts)→ 403(不能扩 SSRF 白名单)', function () {
+    expect(runAdminOnly($this->mw, '/scaffold/config/hosts', 'POST', 'dev')->getStatusCode())->toBe(403);
+});
+
+it('member 改 AI 配置(POST /config/ai)→ 403', function () {
+    expect(runAdminOnly($this->mw, '/scaffold/config/ai', 'POST', 'dev')->getStatusCode())->toBe(403);
+});
+
+it('admin 改配置(POST /config/hosts)放行', function () {
+    expect(runAdminOnly($this->mw, '/scaffold/config/hosts', 'POST', 'boss')->getStatusCode())->toBe(200);
+});
+
+it('member 读配置(GET /config)放行 —— 只拦写,页面只读且敏感字段已掩码', function () {
+    expect(runAdminOnly($this->mw, '/scaffold/config', 'GET', 'dev')->getStatusCode())->toBe(200);
+    expect(runAdminOnly($this->mw, '/scaffold/config/env', 'GET', 'dev')->getStatusCode())->toBe(200);
+});
+
+it('非写方法不被当成"写"拦掉(HEAD 属 safe method)', function () {
+    expect(runAdminOnly($this->mw, '/scaffold/config/basic', 'HEAD', 'dev')->getStatusCode())->toBe(200);
+});
+
+it('config 写拦截也跟随自定义 route prefix', function () {
+    config(['scaffold.route.prefix' => 'devtools']);
+    expect(runAdminOnly($this->mw, '/devtools/config/hosts', 'POST', 'dev')->getStatusCode())->toBe(403);
+    // 原前缀不再受限(证明是按配置前缀匹配,不是硬编码)
+    expect(runAdminOnly($this->mw, '/scaffold/config/hosts', 'POST', 'dev')->getStatusCode())->toBe(200);
 });
 
 it('auth 关 / 无 user → 放行(单用户/开放模式)', function () {
