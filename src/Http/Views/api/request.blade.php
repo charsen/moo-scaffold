@@ -205,7 +205,10 @@
     window.ScaffoldConfig = Object.assign(window.ScaffoldConfig || {}, {
         apiCache:  '{{ route('api.cache', [], false) }}',
         apiProxy:  '{{ route('api.proxy', [], false) }}',
-        apiParam:  '{{ route('api.param', [], false) }}'
+        apiParam:  '{{ route('api.param', [], false) }}',
+        // 表单预览可识别的 widget type —— 单一来源 Support\FormWidgetTypes::detectable()，
+        // 不再由 pages/api-request.js 内联维护（2026-09-11 收口）。
+        knownWidgetTypes: @json(\Mooeen\Scaffold\Support\FormWidgetTypes::detectable())
     });
 
     // 所有 jQuery $.ajax 自动带 CSRF token——apiProxy / apiCache / apiRecord 都在 scaffold 的 VerifyCsrfToken 组里
