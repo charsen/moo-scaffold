@@ -3,6 +3,10 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-11，**历史脱敏的边界 + 一处判断更正**：本轮那 15 个未推送 commit 里的宿主名 / 域名 / 绝对路径已用 `git filter-branch`（限定 `origin/master..master`）就地脱敏 —— 改写后**最终文件内容一字未变**（`git diff <旧 sha> master` 为空）、commit 数不变（15）、工作区干净，且**正常 `git push` 即可**（`origin/master` 是新 master 的祖先，远程是快进，**不需要强推**）。动手前已整仓备份 `.git`（48M → `/tmp`）。
+  **更正**：起初只按「文件内容」搜（`git log -S<串>`）得出"含内部名的只有 3 个 commit、且全未推送"。这个结论**不完整** —— `-S` **只搜内容 diff，不搜 commit message**。补搜 message 后发现另有 **6 个 commit 的 message 里也含该宿主名**，而且它们**早已随 `2.1.10` / `2.1.11` / `2.1.12` 三个 tag 发布到两个远程**（`master` 与 `dev` 都在）。
+  清那 6 条要 rewrite **已发布**历史 + 强推 2 个远程 + **重打 tag**（tag 不可变、下游可能按 tag 取包），代价与风险远超收益 —— **决定不清**，仅记录在此。
+  **教训（值得复用）**：查"某串有没有进过历史"要**两条腿**走 —— `git log -S<串>` 查**文件内容**，`git log --all --grep=<串>` 查 **commit message**；只查一种会得出"历史很干净"的错误结论。想一次穷尽可用 `git cat-file --batch-all-objects --batch` 按对象类型遍历（message 属 commit 对象、**不在 blob 里**，所以按 blob 扫描同样会漏）。
 - 2026-09-11，**更正先前结论**：那 7 条 e2e 失败**并非都「与本仓代码无关」**—— 其中 4 条是 **spec 自身缺陷**（跟宿主无关，在任何宿主上都错），只有 3 条属宿主数据绑定。现已全部转绿：某本地宿主上 `40 passed / 7 failed / 7 skipped` → **`47 passed / 0 failed / 7 skipped`**。分类与改法：
   **A. spec 自身缺陷（改了对任何宿主都受益）**
   - **sidebar 链接定位**：链接的可访问名是「1. platform_regions 12」（序号 + key + 字段数三个 span 拼成），拿 `getByRole('link', { name: /^<key>/ })` 去匹配**永远失配** —— 而失败形态是 30s 超时，看着像后端慢。修：视图给 `<a>` 加 `data-table-key`，spec 改按该属性定位。
