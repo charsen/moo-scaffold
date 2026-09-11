@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/banner.jpg" alt="moo-scaffold · Schema 驱动代码生成" width="100%" />
+</p>
+
 # moo-scaffold
 
 > **Laravel 后端代码生成器 + 开发辅助后台。** 写一份 YAML,一条命令生成全套能直接跑的后端代码;再附一个「开发期可写、生产只读」的 `/scaffold` 开发后台。
