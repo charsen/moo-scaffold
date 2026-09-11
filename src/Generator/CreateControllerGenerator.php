@@ -16,6 +16,7 @@ use Mooeen\Scaffold\Foundation\FormRequest;
 use Mooeen\Scaffold\Rules\Mobile;
 use Mooeen\Scaffold\Rules\NumericArray;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
+use Mooeen\Scaffold\Support\FieldName;
 use Mooeen\Scaffold\Utility;
 
 use function in_array;
@@ -657,7 +658,7 @@ class CreateControllerGenerator extends Generator
             }
 
             if (isset($enums[$field_name])) {
-                $enum_class            = str_replace(' ', '', ucwords(str_replace('_', ' ', $field_name)));
+                $enum_class            = FieldName::studly((string) $field_name);
                 $rules['enum_class'][] = $enum_class;
                 // plan-40 §二 F8 P1 防御纵深:field_name 已经 SchemaLoader 严校 `^[a-z][a-z0-9_]*$`,
                 // 双层保护下 caller 也 escape,跟 CreateModelGenerator C-6 修法对齐
@@ -757,7 +758,7 @@ class CreateControllerGenerator extends Generator
         $fields = array_filter(
             $fields,
             static function ($meta, string $name) use ($excluded, $excluded_types): bool {
-                if (Str::startsWith($name, '_') || str_contains($name, 'password') || in_array($name, $excluded, true)) {
+                if (FieldName::isHidden((string) $name) || in_array($name, $excluded, true)) {
                     return false;
                 }
                 $type = is_array($meta) ? ($meta['type'] ?? null) : null;
@@ -791,7 +792,7 @@ class CreateControllerGenerator extends Generator
         $fields = array_keys($fields);
         $res    = [];
         foreach ($fields as $value) {
-            if (Str::startsWith($value, '_') or str_contains($value, 'password')) { // 去掉隐藏字段
+            if (FieldName::isHidden((string) $value)) { // 去掉隐藏字段
                 continue;
             }
             $res[] = "'{$value}'";

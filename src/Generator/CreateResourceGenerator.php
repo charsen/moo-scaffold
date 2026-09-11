@@ -11,8 +11,8 @@
 namespace Mooeen\Scaffold\Generator;
 
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
-use Illuminate\Support\Str;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
+use Mooeen\Scaffold\Support\FieldName;
 
 class CreateResourceGenerator extends Generator
 {
@@ -188,7 +188,7 @@ class CreateResourceGenerator extends Generator
         $code   = [];
 
         foreach ($fields as $field_name => $attr) {
-            if (Str::startsWith($field_name, '_') or str_contains($field_name, 'password')) {
+            if (FieldName::isHidden((string) $field_name)) {
                 continue;
             }
 
