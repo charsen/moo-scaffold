@@ -33,12 +33,27 @@ POST 在以下任一情况被拒(403 + flash),`EnforceScaffoldWritable` 中间�
 
 1. **`APP_ENV=production`** — 生产一律只读。
 2. **`SCAFFOLD_CONFIG_READONLY=true`** — 强制只读总开关(local 也只读)。
+3. **登录角色** — 配置**写**仅 admin(`EnforceAdminOnly`),`member` 提交任何分组都 403。
+   页面 `GET` 不拦:只读、敏感字段已掩码。为什么单独把配置的写权限收紧:配置里的
+   `scaffold.hosts` 同时是接口调试代理的 **SSRF 白名单来源**(`/scaffold/api/proxy`),
+   改白名单的权限不该和用白名单的权限一样低。角色口径见 [12-security.md](12-security.md) 与
+   `docs/overview.md` 的角色表。
 
 页面顶部显示当前状态(可编辑 / 强制只读 / 生产·只读)。详见 [12-security.md](12-security.md)。
 
 ## 敏感字段
 
-`config_ui.sensitive_keys`(默认 `['PASSWORD', 'SECRET', 'KEY', 'TOKEN']`)按子串匹配 env 名,命中即认定 `sensitive`;也可在字段定义里显式写 `'sensitive' => true`。标了 `sensitive` 的字段在表单和 env 镜像页自动掩码,点"显示"才看明文。
+`config_ui.sensitive_keys`(默认 `['PASSWORD', 'SECRET', 'KEY', 'TOKEN']`)做**子串匹配**:字段表单里比字段 `path`,`/scaffold/config/env` 镜像页里比 env key;也可在字段定义里显式写 `'sensitive' => true`。
+
+标了 `sensitive` 的字段**源值永不进浏览器**(2026-09-11 收口,此前表单的可编辑分支直接回显未掩码值):
+
+- 表单渲染**空白输入** + 占位「已配置,留空保持原值 / 未配置」,`string` 用 `password` 型控件;
+  当前值 / 默认值 / 保存后的 diff 一律显示 `****`,env 镜像页同样掩码。
+- **留空 = 不修改**:写入侧对敏感字段的空白提交直接跳过,所以「改了同组别的字段顺手保存」不会把敏感值清空。
+- 要改就填新值;要**清空**只能直接编辑源文件 / `.env`。
+- `bool` 类型例外:布尔没有「空」这个表单态(checkbox 必发 `0`/`1`,hidden 兜底也发 `0`),
+  空白化会把真值写成 `false`,而布尔本身也承载不了秘密 → 敏感 `bool` 退化为只读展示。
+- **没有「点显示看明文」这回事** —— 明文只存在于源文件里,不在 HTML 里。
 
 ## `.env` 镜像页
 

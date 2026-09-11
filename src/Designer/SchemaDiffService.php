@@ -3,6 +3,7 @@
 namespace Mooeen\Scaffold\Designer;
 
 use Illuminate\Support\Facades\Schema;
+use Mooeen\Scaffold\Support\FieldTypes;
 
 /**
  * Compute YAML diff between working-tree YAML and last-captured snapshot.

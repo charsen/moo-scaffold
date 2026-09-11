@@ -16,6 +16,7 @@ use Illuminate\Routing\Router;
 use Mooeen\Scaffold\Designer\EmptyDiffException;
 use Mooeen\Scaffold\Designer\MigrationWriter;
 use Mooeen\Scaffold\Designer\SchemaDiffService;
+use Mooeen\Scaffold\Designer\SnapshotStore;
 use Mooeen\Scaffold\Generator\CreateApiGenerator;
 use Mooeen\Scaffold\Generator\CreateControllerGenerator;
 use Mooeen\Scaffold\Generator\CreateModelGenerator;
@@ -246,6 +247,12 @@ class FreeCommand extends Command
         $this->console()->info(count($files) . ' 个 migration 文件已生成');
         foreach ($files as $f) {
             $this->line('  + ' . $f);
+        }
+
+        // 2026-09-11:同 CreateMigrationCommand —— baseline 没推进时 migration 已落盘但
+        // 下次 preview 会重报本次变更,必须让用户知道,否则再生成一次就是重复 migration。
+        if ($note = SnapshotStore::baselineNote($result['baseline'] ?? [])) {
+            $this->console()->warn($note);
         }
 
         return count($files);

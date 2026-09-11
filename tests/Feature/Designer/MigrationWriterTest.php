@@ -574,9 +574,17 @@ class SpySnapshotStore extends SnapshotStore
         $this->captureCalls[] = $schema;
     }
 
-    public function captureTables(string $schema, array $tableKeys): void
+    /**
+     * 2026-09-11：签名跟 SnapshotStore::captureTables 一起从 void 改成 array —— PHP 不允许
+     * 子类把返回类型收窄回 void。`$captureTablesResult` 让用例能模拟"baseline 没推进"。
+     */
+    public array $captureTablesResult = ['advanced' => true, 'rebuilt_from_scratch' => false, 'reason' => null];
+
+    public function captureTables(string $schema, array $tableKeys): array
     {
         $this->captureTablesCalls[] = ['schema' => $schema, 'tables' => $tableKeys];
+
+        return $this->captureTablesResult;
     }
 }
 
@@ -614,6 +622,10 @@ it('write() captures only rendered tables via captureTables (P1-5)', function ()
         expect($result)->toHaveKey('files_written');
         expect($result)->not->toHaveKey('git_committed');     // plan 39 砍
         expect($result)->not->toHaveKey('commit_sha');        // plan 39 砍
+        // 2026-09-11：baseline 状态必须透出 —— 原先 captureTables 是 void，write() 只回
+        // files_written，于是「migration 已落盘但 baseline 没推进」这件事四个消费方都看不到。
+        expect($result)->toHaveKey('baseline');
+        expect($result['baseline']['advanced'])->toBeTrue();
 
         expect($spy->captureTablesCalls)->toHaveCount(1);
         expect($spy->captureTablesCalls[0]['schema'])->toBe('Demo');
@@ -627,6 +639,64 @@ it('write() captures only rendered tables via captureTables (P1-5)', function ()
         @rmdir($tempDir . '/migrations');
         @rmdir($tempDir);
     }
+});
+
+// ─── 2026-09-11:baseline 未推进的可见化（原先 write() 只回 files_written）───────
+
+it('write() 透出未推进的 baseline，baselineNote 给出用户可读提示', function () {
+    $spy                      = new SpySnapshotStore(app(Filesystem::class));
+    $spy->captureTablesResult = [
+        'advanced'             => false,
+        'rebuilt_from_scratch' => false,
+        'reason'               => '源 schema yaml 解析失败，baseline 未推进（migration 文件已落盘）。',
+    ];
+    app()->instance(SnapshotStore::class, $spy);
+    $writer = app()->make(MigrationWriter::class);
+
+    $tempDir = sys_get_temp_dir() . '/p15b_test_' . uniqid();
+    mkdir($tempDir, 0755, true);
+    app()->useDatabasePath($tempDir);
+
+    try {
+        $fakeDiff = [
+            'schema'   => 'Demo',
+            'is_empty' => false,
+            'tables'   => [
+                'demo_a' => [
+                    'status'              => 'updated',
+                    'baseline_definition' => ['fields' => [], 'index' => []],
+                    'current_definition'  => ['fields' => [], 'index' => []],
+                    'field_changes'       => [['op' => 'add', 'field' => 'x', 'definition' => ['type' => 'varchar', 'size' => 32]]],
+                    'index_changes'       => [],
+                    'warnings'            => [],
+                ],
+            ],
+        ];
+
+        $result = $writer->write($fakeDiff);
+
+        // migration 文件照常写出来了 —— 这正是"不能只报失败"的原因：盘上已经有文件
+        expect($result['files_written'])->not->toBeEmpty();
+        // 但 baseline 状态必须透出，否则调用方一路报成功
+        expect($result['baseline']['advanced'])->toBeFalse();
+        expect(SnapshotStore::baselineNote($result['baseline']))
+            ->toStartWith('⚠ ')->toContain('baseline 未推进');
+    } finally {
+        foreach (glob($tempDir . '/migrations/*.php') ?: [] as $f) {
+            @unlink($f);
+        }
+        @rmdir($tempDir . '/migrations');
+        @rmdir($tempDir);
+    }
+});
+
+it('baselineNote：正常状态返回空串（前端据此不弹提示）', function () {
+    expect(SnapshotStore::baselineNote(['advanced' => true, 'rebuilt_from_scratch' => false, 'reason' => null]))->toBe('');
+    // 老调用方可能传空数组（键缺失）→ 也必须安全返回空串
+    expect(SnapshotStore::baselineNote([]))->toBe('');
+    expect(SnapshotStore::baselineNote(['reason' => '']))->toBe('');
+    // 有原因时必须带上 ⚠ 前缀
+    expect(SnapshotStore::baselineNote(['reason' => '快照损坏']))->toBe('⚠ 快照损坏');
 });
 
 // ─── plan-40 §三 R-6:atomic claim — fopen('xb') 防 web+CLI 同分钟撞 filename ─────

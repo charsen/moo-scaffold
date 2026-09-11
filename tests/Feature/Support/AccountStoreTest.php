@@ -107,3 +107,47 @@ it('isAdmin: admin → true,member → false,不存在 → false', function () {
     expect($this->store->isAdmin('dev'))->toBeFalse();
     expect($this->store->isAdmin('ghost'))->toBeFalse();
 });
+
+// ─── 2026-09-11 读降级:accounts.yaml 坏形不得 500 掉整条鉴权链路 ────────────────
+// ScaffoldAuthenticate 每个受保护请求都走 load();裸 parse 抛异常 = 整站 500,
+// 而修复入口 /scaffold/accounts 本身在鉴权之后 → 面板彻底锁死,只能上磁盘改文件。
+// 口径对齐 AiSettingStore::load():解析失败记 warning 并降级为空集。
+
+it('load() 在 yaml 用 tab 缩进(手改常见坏形)时降级为空集而不抛', function () {
+    // 坏文件写盘后必须绕过 store 自己的写路径(tab 缩进是 Symfony YAML 硬拒的)
+    file_put_contents(base_path('accounts.yaml'), "accounts:\n\talice: {role: admin}\n");
+
+    expect($this->store->load())->toBe(['meta' => [], 'accounts' => []]);
+});
+
+it('load() 在 yaml 流式括号未闭合时降级为空集而不抛', function () {
+    file_put_contents(base_path('accounts.yaml'), "accounts:\n  alice: {role: admin\n");
+
+    expect($this->store->load())->toBe(['meta' => [], 'accounts' => []]);
+});
+
+it('load() 在根节点是标量时降级为空集(不在字符串上取下标)', function () {
+    file_put_contents(base_path('accounts.yaml'), "just-a-plain-string\n");
+
+    expect($this->store->load())->toBe(['meta' => [], 'accounts' => []]);
+});
+
+it('损坏文件下 find/listEnabled/isAdmin/canDesignDb 均不抛(鉴权链路不 500)', function () {
+    file_put_contents(base_path('accounts.yaml'), "accounts:\n\tbroken: yes\n");
+
+    expect($this->store->find('anyone'))->toBeNull();
+    expect($this->store->all())->toBe([]);
+    expect($this->store->listEnabled())->toBe([]);
+    expect($this->store->isAdmin('anyone'))->toBeFalse();
+    expect($this->store->canDesignDb('anyone'))->toBeFalse();
+    expect($this->store->meta())->toBe([]);
+});
+
+it('文件不存在与文件损坏两种"没账号"状态返回同一形状(调用方无需分支)', function () {
+    $missing = $this->store->load();   // sandbox 里还没有 accounts.yaml
+
+    file_put_contents(base_path('accounts.yaml'), "accounts:\n\tbroken: yes\n");
+    $broken = $this->store->load();
+
+    expect($broken)->toBe($missing);
+});

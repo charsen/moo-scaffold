@@ -3,6 +3,7 @@
 namespace Mooeen\Scaffold\Designer;
 
 use Illuminate\Filesystem\Filesystem;
+use Mooeen\Scaffold\Support\FieldTypes;
 
 /**
  * Render & write Laravel migrations from a SchemaDiffService::diff() result.
@@ -75,7 +76,11 @@ class MigrationWriter
      * Plan 39:GUI 不再做 git commit — 只生成 migration 文件 + 推进 baseline 快照。
      * git add / commit 由开发者手动组合 yaml + migration 一起提交。
      *
-     * @return array{files_written:string[]}
+     * `baseline.advanced=false` 表示 migration 已落盘但 baseline **没**推进。调用方**必须**把
+     * `baseline.reason` 回报给用户（用 `SnapshotStore::baselineNote()` 格式化）—— 否则用户会以为
+     * 一切正常，而下次预览会重报本次变更、再点一次生成就产出重复 migration。
+     *
+     * @return array{files_written:string[], baseline:array{advanced:bool, rebuilt_from_scratch:bool, reason:?string}}
      */
     public function write(array $diff): array
     {
@@ -108,10 +113,14 @@ class MigrationWriter
 
         // Plan 36 Round 2:只把本次写过 migration 的表更新进 baseline,
         // 避免 only_table 时把其它表未 migrate 的修改吃进 baseline。
-        $this->snapshot->captureTables((string) $diff['schema'], array_keys($rendered));
+        // 2026-09-11:captureTables 现在返回状态(不再 void) —— 它内部对"源 yaml 解析失败 /
+        // 快照写失败"是 log 不抛(刻意,见 SnapshotStore 注释),原先调用方无从得知,于是一路
+        // 向用户报成功。这里把状态透出去,由各调用方给用户可见提示。
+        $baseline = $this->snapshot->captureTables((string) $diff['schema'], array_keys($rendered));
 
         return [
             'files_written' => $filesWritten,
+            'baseline'      => $baseline,
         ];
     }
 

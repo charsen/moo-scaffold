@@ -74,6 +74,60 @@ it('POST /scaffold/api/proxy 非白名单 origin → _proxy_status=403(拒绝出
     expect($r->json('_proxy_status'))->toBe(403);
 });
 
+// ─── hosts 为空时的兜底：不信任 Host 头(2026-09-11)────────────────────────────
+// 原实现在 hosts 为空时用 `$req->getScheme()/getHost()/getPort()` 兜底 —— 那是**请求头**、
+// 攻击者可控：带 `Host: evil.internal` 就能让"白名单"恰好等于攻击者指定的 origin，
+// 代理退化成任意出网跳板。现改为 config('app.url') 同源兜底，拿不到就不允许任何目标。
+
+it('hosts 为空 + 目标不是 app.url 声明的同源 → 403(不因"这就是访问我的 Host"而放行)', function () {
+    // 决定性判据：app.url 声明的是 panel.test，而测试请求实际打在 localhost 上，
+    // 目标取 localhost —— 也就是"请求自己的 host"。
+    //   旧兜底(信任 Host 头/请求 host) → 视 localhost 为同源 → 放行(测试会失败)
+    //   新兜底(信任 app.url)          → 白名单里只有 panel.test → 403
+    config(['scaffold.hosts' => [], 'app.url' => 'http://panel.test']);
+    Http::fake(['*' => Http::response(['leaked' => 1], 200)]);
+
+    // ⚠ 别试图用 headers/serverVariables 伪造 Host 来构造这个用例：Laravel 测试客户端把 headers
+    // 交给 Symfony Request::create，而 HTTP_HOST 会被 URI 的 host 覆盖 → $req->getHost() 永远
+    // 是 localhost，用例会**假绿**（实测：旧兜底还在时它照样通过，withServerVariables 也一样）。
+    // 所以判据取"app.url 与请求 host 不同"这个可控变量。
+    $r = $this->postJson('/scaffold/api/proxy', [
+        '_proxy_url'    => 'http://localhost/steal',
+        '_proxy_method' => 'GET',
+    ]);
+
+    $r->assertOk();
+    expect($r->json('_proxy_status'))->toBe(403);
+    expect($r->json('leaked'))->toBeNull();            // 绝不该真发出去
+    Http::assertNothingSent();
+});
+
+it('hosts 为空 + 目标与 app.url 同源 → 放行(保留开发便利，但走配置而非请求头)', function () {
+    config(['scaffold.hosts' => [], 'app.url' => 'http://localhost']);
+    Http::fake(['localhost/*' => Http::response(['ok' => 1], 200)]);
+
+    $r = $this->postJson('/scaffold/api/proxy', [
+        '_proxy_url'    => 'http://localhost/api/ping',
+        '_proxy_method' => 'GET',
+    ]);
+
+    $r->assertOk();
+    expect($r->json('_proxy_status'))->toBe(200);
+    expect($r->json('ok'))->toBe(1);
+});
+
+it('hosts 为空 + app.url 也为空 → 一律 403(宁可白名单空着,不拿请求头兜底)', function () {
+    config(['scaffold.hosts' => [], 'app.url' => '']);
+
+    $r = $this->postJson('/scaffold/api/proxy', [
+        '_proxy_url'    => 'http://localhost/api/ping',
+        '_proxy_method' => 'GET',
+    ]);
+
+    $r->assertOk();
+    expect($r->json('_proxy_status'))->toBe(403);
+});
+
 it('POST /scaffold/api/proxy 非法 scheme(file://)→ url 校验 422 / 403', function () {
     // 'url' 校验规则先拦非 http(s);若放过则 isAllowedProxyUrl 的 scheme 白名单兜底 403
     $r = $this->postJson('/scaffold/api/proxy', [
