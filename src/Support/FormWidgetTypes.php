@@ -3,7 +3,7 @@
 namespace Mooeen\Scaffold\Support;
 
 /**
- * 表单控件类型词表（2026-09-11 收口）。
+ * 表单控件类型词表 + 规则反推（2026-09-11 收口）。
  *
  * 背景：接口调试器的 `public/javascript/pages/api-request.js` 曾内联一份
  * `KNOWN_WIDGET_TYPES`，注释写明“对齐下游 admin 前端 former/config.ts”，实际只能靠人工
@@ -21,7 +21,11 @@ namespace Mooeen\Scaffold\Support;
  * - `date` / `cropper-image` 只在 `DEBUGGER_RENDERABLE`：历史 / 误用 type，下游注册表没有；
  *   留在可识别集合里，避免老 host 下发的字段让整张表单预览消失。
  *
- * 约定：新增类型改这里，不再改 JS。检测口径用 `detectable()`。
+ * 本类同时承载**规则 → 控件类型**的反推（`infer()`）：它是类型口径的方向之一，与词表同源，
+ * 不再散在 `Foundation\FormRequest` 里。反向（type → 校验规则）由消费方（如动态字段小应用）
+ * 按自己的字段类型登记产出，本类不预置。
+ *
+ * 约定：新增类型改这里，不再改 JS；反推规则也只在这里加。
  */
 final class FormWidgetTypes
 {
@@ -52,5 +56,31 @@ final class FormWidgetTypes
     public static function detectable(): array
     {
         return array_values(array_unique([...self::FORMER, ...self::DEBUGGER_RENDERABLE]));
+    }
+
+    /**
+     * 从验证规则反推控件类型（2026-09-11 从 `FormRequest::formatFormConfig` 原样搬来，逐字节保持）。
+     *
+     * 现状语义：
+     * - 规则里含精确字符串 `date` ⇒ `date-picker`（**优先于** password —— 原来就是 elseif 顺序）；
+     * - 否则字段名含 `password` ⇒ `password`；
+     * - 都不命中 ⇒ `null`，调用方**不写 `type` 键**（`input` 是 `FormWidgetCollection::toArray` 后补的）。
+     *
+     * 不在这里判断 `options()` 命中的 `radio`：那是「业务提供了选项集」的语义，由调用方在拿到
+     * 本方法结果后**无条件覆盖**，不属于类型反推。
+     *
+     * @param array<int|string, mixed> $rules 单个字段的验证规则数组
+     */
+    public static function infer(array $rules, string $field): ?string
+    {
+        if (in_array('date', $rules, true)) {
+            return 'date-picker';
+        }
+
+        if (str_contains($field, 'password')) {
+            return 'password';
+        }
+
+        return null;
     }
 }

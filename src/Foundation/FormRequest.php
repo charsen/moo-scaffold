@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 use Mooeen\Scaffold\Exceptions\FormLayoutException;
+use Mooeen\Scaffold\Support\FormFrontendRules;
+use Mooeen\Scaffold\Support\FormWidgetTypes;
 
 class FormRequest extends BaseFormRequest
 {
@@ -131,7 +133,7 @@ class FormRequest extends BaseFormRequest
     public function getFormConfig(array $reset = [], array $exclude = [], bool $with_default = false): array
     {
         $rules          = $this->rules();
-        $frontend_rules = $this->getFrontendRules($rules);
+        $frontend_rules = FormFrontendRules::fromRules($rules);
 
         return $this->formatFormConfig($rules, $frontend_rules, $reset, $exclude, $with_default);
     }
@@ -193,44 +195,6 @@ class FormRequest extends BaseFormRequest
     }
 
     /**
-     * 转换成前端验证规则
-     */
-    private function getFrontendRules(array $all_rules): array
-    {
-        if (empty($all_rules)) {
-            return [];
-        }
-
-        // 若是给提前端提供验证规则，去掉 unique 规则
-        $frontend_rules = [];
-
-        foreach ($all_rules as $field_name => $rules) {
-            // 对 .* 规则的特殊处理
-            $is_wildcard = str_contains($field_name, '.*');
-            $field       = $is_wildcard ? str_replace('.*', '', $field_name) : $field_name;
-
-            // 父字段存在时，子项规则只约束数组元素，不能套到聚合控件本身。
-            if ($is_wildcard && array_key_exists($field, $all_rules)) {
-                continue;
-            }
-
-            foreach ($rules as $k => $rule) {
-                if (! is_string($rule) || str_contains($rule, '$this->get') || str_contains($rule, 'exists:')) {
-                    continue;
-                }
-
-                $key     = preg_replace('/\:.+/i', '', $rule);
-                $message = $key === 'nullable' ? '' : __('validation.' . $key);
-                $message = str_replace(':attribute', __('validation.attributes.' . $field), $message);
-
-                $frontend_rules[$field][] = ['rule' => $rule, 'msg' => is_array($message) ? $message['string'] : $message];
-            }
-        }
-
-        return $frontend_rules;
-    }
-
-    /**
      * 根据验证规则转换成表单控件
      */
     private function formatFormConfig(array $all_rules, array $frontend_rules, array $reset, array $exclude, bool $with_default): array
@@ -281,10 +245,9 @@ class FormRequest extends BaseFormRequest
 
             // 通过字段类型指定 控件类型
             // https://learnku.com/docs/laravel/10.x/validation/14856#189a36
-            if (in_array('date', $rules, true)) {
-                $tmp['type'] = 'date-picker';
-            } elseif (str_contains($field, 'password')) {
-                $tmp['type'] = 'password';
+            // 反推口径（date 优先 password、无命中不写 type）收口在 Support\FormWidgetTypes::infer()
+            if (($inferred_type = FormWidgetTypes::infer($rules, $field)) !== null) {
+                $tmp['type'] = $inferred_type;
             }
 
             // model enum 字段处理, options() 是在业务的 FormRequest 中定义的
