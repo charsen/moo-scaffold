@@ -18,16 +18,18 @@
   **验证**：`designer.spec` 单跑 41 passed / 0 failed；`api-request + cloud + db-docs + designer` 子集 44 / 0；完整套件 **47 / 0**。**原宿主未实测**（本机没建它的库），判「无回归」的依据是「默认值逐项保留 + 定位方式在其字段顺序下等价」+ 上述三次跑。
 - 2026-09-11，**「创建表 / 删表」两条 e2e 会在宿主 `database/migrations/` 生成 migration** —— 来源不是测试点错按钮，而是它们的**清理步骤**调 `DELETE .../tables/<key>`，而后端 `deleteTable` 会**对整个 schema 做 diff 并生成 migration**（设计如此：删表要出 migration）。产出的文件名对应**宿主 yaml 与 baseline 的既有差异**，与代码改动无关，但必须清：`test:e2e:safe` 会清当次的；**直连 `test:e2e` 则不清**，而且这类残留会被**下一次 safe 跑当成「宿主原有未跟踪文件」而保留 → 永久累积**（实测漏出 3 个）。跑完一律 `git -C <宿主仓> status --short --untracked-files=all` 核对到干净。
   **连带一条诊断经验**：同一套件两轮「一次有残留、一次没有」不是抖动 —— 前一环「创建表 POST」超时中断就没走到 DELETE 清理，通过了才会走到。查残留先看上游成功与否。
-- 2026-09-11，**本机可跑 e2e 的宿主是 `H1`**（`http://H1`），不是 LLE：LLE 虽是这套 spec 的原生宿主（`designer.spec` 的 schema 默认值取自它），但本机**没建它的库**（`/scaffold/login` 直接 500 `Unknown database 'DB_NAME'`）。H1 三个前置都天然满足：`vendor/charsen/moo-scaffold` 是**指向本仓的软链**、`public/vendor/scaffold` 已发布（且被 gitignore）、有可用账号 + DB 正常。
-  推荐跑法（`E2E_API_SCHEMAS_CSV` 要按宿主实际 schema 覆盖，默认值是 LLE 的）：
+- 2026-09-11，**本机可跑 e2e 的宿主**（下文代号 **H1**）与**这套 spec 的原生 fixture 宿主**（代号 **H2**）是两个不同项目，别混：H2 是 `designer.spec` 默认值的来源，但本机**没建它的库**（`/scaffold/login` 直接 500 `Unknown database '<db>'`）。H1 三个前置天然满足：`vendor/charsen/moo-scaffold` 是**指向本仓的软链**、`public/vendor/scaffold` 已发布（且被 gitignore）、有可用账号 + DB 正常。
+  （代号 ↔ 真实宿主的对照记在本地私有 skill `moo-scaffold-optimize` 里，不写进本仓。）
+  推荐跑法（两个 CSV 都要按宿主实际 schema 覆盖，默认值是 H2 的）：
   ```bash
-  E2E_BASE_URL=http://H1 \
-  E2E_HOST_SCAFFOLD_DB_PATH=/path/to/H1/engine/scaffold/database \
-  E2E_API_SCHEMAS_CSV='Laravel,Platform,Tagging,Crm,Finance,Market,Perform,Property,Solution,WorkItem' \
-  no_proxy='H1,localhost,127.0.0.1' npm run test:e2e:safe
+  E2E_BASE_URL=http://<H1> \
+  E2E_HOST_SCAFFOLD_DB_PATH=/path/to/<H1>/engine/scaffold/database \
+  E2E_SCHEMAS_CSV='<H1 的 schema key，逗号分隔>' \
+  E2E_API_SCHEMAS_CSV='<H1 里可只读预览的 schema，逗号分隔>' \
+  no_proxy='<H1 的域名>,localhost,127.0.0.1' npm run test:e2e:safe
   ```
   （本机有 HTTP 代理，脚本外的 `curl` 探测本地端口要 `--noproxy '*'`。）
-  **在该宿主上的稳定基线：40 passed / 7 failed / 7 skipped**，7 条失败**与本仓代码无关**（见下条 A/B），逐条根因：`designer:70` 期望的 heading 是 schema **key** 而页面渲的是中文名（用宿主真实 key 覆盖 `E2E_SCHEMAS_CSV` 仍失败 → env 修不了）；`designer:95` 期望 `media_duration.format = float:1000000`，而宿主 `Platform.yaml` **整份没有 `format` 属性**（已逐字核过）；`designer:109` 期望 `region_name` 索引，宿主 `platform_regions` 没有该索引；`designer:84`/`442`/`930` 是 sidebar 链接名 / 新表出现时机 / POST 触发时机与宿主数据不吻合；`theme-logo` 登录页没有 `img[alt=Scaffold]`。
+  **当时记录的基线（已过时，见本文件开头的更正条）：40 passed / 7 failed / 7 skipped** —— 其中 4 条实为 **spec 自身缺陷**、3 条才是宿主数据差异。当时的逐条根因记录（含误判，留作对照）：`designer:70` 期望的 heading 是 schema **key** 而页面渲的是中文名（用宿主真实 key 覆盖 `E2E_SCHEMAS_CSV` 仍失败 → env 修不了）；`designer:95` 期望 `media_duration.format = float:1000000`，而宿主 `Platform.yaml` **整份没有 `format` 属性**（已逐字核过）；`designer:109` 期望 `region_name` 索引，宿主 `platform_regions` 没有该索引；`designer:84`/`442`/`930` 是 sidebar 链接名 / 新表出现时机 / POST 触发时机与宿主数据不吻合；`theme-logo` 登录页没有 `img[alt=Scaffold]`。
 - 2026-09-11，**「改完跑 e2e」要用 A/B 对照而不是只看红绿**（这次靠它把「有回归」证伪）：
   做法——把宿主指向本仓（软链天然满足）→ 在**当前 master** 跑一遍 → `git checkout -b tmp 上一轮基线提交` 让宿主自动换成改动前的代码 → 用**完全相同的 env** 再跑一遍 → 对比**失败集合**（不是只对比 passed 数）→ 切回 master、删临时分支。
   实测结论：master 第 1 次 39 passed/8 failed、第 2 次 40/7、baseline 40/7，**第 2 次的失败集与 baseline 逐条一致**；唯一差异 `designer:569` 是**偶发**（同代码两次跑一次红一次绿）。所以「本轮改动零回归」是有证据的结论，而不是"看起来没报错"。
@@ -38,8 +40,8 @@
   **③ `.env.e2e.example` 里的示例路径是错的**（写 `engine/scaffold`，而 README / `designer.spec` 都要求 `scaffold/database/`）。`designer.spec` 会 `path.resolve(dbDir, '<Schema>.yaml')` 去清自己造的 yaml，指到上一级就清不掉、留下残留。已更正示例与 README 说明。
   **【shell 坑】变量名紧跟全角标点会被 bash 吞字节**：`"...$REPO_ROOT；..."` 里 bash 把全角分号的首字节并进变量名 → `set -u` 下报 `unbound variable`（报错里变量名显示成乱码），那行 `echo` 静默失败。凡中英混排的 shell 脚本，变量一律写 `${VAR}`。
 - 2026-09-11，e2e 跑起来的**前置清单**与两个**会误导排查的坑**（记录自一次完整尝试）：
-  **目标宿主**：这套 playwright 套件是给 **H2**（`engine/`）写的 —— `designer.spec.ts` 的 API smoke schema 列表注释明写「默认 = LLE 当前实际 yaml 文件名」（`Laravel,Light,Order,Platform,Tagging,User`）。跑在别的宿主（如 某个下游宿主）时，只有同名 schema 能过，其余 preview 会 **500**（形如 `{"ok":false,"status":500}`），看着像代码坏了、其实是"该宿主没这个 schema"。**先对齐宿主再判断失败含义**。
-  **前置（缺一个就全红）**：① 宿主 `vendor/charsen/moo-scaffold` 指向本仓（LLE 是软链，天然是工作区；靠 `composer update` 走 path 仓也行，但本项目 lock 里 scaffold 是 git source，`composer update <pkg>` 会被迫连带升 `moo-monitor-laravel` 并要求 `-W`，不如直接建软链）；② **资产已发布** `public/vendor/scaffold`（`php artisan vendor:publish --provider="Mooeen\Scaffold\ScaffoldProvider"`）—— 缺它时页面里 `/vendor/scaffold/javascript/*.js` 全 **404**，Alpine 起不来 → 所有依赖 designer 的 spec 秒失败，现象与"代码坏了"极像；③ 宿主**本地数据库存在**（LLE 缺 `DB_NAME` 库 → `/scaffold/login` 直接 500，日志 `Unknown database`）；④ 宿主有可登录的 scaffold 账号（`scaffold/accounts.yaml`；没有就用 `php artisan moo:account:add <user> --password=... --role=admin` 造第一个）；⑤ 有能在跑的 dev server（LLE 无 nginx vhost，需 `php artisan serve`，`E2E_BASE_URL` 指向它）。
+  **目标宿主**：这套 playwright 套件是给**某个特定宿主项目**（代号 **H2**，形如 `<H2>/engine/`）写的 —— `designer.spec.ts` 的 API smoke schema 列表注释明写「默认 = 该宿主当前实际 yaml 文件名」（`Laravel,Light,Order,Platform,Tagging,User`）。跑在别的宿主时，只有同名 schema 能过，其余 preview 会 **500**（形如 `{"ok":false,"status":500}`），看着像代码坏了、其实是"该宿主没这个 schema"。**先对齐宿主再判断失败含义**。
+  **前置（缺一个就全红）**：① 宿主 `vendor/charsen/moo-scaffold` 指向本仓（H2 的 vendor 就是软链，天然是工作区；靠 `composer update` 走 path 仓也行，但本项目 lock 里 scaffold 是 git source，`composer update <pkg>` 会被迫连带升 `moo-monitor-laravel` 并要求 `-W`，不如直接建软链）；② **资产已发布** `public/vendor/scaffold`（`php artisan vendor:publish --provider="Mooeen\Scaffold\ScaffoldProvider"`）—— 缺它时页面里 `/vendor/scaffold/javascript/*.js` 全 **404**，Alpine 起不来 → 所有依赖 designer 的 spec 秒失败，现象与"代码坏了"极像；③ 宿主**本地数据库存在**（H2 缺 `<db>` 库 → `/scaffold/login` 直接 500，日志 `Unknown database`）；④ 宿主有可登录的 scaffold 账号（`scaffold/accounts.yaml`；没有就用 `php artisan moo:account:add <user> --password=... --role=admin` 造第一个）；⑤ 有能在跑的 dev server（H2 无 nginx vhost，需 `php artisan serve`，`E2E_BASE_URL` 指向它）。
   **【坑一】`global-setup.ts` 的自动登录存态不可靠**：它的 `waitForURL(/\/scaffold(\/|$)/)` 会**立刻**匹配上 `/scaffold/login` 自身 → 在登录 POST 完成前就 `storageState()`，存出**没有 `scaffold_auth`** 的空会话。表现是整轮「未登录」式失败（等不到菜单项）。首次录态请走 `npm run test:e2e:auth`（codegen 手登），或把等待条件改成"离开 `/scaffold/login`"。
   **【坑二】`test:e2e:safe` 的 `git checkout .` 只回滚已跟踪文件**，不删未跟踪产物 —— 新建的 schema yaml / `.snapshots/*.yaml` / migration 会**留在宿主仓**（本次实测残留 8 个 migration + 1 个 `E2eTmp*.yaml` + 1 个 snapshot）。跑完要自己按时间戳清。
   **【坑三·本机特有】** 这台机器有 HTTP 代理（`127.0.0.1:52120`）。`curl` 直连本地端口要加 `--noproxy '*'`，否则拿到 **502**（不是服务没起），会把人引向错误结论。
@@ -53,7 +55,7 @@
   **残留（下一轮可收）**：(a) `capture()` 的写失败仍只 log —— 它已有 `@throws` 契约，改成抛是独立的行为变更（会改 CLI 退出行为），没混进本次范围；(b) `unsetTables()` 的解析失败仍是 `log + return`（void），同族缺口；(c) `baselineNote()` 只做 `⚠` 前缀 + null 判断的集中，前端 rename/delete 两条路径复用既有 `data.note` 时 toast 级别仍是 `info`/`success`（只有 migrate 那条新加了 `warning`），文案里带 `⚠` 兜住严重性。
   **测试**：`SnapshotStoreTest` 3 条（源 yaml 冲突标记 → `advanced=false` 且 snapshot 字节不变；快照损坏 → `rebuilt_from_scratch=true` 且锁定"其它表 baseline 被丢弃"这一既有副作用；正常路径 `reason=null`）+ `MigrationWriterTest` 2 条（`write()` 透出未推进的 baseline；`baselineNote()` 空串/`⚠` 语义）。revert 验证两段：把 parse 分支改回"看似正常"→ 恰 1 条失败；去掉 `write()` 的 `baseline` 键 → 恰 2 条失败。
   **坑**：`tests/Feature/Designer/MigrationWriterTest.php` 里的 `SpySnapshotStore` 覆写了 `captureTables`，PHP **不允许子类把返回类型收窄回 void** —— 改父类签名必须同步改 spy，否则是致命错误（不是测试失败）。
-- 2026-09-11，类型清单单一来源 `Support\FieldTypes`（**从 `Designer\FieldTypes` 移来**）：该类第一阶段只收口了 Designer 侧的数值分组（ship-checklist #7），Generator 侧仍各自内联。第二阶段补上 codegen 侧分组并挪到 `Support` —— 它同时被 Designer 与 Generator 消费，留在 `Designer` 下会让 `Generator` 反向依赖 `Designer`；挪动前已确认仓内（含 docs/tests/stubs）与整个 `/path/to/` 生态**无其它消费者**。新增：`INT_NO_BIGINT` / `BOOL` / `STRING` / `STRING_SIZE` / `TEXT_LARGE` / `DATE` / `DATETIME`。
+- 2026-09-11，类型清单单一来源 `Support\FieldTypes`（**从 `Designer\FieldTypes` 移来**）：该类第一阶段只收口了 Designer 侧的数值分组（ship-checklist #7），Generator 侧仍各自内联。第二阶段补上 codegen 侧分组并挪到 `Support` —— 它同时被 Designer 与 Generator 消费，留在 `Designer` 下会让 `Generator` 反向依赖 `Designer`；挪动前已确认仓内（含 docs/tests/stubs）与整个下游生态仓**无其它消费者**。新增：`INT_NO_BIGINT` / `BOOL` / `STRING` / `STRING_SIZE` / `TEXT_LARGE` / `DATE` / `DATETIME`。
   **为什么值得收口**：本仓已复发两次同型事故 —— 有人写了更窄的 inline 列表，整类列静默丢校验/生成（`CreateControllerGenerator` 2026-06-11 两条修复注释自证：漏 smallint/mediumint/decimal/float/double → Request 数值列零校验；漏 text 系列 → 文本字段缺 `'string'`）。同类字面散落在 Model/Controller/TS/Resource/FreshStorage 五个生成器里。
   **顺带修掉一个现存同型漏判**：`CreateModelGenerator::buildFilter` 的 LIKE-scope 字符串族原为 `['varchar','char','text','tinytext']`，**漏 mediumtext/longtext**（姊妹点 `CreateControllerGenerator` 的字符串族是完整 6 成员，两处口径不一致）→ mediumtext/longtext 列拿不到搜索 scope。现统一走 `FieldTypes::STRING`。这是 additive 产物变化。
   **一处更正**：曾以为 `CreateTSModelGenerator` "漏 bigint"，实际它上面就有独立 bigint 分支映射成 `bigint | string`（JS number 装不下 64 位），比一律 `number` 更正确 —— 所以那里是刻意拆开，用 `INT_NO_BIGINT` 表达。`FieldTypes::DATE` **故意不含 `time`**：designer 的 `designer_type_options` 可选 `time`，但 `time` 没有 date/Carbon 语义，给它加 `date` 校验或 `Carbon|null` 是错的；现状是"designer 可建、codegen 落到 string 兜底"，要改先得定语义，不在收口范围内。
