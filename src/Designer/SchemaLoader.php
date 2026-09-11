@@ -4,6 +4,7 @@ namespace Mooeen\Scaffold\Designer;
 
 use Illuminate\Support\Facades\DB;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
+use Mooeen\Scaffold\Support\Concerns\AtomicFileWrite;
 use Mooeen\Scaffold\Support\PackageRegistry;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Finder\Finder;
@@ -30,6 +31,8 @@ use Symfony\Component\Yaml\Yaml;
  */
 class SchemaLoader
 {
+    use AtomicFileWrite;
+
     // plan-51:新增 db_unique 显式语义("DB 层强约束" 跟 "app 层 soft-aware" 区分)
     private const FIELD_LEGAL_KEYS = ['name', 'type', 'size', 'min_size', 'required', 'unique', 'db_unique', 'default', 'unsigned', 'desc', 'comment', 'index', 'precision', 'format'];
 
@@ -329,10 +332,7 @@ class SchemaLoader
         ];
         $raw['tables'][$tableKey] = $node;
         $yaml                     = YamlFormatter::dumpPreservingComments($raw, $originalText);
-        // plan-40 §三 R-1:LOCK_EX 防 multi-tab 同 schema save 互覆
-        if (file_put_contents($path, $yaml, LOCK_EX) === false) {
-            throw new SchemaLoadException("write failed: {$path}");
-        }
+        $this->writeSchemaYaml($path, $yaml);
         unset($this->cache[$schema]);
         $this->listModulesCache = null;     // Round 2 P2:invalidate listModules cache(写改了字段数 / last_migration)
     }
@@ -363,9 +363,7 @@ class SchemaLoader
             'module' => $module,
             'tables' => [],
         ]);
-        if (file_put_contents($path, $headerComment . $body, LOCK_EX) === false) {
-            throw new SchemaLoadException("write failed: {$path}");
-        }
+        $this->writeSchemaYaml($path, $headerComment . $body);
         $this->listModulesCache = null;     // Round 2 P2:新 schema 出现,invalidate
         $this->originMap        = null;     // plan-53:出身表同步失效
     }
@@ -438,9 +436,7 @@ class SchemaLoader
         }
         $raw['module']['folder'] = $newName;
         $yaml                    = YamlFormatter::dumpPreservingComments($raw, $originalText);
-        if (file_put_contents($newPath, $yaml, LOCK_EX) === false) {
-            throw new SchemaLoadException("write failed: {$newPath}");
-        }
+        $this->writeSchemaYaml($newPath, $yaml);
         if (! @unlink($oldPath)) {
             @unlink($newPath); // rollback
             throw new SchemaLoadException("rename failed (cannot remove old): {$oldPath}");
@@ -469,10 +465,7 @@ class SchemaLoader
         }
         unset($raw['tables'][$tableKey]);
         $yaml = YamlFormatter::dumpPreservingComments($raw, $originalText);
-        // plan-40 §三 R-1:LOCK_EX 防 multi-tab 同 schema save 互覆
-        if (file_put_contents($path, $yaml, LOCK_EX) === false) {
-            throw new SchemaLoadException("write failed: {$path}");
-        }
+        $this->writeSchemaYaml($path, $yaml);
         unset($this->cache[$schema]);
         $this->listModulesCache = null;     // Round 2 P2:invalidate listModules cache(写改了字段数 / last_migration)
     }
@@ -517,9 +510,7 @@ class SchemaLoader
         }
         $raw['tables'] = $newTables;
         $yaml          = YamlFormatter::dumpPreservingComments($raw, $originalText);
-        if (file_put_contents($path, $yaml, LOCK_EX) === false) {
-            throw new SchemaLoadException("write failed: {$path}");
-        }
+        $this->writeSchemaYaml($path, $yaml);
         unset($this->cache[$schema]);
         $this->listModulesCache = null;
     }
@@ -591,10 +582,7 @@ class SchemaLoader
         }
 
         $yaml = YamlFormatter::dumpPreservingComments($raw, $originalText);
-        // plan-40 §三 R-1:LOCK_EX 防 multi-tab 同 schema save 互覆
-        if (file_put_contents($path, $yaml, LOCK_EX) === false) {
-            throw new SchemaLoadException("write failed: {$path}");
-        }
+        $this->writeSchemaYaml($path, $yaml);
         unset($this->cache[$schema]);
         $this->listModulesCache = null;     // Round 2 P2:invalidate listModules cache(写改了字段数 / last_migration)
     }
@@ -1219,6 +1207,24 @@ class SchemaLoader
             return Yaml::parseFile($path) ?: [];
         } catch (\Throwable $e) {
             throw new SchemaLoadException("YAML parse failed for {$schema}: {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * 原子写 schema YAML，并把底层失败统一转成 SchemaLoadException。
+     *
+     * 2026-09-11：原先 6 处写盘各自 `file_put_contents($path, $yaml, LOCK_EX)`。LOCK_EX 只
+     * 串行化写入动作，既不防半写撕裂（进程中途死掉仍留半份文件），也挡不住读-改-写的丢更新。
+     * 改为 tmp + rename 后原子性来自 rename 本身，锁反而多余，故一并去掉。
+     *
+     * @throws SchemaLoadException
+     */
+    private function writeSchemaYaml(string $path, string $yaml): void
+    {
+        try {
+            $this->writeFileAtomically($path, $yaml);
+        } catch (\RuntimeException $e) {
+            throw new SchemaLoadException("write failed: {$path}", 0, $e);
         }
     }
 

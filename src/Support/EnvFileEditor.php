@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mooeen\Scaffold\Support;
 
+use Mooeen\Scaffold\Support\Concerns\AtomicFileWrite;
 use RuntimeException;
 
 /**
@@ -13,7 +14,7 @@ use RuntimeException;
  *   - 保留所有注释、空行、行顺序
  *   - 仅替换已有 key 的 value；不支持新增 key（避免误增）
  *   - 自动决定值是否加引号（含空格 / # / = 等就加双引号并 escape）
- *   - 写入流程：临时文件 → rename，原子操作
+ *   - 写入流程：临时文件 → rename，原子操作，且保留原文件权限位
  *
  * 不做的事：
  *   - 多行值（heredoc 等）：.env 习惯上单行，不支持
@@ -21,6 +22,8 @@ use RuntimeException;
  */
 class EnvFileEditor
 {
+    use AtomicFileWrite;
+
     /**
      * 批量写 .env。$writes 为 KEY => 字符串值。
      *
@@ -73,13 +76,12 @@ class EnvFileEditor
 
         $next = implode($eol, $lines);
 
-        $tmp = $filePath . '.tmp.' . bin2hex(random_bytes(4));
-        if (file_put_contents($tmp, $next) === false) {
-            throw new RuntimeException(".env 临时文件写入失败：{$tmp}");
-        }
-        if (! @rename($tmp, $filePath)) {
-            @unlink($tmp);
-            throw new RuntimeException(".env rename 失败：{$tmp} → {$filePath}");
+        // 原子写 + 保留原文件权限位：原先手写 tmp + rename 未 chmod，而 .env 常被加固成
+        // 0600/0640，每次保存都会按 umask 被放宽成 0644。
+        try {
+            $this->writeFileAtomically($filePath, $next);
+        } catch (RuntimeException $e) {
+            throw new RuntimeException(".env 写入失败：{$filePath}：{$e->getMessage()}", 0, $e);
         }
     }
 
