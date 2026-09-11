@@ -66,3 +66,27 @@ it('GET /scaffold/api/request 把 detectable() 真吐进 window.ScaffoldConfig',
     $r->assertSee('knownWidgetTypes', false);
     $r->assertSee('text-amount', false);
 });
+
+/* ---------------------------------------------------------------------------
+ * 规则 → 控件类型反推（S2b 从 FormRequest 收口到这里）
+ * ------------------------------------------------------------------------ */
+
+it('infer:date 精确命中优先于 password;都不命中返回 null', function () {
+    expect(FormWidgetTypes::infer(['required', 'date'], 'plain'))->toBe('date-picker');
+    // date 优先：字段名虽含 password，仍是 date-picker（原实现就是 elseif 顺序）
+    expect(FormWidgetTypes::infer(['required', 'date'], 'password_expire_date'))->toBe('date-picker');
+    expect(FormWidgetTypes::infer(['required', 'string'], 'user_password'))->toBe('password');
+    expect(FormWidgetTypes::infer(['required', 'string'], 'plain'))->toBeNull();
+    // 精确匹配：'date_format:Y-m-d' 不等于 'date'，不参与反推
+    expect(FormWidgetTypes::infer(['required', 'date_format:Y-m-d'], 'plain'))->toBeNull();
+});
+
+it('接线锚点:FormRequest 走 infer/FormFrontendRules,不再内联反推与规则投影', function () {
+    $src = file_get_contents(__DIR__ . '/../../../src/Foundation/FormRequest.php');
+    expect($src)->toBeString();
+    expect($src)->toContain('FormWidgetTypes::infer(');
+    expect($src)->toContain('FormFrontendRules::fromRules(');
+    // 旧的内联实现必须消失（漏一处即说明又被复制回去）
+    expect($src)->not->toContain("'date-picker'");
+    expect($src)->not->toContain('getFrontendRules');
+});
