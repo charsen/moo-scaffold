@@ -3,6 +3,21 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-11，**更正先前结论**：那 7 条 e2e 失败**并非都「与本仓代码无关」**—— 其中 4 条是 **spec 自身缺陷**（跟宿主无关，在任何宿主上都错），只有 3 条属宿主数据绑定。现已全部转绿：某本地宿主上 `40 passed / 7 failed / 7 skipped` → **`47 passed / 0 failed / 7 skipped`**。分类与改法：
+  **A. spec 自身缺陷（改了对任何宿主都受益）**
+  - **sidebar 链接定位**：链接的可访问名是「1. platform_regions 12」（序号 + key + 字段数三个 span 拼成），拿 `getByRole('link', { name: /^<key>/ })` 去匹配**永远失配** —— 而失败形态是 30s 超时，看着像后端慢。修：视图给 `<a>` 加 `data-table-key`，spec 改按该属性定位。
+  - **`单字段索引三态` 的 option 值漂移**：spec 还在传 `value: 'unique'`，而 plan-51 已把 unique 拆成 `unique-app` / `unique-db` 并**移除**旧值 → `selectOption` 找不到 option。改传 `unique-db`。教训：UI 选项值变更后要 grep 一遍 spec 里的字面值。
+  - **`theme-logo` 与全局登录态冲突**：全局 storageState 带**有效**登录态时访问 `/scaffold/login` 会被 302 到 `/scaffold`（已实测确认）→ 页面里根本没有 login logo，报的是 `element(s) not found`（**不是** not visible，极易误判成 UI 坏了）。修：该 spec 用 `test.use({ storageState: { cookies: [], origins: [] } })` 隔离。
+  - **创建表类用例偶发超时**：原先用裸 `page.goto`（只等 `load`，**不等 Alpine init**），而「+ 新建」是 `x-on:click` 绑定 —— Alpine 没起来时点了**根本不发请求**，表现为 `waitForResponse` 超时（极易误判成后端坏）。修：改用 `gotoDesigner`（等 Alpine ready + 字段行 > 0），超时 6s → 15s（该请求要写 yaml + 重建缓存 + redirect，冷态下 6s 偶发不够）。
+  **B. 宿主数据绑定（收成 env；默认值一律保留原值 = 对原宿主零变化）**
+  - 首页「模块」：页面渲的是 `module.folder`，**≠ schema key** → 断言改为「`data-schema-key` 命中 **或** heading 文本命中」，两种标识都认（老的显示名值照过）。
+  - 字段 `precision/size/format`：原先写死 `rows.nth(11)`（依赖宿主字段顺序）→ 改用现成的 `findFieldRowIdx(字段 key)`；`format` 是宿主字段属性，新增 `E2E_FIELD_FORMAT`，**留空即跳过该列断言**。
+  - 索引字段名 / 侧栏表名 → `E2E_INDEX_FIELDS_CSV` / `E2E_TABLE_IN_LIST`。
+  - 索引 round-trip 的靶行：原先 `rows.nth(2)`（依赖宿主第 3 行是 `_lft`）→ 新增 `findIndexFreeRowIdx()` 动态找「index 为空且 select 未禁用」的行（在原宿主上选中的仍是 `_lft`，等价）。
+  完整清单 + 换宿主实例见 `.env.e2e.example` 与 `tests/Browser/README.md`。
+  **验证**：`designer.spec` 单跑 41 passed / 0 failed；`api-request + cloud + db-docs + designer` 子集 44 / 0；完整套件 **47 / 0**。**原宿主未实测**（本机没建它的库），判「无回归」的依据是「默认值逐项保留 + 定位方式在其字段顺序下等价」+ 上述三次跑。
+- 2026-09-11，**「创建表 / 删表」两条 e2e 会在宿主 `database/migrations/` 生成 migration** —— 来源不是测试点错按钮，而是它们的**清理步骤**调 `DELETE .../tables/<key>`，而后端 `deleteTable` 会**对整个 schema 做 diff 并生成 migration**（设计如此：删表要出 migration）。产出的文件名对应**宿主 yaml 与 baseline 的既有差异**，与代码改动无关，但必须清：`test:e2e:safe` 会清当次的；**直连 `test:e2e` 则不清**，而且这类残留会被**下一次 safe 跑当成「宿主原有未跟踪文件」而保留 → 永久累积**（实测漏出 3 个）。跑完一律 `git -C <宿主仓> status --short --untracked-files=all` 核对到干净。
+  **连带一条诊断经验**：同一套件两轮「一次有残留、一次没有」不是抖动 —— 前一环「创建表 POST」超时中断就没走到 DELETE 清理，通过了才会走到。查残留先看上游成功与否。
 - 2026-09-11，**本机可跑 e2e 的宿主是 `H1`**（`http://H1`），不是 LLE：LLE 虽是这套 spec 的原生宿主（`designer.spec` 的 schema 默认值取自它），但本机**没建它的库**（`/scaffold/login` 直接 500 `Unknown database 'DB_NAME'`）。H1 三个前置都天然满足：`vendor/charsen/moo-scaffold` 是**指向本仓的软链**、`public/vendor/scaffold` 已发布（且被 gitignore）、有可用账号 + DB 正常。
   推荐跑法（`E2E_API_SCHEMAS_CSV` 要按宿主实际 schema 覆盖，默认值是 LLE 的）：
   ```bash
