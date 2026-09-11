@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mooeen\Scaffold\Support;
 
+use Mooeen\Scaffold\Support\Concerns\AtomicFileWrite;
 use PhpParser\Node;
 use PhpParser\Parser;
 use PhpParser\ParserFactory;
@@ -22,13 +23,15 @@ use RuntimeException;
  *   3. 校验 value 节点是字面量 / 简单数组（FuncCall / Variable 等抛错）
  *   4. 倒序应用位置替换（保持前一个替换的位置不被后面的影响）
  *   5. 再 parse 一次校验
- *   6. 原子写：临时文件 → rename
+ *   6. 原子写：临时文件 → rename（并保留原文件权限位）
  *   7. opcache_invalidate
  *
  * 失败时原文件保持不动。
  */
 class PhpFileEditor
 {
+    use AtomicFileWrite;
+
     private Parser $parser;
 
     public function __construct()
@@ -95,15 +98,9 @@ class PhpFileEditor
             throw new RuntimeException('写入后 PHP 语法错误，已回滚：' . $e->getMessage());
         }
 
-        // 原子写
-        $tmp = $filePath . '.tmp.' . bin2hex(random_bytes(4));
-        if (file_put_contents($tmp, $next) === false) {
-            throw new RuntimeException("临时文件写入失败：{$tmp}");
-        }
-        if (! @rename($tmp, $filePath)) {
-            @unlink($tmp);
-            throw new RuntimeException("rename 失败：{$tmp} → {$filePath}");
-        }
+        // 原子写 + 保留原文件权限位（原先手写 tmp + rename 未 chmod，每次保存会按 umask
+        // 把原文件的权限位放宽，例如 0600 的 .env 变 0644）
+        $this->writeFileAtomically($filePath, $next);
 
         if (function_exists('opcache_invalidate')) {
             @opcache_invalidate($filePath, true);

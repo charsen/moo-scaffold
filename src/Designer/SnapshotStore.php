@@ -4,6 +4,7 @@ namespace Mooeen\Scaffold\Designer;
 
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Log;
+use Mooeen\Scaffold\Support\Concerns\AtomicFileWrite;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
@@ -24,11 +25,13 @@ use Symfony\Component\Yaml\Yaml;
  *
  * 不做的:
  *   - 不做多版本(git 已经管理)
- *   - 不做 atomic write(scaffold 是单 dev 工具,无并发)
+ *   - 不做 flock(读-改-写的丢更新不是锁能解决的;写入本身已原子,见 writeSnapshot)
  *   - 不防用户绕过 designer 改 yaml(同 plan-30 parser 路线,scaffold 不兜历史漂移)
  */
 class SnapshotStore
 {
+    use AtomicFileWrite;
+
     public function __construct(
         private readonly Filesystem $fs,
     ) {}
@@ -59,8 +62,7 @@ class SnapshotStore
         }
 
         $this->ensureSnapshotDir($schema);
-        // plan-40 §三 R-1:LOCK_EX 防 captureTables vs save / multi-tab 写覆盖
-        $this->fs->put($this->snapshotPath($schema), YamlFormatter::dump($parsed), lock: true);
+        $this->writeSnapshot($this->snapshotPath($schema), YamlFormatter::dump($parsed));
     }
 
     /**
@@ -132,7 +134,7 @@ class SnapshotStore
         }
 
         $this->ensureSnapshotDir($schema);
-        $this->fs->put($snapshotPath, YamlFormatter::dump($snapParsed), lock: true);     // plan-40 §三 R-1
+        $this->writeSnapshot($snapshotPath, YamlFormatter::dump($snapParsed));
     }
 
     private function ensureSnapshotDir(string $schema): void
@@ -140,6 +142,24 @@ class SnapshotStore
         $dir = dirname($this->snapshotPath($schema));
         if (! $this->fs->isDirectory($dir)) {
             $this->fs->makeDirectory($dir, 0755, true);
+        }
+    }
+
+    /**
+     * 原子写快照。失败只 log 不抛 —— 与本类对 parse 失败的处理保持一致：
+     * 快照没写成功 ⇒ baseline 不推进 ⇒ 下次 preview 会重报本次 change，用户重跑即可；
+     * 而抛异常会在 migration 文件已落盘之后把流程打断，反而更难收拾。
+     *
+     * 2026-09-11：原先 3 处 `$this->fs->put($path, ..., lock: true)`，既非原子（半写会留
+     * 半份 baseline）又不检查返回值（写失败完全静默）。LOCK_EX 只串行化写入动作，
+     * 挡不住半写撕裂，故改用 tmp + rename 并补上失败可见性。
+     */
+    private function writeSnapshot(string $path, string $content): void
+    {
+        try {
+            $this->writeFileAtomically($path, $content);
+        } catch (\RuntimeException $e) {
+            Log::warning("SnapshotStore write failed for {$path}: {$e->getMessage()}");
         }
     }
 
@@ -184,7 +204,7 @@ class SnapshotStore
             return;
         }
         // plan-49 后续:统一走 YamlFormatter,canonical key 顺序 + tables 间空行(跟主 yaml 一致)
-        $this->fs->put($path, YamlFormatter::dump($parsed), lock: true);
+        $this->writeSnapshot($path, YamlFormatter::dump($parsed));
     }
 
     public function load(string $schema): ?string
