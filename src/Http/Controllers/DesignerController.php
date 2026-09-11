@@ -511,6 +511,10 @@ class DesignerController
 
         return $this->ok([
             'files_written' => $result['files_written'],
+            // 2026-09-11:baseline 没按请求推进（源 yaml 解析失败 / 快照写失败）或快照被从零重建时，
+            // migration 文件**已经落盘**，但下次 preview 会重报本次变更 —— 前端按既有 `data.note`
+            // 约定渲染黄色提示。空串 = 一切正常，前端不显示。
+            'note' => SnapshotStore::baselineNote($result['baseline'] ?? []),
         ]);
     }
 
@@ -680,8 +684,13 @@ class DesignerController
             try {
                 $migrationFile = $this->writer->writeRename($schema, $table, $data['new_key']);
                 // 迁 baseline:旧 key 在 current yaml 已不存在 → 从 snapshot 移除;新 key 吸入
-                $this->snapshot->captureTables($schema, [$table, $data['new_key']]);
-                $note = "已生成 rename migration：{$migrationFile}。跑 `php artisan migrate` 真改 DB 表名。";
+                // 2026-09-11:captureTables 返回状态,baseline 没推进时必须一并告诉用户
+                // ——否则下次 diff 会把改名当删表+建表。
+                $capture = $this->snapshot->captureTables($schema, [$table, $data['new_key']]);
+                $note    = "已生成 rename migration：{$migrationFile}。跑 `php artisan migrate` 真改 DB 表名。";
+                if ($bnote = SnapshotStore::baselineNote($capture)) {
+                    $note .= ' ' . $bnote;
+                }
             } catch (Throwable $e) {
                 Log::warning(
                     "renameTable auto-migration failed for {$schema}.{$table} → {$data['new_key']}: {$e->getMessage()}"
@@ -718,11 +727,13 @@ class DesignerController
         // 失败不影响 yaml 删除本身(yaml 已删),log warning + UI note 提示 user 手动跑。
         $migrationFiles = [];
         $migrationNote  = '';
+        $baseline       = [];
         try {
             $migDiff = $this->diff->diff($schema);
             if (empty($migDiff['suspected_renames'])) {
                 $result         = $this->writer->write($migDiff);
                 $migrationFiles = $result['files_written'] ?? [];
+                $baseline       = $result['baseline']      ?? [];
             } else {
                 // schema 内有未确认的疑似改名 → 不能安全 write(会把改名当 drop+add)。
                 // 之前这里静默跳过、note 还说"snapshot 已同步",误导用户(2026-06-09 修)。
@@ -744,6 +755,12 @@ class DesignerController
             $note .= $migrationNote;
         } else {
             $note .= '无新增 migration（snapshot 已同步）。';
+        }
+
+        // 2026-09-11:baseline 提示必须**追加在 if/elseif 之外** —— 它恰恰发生在"migration 文件
+        // 已生成"那条分支里,塞进上面的 elseif 会被吞掉。
+        if ($bnote = SnapshotStore::baselineNote($baseline ?? [])) {
+            $note .= ' ' . $bnote;
         }
 
         return $this->ok([

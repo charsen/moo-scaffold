@@ -16,6 +16,7 @@ use Mooeen\Scaffold\Designer\EmptyDiffException;
 use Mooeen\Scaffold\Designer\MigrationWriter;
 use Mooeen\Scaffold\Designer\SchemaDiffService;
 use Mooeen\Scaffold\Designer\SchemaLoadException;
+use Mooeen\Scaffold\Designer\SnapshotStore;
 use Mooeen\Scaffold\Generator\FreshStorageGenerator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
@@ -107,6 +108,14 @@ class CreateMigrationCommand extends Command
         foreach ($files as $f) {
             $this->line('  + ' . $f);
         }
+
+        // 2026-09-11:baseline 可能没推进(源 yaml 解析失败 / 快照写失败 / 快照损坏重建)。
+        // captureTables 刻意不抛异常(文件已落盘,抛会打断在半成品),所以必须在这里明说
+        // —— 否则用户以为成功,下次 preview 重报同一变更,再生成一次就是重复 migration。
+        if ($note = SnapshotStore::baselineNote($result['baseline'] ?? [])) {
+            $this->console()->warn($note);
+        }
+
         // plan-39:GUI 不再 git commit,CLI 同样不自动 commit,提示用户手动
         $this->line('');
         $this->line('<fg=gray>提示：scaffold 不会自动 git commit，请手动：</>');
