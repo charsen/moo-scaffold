@@ -4,6 +4,7 @@ namespace Mooeen\Scaffold\Designer;
 
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Log;
+use Mooeen\Scaffold\Support\Concerns\AtomicFileWrite;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
@@ -24,11 +25,13 @@ use Symfony\Component\Yaml\Yaml;
  *
  * 不做的:
  *   - 不做多版本(git 已经管理)
- *   - 不做 atomic write(scaffold 是单 dev 工具,无并发)
+ *   - 不做 flock(读-改-写的丢更新不是锁能解决的;写入本身已原子,见 writeSnapshot)
  *   - 不防用户绕过 designer 改 yaml(同 plan-30 parser 路线,scaffold 不兜历史漂移)
  */
 class SnapshotStore
 {
+    use AtomicFileWrite;
+
     public function __construct(
         private readonly Filesystem $fs,
     ) {}
@@ -59,8 +62,10 @@ class SnapshotStore
         }
 
         $this->ensureSnapshotDir($schema);
-        // plan-40 §三 R-1:LOCK_EX 防 captureTables vs save / multi-tab 写覆盖
-        $this->fs->put($this->snapshotPath($schema), YamlFormatter::dump($parsed), lock: true);
+        // 这里刻意**不**检查返回值：capture() 只被 `moo:snapshot:init` 调用，写失败原先只 log；
+        // 把它改成抛属于独立的行为变更（会改 CLI 退出行为），不混进本次「captureTables → write()
+        // 链可见化」的范围。见 NOTES.md 的残留清单。
+        $this->writeSnapshot($this->snapshotPath($schema), YamlFormatter::dump($parsed));
     }
 
     /**
@@ -74,14 +79,24 @@ class SnapshotStore
      *   - 表在 current yaml 不存在(被删了)→ 从快照中移除该表
      *   - 表在 current yaml 存在 → snapshot[tables][k] = current[tables][k]
      *
+     * 返回状态（2026-09-11 新增 —— 原先 `void`，导致下面两条失败路径调用方无从得知）：
+     *   - `advanced=false` ⇒ baseline **没有**按请求推进，`reason` 是给用户看的中文说明，调用方必须回报；
+     *   - `rebuilt_from_scratch=true` ⇒ 快照自身损坏、已从零重建，**其它表的 baseline 被丢弃**。
+     *
+     * 为什么不用异常表达这两件事：本方法在 migration 文件**已落盘之后**才调，抛异常会把流程
+     * 打断在半成品状态（见下方 parse 分支的注释），所以保留「log 不抛」，但**必须把结果交回调用方**
+     * —— 否则调用方会向用户报成功，而用户下次预览重见同一变更、再点一次就产出重复 migration。
+     *
      * @param array<int,string> $tableKeys
      *
-     * @throws \RuntimeException 源 yaml 不存在 / 解析失败时
+     * @return array{advanced:bool, rebuilt_from_scratch:bool, reason:?string}
+     *
+     * @throws \RuntimeException 源 yaml 文件**不存在**时（注意：解析失败**不**抛，见上）
      */
-    public function captureTables(string $schema, array $tableKeys): void
+    public function captureTables(string $schema, array $tableKeys): array
     {
         if ($tableKeys === []) {
-            return;
+            return ['advanced' => true, 'rebuilt_from_scratch' => false, 'reason' => null];
         }     // 没要更新的表 → no-op
 
         $this->assertOriginWritable($schema);
@@ -94,27 +109,39 @@ class SnapshotStore
         try {
             $currentParsed = Yaml::parse($currentRaw) ?: [];
         } catch (ParseException $e) {
-            // plan-39 后 GUI 不再调 git commit,但仍保留稳态:源 yaml 坏掉时不抛,不写盘。
-            // migration 文件已落盘 → baseline 不推进 → 下次 preview 会重报本次 change,
-            // 用户必须先恢复 yaml 才能继续。Log warning 让运行时可见。
+            // 保留稳态:源 yaml 坏掉时不抛,不写盘 —— 本方法在 migration 文件已落盘之后调,
+            // 抛异常会把流程打断在半成品状态。代价是 baseline 不推进、下次 preview 会重报本次
+            // change。原先这里只 Log::warning,调用方无从得知,于是照旧向用户报成功
+            // (web 端是绿色 toast「migration 已生成 N 个文件」)。现把结果交回调用方。
             Log::warning(
                 "SnapshotStore::captureTables skipped: source yaml parse failed for {$schema}: {$e->getMessage()}",
             );
 
-            return;
+            return [
+                'advanced'             => false,
+                'rebuilt_from_scratch' => false,
+                'reason'               => '源 schema yaml 解析失败，baseline 未推进（migration 文件已落盘）。'
+                    . '下次预览会重报本次变更；请先修好 yaml 再重新 preview + 生成，'
+                    . '不要直接再点一次生成（会产出重复 migration）。原因：' . $e->getMessage(),
+            ];
         }
 
         $snapshotPath = $this->snapshotPath($schema);
+        $rebuilt      = false;
         if ($this->fs->exists($snapshotPath)) {
             try {
                 $snapParsed = Yaml::parse($this->fs->get($snapshotPath)) ?: [];
             } catch (ParseException $e) {
-                // 快照坏掉 — 当冷启动重新搭骨架,迁过来本次要 capture 的表
+                // 快照坏掉 — 当冷启动重新搭骨架,迁过来本次要 capture 的表。
+                // ⚠ 副作用:下面的 merge 只放回 $tableKeys 列出的表,**其它表的 baseline 全部丢弃**
+                // (之后那些表会走 baseline_drift 拒生成)。快照是入 git 的全员共享文件,冲突标记
+                // 落进去就会命中,所以这个副作用必须让调用方看见。
                 Log::warning(
                     "SnapshotStore::captureTables snapshot for {$schema} unparseable, rebuilding from scratch: {$e->getMessage()}",
                 );
                 $snapParsed           = $currentParsed;
                 $snapParsed['tables'] = [];
+                $rebuilt              = true;
             }
         } else {
             // 冷启动:用 current 的 top-level scaffolding 当骨架,tables 留空待 merge
@@ -132,7 +159,40 @@ class SnapshotStore
         }
 
         $this->ensureSnapshotDir($schema);
-        $this->fs->put($snapshotPath, YamlFormatter::dump($snapParsed), lock: true);     // plan-40 §三 R-1
+        $written = $this->writeSnapshot($snapshotPath, YamlFormatter::dump($snapParsed));
+
+        if (! $written) {
+            return [
+                'advanced'             => false,
+                'rebuilt_from_scratch' => $rebuilt,
+                'reason'               => '快照写入失败（详见日志），baseline 未推进。下次预览会重报本次变更；'
+                    . '请确认 .snapshots/ 目录可写后重新 preview + 生成，不要直接再点一次生成（会产出重复 migration）。',
+            ];
+        }
+
+        return [
+            'advanced'             => true,
+            'rebuilt_from_scratch' => $rebuilt,
+            'reason'               => $rebuilt
+                ? '快照文件损坏，已从零重建：本次这几张表的 baseline 已就位，但**其它表的 baseline 已被丢弃**。'
+                    . '需要时请从 git 还原 .snapshots/ 里其它表的段，否则那些表会报 baseline 缺失、拒绝生成 migration。'
+                : null,
+        ];
+    }
+
+    /**
+     * 把 `captureTables()` 的返回状态转成一句给用户看的提示（无异常 → 空串）。
+     *
+     * 各调用方（CLI 命令 / DesignerController 三条路径）都要显示它，所以格式化只留这一处，
+     * 免得 5 个地方各自写 null 判断与 `⚠` 前缀后慢慢漂移。
+     *
+     * @param array{advanced?:bool, rebuilt_from_scratch?:bool, reason?:?string} $baseline
+     */
+    public static function baselineNote(array $baseline): string
+    {
+        $reason = $baseline['reason'] ?? null;
+
+        return is_string($reason) && $reason !== '' ? '⚠ ' . $reason : '';
     }
 
     private function ensureSnapshotDir(string $schema): void
@@ -140,6 +200,31 @@ class SnapshotStore
         $dir = dirname($this->snapshotPath($schema));
         if (! $this->fs->isDirectory($dir)) {
             $this->fs->makeDirectory($dir, 0755, true);
+        }
+    }
+
+    /**
+     * 原子写快照。失败只 log 不抛 —— 与本类对 parse 失败的处理保持一致：
+     * 快照没写成功 ⇒ baseline 不推进 ⇒ 下次 preview 会重报本次 change，用户重跑即可；
+     * 而抛异常会在 migration 文件已落盘之后把流程打断，反而更难收拾。
+     *
+     * 2026-09-11：原先 3 处 `$this->fs->put($path, ..., lock: true)`，既非原子（半写会留
+     * 半份 baseline）又不检查返回值（写失败完全静默）。LOCK_EX 只串行化写入动作，
+     * 挡不住半写撕裂，故改用 tmp + rename 并补上失败可见性。
+     *
+     * 返回值供 `captureTables()` 把"没写成功 ⇒ baseline 没推进"回报给调用方
+     * —— 只 log 不抛是刻意的（别在 migration 已落盘后打断），但**不能再静默**。
+     */
+    private function writeSnapshot(string $path, string $content): bool
+    {
+        try {
+            $this->writeFileAtomically($path, $content);
+
+            return true;
+        } catch (\RuntimeException $e) {
+            Log::warning("SnapshotStore write failed for {$path}: {$e->getMessage()}");
+
+            return false;
         }
     }
 
@@ -184,7 +269,7 @@ class SnapshotStore
             return;
         }
         // plan-49 后续:统一走 YamlFormatter,canonical key 顺序 + tables 间空行(跟主 yaml 一致)
-        $this->fs->put($path, YamlFormatter::dump($parsed), lock: true);
+        $this->writeSnapshot($path, YamlFormatter::dump($parsed));
     }
 
     public function load(string $schema): ?string

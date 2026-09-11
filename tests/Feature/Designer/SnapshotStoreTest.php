@@ -162,3 +162,65 @@ it('capture() 与 captureTables(全表) 产出完全一致的 baseline 文件(�
     // 且都是合法 yaml、数据无损
     expect(Yaml::parse($afterCapture)['tables'])->toHaveKeys($tableKeys);
 });
+
+// ─── 失败路径可见化(2026-09-11)─────────────────────────────────────────────
+// 原先两条失败路径都只 Log::warning,而 captureTables 是 void → MigrationWriter::write()
+// 照旧返回 files_written → 4 个消费方向用户报成功(web 是绿色 toast「migration 已生成 N 个文件」)。
+// 后果:baseline 没推进 ⇒ 下次 preview 重报本次变更 ⇒ 用户再点一次生成就产出重复 migration。
+// 现在 captureTables 返回状态,调用方必须回报。这两条用例把两条失败路径钉住。
+
+it('captureTables: 源 yaml 解析失败 → advanced=false + 原因，且不动 snapshot', function () {
+    $before = $this->fs->get($this->snapPath);
+
+    // 模拟 git 合并冲突标记落在 schema yaml 上(多人同步的真实场景)
+    file_put_contents(
+        $this->yamlPath,
+        "<<<<<<< HEAD\ntables:\n    demo_users:\n        name: 用户\n=======\ntables:\n    demo_users:\n        name: 会员\n>>>>>>> other\n",
+    );
+
+    $res = $this->snapshot->captureTables('Demo', ['demo_users']);
+
+    // bug 版本:void → 调用方拿不到任何信号
+    expect($res['advanced'])->toBeFalse();
+    expect($res['rebuilt_from_scratch'])->toBeFalse();
+    expect($res['reason'])->toBeString()->toContain('baseline 未推进');
+    // 提示可直接给用户看(带 ⚠)
+    expect(SnapshotStore::baselineNote($res))->toStartWith('⚠ ');
+
+    // baseline 没被碰过 —— 下次 diff 会照旧重报本次变更,所以文案必须提醒"别再点一次生成"
+    expect($this->fs->get($this->snapPath))->toBe($before);
+});
+
+it('captureTables: snapshot 自身损坏 → 从零重建，并回报"其它表 baseline 已被丢弃"', function () {
+    // 先让 snapshot 里有"其它表"的 baseline
+    $snap                         = Yaml::parseFile($this->snapPath);
+    $snap['tables']['demo_extra'] = ['name' => '额外', 'desc' => '', 'index' => [], 'fields' => ['id' => []]];
+    file_put_contents($this->snapPath, Yaml::dump($snap, 6, 4));
+
+    // 把 snapshot 弄坏(同:冲突标记落进 .snapshots/Demo.yaml,而它也是入 git 的共享文件)
+    file_put_contents($this->snapPath, "tables: [unclosed\n");
+
+    $res = $this->snapshot->captureTables('Demo', ['demo_users']);
+
+    expect($res['advanced'])->toBeTrue();                    // 本次这几张表确实就位了
+    expect($res['rebuilt_from_scratch'])->toBeTrue();        // 但代价是从零重建
+    expect($res['reason'])->toBeString()->toContain('其它表的 baseline 已被丢弃');
+
+    // 锁定这个(既有的)副作用:重建后只剩本次 capture 的表,demo_extra 的 baseline 没了
+    // → 之后它会走 baseline_drift 拒生成。调用方看到 reason 才知道要去 git 还原。
+    $after = Yaml::parse($this->fs->get($this->snapPath));
+    expect($after['tables'])->toHaveKey('demo_users');
+    expect($after['tables'])->not->toHaveKey('demo_extra');
+});
+
+it('captureTables: 正常路径返回 advanced=true / reason=null（前端据此不弹提示）', function () {
+    $res = $this->snapshot->captureTables('Demo', ['demo_users']);
+
+    expect($res)->toBe(['advanced' => true, 'rebuilt_from_scratch' => false, 'reason' => null]);
+    expect(SnapshotStore::baselineNote($res))->toBe('');
+
+    // 空 tableKeys 是 no-op,同样算"没有异常"
+    expect($this->snapshot->captureTables('Demo', []))->toBe([
+        'advanced' => true, 'rebuilt_from_scratch' => false, 'reason' => null,
+    ]);
+});

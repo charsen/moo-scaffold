@@ -16,6 +16,8 @@ use Mooeen\Scaffold\Foundation\FormRequest;
 use Mooeen\Scaffold\Rules\Mobile;
 use Mooeen\Scaffold\Rules\NumericArray;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
+use Mooeen\Scaffold\Support\FieldName;
+use Mooeen\Scaffold\Support\FieldTypes;
 use Mooeen\Scaffold\Utility;
 
 use function in_array;
@@ -607,9 +609,11 @@ class CreateControllerGenerator extends Generator
             }
 
             // 2026-06-11 修:原来只认 int/tinyint/bigint,漏 smallint/mediumint/decimal/float/double
-            // → 生成的 Request 对这些数值列零类型校验。inline 列表跟本文件其它类型判断保持一致风格。
-            $isIntType   = in_array($attr['type'], ['tinyint', 'smallint', 'mediumint', 'int', 'bigint'], true);
-            $isFloatType = in_array($attr['type'], ['decimal', 'float', 'double'], true);
+            // → 生成的 Request 对这些数值列零类型校验。
+            // 2026-09-11:改为 FieldTypes 单一来源 —— 这类"漏一个成员"的事故本仓复发过两次,
+            // 只有把成员收到一处才谈得上"改一处不漏四处"。
+            $isIntType   = in_array($attr['type'], FieldTypes::INT, true);
+            $isFloatType = in_array($attr['type'], FieldTypes::FLOAT, true);
             if ($isIntType || $isFloatType) {
                 // decimal/float/double → numeric;整数列 format float: → numeric;雪花 bigint → numeric;其余整型 → integer
                 if ($isFloatType || (isset($attr['format']) && str_contains($attr['format'], 'float:'))) {
@@ -636,28 +640,28 @@ class CreateControllerGenerator extends Generator
 
             // 字符串类型都加 string 规则;text 系列(text/tinytext/mediumtext/longtext)同样是字符串,
             // 原先漏掉 → 生成的 Request 里 text 字段缺 'string' 验证。max/min 仍只给 char/varchar(text 无 size)。
-            if (in_array($attr['type'], ['char', 'varchar', 'tinytext', 'text', 'mediumtext', 'longtext'])) {
+            if (in_array($attr['type'], FieldTypes::STRING)) {
                 $filed_rules[] = 'string';
             }
 
-            if ($attr['type'] === 'boolean' || $attr['type'] === 'bool') {
+            if (in_array($attr['type'], FieldTypes::BOOL, true)) {
                 $filed_rules[] = 'in:0,1';
             }
 
-            if (in_array($attr['type'], ['date', 'datetime', 'timestamp'])) {
+            if (in_array($attr['type'], FieldTypes::DATE)) {
                 $filed_rules[] = 'date';
             }
 
-            if (isset($attr['min_size']) && in_array($attr['type'], ['char', 'varchar'])) {
+            if (isset($attr['min_size']) && in_array($attr['type'], FieldTypes::STRING_SIZE)) {
                 $filed_rules[] = "min:{$attr['min_size']}";
             }
 
-            if (isset($attr['size']) && in_array($attr['type'], ['char', 'varchar'])) {
+            if (isset($attr['size']) && in_array($attr['type'], FieldTypes::STRING_SIZE)) {
                 $filed_rules[] = "max:{$attr['size']}";
             }
 
             if (isset($enums[$field_name])) {
-                $enum_class            = str_replace(' ', '', ucwords(str_replace('_', ' ', $field_name)));
+                $enum_class            = FieldName::studly((string) $field_name);
                 $rules['enum_class'][] = $enum_class;
                 // plan-40 §二 F8 P1 防御纵深:field_name 已经 SchemaLoader 严校 `^[a-z][a-z0-9_]*$`,
                 // 双层保护下 caller 也 escape,跟 CreateModelGenerator C-6 修法对齐
@@ -752,12 +756,12 @@ class CreateControllerGenerator extends Generator
         }
 
         // 大文本类型不进列表查询字段（避免 SELECT 拖累、列表回包过大）
-        $excluded_types = ['text', 'mediumtext', 'longtext'];
+        $excluded_types = FieldTypes::TEXT_LARGE;
 
         $fields = array_filter(
             $fields,
             static function ($meta, string $name) use ($excluded, $excluded_types): bool {
-                if (Str::startsWith($name, '_') || str_contains($name, 'password') || in_array($name, $excluded, true)) {
+                if (FieldName::isHidden((string) $name) || in_array($name, $excluded, true)) {
                     return false;
                 }
                 $type = is_array($meta) ? ($meta['type'] ?? null) : null;
@@ -791,7 +795,7 @@ class CreateControllerGenerator extends Generator
         $fields = array_keys($fields);
         $res    = [];
         foreach ($fields as $value) {
-            if (Str::startsWith($value, '_') or str_contains($value, 'password')) { // 去掉隐藏字段
+            if (FieldName::isHidden((string) $value)) { // 去掉隐藏字段
                 continue;
             }
             $res[] = "'{$value}'";

@@ -28,6 +28,22 @@ class ControllerAdder extends Adder
         $this->config = $this->utility->getConfig("controller.{$app}");
         $folder       = $folder === '<ROOT_PATH>' ? '' : $folder;
 
+        // 2026-09-11 输入守卫：这四值都由 moo:adder 交互 prompt 得来，会原样出现在生成的
+        // PHP（方法签名 / use 语句 / DocBlock）与文件名里，原先零校验 —— 含 `;` `}` 引号
+        // 或换行即可产出语法错文件，`../` 可穿越目录。
+        if (! $this->isControllerPath((string) $controller)) {
+            return $this->invalidInput((string) $controller, '控制器名非法：只允许字母/数字/下划线，可用 / 分隔目录');
+        }
+        if (! $this->isPhpIdentifier((string) $action)) {
+            return $this->invalidInput((string) $action, 'action 名非法：只允许字母/数字/下划线，且不能以数字开头');
+        }
+        if ((string) $request_name !== '' && ! $this->isPhpIdentifier((string) $request_name)) {
+            return $this->invalidInput((string) $request_name, 'Request 名非法：只允许字母/数字/下划线，且不能以数字开头');
+        }
+        if ((string) $resource_name !== '' && ! $this->isPhpIdentifier((string) $resource_name)) {
+            return $this->invalidInput((string) $resource_name, 'Resource 名非法：只允许字母/数字/下划线，且不能以数字开头');
+        }
+
         if ($new_controller) {
             $controller = Utility::ensureControllerSuffix($controller);
             $controller = ucfirst($controller);
@@ -38,15 +54,35 @@ class ControllerAdder extends Adder
             $file_path = base_path('/') . $this->config['path'] . $controller . '.php';
         }
         $relative_file_path = $this->relDisplay($file_path, $this->originCtx);
-        $file_codes         = file($file_path);
-        $action_added       = false;
 
-        $this->replaceUse($file_path, $file_codes, $request_name, $resource_name);
+        // 2026-09-11：源文件不可读时立刻中止。原实现直接 `file($file_path)` 拿 false 继续跑，
+        // 崩点落在下游 count(false) 的 TypeError（报错位置与真实原因无关），或更糟 ——
+        // 把内容写进负下标后 put() 出去，文件「生成成功」但内容为空。
+        $file_codes = $this->readSourceLines($file_path);
+        if ($file_codes === null) {
+            $this->console()->failed($relative_file_path, '源文件不存在或不可读，已中止（未写入任何内容）');
+
+            return false;
+        }
+
+        $action_added = false;
+
+        if (! $this->replaceUse($file_path, $file_codes, $request_name, $resource_name)) {
+            $this->console()->failed($relative_file_path, '未找到 use 语句锚点，已中止（未写入任何内容）');
+
+            return false;
+        }
 
         if ($this->hasFunction($file_codes, $action)) {
             $this->console()->exists("Action {$action}", 'Already exists');
         } else {
-            $end_line    = $this->getEndLine($file_codes);
+            $end_line = $this->getEndLine($file_codes);
+            if ($end_line < 0) {
+                $this->console()->failed($relative_file_path, '未找到类闭合 } 锚点，已中止（未写入任何内容）');
+
+                return false;
+            }
+
             $action_code = $this->getActionFunction($action, $request_name, $resource_name);
             $this->replaceLine($action_code, $file_codes, $end_line);
             $action_added = true;
@@ -55,7 +91,13 @@ class ControllerAdder extends Adder
         $request_name  = empty($request_name) ? '' : "{$request_name} \$request";
         $resource_name = ($this->is_collection) ? 'BaseResourceCollection' : $resource_name;
 
-        $this->filesystem->put($file_path, implode('', $file_codes));
+        $bytes = $this->filesystem->put($file_path, implode('', $file_codes));
+        if ($bytes === false) {
+            $this->console()->failed($relative_file_path, '写入失败，文件未变更');
+
+            return false;
+        }
+
         if ($action_added) {
             $this->console()->added($relative_file_path, "@{$action}({$request_name}): {$resource_name}");
         }
@@ -149,7 +191,14 @@ class ControllerAdder extends Adder
         $this->filesystem->put($file_path, implode(PHP_EOL, $codes));
     }
 
-    private function replaceUse($file_path, &$file_codes, &$request_name, &$resource_name): void
+    /**
+     * 注入 use 语句，返回是否成功。
+     *
+     * 2026-09-11：改为返回 bool —— 需要注入却找不到 use 锚点时返回 false，
+     * 由 start() 中止整次操作，而不是把内容写进 $use_line = -1 的负下标后静默丢失。
+     * 无需注入（$use_codes 为空）时不依赖锚点，直接算成功。
+     */
+    private function replaceUse($file_path, &$file_codes, &$request_name, &$resource_name): bool
     {
         $use_line  = $this->getFirstUseLine($file_codes);
         $use_codes = [];
@@ -168,10 +217,11 @@ class ControllerAdder extends Adder
             $use_codes[] = 'use Mooeen\Scaffold\Foundation\BaseResourceCollection;';
         }
 
-        if (! empty($use_codes)) {
-            $this->replaceLine(implode(PHP_EOL, $use_codes), $file_codes, $use_line);
+        if (empty($use_codes)) {
+            return true;
         }
 
+        return $this->replaceLine(implode(PHP_EOL, $use_codes), $file_codes, $use_line);
     }
 
     private function buildResource($controller_path, &$resource_name, $file_codes): bool|string
@@ -279,7 +329,8 @@ class ControllerAdder extends Adder
 
         $data_code[] = ''; // 空一行
         $data_code[] = $this->getTabs(1) . '/**';
-        $data_code[] = $this->getTabs(1) . " * {$action}";
+        // $action 已过 isPhpIdentifier（不含换行），这里再走一次 sanitizeDocblock 防 `*/` 提前闭合
+        $data_code[] = $this->getTabs(1) . ' * ' . $this->sanitizeDocblock($action);
         $data_code[] = $this->getTabs(1) . ' */';
 
         $fn_return   = ($this->is_collection) ? 'BaseResourceCollection' : $resource;

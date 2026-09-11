@@ -11,7 +11,6 @@ namespace Mooeen\Scaffold\Http\Controllers;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Mooeen\Scaffold\Foundation\FormRequest;
 use Mooeen\Scaffold\Http\Requests\Api\ProxyRequest;
 
 /**
@@ -44,7 +43,7 @@ class ApiProxyController extends Controller
             return response()->json(['_proxy_status' => 400, 'message' => 'Unsupported _proxy_method']);
         }
 
-        if (! $this->isAllowedProxyUrl($req, $url)) {
+        if (! $this->isAllowedProxyUrl($url)) {
             // plan-22 安全审计 Q3:拒绝时 audit log,便于排查异常流量
             Log::warning('scaffold.api.proxy.denied', [
                 'url'    => $url,
@@ -112,7 +111,7 @@ class ApiProxyController extends Controller
             ->withOptions(['allow_redirects' => false]);
     }
 
-    private function isAllowedProxyUrl(FormRequest $req, string $url): bool
+    private function isAllowedProxyUrl(string $url): bool
     {
         // plan-22 安全审计 Q3:显式协议白名单(原靠 origin match 隐含挡 file/gopher,显式写出来更稳)
         $scheme = strtolower((string) parse_url(trim($url), PHP_URL_SCHEME));
@@ -125,10 +124,10 @@ class ApiProxyController extends Controller
             return false;
         }
 
-        return in_array($targetOrigin, $this->getAllowedProxyOrigins($req), true);
+        return in_array($targetOrigin, $this->getAllowedProxyOrigins(), true);
     }
 
-    private function getAllowedProxyOrigins(FormRequest $req): array
+    private function getAllowedProxyOrigins(): array
     {
         $origins = [];
         foreach (array_values($this->config('hosts') ?: []) as $hostUrl) {
@@ -142,11 +141,21 @@ class ApiProxyController extends Controller
             return array_values(array_unique($origins));
         }
 
-        return [$this->buildOrigin([
-            'scheme' => $req->getScheme(),
-            'host'   => $req->getHost(),
-            'port'   => $req->getPort(),
-        ])];
+        // hosts 为空时的同源兜底。
+        //
+        // ⚠ 不能用 `$req->getScheme()/getHost()/getPort()`：那是**请求头**、攻击者可控 ——
+        // 带 `Host: victim.internal` 就能让"白名单"恰好等于攻击者指定的那个 origin，
+        // 代理退化成任意出网跳板（白名单形同虚设）。改用 `config('app.url')`，即运维在
+        // .env 里声明的本站地址；拿不到就**不允许任何目标** —— 宁可白名单空着报 403，
+        // 也不拿请求头兜底。
+        $appUrl = trim((string) config('app.url'));
+        if ($appUrl === '') {
+            return [];
+        }
+
+        $origin = $this->normalizeOrigin($appUrl);
+
+        return $origin === null ? [] : [$origin];
     }
 
     private function normalizeOrigin(string $url): ?string
