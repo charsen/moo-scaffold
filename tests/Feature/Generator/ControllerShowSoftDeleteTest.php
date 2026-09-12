@@ -66,6 +66,9 @@ function showfix_meta(array $fields): array
         'use_traits_code'               => "    use BaseActionTrait;\n    use DemoTrait;",
         'show_fields'                   => "'id'",
         'show_find_or_fail'             => showfix_call(showfix_gen(), 'showFindOrFail', [$fields]),
+        // 2026-09-12：trashed / forceDestroy / restore 也改为按软删条件生成（对称补全）
+        'soft_delete_methods' => showfix_call(showfix_gen(), 'softDeleteMethods', [$fields, '示例', 'Demo']),
+        'trashed_list_append' => isset($fields['deleted_at']) ? "'deleted_at'" : '',
     ];
 }
 

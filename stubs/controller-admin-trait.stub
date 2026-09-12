@@ -18,6 +18,9 @@ trait {{trait_class}}
 {
     /**
      * 列表的查询字段
+     *
+     * `trashed` 分支的 append 由生成器按模型是否软删决定：本表无 `deleted_at` 时
+     * append 为空数组 —— select 不存在的列会让端点 500。
      */
     private function getListFields(string $action = 'index'): array
     {
@@ -26,7 +29,7 @@ trait {{trait_class}}
         if ($action === 'index') {
             $append = ['updated_at'];
         } else {
-            $append = ['deleted_at'];
+            $append = [{{trashed_list_append}}];
         }
 
         return [...$fields, ...$append];
