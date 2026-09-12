@@ -170,6 +170,7 @@ class CreateControllerGenerator extends Generator
                     'list_columns'                  => $this->getListFields($fields, true, $enums),
                     'form_layout_columns'           => $this->getFormLayoutColumns($rules),
                     'show_fields'                   => $this->getShowFields($fields),
+                    'show_find_or_fail'             => $this->showFindOrFail($fields),
                     'route_key'                     => strtolower(Str::snake($attr['model_class'], '-')),
                     'model_class'                   => $model_class,
                     'model_key_name'                => (new $model_class)->getKeyName(),
@@ -805,6 +806,19 @@ class CreateControllerGenerator extends Generator
         // 占位本身的缩进顶上,后续行各补 3 tab(getTabs(3)=12 空格)。
         // 配套:controller-*.stub 的 show() 已改成多行 `$columns = [\n  {{show_fields}}\n];`。
         return trim(implode(',' . PHP_EOL . $this->getTabs(3), $res));
+    }
+
+    /**
+     * show() 的取记录表达式：软删模型带 withTrashed()（能查看已删除记录），非软删模型普通 findOrFail()。
+     *
+     * 判定走 Generator::hasSoftDeletes —— 与 CreateModelGenerator 注入 SoftDeletes trait 同源。
+     * 不软删的表若生成 withTrashed()，模型上没有该方法，show 端点直接 500。
+     */
+    private function showFindOrFail(array $fields): string
+    {
+        return $this->hasSoftDeletes($fields)
+            ? '$this->model->withTrashed()->findOrFail($id)'
+            : '$this->model->findOrFail($id)';
     }
 
     /**
