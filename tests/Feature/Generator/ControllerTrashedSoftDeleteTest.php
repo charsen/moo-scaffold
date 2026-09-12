@@ -194,21 +194,34 @@ it('渲染 controller-admin-trait.stub:非软删表 trashed append 为空数组,
 });
 
 // ─── 共享动作 trait 的运行时守卫 ──────────────────────────────────────────
-it('两个共享动作 trait 的 forceDestroyAction/restoreAction 都带非软删运行时守卫', function () {
-    foreach (['controller-admin-base-action-trait', 'controller-resource-actions-trait'] as $name) {
-        $stub = trashedfix_stub($name);
+it('host 侧 controller-admin-base-action-trait 的 forceDestroyAction/restoreAction 保留非软删运行时守卫', function () {
+    // host 里确有「模型非软删但 forceDestroy/restore 端点仍在」的存量控制器
+    // （iResource 按 public 方法注册路由，模型后来不再软删就 drift 出来），这处守卫真拦 500，保留。
+    $stub = trashedfix_stub('controller-admin-base-action-trait');
 
-        expect(substr_count($stub, 'in_array(SoftDeletes::class, class_uses_recursive($this->model), true)'))->toBe(2)
-            ->and($stub)->toContain('use Illuminate\\Database\\Eloquent\\SoftDeletes;')
-            ->and($stub)->toContain("abort(404, 'The model does not support soft deletes.');");
+    expect(substr_count($stub, 'in_array(SoftDeletes::class, class_uses_recursive($this->model), true)'))->toBe(2)
+        ->and($stub)->toContain('use Illuminate\\Database\\Eloquent\\SoftDeletes;')
+        ->and($stub)->toContain("abort(404, 'The model does not support soft deletes.');");
+});
 
-        // 占位符渲染后仍须是合法 PHP（stub 只留 {{namespace}} / {{base_resources}}）
-        $php = trashedfix_call(trashedfix_gen(), 'buildStub', [[
-            'namespace'      => 'App\\Admin\\Controllers\\Traits',
-            'base_resources' => 'Mooeen\\Scaffold\\Foundation\\BaseResource',
-        ], $stub]);
+it('包侧 controller-resource-actions-trait 不再带非软删守卫（生成出来的包里恒不触发）', function () {
+    // 非软删模型本来就不生成 forceDestroy()/restore() 端点，守卫在每个生成出来的包里都是死代码，
+    // 且每包一份、要人记得维护 —— 2026-09-12 用户判定不要，已从 11 个包 + 本模板一并移除。
+    $stub = trashedfix_stub('controller-resource-actions-trait');
 
-        expect($php)->not->toContain('{{');
-        expect(trashedfix_syntax_error($php))->toBeNull();
-    }
+    expect($stub)->not->toContain('class_uses_recursive')
+        ->and($stub)->not->toContain('does not support soft deletes')
+        ->and($stub)->not->toContain('use Illuminate\\Database\\Eloquent\\SoftDeletes;')
+        // 端点方法本身仍在（软删模型要用）
+        ->and($stub)->toContain('private function forceDestroyAction')
+        ->and($stub)->toContain('private function restoreAction')
+        ->and($stub)->toContain('->onlyTrashed()');
+
+    $php = trashedfix_call(trashedfix_gen(), 'buildStub', [[
+        'namespace'      => 'Mooeen\\Demo\\Http\\Controllers\\Admin\\Traits',
+        'base_resources' => 'Mooeen\\Scaffold\\Foundation\\BaseResource',
+    ], $stub]);
+
+    expect($php)->not->toContain('{{');
+    expect(trashedfix_syntax_error($php))->toBeNull();
 });
