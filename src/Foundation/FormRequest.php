@@ -273,7 +273,20 @@ class FormRequest extends BaseFormRequest
             $result[$field] = $tmp;
         }
 
-        // 若 reset 还存在数据，则是新增的，直接附加进去
+        // 若 reset 还存在数据，则是新增的，直接附加进去。
+        //
+        // ⚠️ 这些键**不在本 Request 的 rules() 内**，是宿主控制器为表单展示需要、
+        //    经 `getFormConfig(reset:)` 额外附加的值（典型：金额回显、keep_department_id
+        //    之类的 hidden 辅助键）。它们长得像控件、前端也确实需要这些键参与表单配置，
+        //    但不是本 Request 的契约字段 —— 校验层刻意不收，并非「改了没生效」。
+        //    为让 `moo:audit:form-contract` 能把「契约参与项」与「仅用于 reset/附加值的键」
+        //    分开，这里显式打上 `contract => false` 标记（宿主已自备 contract 键时以宿主为准；
+        //    前端与 Resource 可忽略该键）。审计对「标记 + 不可见」的条目默认跳过；
+        //    「标记 + 用户可见」仍是真实缺陷（前端渲染得出、用户填得进），不因标记豁免。
+        foreach ($reset as $field => $config) {
+            $reset[$field] = is_array($config) ? ($config + ['contract' => false]) : $config;
+        }
+
         return array_merge($result, $reset);
     }
 }

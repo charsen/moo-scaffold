@@ -71,30 +71,6 @@ class {{controller_name}}Controller extends Controller
     }
 
     /**
-     * {{entity_name}}回收站
-     *
-     * @acl {zh-CN: {{entity_name}}回收站, en: {{entity_en_name}} Trashed, desc: }
-     */
-    public function trashed(IndexRequest $request): BaseResourceCollection
-    {
-        $validated = $request->validated();
-
-        $result    = $this->model->select($this->getListFields('trashed'))
-                                 ->filter($validated)
-                                 ->latest('deleted_at')
-                                 ->onlyTrashed()
-                                 ->paginate(($validated['page_limit'] ?? NULL));
-        $result->append(['options']);
-
-        return BaseResource::collection($result)
-                           ->trashed()
-                           ->additional([
-                               'columns'      => $this->getListColumns('trashed'),
-                               'form_widgets' => $this->getListFormWidgets($request, 'trashed'),
-                           ]);
-    }
-
-    /**
      * 创建{{entity_name}}
      *
      * @acl {zh-CN: 创建{{entity_name}}, en: Create {{entity_en_name}}, desc: }
@@ -131,7 +107,7 @@ class {{controller_name}}Controller extends Controller
      */
     public function show(int|string $id): BaseResource
     {
-        $result  = $this->model->withTrashed()->findOrFail($id);
+        $result  = {{show_find_or_fail}};
         $result->append(['options']);
 
         $columns = [
@@ -149,24 +125,6 @@ class {{controller_name}}Controller extends Controller
     public function destroyBatch(DestroyBatchRequest $request): BaseResource
     {
         return $this->destroyBatchAction($request);
-    }
-
-    /**
-     * 永久删除{{entity_name}}
-     *
-     * @acl {zh-CN: 永久删除{{entity_name}}, en: Destroy Forever {{entity_en_name}}, desc: }
-     */
-    public function forceDestroy(int|string $id): BaseResource
-    {
-        return $this->forceDestroyAction($id);
-    }
-
-    /**
-     * 恢复{{entity_name}}
-     */
-    public function restore(DestroyBatchRequest $request): BaseResource
-    {
-        return $this->restoreAction($request);
     }
 
     /**
@@ -189,4 +147,4 @@ class {{controller_name}}Controller extends Controller
                                'form_widgets' => $this->getFormWidgets(new UpdateRequest, 'edit'),
                            ]);
     }
-}
+{{soft_delete_methods}}}

@@ -1,0 +1,203 @@
+<?php declare(strict_types=1);
+
+use Illuminate\Support\Facades\File;
+
+/*
+ * `moo:audit:form-contract` 命令测试 —— 用包内最小 fixture 工程（不依赖真实 Host / 数据库），
+ * 覆盖可见性归类、@moo-waived 豁免、陈旧标记、分桶摘要、CSV 列集与默认/放开口径的退出码。
+ *
+ * fixture 控制器/Request 位于 tests/Feature/Command/Fixtures/FormContract/，命名空间由 composer
+ * 的 `Mooeen\Scaffold\Tests\` PSR-4 前缀承载，命令按 --scope 绝对路径反推出 `...\App\Admin\Controllers`。
+ */
+
+function formContractScope(): string
+{
+    return __DIR__ . '/Fixtures/FormContract/App/Admin/Controllers';
+}
+
+/** @return array<int, array<string, string>> */
+function formContractCsv(string $path): array
+{
+    $rows   = [];
+    $handle = fopen($path, 'r');
+    $header = fgetcsv($handle);
+    while (($row = fgetcsv($handle)) !== false) {
+        $rows[] = array_combine($header, $row);
+    }
+    fclose($handle);
+
+    return $rows;
+}
+
+/** @param array<int, array<string, string>> $rows */
+function formContractFind(array $rows, string $field, string $method): array
+{
+    foreach ($rows as $row) {
+        if ($row['Field'] === $field && $row['Method'] === $method) {
+            return $row;
+        }
+    }
+
+    throw new RuntimeException("fixture row not found: {$field}/{$method}");
+}
+
+beforeEach(function () {
+    $this->tmp = sys_get_temp_dir() . '/moo-form-contract-' . bin2hex(random_bytes(4));
+    File::ensureDirectoryExists($this->tmp);
+});
+
+afterEach(function () {
+    File::deleteDirectory($this->tmp);
+});
+
+test('默认口径只报用户可见违规：hidden/disabled 噪音与 waived 豁免都不计入，CSV 沿用既有列集', function () {
+    $csv = $this->tmp . '/default.csv';
+
+    $this->artisan('moo:audit:form-contract', ['--scope' => formContractScope(), '--out' => $csv])
+        ->expectsOutputToContain('Contract violations: 4 (visible 4, hidden 2, disabled 2, layout-only 0, waived 2)')
+        ->expectsOutputToContain('Waived form fields: 2')
+        ->expectsOutputToContain('legacy_field = 早期精简：nullable 字段暂不实现')
+        // 陈旧标记不能被静默忽略
+        ->expectsOutputToContain('Stale waived markers: 4')
+        ->expectsOutputToContain('removed_field')
+        ->assertExitCode(1);
+
+    $rows = formContractCsv($csv);
+    expect($rows)->toHaveCount(10);
+    expect(array_keys($rows[0]))
+        ->toBe(['Module', 'Controller', 'Method', 'Request', 'Field', 'WidgetCount', 'Note', 'Visible', 'ExcludedBy']);
+
+    // 可见的 rules 外附加键 = 真实违规（用户填得进、提交被丢）
+    $visible = formContractFind($rows, 'ghost_visible', 'create');
+    expect($visible['Visible'])->toBe('yes')
+        ->and($visible['ExcludedBy'])->toBe('')
+        ->and($visible['Request'])->toBe('StoreRequest')
+        ->and($visible['Note'])->toContain('[contract=false');
+
+    // hidden / disabled 噪音：登记但标为排除
+    expect(formContractFind($rows, 'ghost_hidden', 'create')['ExcludedBy'])->toBe('hidden')
+        ->and(formContractFind($rows, 'ghost_hidden', 'create')['Visible'])->toBe('no')
+        ->and(formContractFind($rows, 'ghost_disabled', 'edit')['ExcludedBy'])->toBe('disabled');
+
+    // 显式 waived：独立桶 + 原因，未计入违规
+    $waived = formContractFind($rows, 'legacy_field', 'create');
+    expect($waived['ExcludedBy'])->toBe('waived')
+        ->and($waived['Visible'])->toBe('no')
+        ->and($waived['Note'])->toContain('[waived: 早期精简：nullable 字段暂不实现]');
+
+    // rules 内字段（name）不登记为检出项
+    foreach ($rows as $row) {
+        expect($row['Field'])->not->toBe('name');
+    }
+});
+
+test('反例：规则被整行注释但未加 @moo-waived 标记的字段仍报可见违规', function () {
+    $csv = $this->tmp . '/commented.csv';
+
+    $this->artisan('moo:audit:form-contract', [
+        '--scope'  => formContractScope(),
+        '--module' => 'Commented',
+        '--out'    => $csv,
+    ])
+        ->expectsOutputToContain('Contract violations: 2 (visible 2, hidden 0, disabled 0, layout-only 0, waived 0)')
+        ->assertExitCode(1);
+
+    $rows = formContractCsv($csv);
+    expect($rows)->toHaveCount(2);
+    foreach ($rows as $row) {
+        expect($row['Field'])->toBe('commented_field')
+            ->and($row['Visible'])->toBe('yes')
+            ->and($row['ExcludedBy'])->toBe('')
+            ->and($row['Note'])->not->toContain('[waived:');
+    }
+});
+
+test('陈旧标记：标记仍在但当期不构成违规时以 warning 报出，不静默忽略', function () {
+    $csv = $this->tmp . '/stale.csv';
+
+    $this->artisan('moo:audit:form-contract', [
+        '--scope'  => formContractScope(),
+        '--module' => 'Stale',
+        '--out'    => $csv,
+    ])
+        ->expectsOutputToContain('Stale waived markers: 4')
+        ->expectsOutputToContain('removed_field: 控件已移除，标记应清理')
+        ->expectsOutputToContain('restored_field: 规则已补回，标记应清理')
+        ->expectsOutputToContain('Contract violations: 0 (visible 0, hidden 0, disabled 0, layout-only 0, waived 0)')
+        ->assertExitCode(0);
+
+    expect(formContractCsv($csv))->toHaveCount(0);
+});
+
+test('--all 放开口径后 hidden/disabled 计入（waived 始终不计），CSV 与默认口径逐字节一致', function () {
+    $defaultCsv = $this->tmp . '/default.csv';
+    $allCsv     = $this->tmp . '/all.csv';
+
+    $this->artisan('moo:audit:form-contract', ['--scope' => formContractScope(), '--out' => $defaultCsv])
+        ->assertExitCode(1);
+
+    $this->artisan('moo:audit:form-contract', ['--scope' => formContractScope(), '--out' => $allCsv, '--all' => true])
+        ->expectsOutputToContain('Contract violations: 8 (visible 4, hidden 2, disabled 2, layout-only 0, waived 2)')
+        ->assertExitCode(1);
+
+    expect(file_get_contents($allCsv))->toBe(file_get_contents($defaultCsv));
+});
+
+test('--include-waived 展开逐条明细且不改变计数（waived 不影响退出码）', function () {
+    $csv = $this->tmp . '/include-waived.csv';
+
+    $this->artisan('moo:audit:form-contract', [
+        '--scope'          => formContractScope(),
+        '--out'            => $csv,
+        '--include-waived' => true,
+    ])
+        ->expectsOutputToContain('Waived form fields: 2')
+        ->expectsOutputToContain('Waived/Waived.create legacy_field: 早期精简：nullable 字段暂不实现')
+        ->expectsOutputToContain('Contract violations: 4 (visible 4, hidden 2, disabled 2, layout-only 0, waived 2)')
+        ->assertExitCode(1);
+});
+
+test('--include-hidden 单独放开不会展开契约外 hidden 键（still contract-gated）', function () {
+    $csv = $this->tmp . '/include-hidden.csv';
+
+    $this->artisan('moo:audit:form-contract', [
+        '--scope'          => formContractScope(),
+        '--out'            => $csv,
+        '--include-hidden' => true,
+    ])
+        ->expectsOutputToContain('Contract violations: 4 (visible 4, hidden 2, disabled 2, layout-only 0, waived 2)')
+        ->assertExitCode(1);
+});
+
+test('--module 只审计指定模块；纯 waived 模块默认退出码 0', function () {
+    $csv = $this->tmp . '/waived-only.csv';
+
+    $this->artisan('moo:audit:form-contract', [
+        '--scope'  => formContractScope(),
+        '--module' => 'Waived',
+        '--out'    => $csv,
+    ])
+        ->expectsOutputToContain('Contract violations: 0 (visible 0, hidden 0, disabled 0, layout-only 0, waived 2)')
+        ->assertExitCode(0);
+
+    $rows = formContractCsv($csv);
+    expect($rows)->toHaveCount(2);
+    foreach ($rows as $row) {
+        expect($row['Module'])->toBe('Waived')
+            ->and($row['ExcludedBy'])->toBe('waived');
+    }
+});
+
+test('layout 内表单的 rules 外附加键被 transformLayout 丢弃，命令不误报', function () {
+    $csv = $this->tmp . '/layout.csv';
+
+    $this->artisan('moo:audit:form-contract', [
+        '--scope'  => formContractScope(),
+        '--module' => 'Layout',
+        '--out'    => $csv,
+    ])
+        ->expectsOutputToContain('Contract violations: 0 (visible 0, hidden 0, disabled 0, layout-only 0, waived 0)')
+        ->assertExitCode(0);
+
+    expect(formContractCsv($csv))->toHaveCount(0);
+});

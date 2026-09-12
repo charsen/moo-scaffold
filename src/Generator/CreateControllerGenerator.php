@@ -170,6 +170,9 @@ class CreateControllerGenerator extends Generator
                     'list_columns'                  => $this->getListFields($fields, true, $enums),
                     'form_layout_columns'           => $this->getFormLayoutColumns($rules),
                     'show_fields'                   => $this->getShowFields($fields),
+                    'show_find_or_fail'             => $this->showFindOrFail($fields),
+                    'soft_delete_methods'           => $this->softDeleteMethods($fields, $attr['entity_name'], $attr['model_class']),
+                    'trashed_list_append'           => $this->hasSoftDeletes($fields) ? "'deleted_at'" : '',
                     'route_key'                     => strtolower(Str::snake($attr['model_class'], '-')),
                     'model_class'                   => $model_class,
                     'model_key_name'                => (new $model_class)->getKeyName(),
@@ -440,6 +443,7 @@ class CreateControllerGenerator extends Generator
             'list_fields'         => $data['list_fields'],
             'list_columns'        => $data['list_columns'],
             'form_layout_columns' => $data['form_layout_columns'],
+            'trashed_list_append' => $data['trashed_list_append'],
             'author'              => $data['author'],
             'date'                => $data['date'],
         ];
@@ -805,6 +809,94 @@ class CreateControllerGenerator extends Generator
         // 占位本身的缩进顶上,后续行各补 3 tab(getTabs(3)=12 空格)。
         // 配套:controller-*.stub 的 show() 已改成多行 `$columns = [\n  {{show_fields}}\n];`。
         return trim(implode(',' . PHP_EOL . $this->getTabs(3), $res));
+    }
+
+    /**
+     * show() 的取记录表达式：软删模型带 withTrashed()（能查看已删除记录），非软删模型普通 findOrFail()。
+     *
+     * 判定走 Generator::hasSoftDeletes —— 与 CreateModelGenerator 注入 SoftDeletes trait 同源。
+     * 不软删的表若生成 withTrashed()，模型上没有该方法，show 端点直接 500。
+     */
+    private function showFindOrFail(array $fields): string
+    {
+        return $this->hasSoftDeletes($fields)
+            ? '$this->model->withTrashed()->findOrFail($id)'
+            : '$this->model->findOrFail($id)';
+    }
+
+    /**
+     * 回收站 / 永久删除 / 恢复三个方法的实现体：软删模型才生成，非软删模型返回空串。
+     *
+     * 为什么**不能**像 show() 那样换个表达式了事：`/trashed` 的查询固定带
+     * `onlyTrashed()` + `latest('deleted_at')` + 列表列含 `deleted_at`，表无 deleted_at 时
+     * 既没有 onlyTrashed() 也选不到列 —— 换表达式等于换端点语义。而路由宏
+     * (AppServiceProvider::iResource) 按「控制器是否有该 public 方法」决定是否注册
+     * `/trashed`、`/forever/{id}`、`/restore`，所以「不生成」= 端点不存在 = 404，
+     * 与包内既有手写范例一致（见 moo-process ProcessInstanceController 注释：
+     * 「trashed / restore / forceDestroy 更是必删：本表无 deleted_at」）。
+     *
+     * 判定走 Generator::hasSoftDeletes —— 与 CreateModelGenerator 注入 SoftDeletes trait 同源。
+     */
+    private function softDeleteMethods(array $fields, string $entity_name = '', string $entity_en_name = ''): string
+    {
+        if (! $this->hasSoftDeletes($fields)) {
+            return '';
+        }
+
+        $methods = [
+            <<<'PHP'
+    /**
+     * {{entity_name}}回收站
+     *
+     * @acl {zh-CN: {{entity_name}}回收站, en: {{entity_en_name}} Trashed, desc: }
+     */
+    public function trashed(IndexRequest $request): BaseResourceCollection
+    {
+        $validated = $request->validated();
+
+        $result    = $this->model->select($this->getListFields('trashed'))
+                                 ->filter($validated)
+                                 ->latest('deleted_at')
+                                 ->onlyTrashed()
+                                 ->paginate(($validated['page_limit'] ?? NULL));
+        $result->append(['options']);
+
+        return BaseResource::collection($result)
+                           ->trashed()
+                           ->additional([
+                               'columns'      => $this->getListColumns('trashed'),
+                               'form_widgets' => $this->getListFormWidgets($request, 'trashed'),
+                           ]);
+    }
+PHP,
+            <<<'PHP'
+    /**
+     * 永久删除{{entity_name}}
+     *
+     * @acl {zh-CN: 永久删除{{entity_name}}, en: Destroy Forever {{entity_en_name}}, desc: }
+     */
+    public function forceDestroy(int|string $id): BaseResource
+    {
+        return $this->forceDestroyAction($id);
+    }
+
+    /**
+     * 恢复{{entity_name}}
+     */
+    public function restore(DestroyBatchRequest $request): BaseResource
+    {
+        return $this->restoreAction($request);
+    }
+PHP,
+        ];
+
+        // 占位符在类体末尾紧贴闭合 `}`，代码块自带 4 空格方法缩进、此处不再加缩进。
+        // 方法体内的 {{entity_name}} / {{entity_en_name}} 在此就地替换：buildStub 是单遍
+        // str_replace，注入值里若再带占位符不会被第二遍处理。
+        return $this->buildStub(
+            ['entity_name' => $entity_name, 'entity_en_name' => $entity_en_name],
+            implode(PHP_EOL . PHP_EOL, $methods),
+        );
     }
 
     /**
