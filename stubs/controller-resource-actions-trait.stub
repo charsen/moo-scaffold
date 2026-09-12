@@ -2,6 +2,7 @@
 
 namespace {{namespace}};
 
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Validation\ValidationException;
 use {{base_resources}};
 
@@ -53,9 +54,19 @@ trait HandlesResourceActions
 
     /**
      * 永久删除
+     *
+     * 运行态守卫：非软删模型（表无 deleted_at / 模型未 use SoftDeletes）没有 onlyTrashed() /
+     * forceDelete()，直接调必然 BadMethodCallException → 500。
+     * 本 trait 是「每个包一份、被该包全部控制器 use」，无法按模型条件化生成；生成器已对非软删
+     * 模型不生成 forceDestroy()/restore() 端点（见 controller-admin.stub 的 soft_delete_methods），
+     * 本守卫兜住手写控制器仍 use 本 trait 的情形，语义与「端点不存在」一致：404。
      */
     private function forceDestroyAction(int|string $id): BaseResource
     {
+        if (! in_array(SoftDeletes::class, class_uses_recursive($this->model), true)) {
+            abort(404, 'The model does not support soft deletes.');
+        }
+
         $result = $this->model->onlyTrashed()->findOrFail($id);
         $result->forceDelete();
 
@@ -69,6 +80,10 @@ trait HandlesResourceActions
      */
     private function restoreAction($request): BaseResource
     {
+        if (! in_array(SoftDeletes::class, class_uses_recursive($this->model), true)) {
+            abort(404, 'The model does not support soft deletes.');
+        }
+
         $validated = $request->validated();
         $model_ids = is_array($validated['ids']) ? $validated['ids'] : [$validated['ids']];
 
