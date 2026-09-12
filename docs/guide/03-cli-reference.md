@@ -142,20 +142,6 @@ php artisan moo:composer:docs --root=/path/to/host --write         # 只替换 m
 - `--write` / `--check` 走 marker 区间 `<!-- BEGIN moo-manifest-table -->` / `<!-- END moo-manifest-table -->`;文档没有 marker 时 `--write` **拒绝**(不猜插入位置),`--check` 视为失败。
 - **纯只读**(`table` / `matrix` / `--bare` / `--check`),任何环境可跑。
 
-### `moo:assets:check [--root=] [--package=] [--publish-dir=] [--out=] [--strict] [--publish-command]`
-
-检测宿主 `public/vendor/<pkg>` 已发布副本是否与包内 `public/` 一致(前端 JS 陈旧 / 根本没副本的人工 md5 比对,改由本命令完成)。
-
-```bash
-php artisan moo:assets:check --root=/path/to/host
-php artisan moo:assets:check --root=/path/to/host --out=storage/app/assets-check.md
-```
-
-- 分类报告 **缺失 / 内容不一致 / 多余**;缺失 + 内容不一致 → 退出码 `1`。
-- **多余**(发布目录里包内已删除的陈旧残留)默认只提示不判失败(`vendor:publish` 不删旧文件,各 Host 普遍存在);`--strict` 时同样算不一致。
-- 发布目录名默认取 manifest 的 `repo-key`(如 `scaffold`),不是 composer 包短名;`--publish-command` 提示修复命令 `php artisan vendor:publish --tag=<publish-tag> --force`。
-- **纯只读**:绝不自动 publish。
-
 ### `moo:cloud:*` — 云端
 
 | 命令 | 作用 |
@@ -184,7 +170,7 @@ php artisan moo:scaffold:merge-yaml scaffold/accounts.yaml --dry-run
   - `moo:account:add` — 首部署 bootstrap
   - `moo:scaffold:merge-yaml` — git sync 冲突合并
   - `moo:db:audit` — 只读对账(也核对生产 DB)
-  - `moo:composer:docs` / `moo:assets:check` — 只读体检(宿主私包清单文档 / 已发布前端副本)
+  - `moo:composer:docs` — 只读体检(宿主私包清单文档 ↔ 三份 manifest)
   - `moo:cloud:push` / `moo:cloud:mcp` / `moo:monitor:migrate` — 云端推送 / MCP / 旧版迁移(由 moo-monitor-laravel 提供,无 only_in_local 限制)
 - 改了 schema YAML **务必**先 `moo:fresh`。
 - 生成的 `Traits/*ModelTrait.php` / `Enums/*.php` 每次都被覆盖，**别写业务代码**；`HasOperator` 等通用能力直接引用共享 `Mooeen\Scaffold\Concerns\*`，不生成本地副本。
