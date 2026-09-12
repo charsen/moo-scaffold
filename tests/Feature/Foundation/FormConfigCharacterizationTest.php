@@ -163,7 +163,7 @@ it('reset:同名字段按「reset 胜」逐键覆盖,原字段属性保留', fun
     expect($c['body']['field'])->toBe('body');
 });
 
-it('reset:**规则外的键被原样追加成控件**（host 依赖的既成契约，不是 bug）', function () {
+it('reset:**规则外的键被附加成控件并打 contract=false 标记**（host 依赖的既成契约，不是 bug）', function () {
     $c = anonymousFormRequest([
         'a' => ['required', 'string'],
     ])->getFormConfig(reset: [
@@ -171,8 +171,28 @@ it('reset:**规则外的键被原样追加成控件**（host 依赖的既成契�
     ]);
 
     expect($c)->toHaveKey('ghost');
-    // 原样附加：没有 field / required / rules —— 这三项由 FormWidgetCollection::toArray 后补
-    expect($c['ghost'])->toBe(['type' => 'text-amount', 'label' => '只读金额']);
+    // 除新增的 contract=false 标记外与改前一致：没有 field / required / rules —— 这三项由
+    // FormWidgetCollection::toArray 后补。标记只用于审计分桶，前端可忽略。
+    expect($c['ghost'])->toBe(['type' => 'text-amount', 'label' => '只读金额', 'contract' => false]);
+});
+
+it('reset:规则外附加键的 contract 标记尊重宿主已写值，非数组值原样保留', function () {
+    $c = anonymousFormRequest(['a' => ['required', 'string']])->getFormConfig(reset: [
+        'ghost_keep'   => ['contract' => true, 'label' => '保留宿主'],
+        'ghost_scalar' => 'raw',
+    ]);
+
+    expect($c['ghost_keep'])->toBe(['contract' => true, 'label' => '保留宿主']);
+    expect($c['ghost_scalar'])->toBe('raw');
+});
+
+it('reset:命中 rules 的键不打 contract 标记（仍是契约参与项）', function () {
+    $c = anonymousFormRequest(['body' => ['required', 'string']])->getFormConfig(reset: [
+        'body' => ['type' => 'textarea'],
+    ]);
+
+    expect($c['body'])->not->toHaveKey('contract');
+    expect($c['body']['type'])->toBe('textarea');
 });
 
 it('exclude:排除 a.* 只丢通配子项行,父字段行保留;排除字段名才连父带子一起丢', function () {

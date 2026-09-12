@@ -56,6 +56,19 @@ class Generator
     // 缩进 / 目录 / stub 读取 / escape 三件套见 SharedCodegenHelpers trait(同上共用)
 
     /**
+     * 表是否启用软删除 —— 「模型是否 use SoftDeletes」的单一判定口径。
+     *
+     * CreateModelGenerator 据此决定是否注入 SoftDeletes trait，CreateControllerGenerator
+     * 据此决定 show() 能否调 withTrashed()。两处必须同源：一边认软删、另一边不认时，
+     * 生成的控制器会调模型上不存在的方法（Call to undefined method ...::withTrashed()）
+     * → show 端点 500。
+     */
+    protected function hasSoftDeletes(array $fields): bool
+    {
+        return isset($fields['deleted_at']);
+    }
+
+    /**
      * 写入文件并输出状态报告
      */
     protected function putAndReport(string $file, string $relativeFile, string $content, string $existVerb = 'overwritten'): void
