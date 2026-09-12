@@ -186,14 +186,15 @@
         // 不追求视觉跟生产一致
         // =========================================================================
 
-        // 已知 widget type 白名单(对齐 下游 admin 前端 former/config.ts 的 elComponents 注册表)
-        // 2026-06-10:补 'rate-picker'(former 新增,a-rate 封装,带 max/allow-half/tooltips)。
-        var KNOWN_WIDGET_TYPES = [
-            'input', 'textarea', 'password', 'radio', 'select', 'cascader',
-            'date-picker', 'datetime-picker', 'month-picker', 'month-day-picker',
-            'date', 'editor', 'upload-image', 'upload-file', 'cropper-image',
-            'checkbox', 'color-picker', 'rate', 'rate-picker'
-        ];
+        // 已知 widget type 白名单 —— 单一来源见 Support\FormWidgetTypes::detectable()，
+        // 由 api/request 视图注入 window.ScaffoldConfig.knownWidgetTypes（2026-09-11 收口）。
+        // 此前这里是内联副本 + 注释“对齐下游 former/config.ts”，只能靠人工同步：2026-06-10
+        // 手工补过 rate-picker，收口时两份清单已双向漂移（text-amount 只在下游，
+        // date / cropper-image 只在 JS）。故意不留内联兜底副本 —— 注入缺失时退回纯 shape
+        // 判定，避免又长出一份会过期的清单。
+        var KNOWN_WIDGET_TYPES = (window.ScaffoldConfig && Array.isArray(window.ScaffoldConfig.knownWidgetTypes))
+            ? window.ScaffoldConfig.knownWidgetTypes
+            : [];
 
         // shape detection:顶层是 array,叶子对象有 type(string)+ label(string),且整组里
         // 至少有一个 widget 的 type 命中白名单。
@@ -212,6 +213,9 @@
             // (former config.ts: components[widget.type] ?? components.input),首字段恰是
             // 未知/新增/误用的 type(如 host 把只读展示字段写成 'text')时,不该让整张表单预览
             // 静默消失。改成"任一 widget 命中白名单"即认定为表单:兼容首字段未知,又挡住任意数组误判。
+            // 2026-09-11:白名单改由后端注入。未注入(单独打开静态资源 / 旧视图缓存)时退回纯 shape
+            // 判定,不用内联副本兜底 —— 那份副本正是这次要消掉的漂移源。
+            if (KNOWN_WIDGET_TYPES.length === 0) return true;
             return widgets.some(function (w) {
                 return w && typeof w.type === 'string' && KNOWN_WIDGET_TYPES.indexOf(w.type) > -1;
             });

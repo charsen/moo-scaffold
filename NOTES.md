@@ -3,6 +3,10 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-11，**裸检出跑 Pest 必须显式指定非 DB 驱动**：本仓无 `.env`，Testbench 起的 Laravel 11+ 默认 `SESSION_DRIVER` / `CACHE_STORE` / `QUEUE_CONNECTION` 全是 `database`，而测试库没有 `sessions` / `cache` 表 ⇒ 所有走 session / cache 的 HTTP 用例 500。
+  **症状有迷惑性**：失败数会随你修的维度**递减**（只设 `SESSION_DRIVER=array` 时 167 failed → 72 failed，报错从 `no such table: sessions` 变成 `no such table: cache`），看起来像"快修好了"，其实只是还差下一项。正确跑法：
+  `SESSION_DRIVER=array CACHE_STORE=array QUEUE_CONNECTION=sync composer test`
+  **判据**：报错出现 `no such table: <非业务表>`（sessions / cache / jobs 等框架表）时先怀疑驱动，不要去补 migration —— 本仓是包，自身没有业务表，Testbench 也不跑宿主 migration。
 - 2026-09-11，**历史脱敏的边界 + 一处判断更正**：本轮那 15 个未推送 commit 里的宿主名 / 域名 / 绝对路径已用 `git filter-branch`（限定 `origin/master..master`）就地脱敏 —— 改写后**最终文件内容一字未变**（`git diff <旧 sha> master` 为空）、commit 数不变（15）、工作区干净，且**正常 `git push` 即可**（`origin/master` 是新 master 的祖先，远程是快进，**不需要强推**）。动手前已整仓备份 `.git`（48M → `/tmp`）。
   **更正**：起初只按「文件内容」搜（`git log -S<串>`）得出"含内部名的只有 3 个 commit、且全未推送"。这个结论**不完整** —— `-S` **只搜内容 diff，不搜 commit message**。补搜 message 后发现另有 **6 个 commit 的 message 里也含该宿主名**，而且它们**早已随 `2.1.10` / `2.1.11` / `2.1.12` 三个 tag 发布到两个远程**（`master` 与 `dev` 都在）。
   清那 6 条要 rewrite **已发布**历史 + 强推 2 个远程 + **重打 tag**（tag 不可变、下游可能按 tag 取包），代价与风险远超收益 —— **决定不清**，仅记录在此。
