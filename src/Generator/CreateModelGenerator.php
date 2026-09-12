@@ -153,8 +153,8 @@ class CreateModelGenerator extends Generator
             $use_class[] = 'use Mooeen\Scaffold\Concerns\UsingSnowFlakePrimaryKey;';
         }
 
-        // 软删除
-        if (isset($table_attr['fields']['deleted_at'])) {
+        // 软删除(判定口径见 Generator::hasSoftDeletes，CreateControllerGenerator show() 同源)
+        if ($this->hasSoftDeletes($table_attr['fields'])) {
             $use_trait[] = 'SoftDeletes';
             $use_class[] = 'use Illuminate\Database\Eloquent\SoftDeletes;';
         }

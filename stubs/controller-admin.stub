@@ -131,7 +131,7 @@ class {{controller_name}}Controller extends Controller
      */
     public function show(int|string $id): BaseResource
     {
-        $result  = $this->model->withTrashed()->findOrFail($id);
+        $result  = {{show_find_or_fail}};
         $result->append(['options']);
 
         $columns = [
