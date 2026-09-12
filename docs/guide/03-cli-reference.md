@@ -124,6 +124,31 @@ php artisan moo:db:audit --schema=Platform # 只查一个
 - 看到漂移:按 DB 现状改 yaml 重跑;baseline 需同步再 `moo:snapshot:init --schema=X --force`。
 - 非 mysql / DB 不可达 → 打印提示、退出 `0`。
 
+### `moo:audit:form-contract [--scope=] [--module=] [--out=] [--include-hidden] [--include-disabled] [--respect-layout] [--include-non-contract] [--include-waived] [--all]`
+
+断言「create / edit 表单实际渲染出的控件，其 field 必须被对应 Store / Update Request 收下」。原为 wisdomcity 的 `audit:form-contract`，表单契约本身属于 scaffold，命令随契约搬入本包。
+
+```bash
+php artisan moo:audit:form-contract                          # 默认只报用户可见违规
+php artisan moo:audit:form-contract --module=Finance          # 只扫一个模块
+php artisan moo:audit:form-contract --all --out=/tmp/fc.csv   # 放开 hidden/disabled/layout 外/契约外附加键
+```
+
+- 被审计对象：`--scope` 下 `*/*Controller.php`（默认 `app/Admin/Controllers`，可绝对路径 + `--namespace=`），反射 `getFormWidgets` 后与同模块 Request 的 `rules()` 求差。
+- **默认口径 = 只报用户可见控件**：hidden / disabled / formLayout 外的控件默认不计入违规与退出码；摘要始终给出分桶 `visible / hidden / disabled / layout-only / waived`，CSV 始终登记全部检出项（含 `Visible` / `ExcludedBy` 两列），各口径下是同一份全集。
+- rules 之外、宿主经 `getFormConfig(reset:)` 附加的键由 `FormRequest::formatFormConfig` 打 `contract => false`。「标记 + 不可见」默认跳过，`--include-non-contract` / `--all` 才计入；「标记 + 可见」仍是真实缺陷，不豁免。
+- **「刻意不实现」的显式声明**（注释形态，字段名自包含，注释重构不会失效）：
+
+  ```php
+  // @moo-waived system_logo: 早期精简：nullable 字段暂不实现
+  // 'system_logo' => ['nullable', 'string', 'max:192'],
+  ```
+
+  命中字段归入 `waived` 桶：不计违规、不影响退出码；摘要给出条数与原因，`--include-waived` 展开逐条。**未标记**的注释规则仍按可见违规报出；**陈旧标记**（标记仍在但当期已不构成违规）以 `Stale waived markers` 警告报出，不静默忽略。
+- **纯只读**（不写源码 / 不发 HTTP / 只读查表取 options），任何环境可跑。
+- **退出码**：有计入的违规 `1`，干净 `0`；`waived` 永不影响退出码。
+- `--out` 默认 `storage/app/audit/.audit-form-contract.csv`，**不指向仓内 baseline**。
+
 ### `moo:composer:docs [--root=] [--format=table|matrix] [--bare] [--write] [--check] [--file=]`
 
 按宿主三份 manifest(`composer.json` / `composer.test.json` / `composer.production.json`)生成「私包清单表」,替代各 Host 手抄 `PRIVATE-COMPOSER-PACKAGES.md`(记数 / 版本 / 来源容易抄错)。
@@ -170,6 +195,7 @@ php artisan moo:scaffold:merge-yaml scaffold/accounts.yaml --dry-run
   - `moo:account:add` — 首部署 bootstrap
   - `moo:scaffold:merge-yaml` — git sync 冲突合并
   - `moo:db:audit` — 只读对账(也核对生产 DB)
+  - `moo:audit:form-contract` — 只读表单契约审计(默认只报用户可见违规)
   - `moo:composer:docs` — 只读体检(宿主私包清单文档 ↔ 三份 manifest)
   - `moo:cloud:push` / `moo:cloud:mcp` / `moo:monitor:migrate` — 云端推送 / MCP / 旧版迁移(由 moo-monitor-laravel 提供,无 only_in_local 限制)
 - 改了 schema YAML **务必**先 `moo:fresh`。

@@ -14,6 +14,7 @@ use Godruoyi\Snowflake\Snowflake;
 use Illuminate\Support\ServiceProvider;
 use Mooeen\Scaffold\Command\AccountAddCommand;
 use Mooeen\Scaffold\Command\AdderCommand;
+use Mooeen\Scaffold\Command\AuditFormContractCommand;
 use Mooeen\Scaffold\Command\ComposerDocsCommand;
 use Mooeen\Scaffold\Command\CreateApiCommand;
 use Mooeen\Scaffold\Command\CreateControllerCommand;
@@ -152,6 +153,8 @@ class ScaffoldProvider extends ServiceProvider
                 DbAuditCommand::class,
                 // 只读体检：宿主私包清单文档 ↔ 三份 manifest
                 ComposerDocsCommand::class,
+                // 只读体检：create/edit 渲染控件 ↔ Store/Update Request rules 契约
+                AuditFormContractCommand::class,
             ]);
         }
 
