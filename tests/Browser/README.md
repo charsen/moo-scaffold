@@ -16,7 +16,8 @@ php /path/to/host/artisan serve --host=127.0.0.1 --port=8088
 
 - 宿主项目的 `vendor/charsen/moo-scaffold` 建议通过 composer path repository **软链本仓**，Blade / PHP 改动即时生效。
 - ⚠️ **坑：`public/` 资源（JS / CSS / img）在宿主里是 `vendor:publish` 的拷贝，不是软链。**
-  改了本仓 `public/` 下的 JS/SCSS 后**必须重新同步进宿主**，否则 e2e 跑的是旧资源（会出莫名超时/红）：
+  改了本仓 `public/` 下的 JS/SCSS 后**必须重新同步进宿主**，否则 e2e 跑的是旧资源（会出莫名超时/红）。
+  表单预览的类型白名单就在 `public/javascript/pages/api-request.js`：不同步宿主副本时，`api-request.spec` 会按**旧白名单**判定而红。
 
   ```bash
   npm run build:css   # 仅在改了 SCSS 时
