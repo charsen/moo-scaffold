@@ -14,7 +14,6 @@ use Godruoyi\Snowflake\Snowflake;
 use Illuminate\Support\ServiceProvider;
 use Mooeen\Scaffold\Command\AccountAddCommand;
 use Mooeen\Scaffold\Command\AdderCommand;
-use Mooeen\Scaffold\Command\AssetsCheckCommand;
 use Mooeen\Scaffold\Command\ComposerDocsCommand;
 use Mooeen\Scaffold\Command\CreateApiCommand;
 use Mooeen\Scaffold\Command\CreateControllerCommand;
@@ -151,9 +150,8 @@ class ScaffoldProvider extends ServiceProvider
                 ScaffoldMergeYamlCommand::class,
                 SnapshotInitCommand::class,
                 DbAuditCommand::class,
-                // 只读体检：宿主私包清单文档 ↔ 三份 manifest / 已发布 public 副本 ↔ 包内 public
+                // 只读体检：宿主私包清单文档 ↔ 三份 manifest
                 ComposerDocsCommand::class,
-                AssetsCheckCommand::class,
             ]);
         }
 
