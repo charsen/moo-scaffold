@@ -389,3 +389,89 @@ it('filterToTable 收窄到 dropped 表 → is_empty=false + 仅该表 rename', 
 it('filterToTable 表 key 不存在 → null', function () {
     expect(SchemaDiffService::filterToTable(diffSvc_fakeDiff(), 'no_such_table'))->toBeNull();
 });
+
+it('框架列新增能被 diff 出来（给存量表补软删列）—— 且 id 永不后补', function () {
+    $orig    = FixtureSchema::activate(app());
+    $sandbox = sys_get_temp_dir() . '/scaffold_framework_col_' . uniqid();
+
+    try {
+        @mkdir($sandbox . '/.snapshots', 0755, true);
+
+        // baseline（快照）= 原 fixture（没有 deleted_at）
+        copy(FixtureSchema::sourcePath(), $sandbox . '/.snapshots/' . FixtureSchema::SCHEMA . '.yaml');
+
+        // 工作区 YAML = 给 demo_users 加 deleted_at（空定义，与真实 schema 里的写法一致）
+        $yaml = file_get_contents(FixtureSchema::sourcePath());
+        $yaml = str_replace(
+            '            updated_at: { type: timestamp }',
+            "            updated_at: { type: timestamp }\n            deleted_at: {  }",
+            $yaml,
+        );
+        file_put_contents($sandbox . '/' . FixtureSchema::SCHEMA . '.yaml', $yaml);
+
+        app()['config']->set('scaffold.database.schema', $sandbox . '/');
+        app()->forgetInstance(SchemaLoader::class);
+        app()->forgetInstance(SnapshotStore::class);
+
+        $result = app()->make(SchemaDiffService::class)->diff(FixtureSchema::SCHEMA);
+        $table  = $result['tables'][FixtureSchema::TABLE];
+
+        $added = collect($table['field_changes'])->where('op', 'add')->pluck('field')->all();
+        // 此前框架列被无条件 skip → 这里会是空数组，`moo:migration` 直接回「无变更」
+        expect($added)->toBe(['deleted_at'])
+            ->and($table['status'])->toBe('updated')
+            ->and(collect($table['field_changes'])->where('op', 'add')->first()['framework'])->toBeTrue()
+            // id 是主键，只由 create_table 下发，永不后补
+            ->and($added)->not->toContain('id');
+    } finally {
+        foreach (glob($sandbox . '/.snapshots/*') ?: [] as $f) {
+            @unlink($f);
+        }
+        foreach (glob($sandbox . '/*') ?: [] as $f) {
+            @unlink($f);
+        }
+        @rmdir($sandbox . '/.snapshots');
+        @rmdir($sandbox);
+        FixtureSchema::deactivate(app(), $orig);
+    }
+});
+
+it('框架列被删：不生成 dropColumn，但必须出高优告警（不再静默消失）', function () {
+    $orig    = FixtureSchema::activate(app());
+    $sandbox = sys_get_temp_dir() . '/scaffold_framework_drop_' . uniqid();
+
+    try {
+        @mkdir($sandbox . '/.snapshots', 0755, true);
+
+        // baseline 带 deleted_at，工作区 YAML 没有 → 「删框架列」
+        $yaml = file_get_contents(FixtureSchema::sourcePath());
+        $yaml = str_replace(
+            '            updated_at: { type: timestamp }',
+            "            updated_at: { type: timestamp }\n            deleted_at: {  }",
+            $yaml,
+        );
+        file_put_contents($sandbox . '/.snapshots/' . FixtureSchema::SCHEMA . '.yaml', $yaml);
+        file_put_contents($sandbox . '/' . FixtureSchema::SCHEMA . '.yaml', file_get_contents(FixtureSchema::sourcePath()));
+
+        app()['config']->set('scaffold.database.schema', $sandbox . '/');
+        app()->forgetInstance(SchemaLoader::class);
+        app()->forgetInstance(SnapshotStore::class);
+
+        $table = app()->make(SchemaDiffService::class)->diff(FixtureSchema::SCHEMA)['tables'][FixtureSchema::TABLE];
+
+        // 不落成 drop 变更（写入侧只会处理 add/modify/rename/drop，framework_drop 会被跳过）
+        expect(collect($table['field_changes'])->where('op', 'drop')->pluck('field')->all())->toBe([])
+            ->and(collect($table['field_changes'])->where('op', 'framework_drop')->pluck('field')->all())->toBe(['deleted_at'])
+            ->and(collect($table['warnings'])->pluck('code')->all())->toContain('FRAMEWORK_COLUMN_DROP');
+    } finally {
+        foreach (glob($sandbox . '/.snapshots/*') ?: [] as $f) {
+            @unlink($f);
+        }
+        foreach (glob($sandbox . '/*') ?: [] as $f) {
+            @unlink($f);
+        }
+        @rmdir($sandbox . '/.snapshots');
+        @rmdir($sandbox);
+        FixtureSchema::deactivate(app(), $orig);
+    }
+});

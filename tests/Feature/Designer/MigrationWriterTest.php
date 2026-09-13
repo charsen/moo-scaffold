@@ -726,3 +726,58 @@ it("R-6 · fopen 'xb' 模式行为 — 已存在文件 fopen 返 false 触发 re
     expect(file_get_contents($fresh))->toBe('content');
     @unlink($fresh);
 });
+
+it('render 把新增的框架列写成框架方法（deleted_at → softDeletes，时间列 → nullable timestamp）', function () {
+    $fakeDiff = [
+        'schema'   => 'Demo',
+        'is_empty' => false,
+        'tables'   => [
+            'demo_users' => [
+                'status'              => 'updated',
+                'baseline_definition' => ['fields' => [], 'index' => []],
+                'current_definition'  => ['fields' => [], 'index' => []],
+                'field_changes'       => [
+                    // 框架列的 YAML 定义是**空的**（真实类型由框架方法决定）——
+                    // 不特判就会走到 resolveType('varchar') 生成一个 varchar 垃圾列
+                    ['op' => 'add', 'field' => 'deleted_at', 'definition' => [], 'after_field' => 'updated_at', 'framework' => true],
+                    ['op' => 'add', 'field' => 'created_at', 'definition' => ['type' => 'timestamp'], 'after_field' => null, 'framework' => true],
+                ],
+                'index_changes' => [],
+                'warnings'      => [],
+            ],
+        ],
+    ];
+
+    $source = $this->writer->render($fakeDiff)['demo_users']['php_source'];
+
+    expect($source)->toContain('$table->softDeletes()')
+        ->and($source)->toContain("\$table->timestamp('created_at')->nullable();")
+        // `->after()` 仍然保留（物理位置跟 YAML 一致）—— 断言不写死分号位置，软删列后面跟着 after
+        ->and($source)->toContain("\$table->softDeletes()->after('updated_at');")
+        // down() 反向删除
+        ->and($source)->toContain("\$table->dropColumn('deleted_at');");
+});
+
+it('render 忽略 framework_drop（框架列删除不自动落库，只由告警通道提示）', function () {
+    $fakeDiff = [
+        'schema'   => 'Demo',
+        'is_empty' => false,
+        'tables'   => [
+            'demo_users' => [
+                'status'              => 'updated',
+                'baseline_definition' => ['fields' => [], 'index' => []],
+                'current_definition'  => ['fields' => [], 'index' => []],
+                'field_changes'       => [
+                    ['op' => 'framework_drop', 'field' => 'deleted_at', 'definition' => [], 'framework' => true],
+                ],
+                'index_changes' => [],
+                'warnings'      => [],
+            ],
+        ],
+    ];
+
+    $source = $this->writer->render($fakeDiff)['demo_users']['php_source'];
+
+    expect($source)->not->toContain('dropColumn')
+        ->and($source)->not->toContain('softDeletes');
+});
