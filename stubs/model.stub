@@ -22,7 +22,7 @@ use Illuminate\Database\Eloquent\Model;
 class {{class}} extends Model
 {
 {{use_trait}}
-
+{{timestamp_columns}}
     /**
      * 表格名称
      * @var string

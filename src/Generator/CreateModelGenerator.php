@@ -181,6 +181,7 @@ class CreateModelGenerator extends Generator
             'hidden'        => $this->getHidden($table_attr['fields']),
             'fillable'      => $this->getFillable($table_attr['fields']),
             'attributes'    => $this->getModelAttributes($table_attr['fields']),
+            'timestamp_columns' => $this->getTimestampColumns($table_attr['fields']),
         ];
 
         // 生成 model 文件
@@ -555,6 +556,32 @@ class CreateModelGenerator extends Generator
     /**
      * use trait 代码
      */
+    /**
+     * 表内没有 `updated_at` 时，显式关掉「更新于」列的自动写入。
+     *
+     * Eloquent 默认在 insert / update 时同时写 `created_at` 与 `updated_at`；表里没有 `updated_at`
+     * 会直接抛 `... has no column named updated_at`，而这类表（留痕、审计、日志、交接）恰恰是最需要
+     * 写得进的地方 —— moo-mini-app 的 `moo_mini_app_record_revisions` 就是被这条卡住的。
+     *
+     * 只关 `UPDATED_AT`、**不关 timestamps**：这些表的 `created_at` 语义往往是「发生于」，仍要自动写。
+     * 返回值留空时占位符替换为空串，因此对已有模型完全不产生格式变化。
+     */
+    public function getTimestampColumns(array $fields): string
+    {
+        if (isset($fields['updated_at'])) {
+            return '';
+        }
+
+        return <<<'PHP'
+
+    /**
+     * 本表只有 `created_at`（语义见字段说明）、没有 `updated_at`：
+     * 显式关掉「更新于」列的自动写入，否则插入会因该列不存在而失败。
+     */
+    public const UPDATED_AT = null;
+PHP;
+    }
+
     public function getModelUseTrait(array $use_trait): string
     {
         if (empty($use_trait)) {
