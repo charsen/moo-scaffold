@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.1.23
+
+- **表单契约收口为单一来源**：控件类型词表与「规则 → 控件类型」的反推统一到 `Support\FormWidgetTypes`（`FORMER` 下发侧 18 项、`DEBUGGER_RENDERABLE` 预览侧 19 项，两者差异是既成事实而非待修漂移）；「规则 → 前端 `[{rule,msg}]`」从 `FormRequest` 私有方法提升到 `Support\FormFrontendRules`。调试器表单预览不再内联类型白名单，改由后端注入 `window.ScaffoldConfig.knownWidgetTypes`（同进程，不再靠人工跨仓同步——此前两份清单已互相漂移过一次）。
+- **新增 `Foundation\RuntimeFormRequest`**：把「字段来自数据库」的运行时 schema 接进既有表单契约，只承载 `rules / options / layout`、不做类型编译，使 `FormWidgetCollection::makeForm()/makeSearch()`、`formLayout` 校验与调试器预览原样可用。它是同一契约的**第二个生产者**，不是第二套链路。
+- **契约审计搬入本包**：新增 `moo:audit:form-contract`，宿主侧重复实现删除。判据收在 `Support\FormWidgetVisibility`，按可见性分桶（`hidden` / `disabled` / `layout` 外 / `waived`），**默认只报用户可见违规**；「刻意不实现」的字段用 Request 里的 `// @moo-waived <字段>: <原因>` 显式豁免（未标记的注释规则仍按可见违规报出，标记不是免罪符），`--include-hidden` / `--include-disabled` / `--respect-layout` / `--include-non-contract` / `--include-waived` / `--all` 逐级放宽口径。
+- `FormRequest::formatFormConfig()` 给规则外的附加键打 `contract => false`，审计据此把「真正的契约外键」与「表单渲染需要的附加项」分开，后者默认不计违规。
+- **生成器：非软删模型不再生成软删端点**。`trashed()` / `forceDestroy()` / `restore()` 整段外置为 `{{soft_delete_methods}}`，`show()` 不再 `withTrashed`（`{{show_find_or_fail}}`），列表 `deleted_at` 追加走 `{{trashed_list_append}}` 占位 —— 此前非软删表命中这些端点即抛 `BadMethodCallException` → 500。配套去掉**包侧**共享动作 trait 里的非软删运行态守卫：它要么不可达、要么恒为真，每包一份却一次也没拦住东西；host 侧 `BaseActionTrait` 的同款守卫**保留**，那里确有「模型非软删但端点仍在」的存量控制器。
+- 新增 `Testing\ComposerProfiles`，把三份 manifest 的私包一致性断言收口到一处；新增只读命令 `moo:composer:docs`；移除 `moo:assets:check`（public 资源是否刷新交由研发判断，不为它扩大工具体积）。
+- 补表单契约特征测试、调试器类型词表回归用例与生成器软删测试；e2e 前置与 `vendor:publish --tag=public` 的坑记入 `tests/Browser/README.md`。
+
+  > **升级注意**：宿主若自行实现过契约审计命令（`audit:form-contract` 及配套可见性类），请删除并改用 `moo:audit:form-contract`，否则口径不可比；`form_widgets` 中规则外附加键新增 `contract` 字段，前端可忽略。已生成的包若需同步软删端点口径，重跑生成器即可。
+
 ## 2.1.22
 
 - 配置相关写操作（保存配置、人员管理）收紧为仅 `admin` 可执行；`/scaffold/api/proxy` 的目标白名单在 `scaffold.hosts` 为空时不再回退请求的 `Host` 头，改用 `config('app.url')`，取不到则一律拒绝。
