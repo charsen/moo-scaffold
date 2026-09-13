@@ -16,6 +16,12 @@ use Mooeen\Scaffold\Support\FieldTypes;
  */
 class SchemaDiffService
 {
+    /**
+     * 框架列（系统字段）：由迁移的 `softDeletes()` / `timestamps()` / 主键声明下发。
+     * 它们的**新增**是正常 schema 变更（典型：给存量表补软删）；**删除**不自动落库（见 fieldDiff）。
+     */
+    private const FRAMEWORK_FIELDS = ['id', 'created_at', 'updated_at', 'deleted_at'];
+
     public function __construct(
         private readonly SchemaLoader $loader,
         private readonly SnapshotStore $snapshot,
@@ -196,8 +202,32 @@ class SchemaDiffService
             $b = $effectiveBefore[$key] ?? null;
             $a = $effectiveAfter[$key]  ?? null;
 
-            if (in_array($key, ['id', 'deleted_at', 'created_at', 'updated_at'], true)) {
-                continue;  // system fields — skip
+            // 系统字段（框架列）。2026-09-13 修复：此前无条件 continue，等于把「给存量表补框架列」
+            // 整类变更静默吞掉 —— 典型场景是 YAML 里给已有表加 `deleted_at` 开软删，
+            // `moo:migration` 会回「无变更，跳过生成 migration」，使用者只能手写迁移文件。
+            if (in_array($key, self::FRAMEWORK_FIELDS, true)) {
+                // `id` 是主键，只由 create_table 下发，永不后补
+                if ($key === 'id') {
+                    continue;
+                }
+                if ($b === null && $a !== null) {
+                    // 新增框架列 → 正常按 add 落库（写入侧负责 emit `$table->softDeletes()` / timestamp）
+                    $idx        = array_search($key, $orderedAfterKeys, true);
+                    $afterField = ($idx !== false && $idx > 0) ? $orderedAfterKeys[$idx - 1] : null;
+                    $changes[]  = ['op' => 'add', 'field' => $key, 'definition' => $a, 'after_field' => $afterField, 'framework' => true];
+
+                    continue;
+                }
+                if ($b !== null && $a === null) {
+                    // **删除框架列一律不自动落库**：删 `deleted_at` 等于让历史记录静默"复活"，
+                    // 删时间列会丢审计线索，都必须人工决定。用一个写入侧不认识的 op 只走告警通道
+                    // （`MigrationWriter` 的 up/down 只处理 add/modify/rename/drop，见到它会跳过）。
+                    $changes[] = ['op' => 'framework_drop', 'field' => $key, 'definition' => $b, 'framework' => true];
+
+                    continue;
+                }
+
+                continue;   // 两边都在 → 框架列没有可比较的属性
             }
 
             if ($b === null && $a !== null) {
@@ -410,6 +440,18 @@ class SchemaDiffService
         $depMap = ! empty($depFieldNames) ? $this->findReverseDepsBatch($depFieldNames) : [];
 
         foreach ($fieldChanges as $ch) {
+            // 框架列被删：不自动落库，但必须出声（此前是静默跳过，等于变更凭空消失）
+            if ($ch['op'] === 'framework_drop') {
+                $warnings[] = [
+                    'level' => 'high',
+                    'code'  => 'FRAMEWORK_COLUMN_DROP',
+                    'msg'   => "框架列 {$ch['field']} 已从 schema 移除，但**不会自动生成 dropColumn**"
+                        . '（删 deleted_at 等于让历史记录静默"复活"、删时间列会丢审计线索）：'
+                        . '请确认语义后手写迁移，或把该列加回 schema。',
+                ];
+
+                continue;
+            }
             if ($ch['op'] === 'drop') {
                 $warnings[] = [
                     'level' => 'high',

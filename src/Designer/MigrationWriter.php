@@ -395,6 +395,15 @@ class MigrationWriter
      */
     private function buildColumnLine(string $field, array $def, bool $forChange = false, array $enums = [], ?string $afterField = null): string
     {
+        // 框架列（系统字段）：`deleted_at: {  }` 在 YAML 里是**空定义**（类型由迁移的框架方法决定），
+        // 直接走下面的 resolveType('varchar') 会生成一个 varchar 垃圾列（2026-09-13 之前的隐患）。
+        // 这里按 create_table 的同款输出补：软删列 → softDeletes()，时间列 → nullable timestamp。
+        // 仅 add 路径（`$forChange` 是 modify，框架列没有可 modify 的属性）。
+        if (! $forChange && ($framework = $this->frameworkColumnLine($field)) !== null) {
+            // 与普通列一样以 `;` 收尾（漏了会生成**语法不合法**的迁移，测试当场逮住）
+            return $framework . $this->afterClause($afterField) . ';';
+        }
+
         $type = $this->resolveType((string) ($def['type'] ?? 'varchar'));
         if (! isset(self::TYPE_TEMPLATES[$type])) {
             throw new \InvalidArgumentException("unsupported migration type [{$type}] for field [{$field}]");
@@ -422,14 +431,43 @@ class MigrationWriter
         }
         // 2026-05-21 bug fix:add column 时追加 ->after('xxx'),保字段在表中的物理位置跟 yaml 一致(否则永远追到表末尾)
         // 仅 add 路径用(forChange=true 是 ->change() 修改字段,不动位置)
-        if ($afterField !== null && $afterField !== '' && ! $forChange) {
-            $line .= "->after('" . $this->escape($afterField) . "')";
-        }
+        $line .= $this->afterClause($forChange ? null : $afterField);
         if ($forChange) {
             $line .= '->change()';
         }
 
         return $line . ';';
+    }
+
+    /**
+     * `->after('xxx')` 片段（add 路径专用，保字段物理位置跟 YAML 一致）。
+     */
+    private function afterClause(?string $afterField): string
+    {
+        if ($afterField === null || $afterField === '') {
+            return '';
+        }
+
+        return "->after('" . $this->escape($afterField) . "')";
+    }
+
+    /**
+     * 框架列（系统字段）的迁移片段；非框架列返回 null。
+     *
+     * `deleted_at` / `created_at` / `updated_at` 在 YAML 里通常是空定义或只带 `type: timestamp`
+     * （真实类型由 `softDeletes()` / `timestamps()` 决定），所以**加列时**必须走这里，
+     * 不能落到 `buildColumnLine` 的 `resolveType()` 上（那会生成 varchar 垃圾列）。
+     * 输出与 `createLinesFromDefinition()` 的框架列写法保持一致。
+     */
+    private function frameworkColumnLine(string $field): ?string
+    {
+        return match ($field) {
+            'deleted_at' => '$table->softDeletes()',
+            // Laravel 的 `timestamps()` 就是两个 nullable timestamp，单列 emit 与它等价；
+            // 同一张表同时补两列时也一样（顺序由 diff 的字段顺序决定）
+            'created_at', 'updated_at' => "\$table->timestamp('{$field}')->nullable()",
+            default                    => null,
+        };
     }
 
     private function renderDefault(string $field, mixed $value, string $type, array $enums = []): string

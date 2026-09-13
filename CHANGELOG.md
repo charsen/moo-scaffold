@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.1.24
+
+- **修复：给存量表补框架列（`deleted_at` / `created_at` / `updated_at`）不再被静默吞掉**。
+  `SchemaDiffService::fieldDiff()` 原先对 `id / deleted_at / created_at / updated_at` 一律 `continue`（"system fields — skip"），
+  于是「YAML 里给已有表加 `deleted_at` 开软删」这类变更**根本不会进 diff** —— `moo:migration` 直接回
+  「无变更，跳过生成 migration」，使用者只能手写迁移文件（工具漏的活不该由人补）。
+  现在：框架列的**新增**正常产出 `add`（`id` 除外 —— 主键只由 `create_table` 下发，永不后补）；
+  框架列的**删除**仍然不自动落库（删 `deleted_at` 等于让历史记录静默"复活"、删时间列会丢审计线索），
+  但会出一个 `FRAMEWORK_COLUMN_DROP` 高优告警，不再无声消失。
+- **修复：`MigrationWriter` 现在能把新增的框架列写成框架方法**。`deleted_at: {  }` 在 YAML 里是**空定义**
+  （真实类型由 `softDeletes()` / `timestamps()` 决定），此前若走 add 路径会落到 `resolveType('varchar')`
+  生成一个 **varchar 垃圾列**。现在 add 路径特判：`deleted_at` → `$table->softDeletes()`、
+  `created_at` / `updated_at` → `$table->timestamp('x')->nullable()`，与 `create_table` 的写法一致，
+  并照常保留 `->after('...')` 以维持字段物理位置跟 YAML 一致；`framework_drop` 这类写入侧不认识的 op
+  在 up/down 里被跳过（只走告警通道）。
+- 回归：`SchemaDiffServiceTest` 两项（框架列新增能进 diff 且 `id` 不后补 / 框架列删除不产 drop 但出告警）
+  与 `MigrationWriterTest` 两项（框架列渲染成框架方法且保 `after` 与 `down()` 反向删除 / `framework_drop` 被忽略）。
+
 ## 2.1.23
 
 - **表单契约收口为单一来源**：控件类型词表与「规则 → 控件类型」的反推统一到 `Support\FormWidgetTypes`（`FORMER` 下发侧 18 项、`DEBUGGER_RENDERABLE` 预览侧 19 项，两者差异是既成事实而非待修漂移）；「规则 → 前端 `[{rule,msg}]`」从 `FormRequest` 私有方法提升到 `Support\FormFrontendRules`。调试器表单预览不再内联类型白名单，改由后端注入 `window.ScaffoldConfig.knownWidgetTypes`（同进程，不再靠人工跨仓同步——此前两份清单已互相漂移过一次）。
