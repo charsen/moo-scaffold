@@ -25,7 +25,7 @@ final class FormFrontendRules
      *
      * @return array<string, list<array{rule: string, msg: string}>>
      */
-    public static function fromRules(array $allRules): array
+    public static function fromRules(array $allRules, array $labels = []): array
     {
         if (empty($allRules)) {
             return [];
@@ -50,7 +50,7 @@ final class FormFrontendRules
 
                 $key     = preg_replace('/\:.+/i', '', $rule);
                 $message = $key === 'nullable' ? '' : __('validation.' . $key);
-                $message = str_replace(':attribute', __('validation.attributes.' . $field), $message);
+                $message = str_replace(':attribute', $labels[$field] ?? __('validation.attributes.' . $field), $message);
 
                 $frontendRules[$field][] = ['rule' => $rule, 'msg' => is_array($message) ? $message['string'] : $message];
             }
