@@ -3,6 +3,25 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-13，**Resource 出参里的「整数键映射」会被 Laravel 递归抹键**（先在某业务包真机自测踩到，随后做了全生态实测）：
+  `Illuminate\Http\Resources\ConditionallyLoadsAttributes::removeMissingValues()` 对「这一层键全为数字」的数组直接
+  `array_values()`，而 `filter()` 会**递归**进所有嵌套数组。它本意是让「删掉条件字段后带洞的列表」仍序列化成 JSON
+  数组，但 `{"1":"正常","2":"停用"}`、`{"4":12,"6":3}` 这类**整数键映射**被误判成列表、键被抹掉。
+  **症状**（都不报错，全是静默）：前端按值取标签错位（值 1 取到第二个选项、值 2 没条目于是显示原始值）；
+  `Rule::in(array_keys($options))` 从 `in:1,2` 变成 `in:0,1` ⇒ **原本合法的记录再也存不进去**；
+  若页面是「Resource 读回来 → 改 → 整页保存」，会把坏形状写回库 ⇒ **选项键永久损坏**。
+  **判据**：与"是否连续"无关 —— `{1,2}`、`{1,3}`（带洞）、`{0,2}` 都中招；字符串键映射与真列表（0..n-1）安全。
+  触发要两个条件同时成立：① 该映射经 Resource 出参；② 有人按值取标签或读回再保存。**只满足 ① 只是这一次响应丢键，不损坏数据**。
+  **两条收口**：① 该 Resource 声明 `public $preserveKeys = true;` —— **必须是实例属性**：检查语句是 `$this->preserveKeys`，
+  写成 `public static` 会落到 `JsonResource::__get()` 转发给底层数组并报 `Attempt to read property "preserveKeys" on array`
+  （Laravel 自己的 `AnonymousResourceCollection` 也是实例属性；`JsonResource::collection()` 会把它传给集合）；
+  ② 出参别给整数键映射，转 `[{key|label}]`（前端与校验同口径，最不容易再踩）。
+  **排查工具**：`php artisan moo:audit:resource-keys`（只读，按 `extra.moo-private-packages` 定位私包 → 抽真实数据递归判定 →
+  输出 `包/资源/列/是否声明/抽样/危险行/键路径`；`--json` 机器可读、`--fail-on-danger` 可当 CI 闸门）。
+  **实测结论**：本生态 28 处「Resource 透出 json 列」里只有 2 处真实命中（`field_params.options`、
+  `stat_file_type_meta`）—— **枚举字典本身不走 Resource**（走 `FormRequest::options()` → `FormWidgetCollection`，
+  本来就是 `[{label,value}]`），所以"枚举数据到处都是"不等于"到处都是这个坑"，不要据此做全生态大改。
+
 - 2026-09-11，**裸检出跑 Pest 必须显式指定非 DB 驱动**：本仓无 `.env`，Testbench 起的 Laravel 11+ 默认 `SESSION_DRIVER` / `CACHE_STORE` / `QUEUE_CONNECTION` 全是 `database`，而测试库没有 `sessions` / `cache` 表 ⇒ 所有走 session / cache 的 HTTP 用例 500。
   **症状有迷惑性**：失败数会随你修的维度**递减**（只设 `SESSION_DRIVER=array` 时 167 failed → 72 failed，报错从 `no such table: sessions` 变成 `no such table: cache`），看起来像"快修好了"，其实只是还差下一项。正确跑法：
   `SESSION_DRIVER=array CACHE_STORE=array QUEUE_CONNECTION=sync composer test`

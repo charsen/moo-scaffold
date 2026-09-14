@@ -1,5 +1,23 @@
 # Changelog
 
+## 未发布
+
+- **新增只读体检 `moo:audit:resource-keys`：找「Resource 原样透出的 json 列」里带整数键映射的地方。**
+  背景：Laravel 的 `ConditionallyLoadsAttributes::removeMissingValues()` 会**递归**把「键全为数字」的嵌套数组
+  `array_values()` 重排（本意是让删掉条件字段后带洞的**列表**仍序列化成 JSON 数组），但
+  `{"1":"正常","2":"停用"}`、`{"4":12,"6":3}` 这类**整数键映射**会被误判成列表、键被抹掉：
+  前端按值取标签错位，**读回来再保存就把键永久写坏**（`Rule::in(array_keys(options))` 还会从 `in:1,2` 变成 `in:0,1`）。
+  命令按 `extra.moo-private-packages` 定位私包（读不到清单时退化扫 `vendor/*/*/src`），
+  把「Resource 透出的列 ∩ json/array cast 列」逐个抽样（默认 200 行）递归判定，输出
+  `包 / 资源 / 列 / 是否声明 preserveKeys / 抽样 / 危险行 / 键路径`；`--json` 给机器读、
+  `--fail-on-danger` 命中即退出码 1（可当 CI 闸门）。纯只读，不碰数据、不改代码。
+  实测本生态：28 处候选里只有 2 处真实命中（mini-app `field_params.options`、attachment
+  `stat_file_type_meta`）。
+  收口方式两条：① 手写 Resource 加 `public $preserveKeys = true;`（**必须是实例属性**，static 会落到
+  `JsonResource::__get()` 报错；生成物上加会被 `-f` 覆盖）；② 出参别给整数键映射，转 `[{key|label}]`。
+- 回归：`AuditResourceKeysCommandTest` 4 项（判定器含带洞键 / 危险与安全列 / 已声明与 static 写法 /
+  `--fail-on-danger` 退出码）+ `Support\NumericKeyMapDetector` 纯函数单测。
+
 ## 2.1.24
 
 - **修复：给存量表补框架列（`deleted_at` / `created_at` / `updated_at`）不再被静默吞掉**。
