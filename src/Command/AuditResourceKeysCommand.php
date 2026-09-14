@@ -20,6 +20,9 @@
  * 该 Resource 已声明 `$preserveKeys` 的，标为「已声明」不再计危险（大小写与 static 写法都会被识别并提示）。
  * 模型不可加载 / 抽样失败（DB 不可达、表不存在）的列计为**未核验**并显式告警 —— 「没查到」不等于「干净」；
  * `--fail-on-danger` 的退出码只反映**已核验**的危险列。
+ *
+ * 复核后**接受**的命中用 `--allow=<包>:<资源>:<列>` 显式登记（段可用 `*` 通配）：登记后不再计入危险、
+ * 不影响退出码，报表里标注「已豁免」；一条 allow 谁都没匹配上会作为**陈旧条目**告警（防止豁免烂在报表里）。
  */
 
 namespace Mooeen\Scaffold\Command;
@@ -43,6 +46,7 @@ class AuditResourceKeysCommand extends Command
         {--package= : 只扫某个私包（vendor 目录名，如 moo-mini-app）}
         {--limit=200 : 每列抽样行数上限}
         {--json : 输出 JSON（便于脚本消费）}
+        {--allow=* : 复核后接受的命中，格式 <包>:<资源>:<列>（段可用 * 通配；可重复；陈旧条目会告警）}
         {--fail-on-danger : 命中危险列时退出码 1}';
 
     /** json / array 类 cast 的声明形态：这些列才可能带映射。 */
@@ -83,14 +87,32 @@ class AuditResourceKeysCommand extends Command
             return self::SUCCESS;
         }
 
-        $report      = [];
-        $dangerCount = 0;
-        $unverified  = 0;
+        [$allow, $badAllow] = $this->parseAllowList();
+        $matchedAllow       = [];
+
+        $report       = [];
+        $dangerCount  = 0;
+        $allowedCount = 0;
+        $unverified   = 0;
 
         foreach ($candidates as $candidate) {
-            $row = $this->inspect($candidate, $limit);
+            $row  = $this->inspect($candidate, $limit);
+            $hits = $this->allowedBy($candidate, $allow);
+
+            if ($hits !== []) {
+                $matchedAllow   = [...$matchedAllow, ...$hits];
+                $row['allowed'] = true;
+                $row['note']    = '已豁免（--allow 登记）：' . implode('、', $hits);
+                if ($row['verdict'] === 'danger') {
+                    $row['verdict'] = 'allowed';
+                }
+            }
+
             if ($row['verdict'] === 'danger') {
                 $dangerCount++;
+            }
+            if ($row['verdict'] === 'allowed') {
+                $allowedCount++;
             }
             if ($row['verdict'] === 'skip') {
                 $unverified++;
@@ -98,10 +120,28 @@ class AuditResourceKeysCommand extends Command
             $report[] = $row;
         }
 
+        $staleAllow = array_values(array_diff($allow, array_unique($matchedAllow)));
+
         if ($json) {
-            $this->line((string) json_encode(['roots' => $roots, 'unverified' => $unverified, 'rows' => $report], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+            $this->line((string) json_encode([
+                'roots'      => $roots,
+                'unverified' => $unverified,
+                'allowed'    => $allowedCount,
+                'staleAllow' => $staleAllow,
+                'badAllow'   => $badAllow,
+                'rows'       => $report,
+            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
         } else {
+            if ($badAllow !== []) {
+                $this->warn('⚠ --allow 条目格式不对（应为 <包>:<资源>:<列>）：' . implode('、', $badAllow));
+            }
             $this->printReport($report, $limit);
+            if ($allowedCount > 0) {
+                $this->line("<fg=gray>已豁免 {$allowedCount} 处（--allow 登记；复核结论写进宿主脚本或 plans/）。</>");
+            }
+            if ($staleAllow !== []) {
+                $this->warn('⚠ 陈旧的 --allow 条目（没有任何命中匹配上，建议删除）：' . implode('、', $staleAllow));
+            }
         }
 
         if ($dangerCount > 0) {
@@ -300,6 +340,7 @@ class AuditResourceKeysCommand extends Command
             'dangerRows'    => 0,
             'paths'         => [],
             'verdict'       => 'skip',
+            'allowed'       => false,
             'note'          => '',
         ];
 
@@ -358,6 +399,68 @@ class AuditResourceKeysCommand extends Command
     }
 
     /**
+     * 解析 `--allow=<包>:<资源>:<列>`（段可用 `*` 通配）。
+     *
+     * @return array{0: list<string>, 1: list<string>} [合法条目, 格式错误的条目]
+     */
+    private function parseAllowList(): array
+    {
+        $allow = [];
+        $bad   = [];
+
+        foreach ((array) $this->option('allow') as $raw) {
+            $entry = trim((string) $raw);
+            if ($entry === '') {
+                continue;
+            }
+
+            // 去掉可能的 `pkg:Res::column` / 空白，统一成三段
+            $entry = str_replace('::', ':', $entry);
+            $parts = array_map('trim', explode(':', $entry));
+
+            if (count($parts) !== 3 || in_array('', $parts, true)) {
+                $bad[] = (string) $raw;
+
+                continue;
+            }
+
+            $allow[] = implode(':', $parts);
+        }
+
+        return [array_values(array_unique($allow)), $bad];
+    }
+
+    /**
+     * 该候选命中了哪些 allow 条目（`*` 匹配任意段；资源段按**类名**比较，避免命名空间写法差异）。
+     *
+     * @param array<string, mixed> $candidate
+     * @param list<string>         $allow
+     *
+     * @return list<string>
+     */
+    private function allowedBy(array $candidate, array $allow): array
+    {
+        if ($allow === []) {
+            return [];
+        }
+
+        $package  = (string) $candidate['package'];
+        $resource = Str::afterLast((string) $candidate['resource'], '\\');
+        $column   = (string) $candidate['column'];
+
+        $hits = [];
+        foreach ($allow as $entry) {
+            [$p, $r, $c] = explode(':', $entry);
+
+            if (($p === '*' || $p === $package) && ($r === '*' || $r === $resource) && ($c === '*' || $c === $column)) {
+                $hits[] = $entry;
+            }
+        }
+
+        return $hits;
+    }
+
+    /**
      * @param list<array<string, mixed>> $report
      */
     private function printReport(array $report, int $limit): void
@@ -377,6 +480,7 @@ class AuditResourceKeysCommand extends Command
                 (string) $row['dangerRows'],
                 match ($row['verdict']) {
                     'danger'   => '<fg=red>危险</>',
+                    'allowed'  => '<fg=yellow>已豁免</>',
                     'declared' => '<fg=green>已保键</>',
                     'ok'       => '<fg=green>安全</>',
                     default    => '<fg=yellow>跳过</>',
