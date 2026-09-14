@@ -243,6 +243,65 @@ PHP,
     expect($output)->toContain('未能核验')->not->toContain('未发现危险列');
 });
 
+it('命令：--allow 登记的命中不再计危险（含 * 通配），陈旧条目会被点出来', function () {
+    $fixture = resourceKeysFixture([
+        'AllowedResource.php' => <<<'PHP'
+<?php
+
+namespace AuditFixture\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\JsonResource;
+
+class AllowedResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return ['meta' => $this->whenHas('meta')];
+    }
+}
+PHP,
+    ]);
+
+    resourceKeysTable($fixture['model'], [['options' => [1 => '正常']]]);
+
+    // 精确登记（包名固定是 host；资源按类名比较）
+    $code = \Illuminate\Support\Facades\Artisan::call('moo:audit:resource-keys', [
+        '--path'           => [$fixture['root']],
+        '--json'           => true,
+        '--allow'          => ['host:AllowedResource:meta'],
+        '--fail-on-danger' => true,
+    ]);
+    $payload = json_decode(\Illuminate\Support\Facades\Artisan::output(), true);
+
+    expect($code)->toBe(0)
+        ->and($payload['allowed'])->toBe(1)
+        ->and($payload['staleAllow'])->toBe([])
+        ->and($payload['rows'][0]['verdict'])->toBe('allowed')
+        ->and($payload['rows'][0]['allowed'])->toBeTrue();
+
+    // 通配段 + 陈旧条目：通配命中 → 仍然 0；多写的那条没人匹配 → 进 staleAllow
+    $code = \Illuminate\Support\Facades\Artisan::call('moo:audit:resource-keys', [
+        '--path'           => [$fixture['root']],
+        '--json'           => true,
+        '--allow'          => ['host:*:meta', 'host:不存在的资源:meta'],
+        '--fail-on-danger' => true,
+    ]);
+    $payload = json_decode(\Illuminate\Support\Facades\Artisan::output(), true);
+
+    expect($code)->toBe(0)
+        ->and($payload['allowed'])->toBe(1)
+        ->and($payload['staleAllow'])->toBe(['host:不存在的资源:meta']);
+
+    // 格式不对的条目单列出来，不静默丢弃
+    \Illuminate\Support\Facades\Artisan::call('moo:audit:resource-keys', [
+        '--path'  => [$fixture['root']],
+        '--json'  => true,
+        '--allow' => ['少了列'],
+    ]);
+    expect(json_decode(\Illuminate\Support\Facades\Artisan::output(), true)['badAllow'])->toBe(['少了列']);
+});
+
 it('命令：--fail-on-danger 命中时返回失败退出码，未命中时成功', function () {
     $fixture = resourceKeysFixture([
         'DangerResource.php' => <<<'PHP'
