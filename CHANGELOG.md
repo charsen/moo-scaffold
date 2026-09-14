@@ -1,5 +1,44 @@
 # Changelog
 
+## 未发布
+
+- **新增只读体检 `moo:audit:resource-keys`：找「Resource 原样透出的 json 列」里带整数键映射的地方。**
+  背景：Laravel 的 `ConditionallyLoadsAttributes::removeMissingValues()` 会**递归**把「键全为数字」的嵌套数组
+  `array_values()` 重排（本意是让删掉条件字段后带洞的**列表**仍序列化成 JSON 数组），但
+  `{"1":"正常","2":"停用"}`、`{"4":12,"6":3}` 这类**整数键映射**会被误判成列表、键被抹掉：
+  前端按值取标签错位，**读回来再保存就把键永久写坏**（`Rule::in(array_keys(options))` 还会从 `in:1,2` 变成 `in:0,1`）。
+  命令按 `extra.moo-private-packages` 定位私包（读不到清单时退化扫 `vendor/*/*/src`），
+  把「Resource 透出的列 ∩ json/array cast 列」逐个抽样（默认 200 行）递归判定，输出
+  `包 / 资源 / 列 / 是否声明 preserveKeys / 抽样 / 危险行 / 键路径`；`--json` 给机器读、
+  `--fail-on-danger` 命中即退出码 1（可当 CI 闸门）。纯只读，不碰数据、不改代码。
+  实测本生态：28 处候选里只有 2 处真实命中（mini-app `field_params.options`、attachment
+  `stat_file_type_meta`）。
+  收口方式两条：① 手写 Resource 加 `public $preserveKeys = true;`（**必须是实例属性**，static 会落到
+  `JsonResource::__get()` 报错；生成物上加会被 `-f` 覆盖）；② 出参别给整数键映射，转 `[{key|label}]`。
+  模型不可加载 / 抽样失败（DB 不可达、表缺失）的列计为**未能核验**并显式告警：「没查到」不等于「干净」，
+  此时 `--fail-on-danger` 的退出码只反映已核验的危险列；`--json` 顶层给出 `unverified` 计数。
+- **`--allow=<包>:<资源>:<列>` 支持「复核后接受」的命中**（段可用 `*` 通配、可重复）：登记后不计危险、
+  不影响退出码；陈旧条目（谁都没匹配上）与格式错误条目分别告警 / 单列，避免豁免悄悄失效。
+- 回归：`AuditResourceKeysCommandTest` 6 项（判定器含带洞键 / 危险与安全列 / 已声明与 static 写法 /
+  抽样失败的未核验口径 / `--allow` 与陈旧条目 / `--fail-on-danger` 退出码）+ `Support\NumericKeyMapDetector` 纯函数单测。
+- **新增只读跨仓体检 `moo:audit:former-types`：断言「后端 `FormWidgetTypes::FORMER`」与
+  「下游 admin SPA `former/config.ts` 的 `elComponents` 注册表」是同一个控件类型集合。**
+  背景：后端 `FORMER` 是表单契约**可能下发**的 type 全集（也是 mini-app 等动态类型登记的白名单），
+  前端 `elComponents` 是把 type 映射到渲染组件的唯一位置，两侧此前只靠 `FormWidgetTypes` 的注释
+  「人工对齐」（plan 61 §2.1 / plan 64 §6.4 要求补自动化检查）：漏一边就是「后端下发新 type、
+  前端静默走只读兜底」，或「前端注册了后端永不下发的死类型」。
+  口径：后端取运行时类常量 `Mooeen\Scaffold\Support\FormWidgetTypes::FORMER`，前端取 `config.ts` 里
+  `elComponents` 对象字面量的**顶层键**；只比**集合**不比顺序；两侧名称目前逐字同名，故无需别名映射
+  （命令内保留 `ALIASES` 显式映射位，命名体系真分叉时登记，不做模糊归一）。`--spa=` 必填，可给
+  SPA 仓根目录（按 `apps/admin/src/components/former/config.ts` 等约定位置探测）或直接给 `config.ts`。
+  输出两边数量、只在前端有的、只在后端有的；`--json` 只出 JSON 适合脚本消费。
+  **退出码：一致 `0` / 不一致 `1`（CI 闸门）/ 路径不存在、解析失败等读取错误 `2`** ——
+  「读不到」绝不等于「一致」。纯只读：不写文件、不跑前端构建、不依赖 DB，任何环境可跑。
+  实跑真实 SPA 仓库：两侧各 18 项，当前一致。
+- 回归：`AuditFormerTypesCommandTest` 8 项（目录推导与文件直指 / 一致退出 0 / 前端多一项退出 1 /
+  后端多一项退出 1 / 路径不存在与缺 `--spa` 报错退出 2 且不说「一致」/ 解析失败不得退化成空清单 /
+  只比集合不比顺序）。
+
 ## 2.1.24
 
 - **修复：给存量表补框架列（`deleted_at` / `created_at` / `updated_at`）不再被静默吞掉**。
