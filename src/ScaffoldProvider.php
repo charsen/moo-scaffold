@@ -15,6 +15,8 @@ use Illuminate\Support\ServiceProvider;
 use Mooeen\Scaffold\Command\AccountAddCommand;
 use Mooeen\Scaffold\Command\AdderCommand;
 use Mooeen\Scaffold\Command\AuditFormContractCommand;
+use Mooeen\Scaffold\Command\AuditFormerTypesCommand;
+use Mooeen\Scaffold\Command\AuditResourceKeysCommand;
 use Mooeen\Scaffold\Command\ComposerDocsCommand;
 use Mooeen\Scaffold\Command\CreateApiCommand;
 use Mooeen\Scaffold\Command\CreateControllerCommand;
@@ -155,6 +157,10 @@ class ScaffoldProvider extends ServiceProvider
                 ComposerDocsCommand::class,
                 // 只读体检：create/edit 渲染控件 ↔ Store/Update Request rules 契约
                 AuditFormContractCommand::class,
+                // 只读体检：Resource 透出的 json 列里是否有「整数键映射」（会被资源层 array_values 丢键）
+                AuditResourceKeysCommand::class,
+                // 只读体检：SPA former/config.ts 控件类型注册表 ↔ 后端 FormWidgetTypes::FORMER 契约
+                AuditFormerTypesCommand::class,
             ]);
         }
 
