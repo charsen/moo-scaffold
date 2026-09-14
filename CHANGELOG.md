@@ -15,8 +15,10 @@
   `stat_file_type_meta`）。
   收口方式两条：① 手写 Resource 加 `public $preserveKeys = true;`（**必须是实例属性**，static 会落到
   `JsonResource::__get()` 报错；生成物上加会被 `-f` 覆盖）；② 出参别给整数键映射，转 `[{key|label}]`。
-- 回归：`AuditResourceKeysCommandTest` 4 项（判定器含带洞键 / 危险与安全列 / 已声明与 static 写法 /
-  `--fail-on-danger` 退出码）+ `Support\NumericKeyMapDetector` 纯函数单测。
+  模型不可加载 / 抽样失败（DB 不可达、表缺失）的列计为**未能核验**并显式告警：「没查到」不等于「干净」，
+  此时 `--fail-on-danger` 的退出码只反映已核验的危险列；`--json` 顶层给出 `unverified` 计数。
+- 回归：`AuditResourceKeysCommandTest` 5 项（判定器含带洞键 / 危险与安全列 / 已声明与 static 写法 /
+  抽样失败的未核验口径 / `--fail-on-danger` 退出码）+ `Support\NumericKeyMapDetector` 纯函数单测。
 
 ## 2.1.24
 
