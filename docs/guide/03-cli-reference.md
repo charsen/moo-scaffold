@@ -149,6 +149,27 @@ php artisan moo:audit:form-contract --all --out=/tmp/fc.csv   # 放开 hidden/di
 - **退出码**：有计入的违规 `1`，干净 `0`；`waived` 永不影响退出码。
 - `--out` 默认 `storage/app/audit/.audit-form-contract.csv`，**不指向仓内 baseline**。
 
+### `moo:audit:resource-keys [--path=*] [--package=] [--limit=] [--json] [--fail-on-danger]`
+
+找出「Resource 原样透出的 json 列」里**真实数据带整数键映射**（`{1: '正常', 2: '停用'}`、`{4: 12, 6: 3}`）的地方：Laravel 的 `ConditionallyLoadsAttributes::removeMissingValues()` 会把这类数组递归 `array_values()`，前端拿到 `[2, 1]` 这种丢键形态——按值取标签错位，读回再保存把键永久写坏。
+
+```bash
+php artisan moo:audit:resource-keys                       # 扫已装私包 + 宿主 app
+php artisan moo:audit:resource-keys --package=moo-attachment
+php artisan moo:audit:resource-keys --limit=500 --json    # 每列抽样上限 / 机器可读
+php artisan moo:audit:resource-keys --fail-on-danger      # 命中即退出码 1（CI 闸门）
+```
+
+- 扫描根默认取宿主 `composer.json` 的 `extra.moo-private-packages`（`vendor/<name>/src`），读不到退回 `vendor/*/*/src`，再加宿主 `app/`；`--path=/abs/src` 显式给出时**只**扫它（该根下应有 `Http/Resources` 与/或 `Models`）。
+- 组合判定：**Model 的 json / array cast 列** ∩ **Resource 里 `whenHas('x')` / `$this->x` 透出的列**；命中后抽样该列真实数据（默认 200 行）递归找「键全数字且非 `0..n-1`」的层级 —— 列表与字符串键映射不算危险。
+- 已声明 `public $preserveKeys = true;`（**实例**属性）的 Resource 记为「已保键」；写成 `static` 会单独提示（实例访问落到 `JsonResource::__get()` 会报错）。
+- **纯只读**（只读查表取样，不写源码、不动数据），任何环境可跑，也可核对**生产** DB。
+- **退出码**：`--fail-on-danger` 且有命中 `1`，否则 `0`；`--json` 只输出 JSON（不带横幅），便于脚本消费。
+- 模型不可加载 / 抽样失败（DB 不可达、表缺失）的列计为**未能核验**并显式告警 —— 「没查到」不等于「干净」；此时 `--fail-on-danger` 的退出码只反映**已核验**的危险列，`--json` 顶层另给 `unverified` 计数。
+- 收口二选一：手写 Resource 加 `$preserveKeys`（生成物上加会被 `-f` 覆盖）；或**改形状** —— 列与出参不给整数键映射，转成 `[{key|value, label}]` 列表（前端与校验同口径，最耐久）。
+
+> 触发要同时满足两件事：该映射**经 Resource 出参**，且有人**按值取标签**或**读回再保存**。只满足前者，那一次响应丢键，数据没坏；两件都满足才是真缺陷。
+
 ### `moo:composer:docs [--root=] [--format=table|matrix] [--bare] [--write] [--check] [--file=]`
 
 按宿主三份 manifest(`composer.json` / `composer.test.json` / `composer.production.json`)生成「私包清单表」,替代各 Host 手抄 `PRIVATE-COMPOSER-PACKAGES.md`(记数 / 版本 / 来源容易抄错)。
@@ -196,6 +217,7 @@ php artisan moo:scaffold:merge-yaml scaffold/accounts.yaml --dry-run
   - `moo:scaffold:merge-yaml` — git sync 冲突合并
   - `moo:db:audit` — 只读对账(也核对生产 DB)
   - `moo:audit:form-contract` — 只读表单契约审计(默认只报用户可见违规)
+  - `moo:audit:resource-keys` — 只读 Resource 整数键映射体检(抽样核对该列真实数据)
   - `moo:composer:docs` — 只读体检(宿主私包清单文档 ↔ 三份 manifest)
   - `moo:cloud:push` / `moo:cloud:mcp` / `moo:monitor:migrate` — 云端推送 / MCP / 旧版迁移(由 moo-monitor-laravel 提供,无 only_in_local 限制)
 - 改了 schema YAML **务必**先 `moo:fresh`。

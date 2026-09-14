@@ -34,7 +34,7 @@ afterEach(function () {
  *
  * @return array{root: string, model: string}
  */
-function resourceKeysFixture(array $resources): array
+function resourceKeysFixture(array $resources, string $table = 'audit_demo_items'): array
 {
     $base  = sys_get_temp_dir() . '/moo-rk-' . bin2hex(random_bytes(4));
     $model = 'AuditDemoItem' . bin2hex(random_bytes(3));
@@ -50,7 +50,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class {$model} extends Model
 {
-    protected \$table = 'audit_demo_items';
+    protected \$table = '{$table}';
 
     protected \$casts = [
         'meta'       => 'json',
@@ -205,6 +205,42 @@ PHP,
     $static = $rows->firstWhere('resource', 'AuditFixture\Http\Resources\StaticResource');
     expect($static['staticDeclare'])->toBeTrue()
         ->and($static['note'])->toContain('static');
+});
+
+it('命令：抽样失败的列计为未核验，不得被当成「无问题」（JSON 计数 + 文本告警）', function () {
+    // 模型指向不存在的表 → 抽样必然失败（模拟 DB 不可达 / 表缺失）
+    $fixture = resourceKeysFixture([
+        'UnsamplableResource.php' => <<<'PHP'
+<?php
+
+namespace AuditFixture\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class UnsamplableResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return ['meta' => $this->whenHas('meta')];
+    }
+}
+PHP,
+    ], 'audit_demo_items_absent');
+
+    $code    = \Illuminate\Support\Facades\Artisan::call('moo:audit:resource-keys', ['--path' => [$fixture['root']], '--json' => true]);
+    $payload = json_decode(\Illuminate\Support\Facades\Artisan::output(), true);
+
+    expect($code)->toBe(0)
+        ->and($payload['unverified'])->toBe(1)
+        ->and($payload['rows'][0]['verdict'])->toBe('skip')
+        ->and($payload['rows'][0]['sampled'])->toBe(0);
+
+    // 文本模式：输出未核验告警，且**不能**出现「未发现危险列」这种干净结论
+    \Illuminate\Support\Facades\Artisan::call('moo:audit:resource-keys', ['--path' => [$fixture['root']]]);
+    $output = \Illuminate\Support\Facades\Artisan::output();
+
+    expect($output)->toContain('未能核验')->not->toContain('未发现危险列');
 });
 
 it('命令：--fail-on-danger 命中时返回失败退出码，未命中时成功', function () {

@@ -97,7 +97,7 @@ moo-scaffold 在同一个 Service Provider 下做两件相对独立的事，构�
 
 ### 模块一：Schema 与代码生成器（CLI 命令）
 
-YAML 驱动的一条生成流水线。**生成类命令 dev-only**（非 local 环境直接退出，防线即 `config('scaffold.only_in_local')`）；以下运维 / 协同类命令**例外，任何环境可跑**（scaffold 自有的显式 `requiresLocalEnvironment = false`）：`moo:fresh`（缓存被 git 忽略，生产需重建）、`moo:account:add`（首账号引导）、`moo:db:audit`（只读对账，含 prod 核对）、`moo:composer:docs`（只读体检：宿主私包清单文档 ↔ 三份 manifest）、`moo:scaffold:merge-yaml`（多端同步脚本调用）；另有 `moo:cloud:push` / `moo:cloud:mcp` / `moo:monitor:migrate`（生产机推云 / AI 接入 / 旧版迁移）由依赖包 [moo-monitor-laravel](https://github.com/charsen/moo-monitor-laravel) 提供，不受 `only_in_local` 限制。
+YAML 驱动的一条生成流水线。**生成类命令 dev-only**（非 local 环境直接退出，防线即 `config('scaffold.only_in_local')`）；以下运维 / 协同类命令**例外，任何环境可跑**（scaffold 自有的显式 `requiresLocalEnvironment = false`）：`moo:fresh`（缓存被 git 忽略，生产需重建）、`moo:account:add`（首账号引导）、`moo:db:audit`（只读对账，含 prod 核对）、`moo:audit:form-contract`（只读表单契约审计，默认只报用户可见违规）、`moo:audit:resource-keys`（只读整数键映射体检，抽样核对该列真实数据）、`moo:composer:docs`（只读体检：宿主私包清单文档 ↔ 三份 manifest）、`moo:scaffold:merge-yaml`（多端同步脚本调用）；另有 `moo:cloud:push` / `moo:cloud:mcp` / `moo:monitor:migrate`（生产机推云 / AI 接入 / 旧版迁移）由依赖包 [moo-monitor-laravel](https://github.com/charsen/moo-monitor-laravel) 提供，不受 `only_in_local` 限制。
 
 | 命令 | 功能点 | 说明 |
 |---|---|---|
@@ -115,6 +115,8 @@ YAML 驱动的一条生成流水线。**生成类命令 dev-only**（非 local �
 | `moo:view` | 前端脚手架 | 生成前端 Vue 页面脚手架（index / trashed / show） |
 | `moo:adder` | 增量追加 | 给**已有** controller 增量追加单个 action + 路由（不必跑整条流水线） |
 | `moo:db:audit` | DB 对账 | 只读对账 YAML 与实际数据库（列类型 / varchar size / 单列 unique 索引），报告漂移 |
+| `moo:audit:form-contract` | 表单契约 | 只读断言 create/edit 表单实际渲染的控件都被 Store / Update Request 收下（默认只报用户可见违规；`// @moo-waived <字段>: <原因>` 豁免） |
+| `moo:audit:resource-keys` | 整数键映射 | 只读体检「Resource 透出的 json 列」里的整数键映射（出参会被 `removeMissingValues()` 抹键）；抽样真实数据判定，`--fail-on-danger` 可当闸门 |
 | `moo:composer:docs` | 私包清单 | 按宿主三份 manifest 生成「私包清单表」Markdown；`--check` 校验文档是否过期，`--write` 仅替换 marker 区间 |
 | `moo:snapshot:init` | 基线快照 | 给现有 schema 一次性落初始 baseline 快照（设计器做 diff 的基线，必跑一次） |
 | `moo:scaffold:merge-yaml` | 冲突合并 | 冲突 yaml 文件 last-write-wins 自动合并（多端同步脚本调用） |

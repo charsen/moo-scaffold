@@ -18,6 +18,8 @@
  *
  * 判定口径：抽样该列真实数据（默认每列 200 行），递归找「键全数字且非 0..n-1」的层级。
  * 该 Resource 已声明 `$preserveKeys` 的，标为「已声明」不再计危险（大小写与 static 写法都会被识别并提示）。
+ * 模型不可加载 / 抽样失败（DB 不可达、表不存在）的列计为**未核验**并显式告警 —— 「没查到」不等于「干净」；
+ * `--fail-on-danger` 的退出码只反映**已核验**的危险列。
  */
 
 namespace Mooeen\Scaffold\Command;
@@ -83,17 +85,21 @@ class AuditResourceKeysCommand extends Command
 
         $report      = [];
         $dangerCount = 0;
+        $unverified  = 0;
 
         foreach ($candidates as $candidate) {
             $row = $this->inspect($candidate, $limit);
             if ($row['verdict'] === 'danger') {
                 $dangerCount++;
             }
+            if ($row['verdict'] === 'skip') {
+                $unverified++;
+            }
             $report[] = $row;
         }
 
         if ($json) {
-            $this->line((string) json_encode(['roots' => $roots, 'rows' => $report], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+            $this->line((string) json_encode(['roots' => $roots, 'unverified' => $unverified, 'rows' => $report], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
         } else {
             $this->printReport($report, $limit);
         }
@@ -101,13 +107,21 @@ class AuditResourceKeysCommand extends Command
         if ($dangerCount > 0) {
             if (! $json) {
                 $this->warn("⚠ 命中 {$dangerCount} 处「整数键映射经 Resource 出参」，请按上面的建议逐处确认。");
+                if ($unverified > 0) {
+                    $this->warn("⚠ 另有 {$unverified} 列未能核验（模型不可加载或抽样失败）——结论不完整。");
+                }
             }
 
             return $this->option('fail-on-danger') ? self::FAILURE : self::SUCCESS;
         }
 
         if (! $json) {
-            $this->info('✓ 未发现危险列（抽样范围内）。');
+            // 抽样失败 ≠ 无问题：不能把「没查到」说成「干净」（只读诊断错误必须显式披露）。
+            if ($unverified > 0) {
+                $this->warn("⚠ 有 {$unverified} 列未能核验（模型不可加载或抽样失败）——本次结论**不完整**，不代表「无问题」；请确认对应模型的 DB 连接可达后重跑。");
+            } else {
+                $this->info('✓ 未发现危险列（抽样范围内）。');
+            }
         }
 
         return self::SUCCESS;
