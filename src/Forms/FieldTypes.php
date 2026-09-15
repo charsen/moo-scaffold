@@ -520,11 +520,13 @@ class FieldTypes
         return new BaseException("{$where}{$reason}");
     }
 
-    /**
-     * 断言登记表自身的完整性 —— 供测试与运行时自检调用（组件名必须落在 scaffold 的 FORMER 词表内）。
-     *
-     * @return list<string> 违规描述；空数组 = 合规
-     */
+    /** 领域登记表可追加已在其前端注册的控件，通用登记表不接入业务组件。 */
+    public static function supportedWidgets(): array
+    {
+        return FormWidgetTypes::FORMER;
+    }
+
+    /** @return list<string> 登记表自身违规描述；空数组 = 合规。 */
     public static function violations(): array
     {
         $violations = [];
@@ -536,8 +538,8 @@ class FieldTypes
             }
             $seen[$type] = true;
 
-            if (! in_array($def['widget'], FormWidgetTypes::FORMER, true)) {
-                $violations[] = "类型「{$type}」的组件名「{$def['widget']}」不在 scaffold FormWidgetTypes::FORMER 内";
+            if (! in_array($def['widget'], static::supportedWidgets(), true)) {
+                $violations[] = "类型「{$type}」的组件名「{$def['widget']}」未在支持的控件清单内";
             }
             foreach ($def['params'] as $key => $spec) {
                 if (! in_array($spec['kind'], ['int', 'number', 'string', 'options', 'values'], true)) {

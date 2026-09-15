@@ -57,3 +57,24 @@ it('停用选项保持原值定义，但拒绝作为新输入', function () {
     expect(fn () => FieldTypes::validateValue('select', $params, 1))->toThrow(ValidationException::class);
     expect(FieldTypes::validateValue('select', $params, '2'))->toBe(2);
 });
+
+it('领域登记表显式扩展控件支持面，未知控件仍会被拒绝', function () {
+    $domain = new class extends FieldTypes
+    {
+        public static function supportedWidgets(): array
+        {
+            return [...parent::supportedWidgets(), 'domain-picker'];
+        }
+
+        protected static function definitions(): array
+        {
+            return parent::definitions() + [
+                'domain'  => ['widget' => 'domain-picker', 'params' => []],
+                'unknown' => ['widget' => 'unregistered-picker', 'params' => []],
+            ];
+        }
+    };
+    expect($domain::violations())->toHaveCount(1)
+        ->and($domain::violations()[0])->toContain('unregistered-picker')
+        ->and(FieldTypes::supportedWidgets())->not->toContain('domain-picker');
+});
