@@ -1,7 +1,9 @@
 # Changelog
 
-## 未发布
+## 2.1.25
 
+- **新增通用字段契约 `Mooeen\Scaffold\Forms\FieldTypes`**：把「字段类型 → 规则 / 参数 / 归一化 / 展示」收成一份声明式登记，供所有表单生产者共享。`params` 是参数元 schema（`kind` / `default` / `min` / `max` / `max_length` / `max_items`，**不写 `default` 即必填**），`rules()` 只产出类型专属规则、`required` / `nullable` 由框架统一前置，并兼容可空文本参数；单选项集有上限，复杂主数据应由消费领域提供独立引用类型。新增运行时依赖 `brick/math` 做数值边界校验。
+- **领域登记表可扩展前端控件**：`FieldTypes::supportedWidgets()` 默认返回 scaffold 的 `FormWidgetTypes::FORMER`，领域子类可覆写它登记已在前端实现的控件；`violations()` 改按 `static::supportedWidgets()` 校验，通用登记表不接入业务组件。回归：`FieldTypesTest`。
 - **新增只读体检 `moo:audit:resource-keys`：找「Resource 原样透出的 json 列」里带整数键映射的地方。**
   背景：Laravel 的 `ConditionallyLoadsAttributes::removeMissingValues()` 会**递归**把「键全为数字」的嵌套数组
   `array_values()` 重排（本意是让删掉条件字段后带洞的**列表**仍序列化成 JSON 数组），但
