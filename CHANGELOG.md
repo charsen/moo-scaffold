@@ -1,12 +1,5 @@
 # Changelog
 
-## 2.1.26
-
-- **新增跨包「批量人员 ID → 展示名」契约 `Mooeen\Scaffold\Contracts\PersonnelNameResolver`**：moo-attachment（上传人）/ moo-collect（收藏人）/ moo-like（点赞人）/ moo-comment（评论人）/ moo-mini-app（台账人员）/ moo-banner / moo-certificate / moo-cms / moo-product（操作人）/ moo-feedback（提交人）此前各自定义过**同签名**契约，host 又各写一份等价实现；形状收进 scaffold 一份后，包只认它、host 只实现一次。语义：批量一次、读时解析不落库（不作为授权依据）、缺失键缺省（不伪造占位名）、不承担有效性过滤（可指派性属组织契约）；**不提供默认实现**——未绑定即显式失败，避免空实现把全站人名静默变空白。
-- 与身份契约分工：`OperatorResolver` 回答「当前操作人 ID」（写路径、单值），本契约回答「这些 ID 现在叫什么」（读路径、批量）；moo-trail 的写时快照是另一件事，不互相替代。
-- 回归：`tests/Feature/Concerns/PersonnelNameResolverTest.php` 3 项 / 9 断言（形状固定 / 未绑定显式失败 / 缺省键缺省）。
-- 批次与语义口径：wisdomcity `plans/68-org-personnel-contract-consolidation.md`；组织数据仍由 `Mooeen\System\Contracts\OrgDirectory` 提供，包不依赖 moo-system。
-
 ## 2.1.25
 
 - **新增通用字段契约 `Mooeen\Scaffold\Forms\FieldTypes`**：把「字段类型 → 规则 / 参数 / 归一化 / 展示」收成一份声明式登记，供所有表单生产者共享。`params` 是参数元 schema（`kind` / `default` / `min` / `max` / `max_length` / `max_items`，**不写 `default` 即必填**），`rules()` 只产出类型专属规则、`required` / `nullable` 由框架统一前置，并兼容可空文本参数；单选项集有上限，复杂主数据应由消费领域提供独立引用类型。新增运行时依赖 `brick/math` 做数值边界校验。
