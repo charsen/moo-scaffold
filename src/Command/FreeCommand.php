@@ -86,6 +86,9 @@ class FreeCommand extends Command
         // app 优先:名少、好记,作主锚;无法由表反推 → 显式给或交互选
         $apps = $this->utility->getAppTargets();
         $app  = $this->argument('app') ?: $this->chooseApp($apps);
+        if ($app === null) {
+            return self::FAILURE;   // chooseApp 已报错（没得选 / 非交互没选成）
+        }
         if (! isset($apps[$app])) {
             return $this->reportAppNotConfigured($app, 'Please check the scaffold configuration and try again.');
         }

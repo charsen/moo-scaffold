@@ -72,6 +72,9 @@ class AdderCommand extends Command
         $app  = $this->argument('app');
         if (empty($app)) {
             $app = $this->chooseApp($apps);
+            if ($app === null) {
+                return self::FAILURE;   // chooseApp 已报错（没得选 / 非交互没选成）
+            }
         }
         if (! isset($apps[$app])) {
             return $this->reportAppNotConfigured($app);
@@ -81,7 +84,15 @@ class AdderCommand extends Command
         if (empty($folder)) {
             // $folder_names = $this->getFolders($apps[$app]['path']);
             $folder_names = $this->utility->getControllerNamespaces($app);
-            $folder       = $this->choicePrompt('选择目录', $folder_names);
+            $folder       = $this->chooseRequired(
+                '选择目录',
+                $folder_names,
+                "app [{$app}] 下没有找到任何控制器目录。",
+                '未选择目录。非交互模式下请把目录名作为第 2 个参数传入。',
+            );
+            if ($folder === null) {
+                return self::FAILURE;   // 早前这里 `ucfirst(null)` 直接在 strict_types 下抛 TypeError
+            }
         }
         $folder = ucfirst($folder);
         $folder = $folder === '/' ? '<ROOT_PATH>' : $folder;
@@ -98,12 +109,26 @@ class AdderCommand extends Command
         $controllers = $origin !== null
             ? $this->getPackageControllers($origin)
             : $this->getControllers($apps[$app]['path'], $folder);
-        $controller     = $this->choicePrompt('选择控制器', $controllers);
+        $controller = $this->chooseRequired(
+            '选择控制器',
+            $controllers,
+            "目录「{$folder}」下没有控制器（也没有可新建的入口）。",
+            '未选择控制器。请去掉 --no-interaction 在交互终端选择，或选 `<NEW_ONE>` 后输入新控制器名。',
+        );
+        if ($controller === null) {
+            return self::FAILURE;   // 早前 null 一路传给 ControllerAdder::start()（形参全无类型）静默当控制器名
+        }
+
         $new_controller = false;
 
         if ($controller === '<NEW_ONE>') {
             $new_controller = true;
             $controller     = $this->askPrompt('输入控制器名');
+            if (! is_string($controller) || trim($controller) === '') {
+                $this->console()->error('未输入控制器名。');
+
+                return self::FAILURE;
+            }
         }
 
         $action_txt                    = $this->askPrompt('输入 action [request] [resource]（空格分隔，后两项可留空）');

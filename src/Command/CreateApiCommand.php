@@ -98,6 +98,9 @@ class CreateApiCommand extends Command
         $app         = $appArgument;
         if (empty($app)) {
             $app = $this->chooseApp($apps);
+            if ($app === null) {
+                return self::FAILURE;   // chooseApp 已报错（没得选 / 非交互没选成）
+            }
         }
         if (! isset($apps[$app])) {
             return $this->reportAppNotConfigured($app);
