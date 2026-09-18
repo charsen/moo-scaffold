@@ -3,6 +3,7 @@
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\File;
+use Mooeen\Scaffold\Command\AccountAddCommand;
 use Mooeen\Scaffold\Command\AdderCommand;
 use Mooeen\Scaffold\Command\CreateApiCommand;
 use Mooeen\Scaffold\Command\CreateControllerCommand;
@@ -20,6 +21,7 @@ use Mooeen\Scaffold\Command\UpdateMultilingualCommand;
 use Mooeen\Scaffold\Designer\SchemaLoader;
 use Mooeen\Scaffold\Designer\SnapshotStore;
 use Mooeen\Scaffold\RouterTool;
+use Mooeen\Scaffold\Support\AccountStore;
 use Mooeen\Scaffold\Support\ConsoleUi;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Console\Input\ArrayInput;
@@ -546,4 +548,99 @@ it('接线源码锚点：4 处 chooseApp() + moo:view 的控制器选择，null 
         '/\$controller = \$this->chooseRequired\( .*?\); if \(\$controller === null\) \{ return self::FAILURE;/',
         'CreateViewCommand：控制器没选成必须转 FAILURE（handle() 驱不动，只能锚点守）',
     );
+});
+
+// ─── 第 20 项：`moo:account:add` 非交互缺密码 ⇒ 建空密码账号（假成功） ──────────────
+//
+// 缺陷链（2026-09-18 坐实）：`secretPrompt()` 非交互**回落 null** → `(string) null === ''` →
+// `AccountStore::create()` 当时不校验空密码（`$rawPwd === '' ? '' : hash`）→ 空 hash 落库 →
+// 命令照样打印「已创建账号」。而 `ScaffoldAuth::attempt()` 里空 hash **恒不可登录**（且等时防枚举）
+// ⇒ 用户以为建好了、实际永远进不去，且没有任何报错。**两层都堵**：store 层拒空密码
+// （一处同时堵 CLI 与 Web UI 两条入口），命令层把「参数没给全」前置成可读报错 + 退出码 2。
+
+/** AccountAddCommand 壳：把交互输入钉成「非交互回落 null」（`--no-interaction` 下的真实值，实测见 skill 回落值表）。 */
+function cec_account_add_command(BufferedOutput $sink): object
+{
+    $cmd = new class(app(Filesystem::class), app(Utility::class)) extends AccountAddCommand
+    {
+        use CecCommandShell;
+
+        public function __construct(Filesystem $fs, Utility $utility)
+        {
+            parent::__construct($fs, $utility);
+        }
+
+        protected function askPrompt(string $question, ?string $default = null): mixed
+        {
+            return null;
+        }
+
+        protected function secretPrompt(string $question, bool $fallback = true): mixed
+        {
+            return null;
+        }
+    };
+
+    $cmd->sink = $sink;
+
+    return $cmd;
+}
+
+it('moo:account:add:非交互缺 --password → 退出 2 + 明确报错，且一行都不写（原先是假成功）', function () {
+    cec_sandbox(function () {
+        config(['scaffold.accounts.yaml_path' => 'accounts.yaml']);
+        app()->forgetInstance(AccountStore::class);
+
+        $sink = new BufferedOutput;
+        $cmd  = cec_account_add_command($sink);
+        $cmd->primeInput(['username' => 'probe_bob']);   // 给了用户名、没给密码
+
+        expect($cmd->handle(app(AccountStore::class)))->toBe(2)
+            ->and($sink->fetch())->toContain('未提供密码')
+            ->and(app(AccountStore::class)->find('probe_bob'))->toBeNull();
+    });
+});
+
+it('moo:account:add:非交互连用户名都没有 → 退出 2 + 明确报错', function () {
+    cec_sandbox(function () {
+        config(['scaffold.accounts.yaml_path' => 'accounts.yaml']);
+        app()->forgetInstance(AccountStore::class);
+
+        $sink = new BufferedOutput;
+        $cmd  = cec_account_add_command($sink);
+        $cmd->primeInput([]);
+
+        expect($cmd->handle(app(AccountStore::class)))->toBe(2)
+            ->and($sink->fetch())->toContain('未提供用户名');
+    });
+});
+
+it('moo:account:add:非交互参数齐 → 正常建号（happy path 没被新守卫改坏）', function () {
+    cec_sandbox(function () {
+        config(['scaffold.accounts.yaml_path' => 'accounts.yaml']);
+        app()->forgetInstance(AccountStore::class);
+
+        $sink = new BufferedOutput;
+        $cmd  = cec_account_add_command($sink);
+        $cmd->primeInput(['username' => 'probe_ok', '--password' => 'pw123']);
+
+        expect($cmd->handle(app(AccountStore::class)))->toBe(0)
+            ->and($sink->fetch())->toContain('已创建账号');
+
+        $row = app(AccountStore::class)->find('probe_ok');
+        expect($row)->not->toBeNull()
+            ->and(password_verify('pw123', $row['password']))->toBeTrue();
+    });
+});
+
+it('store 层锚点：create() 拒空密码，而 update() 的「空 = 不改」语义保持不变', function () {
+    $flat = (string) preg_replace(
+        '/\s+/',
+        ' ',
+        (string) file_get_contents((new ReflectionClass(AccountStore::class))->getFileName()),
+    );
+
+    expect($flat)->toContain("throw new RuntimeException('password 不能为空')")
+        // update() 那条「非空才改」的判据 —— 防止有人把 create() 的校验顺手复制过去堵死"留空不改"
+        ->and($flat)->toContain("if (\$newPwd !== '') {");
 });

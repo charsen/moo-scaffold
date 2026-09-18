@@ -37,6 +37,31 @@ it('create() 不重复 hash 已是 bcrypt 的密码(幂等)', function () {
     expect($row['password'])->toBe($hash);     // 原样存,不二次 hash
 });
 
+// 第 20 项：空密码不是"弱密码"，而是**假成功** —— 空 hash 在 ScaffoldAuth::attempt() 里恒不可登录
+// （那里已挡 + 等时防枚举），所以放行只会得到「命令/表单报成功、用户永远登不进、也看不出原因」。
+it('create() 拒空密码(空 hash 在鉴权侧恒不可登录 ⇒ 放行只会得到假成功)', function () {
+    expect(fn () => $this->store->create(['username' => 'nopw', 'password' => ''], 'test'))
+        ->toThrow(\RuntimeException::class, 'password 不能为空');
+
+    // 关键：不是"建了个空密码账号"，而是连文件都没落
+    expect($this->store->find('nopw'))->toBeNull();
+    expect(file_exists($this->sandbox . '/accounts.yaml'))->toBeFalse();
+});
+
+it('create() 连 password 键都没有也拒(Web 表单 nullable / CLI 未给 option 都汇到这里)', function () {
+    expect(fn () => $this->store->create(['username' => 'nokey'], 'test'))
+        ->toThrow(\RuntimeException::class, 'password 不能为空');
+});
+
+it('update() 的空密码仍是"不改"语义(别被 create() 的非空校验顺手带堵)', function () {
+    $this->store->create(['username' => 'keep', 'password' => 'orig', 'role' => 'admin'], 'test');
+    $before = $this->store->find('keep');
+
+    $this->store->update('keep', ['password' => ''], 'test');
+
+    expect($this->store->find('keep')['password'])->toBe($before['password']);   // 旧 hash 原样保留
+});
+
 it('delete() 拒删最后一个启用 admin(store 层兜底)', function () {
     $this->store->create(['username' => 'solo', 'password' => 'x', 'role' => 'admin'], 'test');
     expect(fn () => $this->store->delete('solo', 'test'))

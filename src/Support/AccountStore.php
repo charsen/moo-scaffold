@@ -129,7 +129,9 @@ class AccountStore
     }
 
     /**
-     * 新增账号；username 唯一性校验。
+     * 新增账号；username / password 均须非空，username 另做唯一性校验。
+     *
+     * @throws RuntimeException username 为空 / password 为空 / 账号已存在 / 字段不合法
      */
     public function create(array $payload, string $by): array
     {
@@ -145,9 +147,17 @@ class AccountStore
             throw new RuntimeException("账号 [{$username}] 已存在");
         }
 
-        $now       = $this->now();
-        $rawPwd    = (string) ($payload['password'] ?? '');
-        $hashedPwd = $rawPwd === '' ? '' : ($this->isPasswordHashed($rawPwd) ? $rawPwd : password_hash($rawPwd, PASSWORD_BCRYPT));
+        $now    = $this->now();
+        $rawPwd = (string) ($payload['password'] ?? '');
+        if ($rawPwd === '') {
+            // 与上面 username 的非空校验对称。空密码落库只会得到**空 hash**，而空 hash 在
+            // ScaffoldAuth::attempt() 里恒不可登录（那里已挡，且等时返回）⇒「创建成功」是假的：
+            // 命令 / 表单都报成功，用户却永远登不进去、也查不出原因。本方法是唯一入口，
+            // CLI（moo:account:add）与 Web UI（AccountController::store）两侧都经此。
+            // ⚠ update() 的空密码是**有意**的「表示不改」，勿一并堵（见 update() 内注释）。
+            throw new RuntimeException('password 不能为空');
+        }
+        $hashedPwd = $this->isPasswordHashed($rawPwd) ? $rawPwd : password_hash($rawPwd, PASSWORD_BCRYPT);
 
         $row = $this->normalize([
             'username'      => $username,
