@@ -781,3 +781,147 @@ it('render 忽略 framework_drop（框架列删除不自动落库，只由告警
     expect($source)->not->toContain('dropColumn')
         ->and($source)->not->toContain('softDeletes');
 });
+
+// ─── emitUp / emitDown 镜像守卫 ──────────────────────────────────────────────
+//
+// `emitUp()`（L235）与 `emitDown()`（L290）是**手工维护的镜像**：down 是 up 的严格逆序 + 状态对调
+// （`after` ↔ `before`、`current_definition.enums` ↔ `baseline_definition.enums`）。
+// 但上游 28 条用例**全部只验 up 方向**（断言某行出现），于是镜像一旦漂移 —— 比如给 up 加了新 op
+// 却忘了加反向 —— **没有任何测试会红**，而后果只在真跑 `migrate:rollback` 时暴露。
+// 下面把它变成可执行断言：① 行为级「每种 op 都成对」；② 语句顺序互为逆序；③ 源码级 op 集合一致
+// （第三层才是真正防「未来新增 op 忘加反向」的那一层，前两层只钉住**当前**的配对关系）。
+
+/** 覆盖**全部** field op（add / modify / drop / rename + 有意忽略的 framework_drop）与全部 index op（add / drop / modify）的 diff。 */
+function mw_all_ops_diff(): array
+{
+    return [
+        'schema'   => 'Demo',
+        'is_empty' => false,
+        'tables'   => [
+            'demo_all_ops' => [
+                'status'              => 'updated',
+                'baseline_definition' => [
+                    'name'   => 'demo_all_ops',
+                    'fields' => ['dropped_col' => ['type' => 'varchar', 'size' => 32]],
+                    'index'  => [],
+                ],
+                'current_definition' => [
+                    'name'   => 'demo_all_ops',
+                    'fields' => [],
+                    'index'  => [],
+                ],
+                'field_changes' => [
+                    ['op' => 'modify', 'field' => 'mod_col', 'before' => ['type' => 'varchar', 'size' => 32], 'after' => ['type' => 'varchar', 'size' => 128]],
+                    ['op' => 'rename', 'from' => 'old_name', 'to' => 'new_name'],
+                    ['op' => 'drop', 'field' => 'dropped_col', 'definition' => ['type' => 'varchar', 'size' => 32]],
+                    ['op' => 'add', 'field' => 'added_col', 'definition' => ['type' => 'varchar', 'size' => 64], 'after_field' => null],
+                    ['op' => 'framework_drop', 'field' => 'deleted_at', 'definition' => [], 'framework' => true],
+                ],
+                'index_changes' => [
+                    ['op' => 'add', 'name' => 'idx_new', 'type' => 'index', 'fields' => 'added_col'],
+                    ['op' => 'drop', 'name' => 'idx_old', 'baseline' => ['type' => 'index', 'fields' => 'old_name']],
+                    ['op' => 'modify', 'name' => 'idx_mod', 'before' => ['type' => 'index', 'fields' => 'mod_col'], 'after' => ['type' => 'unique', 'fields' => 'mod_col']],
+                ],
+                'warnings' => [],
+            ],
+        ],
+    ];
+}
+
+/** 渲染上面那份 diff，并按模板的固定形状切成 [up 段, down 段]（用 `public function down(): void` 当锚，别按行号切）。 */
+function mw_all_ops_up_down(): array
+{
+    $source = app(MigrationWriter::class)->render(mw_all_ops_diff())['demo_all_ops']['php_source'];
+
+    return explode('public function down(): void', $source, 2);
+}
+
+it('emitUp / emitDown 每种 op 都成对：field 的 add·modify·drop·rename + index 的 add·drop·modify', function () {
+    [$up, $down] = mw_all_ops_up_down();
+
+    // field add：up 建列 / down 删列
+    expect($up)->toContain("'added_col'")
+        ->and($down)->toContain("\$table->dropColumn('added_col');");
+
+    // field drop：up 删列 / down 用 baseline definition 重建
+    expect($up)->toContain("\$table->dropColumn('dropped_col');")
+        ->and($down)->toContain("'dropped_col'");
+
+    // field rename：两侧方向相反（这是最容易被写反的一对）
+    expect($up)->toContain("renameColumn('old_name', 'new_name');")
+        ->and($down)->toContain("renameColumn('new_name', 'old_name');");
+
+    // field modify：两侧都重建列，靠 after / before 决定内容
+    expect($up)->toContain("'mod_col'")
+        ->and($down)->toContain("'mod_col'");
+
+    // index add：up 建索引 / down 删索引
+    expect($up)->toContain("\$table->index('added_col', 'idx_new');")
+        ->and($down)->toContain("\$table->dropIndex('idx_new');");
+
+    // index drop：up 删索引 / down 用 baseline 重建
+    expect($up)->toContain("\$table->dropIndex('idx_old');")
+        ->and($down)->toContain("\$table->index('old_name', 'idx_old');");
+
+    // index modify：up 删旧建新 / down 删新建旧（类型从 index 换回 baseline 的 index）
+    expect($up)->toContain("\$table->dropIndex('idx_mod');")
+        ->and($up)->toContain("\$table->unique('mod_col', 'idx_mod');")
+        ->and($down)->toContain("\$table->dropUnique('idx_mod');")
+        ->and($down)->toContain("\$table->index('mod_col', 'idx_mod');");
+
+    // framework_drop 两侧都**有意**忽略（只走告警通道）—— 别把它当成"漏了一半"
+    expect($up)->not->toContain('deleted_at')
+        ->and($down)->not->toContain('deleted_at');
+});
+
+it('emitUp / emitDown 的语句顺序互为逆序（DDL 安全序是承重契约，别随手重排）', function () {
+    [$up, $down] = mw_all_ops_up_down();
+
+    $at = static fn (string $haystack, string $needle): int|false => strpos($haystack, $needle);
+
+    // up：先 modify → 再 rename → 再删列 → 再加列，最后才是 index 段（先删后增）
+    $upPositions = [
+        "'mod_col'"                            => $at($up, "'mod_col'"),
+        "renameColumn('old_name', 'new_name')" => $at($up, "renameColumn('old_name', 'new_name')"),
+        "dropColumn('dropped_col')"            => $at($up, "dropColumn('dropped_col')"),
+        "'added_col'"                          => $at($up, "'added_col'"),
+        "dropIndex('idx_old')"                 => $at($up, "dropIndex('idx_old')"),
+    ];
+
+    // down：index 段在前（先撤掉新增的索引，再恢复被删的），field 段在后
+    $downPositions = [
+        "dropIndex('idx_new')"                 => $at($down, "dropIndex('idx_new')"),
+        "index('old_name', 'idx_old')"         => $at($down, "index('old_name', 'idx_old')"),
+        "dropColumn('added_col')"              => $at($down, "dropColumn('added_col')"),
+        "renameColumn('new_name', 'old_name')" => $at($down, "renameColumn('new_name', 'old_name')"),
+    ];
+
+    foreach ([['up', $upPositions], ['down', $downPositions]] as [$side, $positions]) {
+        foreach ($positions as $needle => $pos) {
+            expect($pos)->toBeInt("{$side}() 段里找不到「{$needle}」");
+        }
+
+        $values = array_values($positions);
+        for ($i = 1; $i < count($values); $i++) {
+            expect($values[$i])->toBeGreaterThan($values[$i - 1], "{$side}() 段的语句顺序变了：「" . array_keys($positions)[$i] . '」跑到前一条之前');
+        }
+    }
+});
+
+it('源码锚点：emitUp / emitDown 引用的 op 字面量集合必须一致（新增 op 忘了加反向就会红）', function () {
+    $src = (string) file_get_contents((new ReflectionClass(MigrationWriter::class))->getFileName());
+
+    // 只扫方法体里的 `'op' === 'xxx'` / `'op' !== 'xxx'`，不扫注释与调用点
+    $opSet = static function (string $method) use ($src): array {
+        preg_match('/private function ' . $method . '\(.*?\n    \}/s', $src, $m);
+        preg_match_all("/'op'\]\s*[!=]={2,3}\s*'([a-z_]+)'/", $m[0] ?? '', $ops);
+        $set = array_values(array_unique($ops[1]));
+        sort($set);
+
+        return $set;
+    };
+
+    // 两侧都处理这 4 种；framework_drop 两侧都**有意**不在这里处理（它只走告警通道）
+    expect($opSet('emitUp'))->toBe(['add', 'drop', 'modify', 'rename'])
+        ->and($opSet('emitDown'))->toBe($opSet('emitUp'));
+});
