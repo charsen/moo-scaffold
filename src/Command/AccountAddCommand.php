@@ -50,11 +50,28 @@ class AccountAddCommand extends Command
 
     private function doHandle(AccountStore $store): int
     {
-        $username = (string) ($this->argument('username') ?? $this->askPrompt('用户名'));
+        // 非交互（--no-interaction / CI / 脚本）下 askPrompt / secretPrompt **都回落 null**，而 `(string) null` 恰好是 ''。
+        // 于是「没给用户名」会静默当成空用户名、「没给密码」会静默当成空密码 —— 后者早前会一路建出空密码账号，
+        // 命令还照样打印「已创建账号」（ScaffoldAuth 侧空 hash 恒不可登录 ⇒ 纯假成功，且看不出哪里错）。
+        // 这两条前置校验把「参数没给全」在**入口**就变成可读报错 + 退出码 2（本命令 2 = 参数错误），
+        // 而不是让它漏到 store 层、混进 4（数据冲突）。
+        $username = trim((string) ($this->argument('username') ?? $this->askPrompt('用户名')));
+        if ($username === '') {
+            $this->console()->error('未提供用户名。非交互模式下请把用户名作为第 1 个参数传入：moo:account:add <username> --password=...');
+
+            return 2;
+        }
+
         $password = (string) ($this->option('password') ?? $this->secretPrompt('密码'));
-        $phone    = (string) $this->option('phone');
-        $role     = (string) $this->option('role');
-        $enabled  = ! (bool) $this->option('disabled');
+        if ($password === '') {
+            $this->console()->error('未提供密码。非交互模式下请显式传入：--password=...');
+
+            return 2;
+        }
+
+        $phone   = (string) $this->option('phone');
+        $role    = (string) $this->option('role');
+        $enabled = ! (bool) $this->option('disabled');
 
         $row = $store->create([
             'username' => $username,
