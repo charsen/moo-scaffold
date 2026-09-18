@@ -38,31 +38,32 @@ class CreateTestCommand extends Command
         ];
     }
 
-    public function handle(): void
+    public function handle(): int
     {
         $this->showTitle();
 
         if (! $this->checkRunning()) {
-            return;
+            return self::FAILURE;
         }
 
         $schema_name = $this->argument('schema_name');
         if (empty($schema_name)) {
             // plan-53:包 schema 测试脚手架未设计(路径/命名空间推导是 host 形态)—— 列表只给 host schema
             $schema_name = $this->chooseSchema($this->hostSchemaNames());
+            if ($schema_name === null) {
+                return self::FAILURE;
+            }
         } elseif ($this->schemaOrigin((string) $schema_name) !== null) {
             $this->console()->error("「{$schema_name}」是扩展包 schema —— moo:test 暂不支持扩展包。");
 
-            return;
+            return self::FAILURE;
         }
 
         (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start(false, true);
 
         $all = $this->utility->getControllers(false);
         if (! isset($all[$schema_name])) {
-            $this->reportSchemaNotFound($schema_name);
-
-            return;
+            return $this->reportSchemaNotFound($schema_name);
         }
 
         $force     = $this->isForced();
@@ -77,5 +78,7 @@ class CreateTestCommand extends Command
 
         $this->tipDone(true);
         $this->tipRunTests($generator->testDirs($schema_name, $targetApp));
+
+        return self::SUCCESS;
     }
 }

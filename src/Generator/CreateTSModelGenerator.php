@@ -11,7 +11,7 @@
 namespace Mooeen\Scaffold\Generator;
 
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
-use Mooeen\Scaffold\Support\FieldTypes;
+use Mooeen\Scaffold\Support\ColumnTypeGroups;
 
 use function in_array;
 
@@ -104,9 +104,9 @@ class CreateTSModelGenerator extends Generator
                 // bigint 单独映射:JS number 装不下 64 位,生成 `bigint | string`。
                 // 所以下一分支用 INT_NO_BIGINT —— 不是漏写 bigint(2026-09-11 核验)。
                 $type = 'bigint | string';
-            } elseif (in_array($attr['type'], FieldTypes::INT_NO_BIGINT)) {
+            } elseif (in_array($attr['type'], ColumnTypeGroups::INT_NO_BIGINT)) {
                 $type = 'number';
-            } elseif (in_array($attr['type'], FieldTypes::BOOL)) {
+            } elseif (in_array($attr['type'], ColumnTypeGroups::BOOL)) {
                 $type = 'boolean';
             }
             // elseif ($attr['type'] === 'array') {

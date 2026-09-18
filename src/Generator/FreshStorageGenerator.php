@@ -13,7 +13,7 @@ namespace Mooeen\Scaffold\Generator;
 use Brick\VarExporter\VarExporter;
 use Illuminate\Support\Str;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
-use Mooeen\Scaffold\Support\FieldTypes;
+use Mooeen\Scaffold\Support\ColumnTypeGroups;
 use Mooeen\Scaffold\Support\PackageRegistry;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Yaml\Yaml;
@@ -275,13 +275,13 @@ class FreshStorageGenerator extends Generator
      */
     private function getFieldDesc(string $key, string $desc, array $enums): array|string
     {
-        $temp = [];
+        $enumParts = [];
 
         if (array_key_exists($key, $enums)) {
             foreach ($enums[$key] as $v) {
-                $temp[] = "{$v[0]}: {$v[2]}";
+                $enumParts[] = "{$v[0]}: {$v[2]}";
             }
-            $desc = '{' . implode(', ', $temp) . '}';
+            $desc = '{' . implode(', ', $enumParts) . '}';
         }
 
         return $desc;
@@ -322,7 +322,7 @@ class FreshStorageGenerator extends Generator
     private function getSize(array &$attr, string $field_name): void
     {
         $attr['size'] = $attr['size'] ?? '';
-        if (in_array($attr['type'], FieldTypes::UNSIGNED_DEFAULT)) {
+        if (in_array($attr['type'], ColumnTypeGroups::UNSIGNED_DEFAULT)) {
             // 添加 unsigned 属性
             $attr['unsigned'] = $attr['unsigned'] ?? true;
 
@@ -333,7 +333,7 @@ class FreshStorageGenerator extends Generator
             } else {
                 $attr['size'] = empty($attr['size']) ? 10 : $attr['size'];
             }
-        } elseif (in_array($attr['type'], FieldTypes::STRING_SIZE)) {
+        } elseif (in_array($attr['type'], ColumnTypeGroups::STRING_SIZE)) {
             $attr['size'] = empty($attr['size']) ? 32 : $attr['size'];
             if (is_string($attr['size']) && str_contains($attr['size'], ',')) {
                 // 保存最小长度，用于生成检验时使用
@@ -370,22 +370,22 @@ class FreshStorageGenerator extends Generator
                 $zh = $en !== '' ? $en : $field_name;
             }
 
-            $temp = [
+            $fieldRow = [
                 'zh-CN' => $zh,
                 'en'    => $en,
             ];
-            $temp['type']    = $attr['type'] ?? 'varchar';     // 同款兜底 — 默认 varchar
-            $temp['table']   = $table_name;
-            $temp['default'] = $attr['default'] ?? '';
-            $temp['format']  = $attr['format']  ?? '';
+            $fieldRow['type']    = $attr['type'] ?? 'varchar';     // 同款兜底 — 默认 varchar
+            $fieldRow['table']   = $table_name;
+            $fieldRow['default'] = $attr['default'] ?? '';
+            $fieldRow['format']  = $attr['format']  ?? '';
 
             // 记录该字段在本表的中文名(全量,含同名一致的),reportNameConflicts 据此挑叫法不一致的列
-            $this->field_table_names[$field_name][$table_name] = $temp['zh-CN'];
+            $this->field_table_names[$field_name][$table_name] = $fieldRow['zh-CN'];
 
             if (isset($all_fields['table_fields'][$field_name])) {
-                $all_fields['duplicate_fields'][$field_name] = $temp;
+                $all_fields['duplicate_fields'][$field_name] = $fieldRow;
             } else {
-                $all_fields['table_fields'][$field_name] = $temp;
+                $all_fields['table_fields'][$field_name] = $fieldRow;
             }
         }
     }
@@ -498,8 +498,9 @@ class FreshStorageGenerator extends Generator
             foreach ($fields as $field_name => $attr) {
                 // YAML 单引号串里的单引号要双写转义('' )—— 否则 en/zh-CN 含撇号(如 Employee's Name)
                 // 会写出非法 YAML,下次 moo:fresh 解析崩、整条流水线挂(2026-06-09 修)。
-                $en   = str_replace("'", "''", (string) $attr['en']);
-                $zh   = str_replace("'", "''", (string) $attr['zh-CN']);
+                // 规则单一来源在 SharedCodegenHelpers::quoteYamlString();本文件曾是全仓唯一的内联漏收点。
+                $en   = $this->quoteYamlString($attr['en']);
+                $zh   = $this->quoteYamlString($attr['zh-CN']);
                 $yaml = ["en: '{$en}'", "'zh-CN': '{$zh}'"];
 
                 $code[] = $this->getTabs(1) . "{$field_name}: { " . implode(', ', $yaml) . ' }';
@@ -671,7 +672,7 @@ class FreshStorageGenerator extends Generator
             return;
         }
 
-        if (! $put) {
+        if ($put === false) {
             $this->console()->failed($relativeFile);
 
             return;

@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 
 /*
@@ -200,4 +201,59 @@ test('layout 内表单的 rules 外附加键被 transformLayout 丢弃，命令�
         ->assertExitCode(0);
 
     expect(formContractCsv($csv))->toHaveCount(0);
+});
+
+// ─── 寿命口径与编排结构（2026-09-18 第 12 项）────────────────────────
+
+test('命令实例是 per-process：同一进程内重复调用不得累积 CSV 行（$rows 必须在 handle() 开头清空）', function () {
+    // 与控制器相反：命令**不是**每请求新建 —— 同一进程内多次 Artisan::call 复用同一个实例
+    // （Laravel 把命令注册进 Artisan 应用，实例留在容器里）。所以任何实例状态都必须每次
+    // handle() 重置，否则上一轮的检出结果会接着累。
+    // 这条会把「把 $rows = [] 那行删掉」变成可观测的失败：第 2 轮的 CSV / Checked 计数翻倍。
+    $first  = $this->tmp . '/repeat-1.csv';
+    $second = $this->tmp . '/repeat-2.csv';
+
+    Artisan::call('moo:audit:form-contract', ['--scope' => formContractScope(), '--out' => $first]);
+    $run1 = Artisan::output();
+
+    Artisan::call('moo:audit:form-contract', ['--scope' => formContractScope(), '--out' => $second]);
+    $run2 = Artisan::output();
+
+    expect(formContractCsv($first))->not->toBeEmpty('前置：第一轮就该有检出项，否则这条测不出累积');
+
+    expect(formContractCsv($second))->toHaveCount(count(formContractCsv($first)))
+        // 摘要是同一条流水线算出来的，累积同样会让它翻倍 —— 顺带守住 $rows 之外的实例状态
+        ->and(preg_match('/Checked \d+ form paths, \d+ skipped\./', $run1, $m1))->toBe(1)
+        ->and(preg_match('/Checked \d+ form paths, \d+ skipped\./', $run2, $m2))->toBe(1)
+        ->and($m2[0])->toBe($m1[0]);
+});
+
+test('handle() 只做编排：五段各自成私有方法，handle() 本体不得再长回去', function () {
+    // 拆之前 handle() 是 278 行单方法（选项解析 / 152 行主循环 / 摘要全挤在一起），
+    // 想知道「哪些开关影响计数」「一行 CSV 怎么来的」都得从里面刨。现拆成
+    // 解析 → 口径 → 执行 → 落账 → 输出 五段，handle() 只留编排。
+    // 用反射量长度而不是扫源码：精确、不依赖缩进，报错自带方法名。
+    $rc = new ReflectionClass(\Mooeen\Scaffold\Command\AuditFormContractCommand::class);
+
+    foreach ([
+        'resolveNamespace',
+        'resolveControllerFiles',
+        'visibilityScopes',
+        'emptyTotals',
+        'inspectController',
+        'inspectFormPath',
+        'dropForgotten',
+        'staleWaivedMarkers',
+        'recordFindings',
+        'reportFindings',
+    ] as $method) {
+        expect($rc->hasMethod($method))->toBeTrue("编排阶段 {$method}() 缺失 —— 是不是又被合回 handle() 了？")
+            ->and($rc->getMethod($method)->isPrivate())->toBeTrue("{$method}() 应是私有实现细节");
+    }
+
+    $handle = $rc->getMethod('handle');
+    $lines  = $handle->getEndLine() - $handle->getStartLine() + 1;
+
+    // 阈值不是圣数：只表达「编排层不该超过一屏」。拆分前 278 行，现在 36 行。
+    expect($lines)->toBeLessThanOrEqual(45, "handle() 又长到 {$lines} 行 —— 新增逻辑应落到对应阶段的私有方法里");
 });

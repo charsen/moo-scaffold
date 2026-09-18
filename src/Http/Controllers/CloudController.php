@@ -11,6 +11,7 @@ use Mooeen\Monitor\Recorder\RuntimeErrorRecorder;
 use Mooeen\Monitor\Recorder\SqlSlowRecorder;
 use Mooeen\Scaffold\Foundation\FormRequest;
 use Mooeen\Scaffold\Http\Requests\ContextRequest;
+use Mooeen\Scaffold\Support\ReadonlyMode;
 use Mooeen\Scaffold\Utility;
 use Throwable;
 
@@ -77,8 +78,8 @@ class CloudController extends Controller
             'buffers'           => $buffers,
             'discard_supported' => $discardSupported,
             'is_local'          => function_exists('app') && app()->environment('local'),
-            'is_prod'           => function_exists('app') && app()->environment('production'),
-            'is_readonly'       => (bool) config('scaffold.config_ui.readonly', false),
+            'is_prod'           => ReadonlyMode::productionActive(),
+            'is_readonly'       => ReadonlyMode::configLocked(),
             'flash_message'     => $request->hasSession() ? $request->session()->pull('flash_message') : null,
             'flash_error'       => $request->hasSession() ? $request->session()->pull('flash_error') : null,
         ]);
@@ -468,7 +469,7 @@ class CloudController extends Controller
         if (! app()->environment('local')) {
             return $this->back($request, false, '仅 local 开发环境允许清理开发噪音。');
         }
-        if ((bool) config('scaffold.config_ui.readonly', false)) {
+        if (ReadonlyMode::configLocked()) {
             return $this->back($request, false, '当前为只读模式，禁止清理开发噪音。');
         }
 

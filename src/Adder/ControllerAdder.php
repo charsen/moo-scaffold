@@ -48,6 +48,12 @@ class ControllerAdder extends Adder
             $controller = Utility::ensureControllerSuffix($controller);
             $controller = ucfirst($controller);
             $file_path  = $this->buildNewController($folder, $controller);
+
+            // null = 控制器或 trait 写入失败（putOrReport 已打过 failed）；这里必须中止，
+            // 否则会走下面的 readSourceLines 再报一句误导性的「源文件不存在或不可读」。
+            if ($file_path === null) {
+                return false;
+            }
         } elseif ($this->originCtx !== null) {
             $file_path = rtrim($this->originCtx->pathFor('controller'), '/') . '/' . $controller . '.php';
         } else {
@@ -91,10 +97,7 @@ class ControllerAdder extends Adder
         $request_name  = empty($request_name) ? '' : "{$request_name} \$request";
         $resource_name = ($this->is_collection) ? 'BaseResourceCollection' : $resource_name;
 
-        $bytes = $this->filesystem->put($file_path, implode('', $file_codes));
-        if ($bytes === false) {
-            $this->console()->failed($relative_file_path, '写入失败，文件未变更');
-
+        if (! $this->putOrReport($file_path, $relative_file_path, implode('', $file_codes))) {
             return false;
         }
 
@@ -110,7 +113,7 @@ class ControllerAdder extends Adder
         ];
     }
 
-    private function buildNewController($folder, $controller): string
+    private function buildNewController($folder, $controller): ?string
     {
         // plan-53:包控制器平铺在包 Controllers/Admin 下(选的"目录"是包本身,非子目录)
         if ($this->originCtx !== null) {
@@ -157,24 +160,34 @@ class ControllerAdder extends Adder
             'controller_name'      => $controller,
         ];
 
-        $this->buildNewControllerTrait($path, $controller, $namespace_pre);
+        if (! $this->buildNewControllerTrait($path, $controller, $namespace_pre)) {
+            return null;
+        }
 
         $content = $this->buildStub($meta, $this->getStub('controller-adder'));
-        $this->filesystem->put($controller_file, $content);
+        if (! $this->putOrReport($controller_file, $controller_relative_file, $content)) {
+            return null;
+        }
+
         $this->console()->created($controller_relative_file);
 
         return $controller_file;
     }
 
-    private function buildNewControllerTrait($path, $controller, $namespace)
+    /**
+     * 生成 Controller trait 骨架；返回 false 表示写入失败 —— 调用方必须中止，
+     * 否则会落下一个「引用了并不存在 trait」的 controller 文件。
+     */
+    private function buildNewControllerTrait($path, $controller, $namespace): bool
     {
         $this->checkDirectory($path . '/Traits/');
-        $file_path = $path . '/Traits/' . $controller . 'Trait.php';
+        $file_path      = $path . '/Traits/' . $controller . 'Trait.php';
+        $trait_relative = str_replace(base_path('/'), './', $file_path);
 
         if ($this->filesystem->exists($file_path)) {
-            $this->console()->exists(str_replace(base_path('/'), './', $file_path), 'Controller trait 已存在');
+            $this->console()->exists($trait_relative, 'Controller trait 已存在');
 
-            return;
+            return true;
         }
 
         $this->checkDirectory($path);
@@ -188,7 +201,7 @@ class ControllerAdder extends Adder
         $codes[] = '}';
         $codes[] = '';
 
-        $this->filesystem->put($file_path, implode(PHP_EOL, $codes));
+        return $this->putOrReport($file_path, $trait_relative, implode(PHP_EOL, $codes));
     }
 
     /**
@@ -277,7 +290,12 @@ class ControllerAdder extends Adder
         $codes[] = '}';
         $codes[] = '';
 
-        $this->filesystem->put($file_path, implode(PHP_EOL, $codes));
+        $relative_file_path = $this->relDisplay($file_path, $this->originCtx);
+
+        // 写失败就不返回 use 语句 —— 否则 controller 会 use 一个并不存在的 resource 类
+        if (! $this->putOrReport($file_path, $relative_file_path, implode(PHP_EOL, $codes))) {
+            return '';
+        }
 
         return "use {$config['namespace']}\\{$resource_name};";
     }
@@ -317,7 +335,12 @@ class ControllerAdder extends Adder
         $codes[] = '}';
         $codes[] = '';
 
-        $this->filesystem->put($file_path, implode(PHP_EOL, $codes));
+        $relative_file_path = $this->relDisplay($file_path, $this->originCtx);
+
+        // 写失败就不返回 use 语句 —— 否则 controller 会 use 一个并不存在的 request 类
+        if (! $this->putOrReport($file_path, $relative_file_path, implode(PHP_EOL, $codes))) {
+            return '';
+        }
 
         return "use {$config['namespace']}\\{$request_name};";
     }

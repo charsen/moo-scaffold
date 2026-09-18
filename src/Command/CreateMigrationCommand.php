@@ -43,12 +43,12 @@ class CreateMigrationCommand extends Command
         ];
     }
 
-    public function handle(SchemaDiffService $diffService, MigrationWriter $writer): void
+    public function handle(SchemaDiffService $diffService, MigrationWriter $writer): int
     {
         $this->showTitle();
 
         if (! $this->checkRunning()) {
-            return;
+            return self::FAILURE;
         }
 
         // 先刷 storage/scaffold cache(让 generator 看到最新 yaml),再定位 schema —— `-t` 可按全局唯一表 key 反查 schema
@@ -56,8 +56,8 @@ class CreateMigrationCommand extends Command
 
         $only_table  = $this->resolveOnlyTable();
         $schema_name = $this->resolveSchemaArg($this->argument('schema_name'), $only_table);
-        if ($schema_name === '') {
-            return;
+        if ($schema_name === null) {
+            return self::FAILURE;
         }
 
         $this->tipCallCommand('moo:migration ' . $schema_name);
@@ -69,7 +69,7 @@ class CreateMigrationCommand extends Command
         } catch (SchemaLoadException $e) {
             $this->console()->error("schema 加载失败：{$e->getMessage()}");
 
-            return;
+            return self::FAILURE;
         }
 
         // -t/--table:把 diff 收窄到单张表(在 suspected_renames 检查前过滤,别让其它表的疑似改名拦住本表)
@@ -77,36 +77,38 @@ class CreateMigrationCommand extends Command
             $filtered = SchemaDiffService::filterToTable($diff, $only_table);
             if ($filtered === null) {
                 $this->console()->error("表 key \"{$only_table}\" 不在 schema \"{$schema_name}\" 的表集中（baseline 与 current 中都没有）。");
-                $this->line('  可选表 key：' . (($keys = array_keys($diff['tables'] ?? [])) === [] ? '（无）' : implode(', ', $keys)));
+                $this->console()->line('  可选表 key：' . (($keys = array_keys($diff['tables'] ?? [])) === [] ? '（无）' : implode(', ', $keys)));
 
-                return;
+                return self::FAILURE;
             }
             $diff = $filtered;
             $this->console()->info("单表模式：仅为表 [{$only_table}] 生成 migration");
         }
 
-        // suspected_renames:CLI 没 GUI rename hint 流,提示用户走 Web UI 标改名
+        // suspected_renames:CLI 没 GUI rename hint 流,提示用户走 Web UI 标改名。
+        // 退出码给 FAILURE:本次要求生成的 migration 一个都没落盘(脚本据此判「完成」是错的)。
         if (! empty($diff['suspected_renames'])) {
             $this->tipUseDesignerRename('确认后再重跑 moo:migration');
             foreach ($diff['suspected_renames'] as $r) {
-                $this->line("  {$r['table']}: {$r['drop']} → {$r['add']}?");
+                $this->console()->line("  {$r['table']}: {$r['drop']} → {$r['add']}?");
             }
 
-            return;
+            return self::FAILURE;
         }
 
         try {
             $result = $writer->write($diff);
         } catch (EmptyDiffException $e) {
+            // 「无变更」是正常结局、不是失败 —— 跟 `git mv` 无文件可移同类,退出码保持 0
             $this->console()->info('无变更，跳过生成 migration。');
 
-            return;
+            return self::SUCCESS;
         }
 
         $files = $result['files_written'] ?? [];
         $this->console()->info(count($files) . ' 个 migration 文件已生成');
         foreach ($files as $f) {
-            $this->line('  + ' . $f);
+            $this->console()->line('  + ' . $f);
         }
 
         // 2026-09-11:baseline 可能没推进(源 yaml 解析失败 / 快照写失败 / 快照损坏重建)。
@@ -117,16 +119,16 @@ class CreateMigrationCommand extends Command
         }
 
         // plan-39:GUI 不再 git commit,CLI 同样不自动 commit,提示用户手动
-        $this->line('');
-        $this->line('<fg=gray>提示：scaffold 不会自动 git commit，请手动：</>');
-        $this->line('<fg=gray>  git add scaffold/database/' . $schema_name . '.yaml scaffold/database/.snapshots/' . $schema_name . '.yaml database/migrations/...</>');
-        $this->line('<fg=gray>  git commit -m "scaffold: update ' . $schema_name . ' schema"</>');
+        $this->console()->line('');
+        $this->console()->line('<fg=gray>提示：scaffold 不会自动 git commit，请手动：</>');
+        $this->console()->line('<fg=gray>  git add scaffold/database/' . $schema_name . '.yaml scaffold/database/.snapshots/' . $schema_name . '.yaml database/migrations/...</>');
+        $this->console()->line('<fg=gray>  git commit -m "scaffold: update ' . $schema_name . ' schema"</>');
 
         if ($this->confirmConsoleCommand('artisan migrate')) {
             $this->tipCallCommand('migrate');
             $this->call('migrate');
         }
 
-        $this->tipDone(true);
+        return $this->tipDone(true);
     }
 }

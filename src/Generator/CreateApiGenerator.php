@@ -231,8 +231,7 @@ class CreateApiGenerator extends Generator
             }
         }
 
-        $put = $this->filesystem->put($yamlFile, $content);
-        if (! $put) {
+        if ($this->filesystem->put($yamlFile, $content) === false) {
             $this->console()->failed($relativeYaml, 'Write failed');
 
             return;
@@ -307,8 +306,7 @@ class CreateApiGenerator extends Generator
                 continue;
             }
 
-            $put = $this->filesystem->put($yamlFile, $content);
-            if (! $put) {
+            if ($this->filesystem->put($yamlFile, $content) === false) {
                 $this->console()->failed($relativeYaml, 'Write failed');
 
                 continue;
@@ -1094,7 +1092,10 @@ class CreateApiGenerator extends Generator
         }
 
         $code[] = '';
-        $this->filesystem->put($transformFile, implode("\n", $code));
+        if (! $this->putOrReport($transformFile, '_menus_transform.yaml', implode("\n", $code))) {
+            return;
+        }
+
         $this->console()->updated('_menus_transform.yaml');
     }
 
@@ -1165,7 +1166,10 @@ class CreateApiGenerator extends Generator
         $code[] = trim($yaml);
         $code[] = '';
 
-        $this->filesystem->put($fullPath, implode("\n", $code));
+        if (! $this->putOrReport($fullPath, $relativePath . $fileName, implode("\n", $code))) {
+            return;
+        }
+
         $this->console()->history($relativePath . $fileName);
     }
 

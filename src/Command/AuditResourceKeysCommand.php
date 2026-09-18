@@ -65,10 +65,10 @@ class AuditResourceKeysCommand extends Command
 
         if ($roots === []) {
             if ($json) {
-                $this->line((string) json_encode(['roots' => [], 'rows' => [], 'error' => 'no_scan_root'], JSON_UNESCAPED_UNICODE));
+                $this->console()->line((string) json_encode(['roots' => [], 'rows' => [], 'error' => 'no_scan_root'], JSON_UNESCAPED_UNICODE));
             } else {
-                $this->warn('没找到可扫描的目录（既没有 vendor/mooeen/*/src，也没有带 Http/Resources 的宿主目录）。');
-                $this->line('<fg=gray>可用 --path=/abs/path/to/src 指定扫描根（该根下应有 Http/Resources 与/或 Models）。</>');
+                $this->console()->warn('没找到可扫描的目录（既没有 vendor/mooeen/*/src，也没有带 Http/Resources 的宿主目录）。');
+                $this->console()->line('<fg=gray>可用 --path=/abs/path/to/src 指定扫描根（该根下应有 Http/Resources 与/或 Models）。</>');
             }
 
             return self::SUCCESS;
@@ -79,9 +79,9 @@ class AuditResourceKeysCommand extends Command
 
         if ($candidates === []) {
             if ($json) {
-                $this->line((string) json_encode(['roots' => $roots, 'rows' => []], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+                $this->console()->line((string) json_encode(['roots' => $roots, 'rows' => []], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
             } else {
-                $this->info('✓ 没有发现「Resource 透出 json 列」的组合 —— 无需关注本类问题。');
+                $this->console()->success('没有发现「Resource 透出 json 列」的组合 —— 无需关注本类问题。');
             }
 
             return self::SUCCESS;
@@ -123,7 +123,7 @@ class AuditResourceKeysCommand extends Command
         $staleAllow = array_values(array_diff($allow, array_unique($matchedAllow)));
 
         if ($json) {
-            $this->line((string) json_encode([
+            $this->console()->line((string) json_encode([
                 'roots'      => $roots,
                 'unverified' => $unverified,
                 'allowed'    => $allowedCount,
@@ -133,22 +133,22 @@ class AuditResourceKeysCommand extends Command
             ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
         } else {
             if ($badAllow !== []) {
-                $this->warn('⚠ --allow 条目格式不对（应为 <包>:<资源>:<列>）：' . implode('、', $badAllow));
+                $this->console()->warn('--allow 条目格式不对（应为 <包>:<资源>:<列>）：' . implode('、', $badAllow));
             }
-            $this->printReport($report, $limit);
+            $this->printReport($report, $limit, $roots);
             if ($allowedCount > 0) {
-                $this->line("<fg=gray>已豁免 {$allowedCount} 处（--allow 登记；复核结论写进宿主脚本或 plans/）。</>");
+                $this->console()->line("<fg=gray>已豁免 {$allowedCount} 处（--allow 登记；复核结论写进宿主脚本或 plans/）。</>");
             }
             if ($staleAllow !== []) {
-                $this->warn('⚠ 陈旧的 --allow 条目（没有任何命中匹配上，建议删除）：' . implode('、', $staleAllow));
+                $this->console()->warn('陈旧的 --allow 条目（没有任何命中匹配上，建议删除）：' . implode('、', $staleAllow));
             }
         }
 
         if ($dangerCount > 0) {
             if (! $json) {
-                $this->warn("⚠ 命中 {$dangerCount} 处「整数键映射经 Resource 出参」，请按上面的建议逐处确认。");
+                $this->console()->warn("命中 {$dangerCount} 处「整数键映射经 Resource 出参」，请按上面的建议逐处确认。");
                 if ($unverified > 0) {
-                    $this->warn("⚠ 另有 {$unverified} 列未能核验（模型不可加载或抽样失败）——结论不完整。");
+                    $this->console()->warn("另有 {$unverified} 列未能核验（模型不可加载或抽样失败）——结论不完整。");
                 }
             }
 
@@ -158,9 +158,9 @@ class AuditResourceKeysCommand extends Command
         if (! $json) {
             // 抽样失败 ≠ 无问题：不能把「没查到」说成「干净」（只读诊断错误必须显式披露）。
             if ($unverified > 0) {
-                $this->warn("⚠ 有 {$unverified} 列未能核验（模型不可加载或抽样失败）——本次结论**不完整**，不代表「无问题」；请确认对应模型的 DB 连接可达后重跑。");
+                $this->console()->warn("有 {$unverified} 列未能核验（模型不可加载或抽样失败）——本次结论**不完整**，不代表「无问题」；请确认对应模型的 DB 连接可达后重跑。");
             } else {
-                $this->info('✓ 未发现危险列（抽样范围内）。');
+                $this->console()->success('未发现危险列（抽样范围内）。');
             }
         }
 
@@ -169,6 +169,9 @@ class AuditResourceKeysCommand extends Command
 
     /**
      * 扫描根：默认已装私包（vendor/mooeen 下每个包的 src）+ 宿主自身；`--path` 显式给出时只扫它。
+     *
+     * 只由 handle() 调一次，结果透传给 printReport()：报表里的「扫描根」就是本次真正扫的同一份，
+     * 既不做第二次文件系统探测，也不会出现「报的根和扫的根不是一回事」。
      *
      * @return list<string>
      */
@@ -207,6 +210,15 @@ class AuditResourceKeysCommand extends Command
      * 宿主 `composer.json` 的 `extra.moo-private-packages` 里的私包根目录（`vendor/<name>/src`）。
      *
      * 读不到清单 / 目录不存在时返回空数组，由调用方退回「扫 vendor」。
+     *
+     * 「同名清单」在本仓另有两处消费者，三处**有意**不同源、不要为了去重而合并：
+     *  - 本处：读宿主**单份** `composer.json`，只取 `name` 映射目录，且对畸形条目**静默跳过**
+     *    （只读诊断命令不能因为宿主清单写歪就崩）；
+     *  - `ComposerDocsCommand::privateRows()`：读 `engine/` 的**三份** profile（local 缺了退 test/
+     *    production），要 `name`/`repo-key`/`provider-rel`/`publish-tag` 四个字段来列表；
+     *  - `ComposerProfiles::manifestProblems()`：三份 profile 的**权威校验器**，逐条报形态/重复/一致性错。
+     * 合并成一个读取器就得同时服务「单文件 / 三档回退 / 校验」三种语义，投影层还要各自重写，
+     * 反而把「容错档位不同」这个有意义的差异藏起来。
      *
      * @return list<string>
      */
@@ -462,14 +474,15 @@ class AuditResourceKeysCommand extends Command
 
     /**
      * @param list<array<string, mixed>> $report
+     * @param list<string>               $roots  handle() 已解析的扫描根（不在本方法里重算）
      */
-    private function printReport(array $report, int $limit): void
+    private function printReport(array $report, int $limit, array $roots): void
     {
-        $this->line('<fg=gray>扫描根：' . implode('、', $this->resolveRoots()) . '</>');
-        $this->line('<fg=gray>判定：递归找「键全为数字且非 0..n-1」的层级；每列抽样上限 ' . $limit . ' 行。</>');
-        $this->line('');
+        $this->console()->line('<fg=gray>扫描根：' . implode('、', $roots) . '</>');
+        $this->console()->line('<fg=gray>判定：递归找「键全为数字且非 0..n-1」的层级；每列抽样上限 ' . $limit . ' 行。</>');
+        $this->console()->line('');
 
-        $this->table(
+        $this->console()->table(
             ['包', '资源', '列', 'preserveKeys', '抽样', '危险行', '判定', '键路径'],
             array_map(static fn (array $row): array => [
                 $row['package'],
@@ -494,16 +507,16 @@ class AuditResourceKeysCommand extends Command
             return;
         }
 
-        $this->line('');
-        $this->line('<fg=yellow>需要确认的列（危险 ≠ 一定出问题，要同时满足「按值取标签」或「读回再保存」）：</>');
+        $this->console()->line('');
+        $this->console()->line('<fg=yellow>需要确认的列（危险 ≠ 一定出问题，要同时满足「按值取标签」或「读回再保存」）：</>');
         foreach ($danger as $row) {
-            $this->line("  • <fg=white>{$row['package']}</> {$row['resource']}::{$row['column']}"
+            $this->console()->line("  • <fg=white>{$row['package']}</> {$row['resource']}::{$row['column']}"
                 . "  <fg=gray>危险行 {$row['dangerRows']}/{$row['sampled']}，路径 " . implode('、', $row['paths']) . '</>');
         }
-        $this->line('');
-        $this->line('<fg=gray>两种收口方式（按成本选）：</>');
-        $this->line('<fg=gray>  ① 该 Resource 是手写文件 → 加 `public $preserveKeys = true;`（必须是实例属性；生成物上加会被 -f 覆盖）；</>');
-        $this->line('<fg=gray>  ② 改形状：出参不要给整数键映射，转成 `[{key|value, label}]`（前端与校验同口径，最不容易再踩）。</>');
+        $this->console()->line('');
+        $this->console()->line('<fg=gray>两种收口方式（按成本选）：</>');
+        $this->console()->line('<fg=gray>  ① 该 Resource 是手写文件 → 加 `public $preserveKeys = true;`（必须是实例属性；生成物上加会被 -f 覆盖）；</>');
+        $this->console()->line('<fg=gray>  ② 改形状：出参不要给整数键映射，转成 `[{key|value, label}]`（前端与校验同口径，最不容易再踩）。</>');
     }
 
     /**

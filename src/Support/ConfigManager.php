@@ -203,26 +203,20 @@ class ConfigManager
      */
     public function assertWritable(): void
     {
-        if (function_exists('app') && app()->environment('production')) {
+        if (ReadonlyMode::productionActive()) {
             throw new ConfigWriteForbiddenException('生产环境禁止修改 scaffold 配置');
         }
-        if ((bool) $this->config->get('scaffold.config_ui.readonly', false)) {
+        if (ReadonlyMode::configLocked()) {
             throw new ConfigWriteForbiddenException('当前为强制只读模式（SCAFFOLD_CONFIG_READONLY）');
         }
     }
 
     /**
-     * 总体只读判定。任一为真即只读：
-     *   1. APP_ENV=production
-     *   2. config('scaffold.config_ui.readonly') = true
+     * 总体只读判定 —— 口径唯一来源见 {@see ReadonlyMode}；本方法只转发，保留给既有调用方。
      */
     public function isReadonly(): bool
     {
-        if (function_exists('app') && app()->environment('production')) {
-            return true;
-        }
-
-        return (bool) $this->config->get('scaffold.config_ui.readonly', false);
+        return ReadonlyMode::active();
     }
 
     /**

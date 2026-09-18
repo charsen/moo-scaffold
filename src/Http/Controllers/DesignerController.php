@@ -35,6 +35,7 @@ use Mooeen\Scaffold\Http\Requests\Designer\SaveRequest;
 use Mooeen\Scaffold\Http\Requests\Designer\ShowRequest;
 use Mooeen\Scaffold\Http\Requests\Designer\TranslateRequest;
 use Mooeen\Scaffold\Support\AccountStore;
+use Mooeen\Scaffold\Support\ReadonlyMode;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Console\Output\NullOutput;
 use Throwable;
@@ -42,7 +43,7 @@ use Throwable;
 /**
  * 数据库设计器 HTTP 端点。
  */
-class DesignerController
+class DesignerController extends Controller
 {
     public function __construct(
         private SchemaLoader $loader,
@@ -50,10 +51,13 @@ class DesignerController
         private MigrationWriter $writer,
         private TranslationService $translator,
         private MigrationCompacter $compacter,
-        private Utility $utility,
+        Utility $utility,
         private AccountStore $accountStore,
         private SnapshotStore $snapshot,
-    ) {}
+        Filesystem $filesystem,
+    ) {
+        parent::__construct($utility, $filesystem);
+    }
 
     /**
      * 当前登录用户能否设计数据库(designer 写权限):admin / 有 can_design_db 的 member → true。
@@ -61,8 +65,8 @@ class DesignerController
      */
     private function userCanDesign(FormRequest $request): bool
     {
-        $user = $request->attributes->get('scaffold_auth_user');
-        if (! is_string($user) || $user === '') {
+        $user = $this->currentOperator($request);
+        if ($user === null) {
             return true;
         }
 
@@ -73,8 +77,8 @@ class DesignerController
     public function index(ContextRequest $req): View
     {
         // 2026-05-23:index 也喂 is_prod/is_readonly,避免"新建 Schema"按钮在 production 还能点
-        $designerIsProd     = function_exists('app') && app()->environment('production');
-        $designerIsReadonly = (bool) config('scaffold.config_ui.readonly', false);
+        $designerIsProd     = ReadonlyMode::productionActive();
+        $designerIsReadonly = ReadonlyMode::configLocked();
         $designerCanDesign  = $this->userCanDesign($req);     // per-user 设计权限(admin / can_design_db),无权限 = 只读
 
         // plan-53 出身分块:host 一块 + 每个扩展包一块(schema 属于谁一眼可辨;仅 host 时不渲染块标题,视觉不变)
@@ -95,7 +99,7 @@ class DesignerController
         }
         ksort($groups);     // '' (host) 天然排最前,包按 key 升序
 
-        return view('scaffold::db.designer.index', [
+        return $this->view('db.designer.index', [
             'designer_modules'       => $modules,
             'designer_module_groups' => $groups,
             'designer_stats'         => $this->loader->loadStats(),
@@ -144,15 +148,15 @@ class DesignerController
         // 2026-05-23:跟 ConfigController / AccountController 一致,把环境只读状态透传给 blade
         // 让 UI 层挂只读 banner + 写按钮 disabled,middleware 是后端兜底,这里是用户视觉守护。
         // 双层守护规则:后端中间件兜底 + 前端锁定态置灰。
-        $designerIsProd     = function_exists('app') && app()->environment('production');
-        $designerIsReadonly = (bool) config('scaffold.config_ui.readonly', false);
+        $designerIsProd     = ReadonlyMode::productionActive();
+        $designerIsReadonly = ReadonlyMode::configLocked();
         $designerCanDesign  = $this->userCanDesign($req);     // per-user 设计权限(admin / can_design_db),无权限 = 只读
 
         // plan-53 出身:包 schema 详情页挂 git 归属高亮;vcs 拷贝包(非软链)整页只读(写权硬线的 UI 层)
         $origin         = $this->loader->originOf($schema);
         $originWritable = $origin === null || $this->utility->targetContext($origin)->writable;
 
-        return view('scaffold::db.designer.show', [
+        return $this->view('db.designer.show', [
             'schema'                     => $schema,
             'designer_modules'           => $this->loader->listModules(),
             'designer_current_module'    => $module,
@@ -207,12 +211,12 @@ class DesignerController
         }
 
         // 写回 yaml(stamp updated_* 用当前登录 scaffold 用户;ScaffoldAuthenticate 中间件已塞 attribute)
-        $author = (string) $req->attributes->get('scaffold_auth_user', '');
+        $author = $this->currentOperator($req);
         try {
             $this->loader->saveModule($schema, [
                 'module' => $payload['module'] ?? [],
                 'tables' => $payload['tables'],
-            ], $author !== '' ? $author : null);
+            ], $author);
         } catch (Throwable $e) {
             return $this->error('WRITE_FAILED', 'YAML 写入失败：' . $e->getMessage(), 500);
         }
@@ -586,7 +590,7 @@ class DesignerController
         // plan-40 §五 F4:跟 routes.php where regex / SchemaLoader 抛 throw 三处一致,
         // controller validate 早 reject 422 比 SchemaLoadException 更友好
         $data   = $req->validated();
-        $author = (string) $req->attributes->get('scaffold_auth_user', '');
+        $author = $this->currentOperator($req);
         try {
             $this->loader->createTable(
                 $schema,
@@ -594,7 +598,7 @@ class DesignerController
                 $data['name'],
                 $data['desc']   ?? '',
                 $data['prefix'] ?? '',
-                $author !== '' ? $author : null,
+                $author,
             );
         } catch (SchemaLoadException $e) {
             return $this->error('CREATE_FAILED', $e->getMessage(), 422);

@@ -40,12 +40,12 @@ class CreateSchemaCommand extends Command
     /**
      * @throws FileNotFoundException
      */
-    public function handle(): void
+    public function handle(): int
     {
         $this->showTitle();
 
         if (! $this->checkRunning()) {
-            return;
+            return self::FAILURE;
         }
 
         $schema_name = $this->argument('schema_name');
@@ -54,12 +54,12 @@ class CreateSchemaCommand extends Command
         if (str_contains($schema_name, '/')) {
             $this->console()->error('暂不支持多级目录，请用单级名（如 System，不要 System/Sub）。');
 
-            return;
+            return self::FAILURE;
         }
 
         $result = (new CreateSchemaGenerator($this, $this->filesystem, $this->utility))
             ->start($schema_name, $force);
 
-        $this->tipDone($result);
+        return $this->tipDone($result);
     }
 }

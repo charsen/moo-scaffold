@@ -14,7 +14,7 @@ final class LocalMarkdownEditor
 
     public function writable(): bool
     {
-        return app()->environment('local') && ! config('scaffold.config_ui.readonly', false);
+        return app()->environment('local') && ! ReadonlyMode::configLocked();
     }
 
     public function assertWritable(): void
@@ -82,23 +82,22 @@ final class LocalMarkdownEditor
 
     private function path(string $scope, string $slug): string
     {
-        abort_unless(in_array($scope, ['plans', 'release_records'], true), 404);
+        abort_unless(RecordScope::allows($scope), 404);
         abort_if($slug === '' || str_starts_with($slug, '/')
                               || preg_match('/[\\\\\x00-\x1f\x7f]/', $slug)
                               || preg_match('~(^|/)[._]|//~', $slug)
                               || strtolower(pathinfo($slug, PATHINFO_EXTENSION)) !== 'md', 404);
 
-        $configured = (string) config('scaffold.' . $scope . '.path');
-        abort_if($configured === '', 404);
-        $base = realpath(str_starts_with($configured, '/') ? $configured : base_path($configured));
-        abort_if($base === false || ! is_dir($base), 404);
+        // 目录边界口径与两个只读仓库同源：配置目录必须真实存在且是目录，且解析后仍在目录内。
+        $base = RecordScope::directory($scope);
+        abort_if($base === null, 404);
         $path = $base;
         foreach (explode('/', $slug) as $segment) {
             $path .= DIRECTORY_SEPARATOR . $segment;
             abort_if(is_link($path), 404);
         }
         $real = realpath($path);
-        abort_if($real === false || ! is_file($real) || ! str_starts_with($real, $base . DIRECTORY_SEPARATOR), 404);
+        abort_if($real === false || ! is_file($real) || ! RecordScope::contains($base, $real), 404);
 
         return $real;
     }

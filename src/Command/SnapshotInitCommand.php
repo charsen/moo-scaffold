@@ -54,7 +54,7 @@ class SnapshotInitCommand extends Command
 
         $schemas = $this->collectSchemas($only);
         if ($schemas === []) {
-            $this->warn($only !== '' ? "没找到 schema：{$only}" : '没找到任何 schema yaml 文件');
+            $this->console()->warn($only !== '' ? "没找到 schema：{$only}" : '没找到任何 schema yaml 文件');
 
             return self::FAILURE;
         }
@@ -63,7 +63,7 @@ class SnapshotInitCommand extends Command
         // 非 mysql / DB 不可达 / 显式 --no-db-check → 跳过,行为同旧版。
         $auditable = ! (bool) $this->option('no-db-check') && $auditor->isSupported();
         if (! $auditable && ! (bool) $this->option('no-db-check')) {
-            $this->line('  <fg=gray>（跳过 yaml↔DB 对账：非 mysql 连接或 DB 不可达）</>');
+            $this->console()->line('  <fg=gray>（跳过 yaml↔DB 对账：非 mysql 连接或 DB 不可达）</>');
         }
 
         $written    = 0;
@@ -80,7 +80,7 @@ class SnapshotInitCommand extends Command
             if ($existed && ! $force) {
                 // plan-37 P1-3:dry-run 模式下 skip 行也带 [dry-run] 标识,跟非 dry-run 区分
                 $prefix = $dryRun ? '<fg=gray>[dry-run]</> ' : '';
-                $this->line("  {$prefix}<fg=gray>skip</>     {$schema}  → {$relPath}（已存在，加 --force 覆盖）");
+                $this->console()->line("  {$prefix}<fg=gray>skip</>     {$schema}  → {$relPath}（已存在，加 --force 覆盖）");
                 $skipped++;
 
                 continue;
@@ -100,7 +100,7 @@ class SnapshotInitCommand extends Command
 
             if ($dryRun) {
                 $tag = $existed ? '<fg=yellow>would overwrite</>' : '<fg=cyan>would create</>';
-                $this->line("  {$tag}  {$schema}  → {$relPath}");
+                $this->console()->line("  {$tag}  {$schema}  → {$relPath}");
                 $this->printDrift($rows);
                 $this->printMissing($missing);
 
@@ -110,25 +110,25 @@ class SnapshotInitCommand extends Command
             try {
                 $store->capture($schema);
                 $tag = $existed ? '<fg=yellow>overwritten</>' : '<fg=green>created</>';
-                $this->line("  {$tag}  {$schema}  → {$relPath}");
+                $this->console()->line("  {$tag}  {$schema}  → {$relPath}");
                 $this->printDrift($rows);
                 $this->printMissing($missing);
                 $written++;
             } catch (\Throwable $e) {
                 $errors[] = [$schema, $e->getMessage()];
-                $this->line("  <fg=red>error</>    {$schema}  → {$e->getMessage()}");
+                $this->console()->line("  <fg=red>error</>    {$schema}  → {$e->getMessage()}");
             }
         }
 
-        $this->line('');
+        $this->console()->line('');
         if ($dryRun) {
             $this->printDriftSummary($driftRows);
             $this->printMissingSummary($missingAll);
-            $this->line('<fg=gray>dry-run 不写盘。去掉 --dry-run 实际执行。</>');
+            $this->console()->line('<fg=gray>dry-run 不写盘。去掉 --dry-run 实际执行。</>');
 
             return self::SUCCESS;
         }
-        $this->info("快照初始化完成：写 {$written} 个，skip {$skipped} 个，error " . count($errors) . ' 个');
+        $this->console()->info("快照初始化完成：写 {$written} 个，skip {$skipped} 个，error " . count($errors) . ' 个');
         $this->printDriftSummary($driftRows);
         $this->printMissingSummary($missingAll);
         if (count($errors) > 0) {
@@ -147,7 +147,7 @@ class SnapshotInitCommand extends Command
     {
         foreach ($rows as $r) {
             $kind = SchemaDbAuditor::kindLabel($r['kind']);
-            $this->line(
+            $this->console()->line(
                 "      <fg=yellow>⚠ drift</> {$r['table']}.{$r['column']}  "
                 . "<fg=gray>{$kind}</> yaml=<fg=cyan>{$r['yaml']}</> db=<fg=magenta>{$r['db']}</>",
             );
@@ -163,10 +163,10 @@ class SnapshotInitCommand extends Command
         if ($n === 0) {
             return;
         }
-        $this->warn("⚠ 发现 {$n} 处 yaml↔DB 漂移（上方 drift 行）。baseline 已照「当前 yaml」落盘，");
-        $this->warn('  但 yaml 与实际 DB 不符 —— 请按 DB 现状修正 yaml 后重跑 moo:snapshot:init --force，');
-        $this->warn('  不要把漂移连同 baseline 一起 commit（会掩盖真实 yaml↔DB 分歧）。');
-        $this->line('<fg=gray>  随时可单独跑 `php artisan moo:db:audit` 复核 yaml↔DB 一致性。</>');
+        $this->console()->warn("发现 {$n} 处 yaml↔DB 漂移（上方 drift 行）。baseline 已照「当前 yaml」落盘，");
+        $this->console()->warn('  但 yaml 与实际 DB 不符 —— 请按 DB 现状修正 yaml 后重跑 moo:snapshot:init --force，');
+        $this->console()->warn('  不要把漂移连同 baseline 一起 commit（会掩盖真实 yaml↔DB 分歧）。');
+        $this->console()->line('<fg=gray>  随时可单独跑 `php artisan moo:db:audit` 复核 yaml↔DB 一致性。</>');
     }
 
     /**
@@ -177,7 +177,7 @@ class SnapshotInitCommand extends Command
     private function printMissing(array $tables): void
     {
         foreach ($tables as $t) {
-            $this->line(
+            $this->console()->line(
                 "      <fg=yellow>⚠ 无 create migration</> {$t}  "
                 . '<fg=gray>（将吸进 baseline → designer/moo:migration 之后判「无变化」）</>',
             );
@@ -193,10 +193,10 @@ class SnapshotInitCommand extends Command
             return;
         }
         $total = array_sum(array_map('count', $missingAll));
-        $this->warn("⚠ {$total} 张表在 yaml 里有、但找不到对应 create migration 文件（上方 ⚠ 无 create migration 行）。");
-        $this->warn('  baseline 仍照 yaml 落盘 —— 但这些表已被吸进基线，之后会被判「无变化」、永远不再生成。');
-        $this->warn('  若这些表本就该建：删掉 .snapshots/<Schema>.yaml 里对应表段 → `moo:migration <Schema> -t <表>` 单独补，');
-        $this->warn('  再重跑 moo:snapshot:init --force。');
+        $this->console()->warn("{$total} 张表在 yaml 里有、但找不到对应 create migration 文件（上方 ⚠ 无 create migration 行）。");
+        $this->console()->warn('  baseline 仍照 yaml 落盘 —— 但这些表已被吸进基线，之后会被判「无变化」、永远不再生成。');
+        $this->console()->warn('  若这些表本就该建：删掉 .snapshots/<Schema>.yaml 里对应表段 → `moo:migration <Schema> -t <表>` 单独补，');
+        $this->console()->warn('  再重跑 moo:snapshot:init --force。');
     }
 
     /**

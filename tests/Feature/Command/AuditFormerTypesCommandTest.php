@@ -187,3 +187,28 @@ it('命令：只比集合不比顺序（前端顺序打乱仍一致）', functio
 
     expect(Artisan::call('moo:audit:former-types', ['--spa' => $fixture['config']]))->toBe(0);
 });
+
+it('命令：--spa 相对路径按当前工作目录展开（不是 base_path / 仓根）', function () {
+    // 造 <tmp>/<x>/spa/... 与 <tmp>/<x>/cwd/，CWD 切到 cwd 再传 `../spa/...`：
+    // 只有「按 getcwd() 展开」能命中 —— 若改成按 base_path() 展开就会报 spa_path_not_found。
+    $base = sys_get_temp_dir() . '/moo-former-rel-' . bin2hex(random_bytes(4));
+    $dir  = $base . '/spa/apps/admin/src/components/former';
+    mkdir($dir, 0777, true);
+    file_put_contents($dir . '/config.ts', formerTypesConfigSource(FormWidgetTypes::FORMER));
+    mkdir($base . '/cwd', 0777, true);
+    $GLOBALS['mooFormerTypesFixtures'][] = $base;
+
+    $prev = getcwd();
+    chdir($base . '/cwd');
+
+    try {
+        $code = Artisan::call('moo:audit:former-types', [
+            '--spa'  => '../spa/apps/admin/src/components/former/config.ts',
+            '--json' => true,
+        ]);
+    } finally {
+        chdir($prev);
+    }
+
+    expect($code)->toBe(0);
+});

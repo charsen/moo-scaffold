@@ -19,14 +19,17 @@ use Illuminate\Routing\ViewController;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use Mooeen\Scaffold\Support\ConsoleUi;
+use Mooeen\Scaffold\Support\Concerns\InteractsWithConsoleUi;
 use ReflectionClass;
 use ReflectionFunction;
 use Symfony\Component\Console\Output\ConsoleOutput;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Terminal;
 
 class RouterTool
 {
+    use InteractsWithConsoleUi;
+
     /**
      * The router instance.
      */
@@ -109,7 +112,12 @@ class RouterTool
      * moo:api 时，$folder != ''，只获取指定目录下的控制器
      * moo:auth 时，$folder = '' $app 下的所有控制器都需要
      */
-    public function __construct(string $app, $folder, string $sort, Utility $utility, Router $router, bool $quiet = false)
+    /**
+     * `$folder` 与属性同为 `string`：早前形参无类型声明，null 能一路过形参、直到属性赋值处才抛
+     * `Cannot assign null to property … of type string` —— 报错点在离真凶（没选成 namespace）很远的地方。
+     * 声明类型后，越界值在**调用点**就以「Argument #2 ($folder) must be of type string」失败。
+     */
+    public function __construct(string $app, string $folder, string $sort, Utility $utility, Router $router, bool $quiet = false)
     {
         $this->app     = $app;
         $this->folder  = $folder;
@@ -118,6 +126,15 @@ class RouterTool
         $this->utility = $utility;
         $this->quiet   = $quiet;
         $this->output  = new ConsoleOutput;
+    }
+
+    /**
+     * ConsoleUi 的出口就是本类自带的 ConsoleOutput —— 语义级输出统一走 `$this->console()`，
+     * 不再每处 `new ConsoleUi($this->output)`（省掉重复构造，也让「谁渲染」只有一个答案）。
+     */
+    protected function getConsoleTarget(): OutputInterface
+    {
+        return $this->output;
     }
 
     public function get()
@@ -137,7 +154,7 @@ class RouterTool
 
         if (empty($this->router->getRoutes())) {
             if (! $this->quiet) {
-                (new ConsoleUi($this->output))->error('应用里没有找到任何路由。');
+                $this->console()->error('应用里没有找到任何路由。');
             }
 
             return [];
@@ -145,7 +162,7 @@ class RouterTool
 
         if (empty($routes = $this->getRoutes())) {
             if (! $this->quiet) {
-                (new ConsoleUi($this->output))->error('没有路由匹配当前过滤条件。');
+                $this->console()->error('没有路由匹配当前过滤条件。');
             }
 
             return [];
@@ -361,7 +378,10 @@ class RouterTool
      */
     public function displayRoutes(array $routes): void
     {
-        $this->output->writeln($this->forCli(collect($routes)));
+        // forCli() 返回「行数组」，逐行走 line() 与原来 writeln($array) 的产物逐字节一致。
+        foreach ($this->forCli(collect($routes)) as $line) {
+            $this->console()->line($line);
+        }
     }
 
     /**

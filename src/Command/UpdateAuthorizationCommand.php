@@ -49,21 +49,19 @@ class UpdateAuthorizationCommand extends Command
         ];
     }
 
-    public function handle(): void
+    public function handle(): int
     {
         $this->showTitle();
 
         if (! $this->checkRunning()) {
-            return;
+            return self::FAILURE;
         }
 
         $apps = $this->utility->getAppTargets();
         $app  = $this->argument('app') ?: $this->chooseApp($apps);
 
         if (! isset($apps[$app])) {
-            $this->reportAppNotConfigured($app);
-
-            return;
+            return $this->reportAppNotConfigured($app);
         }
 
         $tool   = new RouterTool($app, '', 'action', $this->utility, $this->router);
@@ -76,6 +74,6 @@ class UpdateAuthorizationCommand extends Command
             $tool->displayRoutes($routes);
         }
 
-        $this->tipDone($result);
+        return $this->tipDone($result);
     }
 }

@@ -85,12 +85,12 @@ class CreateApiCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(): void
+    public function handle(): int
     {
         $this->showTitle();
 
         if (! $this->checkRunning()) {
-            return;
+            return self::FAILURE;
         }
 
         $apps        = $this->utility->getAppTargets();
@@ -100,9 +100,7 @@ class CreateApiCommand extends Command
             $app = $this->chooseApp($apps);
         }
         if (! isset($apps[$app])) {
-            $this->reportAppNotConfigured($app);
-
-            return;
+            return $this->reportAppNotConfigured($app);
         }
 
         // $this->tipCallCommand('moo:fresh');
@@ -117,19 +115,17 @@ class CreateApiCommand extends Command
             $staleMode = 'deprecate';
         }
         $syncNames = (bool) $this->option('sync-names');
-        $result    = true;
 
         if ($this->option('all')) {
-            $result = $this->generateAllNamespaces($app, $force, $staleMode, $syncNames);
-            $this->tipDone($result);
-
-            return;
+            return $this->tipDone($this->generateAllNamespaces($app, $force, $staleMode, $syncNames));
         }
 
         $namespaceArgument = $this->argument('namespace');
         if (empty($namespaceArgument)) {
-            $namespaces = $this->utility->getControllerNamespaces($app);
-            $namespace  = $this->choicePrompt('选择 namespace', $namespaces);
+            $namespace = $this->chooseNamespace($app);
+            if ($namespace === null) {
+                return self::FAILURE;   // chooseNamespace 已报错，退出码必须跟着红字走
+            }
         } else {
             $namespace = $this->normalizeNamespace($namespaceArgument);
         }
@@ -144,7 +140,39 @@ class CreateApiCommand extends Command
             $tool->displayRoutes($routes);
         }
 
-        $this->tipDone($result);
+        return $this->tipDone($result);
+    }
+
+    /**
+     * 选 namespace（没给 `namespace` 参数时的交互回落）。
+     *
+     * 返回 `null` = **没得选或没选成**，两种情况都先报错再返回，调用方一律中止（FAILURE）——
+     * 与 `Command::chooseSchema()` 同口径（第 16 项立的规矩），这里补的是同一个坑的另一处现场：
+     *   ① 该 app 下一个控制器命名空间都没有 → 早前直接 `choice([], …)`，抛 Symfony 的
+     *      `LogicException: Choice question must have at least 1 choice available.`（崩栈而非报错）；
+     *   ② 非交互模式（`--no-interaction`）下 `choice` 回落默认值 null → 早前原样传给 RouterTool，
+     *      而 `RouterTool::$folder` 是 `string` 属性，于是在**属性赋值处**抛
+     *      `TypeError: Cannot assign null to property … of type string` 崩栈，而不是一行红字 + 退出码 1。
+     */
+    private function chooseNamespace(string $app): ?string
+    {
+        $namespaces = $this->utility->getControllerNamespaces($app);
+
+        if ($namespaces === []) {
+            $this->console()->error("app [{$app}] 下没有找到任何控制器命名空间，无法生成 API。");
+
+            return null;
+        }
+
+        $picked = $this->choicePrompt('选择 namespace', $namespaces);
+
+        if ($picked === null || $picked === '') {
+            $this->console()->error('未选择 namespace。非交互模式下请显式传入 namespace，或用 -a 生成该 app 下全部 namespace。');
+
+            return null;
+        }
+
+        return $this->normalizeNamespace((string) $picked);
     }
 
     private function generateAllNamespaces(string $app, bool $force, string $staleMode, bool $syncNames = false): bool

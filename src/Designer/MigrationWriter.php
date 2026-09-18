@@ -3,7 +3,7 @@
 namespace Mooeen\Scaffold\Designer;
 
 use Illuminate\Filesystem\Filesystem;
-use Mooeen\Scaffold\Support\FieldTypes;
+use Mooeen\Scaffold\Support\ColumnTypeGroups;
 
 /**
  * Render & write Laravel migrations from a SchemaDiffService::diff() result.
@@ -234,45 +234,45 @@ class MigrationWriter
     /** @return string[] */
     private function emitUp(array $tableDiff): array
     {
-        $fc    = $tableDiff['field_changes'];
-        $ic    = $tableDiff['index_changes'];
-        $enums = (array) ($tableDiff['current_definition']['enums'] ?? []);     // plan-40 §六 enum-aware default
-        $lines = [];
+        $fieldChanges = $tableDiff['field_changes'];
+        $indexChanges = $tableDiff['index_changes'];
+        $enums        = (array) ($tableDiff['current_definition']['enums'] ?? []);     // plan-40 §六 enum-aware default
+        $lines        = [];
 
         // 1. modify (use old name if also being renamed)
-        foreach ($fc as $ch) {
-            if ($ch['op'] !== 'modify') {
+        foreach ($fieldChanges as $change) {
+            if ($change['op'] !== 'modify') {
                 continue;
             }
-            $oldName = $this->oldNameForModify($ch, $fc);
-            $lines[] = $this->buildColumnLine($oldName, $ch['after'], forChange: true, enums: $enums);
+            $oldName = $this->oldNameForModify($change, $fieldChanges);
+            $lines[] = $this->buildColumnLine($oldName, $change['after'], forChange: true, enums: $enums);
         }
         // 2. rename
-        foreach ($fc as $ch) {
-            if ($ch['op'] === 'rename') {
-                $lines[] = "\$table->renameColumn('{$ch['from']}', '{$ch['to']}');";
+        foreach ($fieldChanges as $change) {
+            if ($change['op'] === 'rename') {
+                $lines[] = "\$table->renameColumn('{$change['from']}', '{$change['to']}');";
             }
         }
         // 3. drop
-        foreach ($fc as $ch) {
-            if ($ch['op'] === 'drop') {
-                $lines[] = "\$table->dropColumn('{$ch['field']}');";
+        foreach ($fieldChanges as $change) {
+            if ($change['op'] === 'drop') {
+                $lines[] = "\$table->dropColumn('{$change['field']}');";
             }
         }
         // 4. add(传 after_field 让 buildColumnLine 追加 ->after('xxx') 保物理位置跟 yaml 一致)
-        foreach ($fc as $ch) {
-            if ($ch['op'] === 'add') {
-                $lines[] = $this->buildColumnLine($ch['field'], $ch['definition'], enums: $enums, afterField: $ch['after_field'] ?? null);
+        foreach ($fieldChanges as $change) {
+            if ($change['op'] === 'add') {
+                $lines[] = $this->buildColumnLine($change['field'], $change['definition'], enums: $enums, afterField: $change['after_field'] ?? null);
             }
         }
         // 5. index — drop first, then add (modify => drop+add)
-        foreach ($ic as $idx) {
+        foreach ($indexChanges as $idx) {
             if ($idx['op'] === 'drop' || $idx['op'] === 'modify') {
                 $before  = $idx['before'] ?? $idx['baseline'] ?? ['type' => 'index'];
                 $lines[] = $this->buildDropIndexLine($idx['name'], $before['type'] ?? 'index');
             }
         }
-        foreach ($ic as $idx) {
+        foreach ($indexChanges as $idx) {
             if ($idx['op'] === 'add' || $idx['op'] === 'modify') {
                 $target  = $idx['after'] ?? $idx;
                 $lines[] = $this->buildAddIndexLine([
@@ -289,20 +289,20 @@ class MigrationWriter
     /** @return string[] */
     private function emitDown(array $tableDiff): array
     {
-        $fc = $tableDiff['field_changes'];
-        $ic = $tableDiff['index_changes'];
+        $fieldChanges = $tableDiff['field_changes'];
+        $indexChanges = $tableDiff['index_changes'];
         // down() 用 baseline.enums:rebuild drop / reverse modify 走 before 状态 → 还要用历史 enum 映射
         $enums = (array) ($tableDiff['baseline_definition']['enums'] ?? []);
         $lines = [];
 
         // reverse index: drop the added, re-add the dropped (modify → drop new then add old)
-        foreach ($ic as $idx) {
+        foreach ($indexChanges as $idx) {
             if ($idx['op'] === 'add' || $idx['op'] === 'modify') {
                 $target  = $idx['after'] ?? $idx;
                 $lines[] = $this->buildDropIndexLine($idx['name'], $target['type'] ?? 'index');
             }
         }
-        foreach ($ic as $idx) {
+        foreach ($indexChanges as $idx) {
             if ($idx['op'] === 'drop' || $idx['op'] === 'modify') {
                 $before  = $idx['before'] ?? $idx['baseline'] ?? ['type' => 'index', 'fields' => $idx['name']];
                 $lines[] = $this->buildAddIndexLine([
@@ -313,30 +313,30 @@ class MigrationWriter
             }
         }
         // reverse add → drop
-        foreach ($fc as $ch) {
-            if ($ch['op'] === 'add') {
-                $lines[] = "\$table->dropColumn('{$ch['field']}');";
+        foreach ($fieldChanges as $change) {
+            if ($change['op'] === 'add') {
+                $lines[] = "\$table->dropColumn('{$change['field']}');";
             }
         }
         // reverse drop → rebuild (use baseline def + baseline enums)
-        foreach ($fc as $ch) {
-            if ($ch['op'] === 'drop') {
-                $lines[] = $this->buildColumnLine($ch['field'], $ch['definition'], enums: $enums);
+        foreach ($fieldChanges as $change) {
+            if ($change['op'] === 'drop') {
+                $lines[] = $this->buildColumnLine($change['field'], $change['definition'], enums: $enums);
             }
         }
         // reverse rename
-        foreach ($fc as $ch) {
-            if ($ch['op'] === 'rename') {
-                $lines[] = "\$table->renameColumn('{$ch['to']}', '{$ch['from']}');";
+        foreach ($fieldChanges as $change) {
+            if ($change['op'] === 'rename') {
+                $lines[] = "\$table->renameColumn('{$change['to']}', '{$change['from']}');";
             }
         }
         // reverse modify (use old name + before def + baseline enums)
-        foreach ($fc as $ch) {
-            if ($ch['op'] !== 'modify') {
+        foreach ($fieldChanges as $change) {
+            if ($change['op'] !== 'modify') {
                 continue;
             }
-            $oldName = $this->oldNameForModify($ch, $fc);
-            $lines[] = $this->buildColumnLine($oldName, $ch['before'], forChange: true, enums: $enums);
+            $oldName = $this->oldNameForModify($change, $fieldChanges);
+            $lines[] = $this->buildColumnLine($oldName, $change['before'], forChange: true, enums: $enums);
         }
 
         return $lines;
@@ -344,9 +344,9 @@ class MigrationWriter
 
     private function oldNameForModify(array $modifyChange, array $allChanges): string
     {
-        foreach ($allChanges as $ch) {
-            if (($ch['op'] ?? null) === 'rename' && ($ch['to'] ?? null) === ($modifyChange['field'] ?? null)) {
-                return (string) $ch['from'];
+        foreach ($allChanges as $change) {
+            if (($change['op'] ?? null) === 'rename' && ($change['to'] ?? null) === ($modifyChange['field'] ?? null)) {
+                return (string) $change['from'];
             }
         }
 
@@ -396,7 +396,7 @@ class MigrationWriter
     private function buildColumnLine(string $field, array $def, bool $forChange = false, array $enums = [], ?string $afterField = null): string
     {
         // 框架列（系统字段）：`deleted_at: {  }` 在 YAML 里是**空定义**（类型由迁移的框架方法决定），
-        // 直接走下面的 resolveType('varchar') 会生成一个 varchar 垃圾列（2026-09-13 之前的隐患）。
+        // 直接走下面的 ColumnTypeGroups::canonicalize('varchar') 会生成一个 varchar 垃圾列（2026-09-13 之前的隐患）。
         // 这里按 create_table 的同款输出补：软删列 → softDeletes()，时间列 → nullable timestamp。
         // 仅 add 路径（`$forChange` 是 modify，框架列没有可 modify 的属性）。
         if (! $forChange && ($framework = $this->frameworkColumnLine($field)) !== null) {
@@ -404,7 +404,8 @@ class MigrationWriter
             return $framework . $this->afterClause($afterField) . ';';
         }
 
-        $type = $this->resolveType((string) ($def['type'] ?? 'varchar'));
+        // 类型归一走单一来源（原私有 resolveType 是残缺副本，只认 bool/boolean）
+        $type = ColumnTypeGroups::canonicalize((string) ($def['type'] ?? 'varchar'));
         if (! isset(self::TYPE_TEMPLATES[$type])) {
             throw new \InvalidArgumentException("unsupported migration type [{$type}] for field [{$field}]");
         }
@@ -456,7 +457,7 @@ class MigrationWriter
      *
      * `deleted_at` / `created_at` / `updated_at` 在 YAML 里通常是空定义或只带 `type: timestamp`
      * （真实类型由 `softDeletes()` / `timestamps()` 决定），所以**加列时**必须走这里，
-     * 不能落到 `buildColumnLine` 的 `resolveType()` 上（那会生成 varchar 垃圾列）。
+     * 不能落到 `buildColumnLine` 的 `ColumnTypeGroups::canonicalize()` 兜底上（那会生成 varchar 垃圾列）。
      * 输出与 `createLinesFromDefinition()` 的框架列写法保持一致。
      */
     private function frameworkColumnLine(string $field): ?string
@@ -476,13 +477,13 @@ class MigrationWriter
         // 仅 int 类型(tinyint/int/bigint/smallint/mediumint)+ field 有 enums 块时生效
         $value = $this->resolveEnumDefault($field, $value, $enums);
 
-        if (in_array($type, FieldTypes::INT, true)) {
+        if (in_array($type, ColumnTypeGroups::INT, true)) {
             return '->default(' . (int) $value . ')';
         }
         if (in_array($type, ['boolean'], true)) {
             return '->default(' . ((bool) $value ? 'true' : 'false') . ')';
         }
-        if (in_array($type, FieldTypes::FLOAT, true)) {
+        if (in_array($type, ColumnTypeGroups::FLOAT, true)) {
             return '->default(' . (float) $value . ')';
         }
         // timestamp/datetime 的 CURRENT_TIMESTAMP:用 ->useCurrent() —— 写成 ->default('current')
@@ -510,16 +511,6 @@ class MigrationWriter
         $entry = $enums[$field][$default];
 
         return is_array($entry) && isset($entry[0]) ? $entry[0] : $default;
-    }
-
-    private function resolveType(string $type): string
-    {
-        $t = strtolower($type);
-
-        return match ($t) {
-            'bool', 'boolean' => 'boolean',
-            default           => $t,
-        };
     }
 
     private function buildAddIndexLine(array $idx): string

@@ -45,12 +45,12 @@ class CreateModelCommand extends Command
     /**
      * @throws FileNotFoundException
      */
-    public function handle(): void
+    public function handle(): int
     {
         $this->showTitle();
 
         if (! $this->checkRunning()) {
-            return;
+            return self::FAILURE;
         }
 
         // 先刷缓存,再定位 schema —— 这样 `-t` 给的全局唯一表 key 能反查出 schema(读 models.php),无需再选模块
@@ -58,11 +58,11 @@ class CreateModelCommand extends Command
 
         $only_table  = $this->resolveOnlyTable();
         $schema_name = $this->resolveSchemaArg($this->argument('schema_name'), $only_table);
-        if ($schema_name === '') {
-            return;
+        if ($schema_name === null) {
+            return self::FAILURE;
         }
         if ($only_table !== null && ! $this->assertTableInSchema($schema_name, $only_table)) {
-            return;
+            return self::FAILURE;
         }
 
         $this->tipCallCommand('moo:model ' . $schema_name);
@@ -98,6 +98,6 @@ class CreateModelCommand extends Command
             }
         }
 
-        $this->tipDone($result);
+        return $this->tipDone($result);
     }
 }

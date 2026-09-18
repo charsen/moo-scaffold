@@ -3,7 +3,7 @@
 namespace Mooeen\Scaffold\Designer;
 
 use Illuminate\Support\Facades\Schema;
-use Mooeen\Scaffold\Support\FieldTypes;
+use Mooeen\Scaffold\Support\ColumnTypeGroups;
 
 /**
  * Compute YAML diff between working-tree YAML and last-captured snapshot.
@@ -48,27 +48,27 @@ class SchemaDiffService
 
         $allKeys = array_unique([...array_keys($baselineTables), ...array_keys($currentTables)]);
         foreach ($allKeys as $tableKey) {
-            $b = $baselineTables[$tableKey] ?? null;
-            $c = $currentTables[$tableKey]  ?? null;
+            $baselineTable = $baselineTables[$tableKey] ?? null;
+            $currentTable  = $currentTables[$tableKey]  ?? null;
 
-            if ($b === null && $c !== null) {
+            if ($baselineTable === null && $currentTable !== null) {
                 // 2026-05-21 防呆:baseline 缺 + DB 已有该表 → user 误删 snapshot 的 drift 状态,
                 // 不能当"新建"emit create_table(会跟 prod 已 ran 的 create 冲突,migrate 报
                 // duplicate column / table)。返 baseline_drift status,MigrationWriter 跳过 emit,
                 // UI 显警告引导 user 手动恢复 baseline。
                 if ($this->dbHasTable($tableKey)) {
-                    $tablesDiff[$tableKey] = $this->baselineDriftDiff($c, $tableKey);
+                    $tablesDiff[$tableKey] = $this->baselineDriftDiff($currentTable, $tableKey);
                     $isEmpty               = false;
 
                     continue;
                 }
-                $tablesDiff[$tableKey] = $this->createdTableDiff($c);
+                $tablesDiff[$tableKey] = $this->createdTableDiff($currentTable);
                 $isEmpty               = false;
 
                 continue;
             }
-            if ($b !== null && $c === null) {
-                $tablesDiff[$tableKey] = $this->droppedTableDiff($b);
+            if ($baselineTable !== null && $currentTable === null) {
+                $tablesDiff[$tableKey] = $this->droppedTableDiff($baselineTable);
                 $isEmpty               = false;
 
                 continue;
@@ -76,8 +76,8 @@ class SchemaDiffService
 
             // both present → diff
             $tableHints   = $this->extractTableHints($tableKey, $renameHints);
-            $fieldChanges = $this->fieldDiff($b['fields'], $c['fields'], $tableHints);
-            $indexChanges = $this->indexDiff($b['index'], $c['index']);
+            $fieldChanges = $this->fieldDiff($baselineTable['fields'], $currentTable['fields'], $tableHints);
+            $indexChanges = $this->indexDiff($baselineTable['index'], $currentTable['index']);
 
             $tableSuspects    = $this->detectSuspectedRenames($tableKey, $fieldChanges, $tableHints);
             $suspectedRenames = array_merge($suspectedRenames, $tableSuspects);
@@ -89,11 +89,11 @@ class SchemaDiffService
 
             $tablesDiff[$tableKey] = [
                 'status'              => $status,
-                'baseline_definition' => $b,
-                'current_definition'  => $c,
+                'baseline_definition' => $baselineTable,
+                'current_definition'  => $currentTable,
                 'field_changes'       => $fieldChanges,
                 'index_changes'       => $indexChanges,
-                'warnings'            => $this->warningCheck($fieldChanges, $indexChanges, $b['fields']),
+                'warnings'            => $this->warningCheck($fieldChanges, $indexChanges, $baselineTable['fields']),
             ];
         }
 
@@ -199,8 +199,8 @@ class SchemaDiffService
 
         $keys = array_unique([...array_keys($effectiveBefore), ...array_keys($effectiveAfter)]);
         foreach ($keys as $key) {
-            $b = $effectiveBefore[$key] ?? null;
-            $a = $effectiveAfter[$key]  ?? null;
+            $defBefore = $effectiveBefore[$key] ?? null;
+            $defAfter  = $effectiveAfter[$key]  ?? null;
 
             // 系统字段（框架列）。2026-09-13 修复：此前无条件 continue，等于把「给存量表补框架列」
             // 整类变更静默吞掉 —— 典型场景是 YAML 里给已有表加 `deleted_at` 开软删，
@@ -210,19 +210,19 @@ class SchemaDiffService
                 if ($key === 'id') {
                     continue;
                 }
-                if ($b === null && $a !== null) {
+                if ($defBefore === null && $defAfter !== null) {
                     // 新增框架列 → 正常按 add 落库（写入侧负责 emit `$table->softDeletes()` / timestamp）
                     $idx        = array_search($key, $orderedAfterKeys, true);
                     $afterField = ($idx !== false && $idx > 0) ? $orderedAfterKeys[$idx - 1] : null;
-                    $changes[]  = ['op' => 'add', 'field' => $key, 'definition' => $a, 'after_field' => $afterField, 'framework' => true];
+                    $changes[]  = ['op' => 'add', 'field' => $key, 'definition' => $defAfter, 'after_field' => $afterField, 'framework' => true];
 
                     continue;
                 }
-                if ($b !== null && $a === null) {
+                if ($defBefore !== null && $defAfter === null) {
                     // **删除框架列一律不自动落库**：删 `deleted_at` 等于让历史记录静默"复活"，
                     // 删时间列会丢审计线索，都必须人工决定。用一个写入侧不认识的 op 只走告警通道
                     // （`MigrationWriter` 的 up/down 只处理 add/modify/rename/drop，见到它会跳过）。
-                    $changes[] = ['op' => 'framework_drop', 'field' => $key, 'definition' => $b, 'framework' => true];
+                    $changes[] = ['op' => 'framework_drop', 'field' => $key, 'definition' => $defBefore, 'framework' => true];
 
                     continue;
                 }
@@ -230,28 +230,28 @@ class SchemaDiffService
                 continue;   // 两边都在 → 框架列没有可比较的属性
             }
 
-            if ($b === null && $a !== null) {
+            if ($defBefore === null && $defAfter !== null) {
                 // 找 $key 在完整 yaml after 顺序里的前一个 key,作为 ->after(prev) 的参数
                 $idx        = array_search($key, $orderedAfterKeys, true);
                 $afterField = ($idx !== false && $idx > 0) ? $orderedAfterKeys[$idx - 1] : null;
-                $changes[]  = ['op' => 'add', 'field' => $key, 'definition' => $a, 'after_field' => $afterField];
+                $changes[]  = ['op' => 'add', 'field' => $key, 'definition' => $defAfter, 'after_field' => $afterField];
 
                 continue;
             }
-            if ($b !== null && $a === null) {
-                $changes[] = ['op' => 'drop', 'field' => $key, 'definition' => $b];
+            if ($defBefore !== null && $defAfter === null) {
+                $changes[] = ['op' => 'drop', 'field' => $key, 'definition' => $defBefore];
 
                 continue;
             }
 
             // modify?
-            $modify = $this->compareField($b, $a);
+            $modify = $this->compareField($defBefore, $defAfter);
             if ($modify !== null) {
                 $changes[] = [
                     'op'            => 'modify',
                     'field'         => $key,
-                    'before'        => $b,
-                    'after'         => $a,
+                    'before'        => $defBefore,
+                    'after'         => $defAfter,
                     'changed_attrs' => $modify,
                 ];
             }
@@ -268,78 +268,68 @@ class SchemaDiffService
         $diffs = [];
         $type  = $after['type'] ?? $before['type'] ?? 'varchar';
 
-        // type
-        $tb = $this->normalizeType((string) ($before['type'] ?? ''));
-        $ta = $this->normalizeType((string) ($after['type'] ?? ''));
-        if ($tb !== $ta) {
+        // type — 走单一来源 ColumnTypeGroups::canonicalize()（原私有 normalizeType 是残缺副本，只认 bool/boolean）
+        $typeBefore = ColumnTypeGroups::canonicalize((string) ($before['type'] ?? ''));
+        $typeAfter  = ColumnTypeGroups::canonicalize((string) ($after['type'] ?? ''));
+        if ($typeBefore !== $typeAfter) {
             $diffs[] = 'type';
         }
 
         // size
-        $sb = $this->normalizeSize($before['size'] ?? null);
-        $sa = $this->normalizeSize($after['size'] ?? null);
-        if ($sb !== $sa) {
+        $sizeBefore = $this->normalizeSize($before['size'] ?? null);
+        $sizeAfter  = $this->normalizeSize($after['size'] ?? null);
+        if ($sizeBefore !== $sizeAfter) {
             $diffs[] = 'size';
         }
 
         // precision (decimal/double/float)
-        if (in_array($ta, FieldTypes::FLOAT, true)) {
-            $pb = $before['precision'] ?? null;
-            $pa = $after['precision']  ?? null;
-            if ($pb !== $pa) {
+        if (in_array($typeAfter, ColumnTypeGroups::FLOAT, true)) {
+            $precisionBefore = $before['precision'] ?? null;
+            $precisionAfter  = $after['precision']  ?? null;
+            if ($precisionBefore !== $precisionAfter) {
                 $diffs[] = 'precision';
             }
         }
 
         // nullable (= !required)
-        $nb = ! (bool) ($before['required'] ?? true);
-        $na = ! (bool) ($after['required'] ?? true);
-        if ($nb !== $na) {
+        $nullableBefore = ! (bool) ($before['required'] ?? true);
+        $nullableAfter  = ! (bool) ($after['required'] ?? true);
+        if ($nullableBefore !== $nullableAfter) {
             $diffs[] = 'nullable';
         }
 
         // default (type-aware normalize)
-        if (! $this->defaultsEqual($before['default'] ?? null, $after['default'] ?? null, $ta)) {
+        if (! $this->defaultsEqual($before['default'] ?? null, $after['default'] ?? null, $typeAfter)) {
             $diffs[] = 'default';
         }
 
         // unsigned
-        $ub = (bool) ($before['unsigned'] ?? false);
-        $ua = (bool) ($after['unsigned'] ?? false);
-        if ($ub !== $ua) {
+        $unsignedBefore = (bool) ($before['unsigned'] ?? false);
+        $unsignedAfter  = (bool) ($after['unsigned'] ?? false);
+        if ($unsignedBefore !== $unsignedAfter) {
             $diffs[] = 'unsigned';
         }
 
         // name (Chinese comment)
-        $cb = (string) ($before['name'] ?? '');
-        $ca = (string) ($after['name'] ?? '');
-        if ($cb !== $ca) {
+        $commentBefore = (string) ($before['name'] ?? '');
+        $commentAfter  = (string) ($after['name'] ?? '');
+        if ($commentBefore !== $commentAfter) {
             $diffs[] = 'name';
         }
 
         return $diffs === [] ? null : $diffs;
     }
 
-    private function normalizeType(string $t): string
+    private function normalizeSize(mixed $raw): ?int
     {
-        $t = strtolower($t);
-
-        return match ($t) {
-            'bool', 'boolean' => 'boolean',
-            default           => $t,
-        };
-    }
-
-    private function normalizeSize(mixed $s): ?int
-    {
-        if ($s === null || $s === '') {
+        if ($raw === null || $raw === '') {
             return null;
         }
-        if (is_int($s)) {
-            return $s;
+        if (is_int($raw)) {
+            return $raw;
         }
-        if (is_string($s) && ctype_digit($s)) {
-            return (int) $s;
+        if (is_string($raw) && ctype_digit($raw)) {
+            return (int) $raw;
         }
 
         return null;
@@ -359,8 +349,8 @@ class SchemaDiffService
             // 实际 int)必须原样保留比较 —— 原 `(int)'high'`=0 把所有 enum-key 默认值塌成 0,导致
             // 改默认值(high→low,实际 1→0)被 diff 判为"无变化"、不生成 migration,DB 默认值留旧
             // (2026-06-10 修)。数值字面仍按类型强转,'5' 与 5 视为相等。
-            in_array($type, FieldTypes::INT, true)                                                   => is_numeric($raw) ? (int) $raw : (string) $raw,
-            in_array($type, FieldTypes::FLOAT, true)                                                 => is_numeric($raw) ? (string) (float) $raw : (string) $raw,
+            in_array($type, ColumnTypeGroups::INT, true)                                             => is_numeric($raw) ? (int) $raw : (string) $raw,
+            in_array($type, ColumnTypeGroups::FLOAT, true)                                           => is_numeric($raw) ? (string) (float) $raw : (string) $raw,
             in_array($type, ['boolean'], true)                                                       => (bool) (is_string($raw) ? (int) $raw : $raw),
             in_array($type, ['varchar', 'char', 'text', 'tinytext', 'mediumtext', 'longtext'], true) => (string) $raw,
             in_array($type, ['timestamp', 'datetime', 'date', 'time'], true)                         => strtoupper(trim((string) $raw)),
@@ -392,25 +382,25 @@ class SchemaDiffService
         $changes = [];
         $keys    = array_unique([...array_keys($before), ...array_keys($after)]);
         foreach ($keys as $key) {
-            $b = $before[$key] ?? null;
-            $a = $after[$key]  ?? null;
+            $indexBefore = $before[$key] ?? null;
+            $indexAfter  = $after[$key]  ?? null;
 
-            if ($b === null && $a !== null) {
-                $changes[] = ['op' => 'add', 'name' => (string) $key, 'type' => $a['type'] ?? 'index', 'fields' => $a['fields'] ?? (string) $key];
-
-                continue;
-            }
-            if ($b !== null && $a === null) {
-                $changes[] = ['op' => 'drop', 'name' => (string) $key, 'baseline' => $b];
+            if ($indexBefore === null && $indexAfter !== null) {
+                $changes[] = ['op' => 'add', 'name' => (string) $key, 'type' => $indexAfter['type'] ?? 'index', 'fields' => $indexAfter['fields'] ?? (string) $key];
 
                 continue;
             }
-            if (($b['type'] ?? null) !== ($a['type'] ?? null) || ($b['fields'] ?? null) !== ($a['fields'] ?? null)) {
+            if ($indexBefore !== null && $indexAfter === null) {
+                $changes[] = ['op' => 'drop', 'name' => (string) $key, 'baseline' => $indexBefore];
+
+                continue;
+            }
+            if (($indexBefore['type'] ?? null) !== ($indexAfter['type'] ?? null) || ($indexBefore['fields'] ?? null) !== ($indexAfter['fields'] ?? null)) {
                 $changes[] = [
                     'op'     => 'modify',
                     'name'   => (string) $key,
-                    'before' => $b,
-                    'after'  => $a,
+                    'before' => $indexBefore,
+                    'after'  => $indexAfter,
                 ];
             }
         }

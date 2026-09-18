@@ -15,11 +15,57 @@ use ReflectionClass;
 
 class RouteController extends Controller
 {
-    /** plan-29:每个 app 的 ACL 文档索引,按 controllerFQCN → method → actionInfo */
+    // ─── 请求级 memo ──────────────────────────────────────────────────
+    // 前五个缓存都在 getAppRoutes() 的 **per-route 循环**里被调用(每条路由各一次);第六个
+    // ($menusTransformCache)在 per-module 循环里被调用。没有它们就是「路由数 × ACL 扫描 /
+    // YAML 解析 / 反射」的重复开销 —— 量级见 $controllerFileCache 当年的记录:400 条路由
+    // = 800 个反射对象/请求。
+    //
+    // 生命周期 = **单次请求**:ScaffoldProvider 零 singleton()/bind(),控制器由容器每请求新建
+    // (Laravel ControllerDispatcher 逐请求 make),所以不存在跨请求读到陈旧 ACL / API yaml 的
+    // 问题,也不需要失效钩子 —— 一次请求内没有人会改这些文件。
+    //
+    // 键都含 app(或 app/folder/controller),同一 app 的多条路由共享一次构建结果;判据一律用
+    // array_key_exists / `=== null`,所以「空结果 / null」也算已建,不会反复重算。
+
+    /** ACL 文档索引,键 = app;消费处按 [fqcn][method] 取中文名 / 白名单等派生字段。 */
     private array $aclIndexCache = [];
 
-    /** plan-29 #3 C3:跨 app normalize key 反向索引(整 controller 生命周期 cache) */
+    /** 跨 app 同名(normalized key)反向索引,键 = normalized key。赋值后即使为 [] 也不再构建(=== null 只判「还没建」)。 */
     private ?array $crossAppIndex = null;
+
+    /** 控制器公开方法名表,键 = controller FQCN;controllerHasMethod() 每条路由查一次。 */
+    private array $controllerMethodsCache = [];
+
+    /**
+     * 控制器文件路径 + action 起始行号(抽屉展示),键 = fqcn@method。
+     *
+     * 2026-06-10 补齐:原先每条路由现场 new 两个反射对象(ReflectionClass + ReflectionMethod),
+     * 400 条路由 = 800 个反射对象/请求;旁边 controllerHasMethod() 早有同类缓存。
+     */
+    private array $controllerFileCache = [];
+
+    /**
+     * API schema YAML(已解析),键 = app/folder/controller;resolveApiInfo() 每条路由查一次。
+     *
+     * 解析失败 / 文件缺失存 null 也算已试(判据是 array_key_exists),避免每条路由重复 try。
+     */
+    private array $apiSchemaCache = [];
+
+    /**
+     * 模块菜单变换 YAML(`_menus_transform.yaml`,已 normalize),键 = **app**;
+     * resolveModuleName() 每个模块查一次。
+     *
+     * 与 $apiSchemaCache 的分档不同:那份是「每个 controller 一个文件」,这份是「每个 app 一个
+     * 文件」,同 app 的所有模块共用同一张表 —— 不缓存就是「模块数 × parseYamlFile」。缓存的是
+     * **整张表**而不是「某模块解析出的 name」:各模块要各自取自己的 name,只缓存单个 name 会让
+     * 第 2..n 个模块全拿到第一个模块的名字。
+     *
+     * 文件缺失 / 解析失败存 [] 也算已试。判据用 array_key_exists 是跟同族对齐：本处 miss 值恒为
+     * []，isset 其实等价；但同族里 $apiSchemaCache 的 miss 值是 null，那里只有 array_key_exists
+     * 正确 —— 统一写法免得下次改 miss 值时静默退化（缺文件反复探测）。
+     */
+    private array $menusTransformCache = [];
 
     public function __construct(
         Utility $utility,
@@ -68,10 +114,6 @@ class RouteController extends Controller
             'keyword'        => $keyword,
         ])->cookie('scaffold_routes_app', $currentApp, 60 * 24 * 30, '/', null, null, true, false);
     }
-
-    private array $apiSchemaCache = [];
-
-    private array $controllerMethodsCache = [];
 
     private function getAppRoutes(string $app): array
     {
@@ -290,10 +332,6 @@ class RouteController extends Controller
         return in_array($method, $this->controllerMethodsCache[$controllerClass], true);
     }
 
-    /** 反射结果按 class@method 缓存:每条路由一次 ReflectionClass+ReflectionMethod,
-     *  400 条路由 = 800 个反射对象/请求;旁边 controllerHasMethod 早有缓存,这里补齐(2026-06-10 修)。 */
-    private array $controllerFileCache = [];
-
     /** plan-29 #2 B:反射 controller 文件路径 + action 起始行号(抽屉里展示) */
     private function resolveControllerFile(string $fqcn, string $method): ?array
     {
@@ -340,18 +378,21 @@ class RouteController extends Controller
         }
     }
 
+    /**
+     * 模块 key → 菜单中文名。表按 app 缓存，整张表复用（见 $menusTransformCache）。
+     */
     private function resolveModuleName(string $app, string $moduleKey): string
     {
-        $apiPath  = $this->utility->getApiPath('schema') . $app . '/';
-        $yamlFile = $apiPath . '_menus_transform.yaml';
+        if (! array_key_exists($app, $this->menusTransformCache)) {
+            $apiPath  = $this->utility->getApiPath('schema') . $app . '/';
+            $yamlFile = $apiPath . '_menus_transform.yaml';
 
-        if (! $this->filesystem->isFile($yamlFile)) {
-            return $moduleKey;
+            $this->menusTransformCache[$app] = $this->filesystem->isFile($yamlFile)
+                ? $this->utility->normalizeMenusTransform($this->utility->parseYamlFile($yamlFile))
+                : [];
         }
 
-        $data = $this->utility->normalizeMenusTransform($this->utility->parseYamlFile($yamlFile));
-
-        return $data[$moduleKey]['name'] ?? $moduleKey;
+        return $this->menusTransformCache[$app][$moduleKey]['name'] ?? $moduleKey;
     }
 
     private function buildDebugUrl(string $app, string $folder, string $controller, string $actionKey): string

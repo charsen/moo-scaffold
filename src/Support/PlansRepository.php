@@ -4,37 +4,35 @@ declare(strict_types=1);
 
 namespace Mooeen\Scaffold\Support;
 
-use Illuminate\Filesystem\Filesystem;
-
-/** 只读研发计划；配置目录是唯一读取边界，不跟随目录外的软链。 */
-final class PlansRepository
+/**
+ * 只读研发计划；配置目录（`scaffold.plans.path`）是唯一读取边界，不跟随目录外的软链。
+ *
+ * 扫描 / 过滤骨架见 {@see MarkdownFileRepository}，本类只声明范围、字段与排序口径。
+ */
+final class PlansRepository extends MarkdownFileRepository
 {
-    public function __construct(private readonly Filesystem $files, private readonly RecordMarkdownDocument $markdown) {}
-
-    /** @return list<array{slug:string,title:string,group:string,order:int,tags:list<string>,body:string}> */
-    public function all(): array
+    protected function scope(): string
     {
-        $path = (string) config('scaffold.plans.path');
-        if ($path === '') {
-            return [];
-        }
-        $base = realpath(str_starts_with($path, '/') ? $path : base_path($path));
-        if ($base === false || ! is_dir($base)) {
-            return [];
-        }
+        return 'plans';
+    }
 
-        $records = [];
-        foreach ($this->files->allFiles($base) as $file) {
-            $real = $file->getRealPath();
-            $slug = str_replace('\\', '/', $file->getRelativePathname());
-            if (strtolower($file->getExtension()) !== 'md'
-                || $real === false || ! str_starts_with($real, $base . DIRECTORY_SEPARATOR)
-                || preg_match('~(^|/)[._]~', $slug)) {
-                continue;
-            }
-            $group     = dirname($slug) === '.' ? '根目录' : dirname($slug);
-            $records[] = ['slug' => $slug] + $this->markdown->parse($this->files->get($real), $slug, $group);
-        }
+    /** 嵌套目录即分组；根目录的文件归「根目录」。 */
+    protected function makeRecord(string $slug, string $raw): array
+    {
+        $group = dirname($slug) === '.' ? '根目录' : dirname($slug);
+
+        return ['slug' => $slug] + $this->markdown->parse($raw, $slug, $group);
+    }
+
+    /**
+     * README 最前；其余按「分组序（组内最小 order）→ 组名 → order → slug 自然序」。
+     *
+     * @param list<array{slug:string,title:string,group:string,order:int,tags:list<string>,body:string,error:?string}> $records
+     *
+     * @return list<array{slug:string,title:string,group:string,order:int,tags:list<string>,body:string,error:?string}>
+     */
+    protected function sortRecords(array $records): array
+    {
         $groupOrder = [];
         foreach ($records as $record) {
             $groupOrder[$record['group']] = min($groupOrder[$record['group']] ?? $record['order'], $record['order']);

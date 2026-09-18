@@ -15,6 +15,10 @@ use Mooeen\Scaffold\Utility;
  */
 class AclDocumentLoader
 {
+    /** 同请求内按 app 缓存压平索引:RouteController 的 aclIndexFor 与 crossAppIndex
+     *  两条路径都会调这里,不缓存的话每个 app 的 ACL yaml(可达 200KB)每请求解析两遍(2026-06-10 修)。 */
+    private array $indexCache = [];
+
     public function __construct(
         private readonly Utility $utility,
         private readonly Filesystem $filesystem,
@@ -63,10 +67,6 @@ class AclDocumentLoader
      *
      * 同 action 在 yaml 里可能出现多次(如 store 兼 create 别名),取第一条即可。
      */
-    /** 同请求内按 app 缓存压平索引:RouteController 的 aclIndexFor 与 crossAppIndex
-     *  两条路径都会调这里,不缓存的话每个 app 的 ACL yaml(可达 200KB)每请求解析两遍(2026-06-10 修)。 */
-    private array $indexCache = [];
-
     public function indexByControllerAction(string $app, string $appName = ''): array
     {
         if (array_key_exists($app, $this->indexCache)) {

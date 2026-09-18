@@ -30,6 +30,34 @@ trait SharedCodegenHelpers
     }
 
     /**
+     * 写入文件；写失败时打一行 failed 并返回 false，调用方据此中止后续流程。
+     *
+     * ⚠️ `Illuminate\Filesystem\Filesystem::put()` 返回的是 `file_put_contents()` 的结果 ——
+     * **`int|false`**（写成功=写入字节数，失败才是 `false`），**不是 bool**。判定必须写
+     * `=== false`：`if (! $put)` / `if ($put)` 会把「成功写入 0 字节」误判成失败。
+     *
+     * 2026-09-18：此前 19 处 `put()` 调用点直接丢弃返回值 —— 磁盘满 / 权限被拒 / 目标是目录时
+     * `put()` 返回 false，代码却继续打 `created()` 绿字，用户以为生成成功。这跟命令层
+     * 「屏幕上打红字『失败』、退出码却是 0」是同一类故障：**屏幕口径 ≠ 真实结果**。
+     *
+     * 只负责「写 + 失败上报」，**刻意不**打成功行：成功行的措辞（created / updated / history /
+     * 带第二段 detail 的变体）各调用点各不相同，由调用点自己保留，避免收口顺手改掉既有输出。
+     * 另一条分工线：本 trait 之外的 `Generator::putAndReport()` 是「写 + 打成功行 + 失败即抛」。
+     *
+     * 隐式依赖同本 trait：`protected Filesystem $filesystem` + `console(): ConsoleUi`。
+     */
+    protected function putOrReport(string $file, string $relativeFile, string $content): bool
+    {
+        if ($this->filesystem->put($file, $content) !== false) {
+            return true;
+        }
+
+        $this->console()->failed($relativeFile, '写入失败，文件未变更');
+
+        return false;
+    }
+
+    /**
      * 获取 tabs 缩进
      */
     protected function getTabs(float $size = 1): string

@@ -11,7 +11,16 @@ use Mooeen\Scaffold\Exceptions\BaseException;
 use Mooeen\Scaffold\Support\FormFrontendRules;
 use Mooeen\Scaffold\Support\FormWidgetTypes;
 
-/** 通用字段契约：规则、参数、归一化与展示由所有表单生产者共享。领域可通过 definitions() 追加特殊类型。 */
+/**
+ * 通用字段契约：规则、参数、归一化与展示由所有表单生产者共享。领域可通过 definitions() 追加特殊类型。
+ *
+ * **命名即契约（别顺手「统一」）**：本类只负责**表单字段**类型（`text` / `money` / `select` …）；
+ * 管**数据库列**词汇分组（`int` / `varchar` / `date` …）的是另一个类 `Support\ColumnTypeGroups`
+ * （2026-09-18 之前它也叫 `FieldTypes`，因为同名混淆才把**那个**改名）。
+ * 本类保持 `FieldTypes` 不动 —— 它是**跨仓扩展契约**：下游用 `is_a($contract, FieldTypes::class, true)`
+ * 校验子类、也有包直接 `extends` 它。改名会破坏这些仓，且换不来任何仓内收益。
+ * 防复发见 `tests/Feature/Support/UniqueClassNamesTest.php`（同名类不得跨顶层目录）。
+ */
 class FieldTypes
 {
     /** 单选项集上限；复杂业务主数据应由消费领域提供独立引用类型。 */

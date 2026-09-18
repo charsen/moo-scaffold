@@ -30,12 +30,12 @@ class UpdateMultilingualCommand extends Command
         ];
     }
 
-    public function handle(): void
+    public function handle(): int
     {
         $this->showTitle();
 
         if (! $this->checkRunning()) {
-            return;
+            return self::FAILURE;
         }
 
         (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start(false, true);
@@ -45,6 +45,6 @@ class UpdateMultilingualCommand extends Command
         $schema = $this->argument('schema');
         $result = (new UpdateMultilingualGenerator($this, $this->filesystem, $this->utility))->start($schema !== null ? (string) $schema : null);
 
-        $this->tipDone($result);
+        return $this->tipDone($result);
     }
 }

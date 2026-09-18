@@ -6,6 +6,7 @@ namespace Mooeen\Scaffold\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Mooeen\Scaffold\Support\ReadonlyMode;
 
 /**
  * 阻止 scaffold 在 production / readonly 模式下对"高风险簇"做 unsafe HTTP method 写入。
@@ -62,15 +63,14 @@ class EnforceScaffoldWritable
         // 计划 / 发版日志仅 local 可编辑；即使 staging 也保持只读。
         $prefix = trim((string) config('scaffold.route.prefix', 'scaffold'), '/');
         if ($request->is($prefix . '/plans/*', $prefix . '/release-records/*')
-            && (! app()->environment('local') || config('scaffold.config_ui.readonly', false))) {
+            && (! app()->environment('local') || ReadonlyMode::configLocked())) {
             return $this->forbidden($request, '仅本地且未开启强制只读时允许编辑。');
         }
 
-        $isProduction = app()->environment('production');
-        $isReadonly   = (bool) config('scaffold.config_ui.readonly', false);
+        $isProduction = ReadonlyMode::productionActive();
 
         // 开发环境且非强制只读 → 放行所有 W
-        if (! $isProduction && ! $isReadonly) {
+        if (! ReadonlyMode::active()) {
             return $next($request);
         }
 

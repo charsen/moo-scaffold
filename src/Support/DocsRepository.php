@@ -7,6 +7,7 @@ namespace Mooeen\Scaffold\Support;
 use Illuminate\Filesystem\Filesystem;
 use InvalidArgumentException;
 use Mooeen\Scaffold\Utility;
+use RuntimeException;
 
 /**
  * plan-52 文档中心存储层。
@@ -32,10 +33,10 @@ class DocsRepository
     /** slug 段非法字符：控制符 + 文件系统危险字符。中文/空格/字母数字 _ - . 允许。 */
     private const SLUG_FORBIDDEN = '/[\x00-\x1f\x7f<>:"\\\\|?*]/u';
 
-    public function __construct(private readonly Filesystem $fs, private readonly Utility $utility) {}
-
     /** all() 的单请求 memo(按 origin 分桶,'' = host):一次渲染 navTree + find 会多次扫同源。save/delete 后置空对应桶。 */
     private array $allCache = [];
+
+    public function __construct(private readonly Filesystem $fs, private readonly Utility $utility) {}
 
     /**
      * 文档源列表(host + 带 docs/ 目录的扩展包,PackageRegistry 自动发现)。
@@ -98,13 +99,15 @@ class DocsRepository
         return "[{$origin}]/docs";
     }
 
+    /**
+     * 总体只读判定 —— 口径唯一来源见 {@see ReadonlyMode}；本方法只转发。
+     *
+     * 注意：本仓内**零调用方**（原实现是一份与 ConfigManager / AiSettingStore 逐行相同的副本，
+     * 本身也没人用）。保留它只为不动公开面 —— 若下次破版本，可连同此注释一起删除。
+     */
     public function isReadonly(): bool
     {
-        if (function_exists('app') && app()->environment('production')) {
-            return true;
-        }
-
-        return (bool) config('scaffold.config_ui.readonly', false);
+        return ReadonlyMode::active();
     }
 
     // -------------------------------------------------------------------------
@@ -340,6 +343,12 @@ class DocsRepository
 
     /**
      * 写入（新建或覆盖）。返回规范化后的 slug。
+     *
+     * 写失败**抛异常**（不是静默 return）：本层无 console；DocsController::save() 已
+     * `catch (\Throwable $e)` 把 message 落成 422 JSON，用户在编辑器里看到红字提示。
+     *
+     * @throws InvalidArgumentException slug 非法 / 路径越界
+     * @throws RuntimeException         写入失败（`Filesystem::put()` 返回 false）时，文件保持原内容
      */
     public function save(string $slug, string $raw, ?string $origin = null): string
     {
@@ -357,7 +366,9 @@ class DocsRepository
         // 统一换行 + 末尾留一个换行
         $raw = str_replace("\r\n", "\n", $raw);
         $raw = rtrim($raw, "\n") . "\n";
-        $this->fs->put($abs, $raw);
+        if ($this->fs->put($abs, $raw) === false) {   // put() 是 int|false，只能与 false 严格比
+            throw new RuntimeException("写入失败，文档未变更：{$slug}");
+        }
         unset($this->allCache[$origin ?? '']);   // 列表变了,作废该源 memo
 
         return $slug;
@@ -389,6 +400,9 @@ class DocsRepository
      * 让前端提示刷新,防止对着过期列表编号错位。
      *
      * @param list<string> $slugs 展示顺序的全量 slug(组块顺序即组顺序)
+     *
+     * @throws InvalidArgumentException 提交集合与该源当前文档不一致（有增删）时
+     * @throws RuntimeException         某篇写入失败时（此前序号已落盘，故提示刷新后重试）
      */
     public function reorder(array $slugs, ?string $origin = null): int
     {
@@ -410,8 +424,12 @@ class DocsRepository
             if ($current[$slug] === $order) {
                 continue;
             }
-            $abs = $this->absPath($slug, $origin);
-            $this->fs->put($abs, $this->withOrderLine((string) $this->fs->get($abs), $order));
+            $abs  = $this->absPath($slug, $origin);
+            $next = $this->withOrderLine((string) $this->fs->get($abs), $order);
+            // put() 是 int|false，只能与 false 严格比。前几篇可能已落盘，故提示带上已改篇数
+            if ($this->fs->put($abs, $next) === false) {
+                throw new RuntimeException("写入失败：{$slug} 未能编号，已改 {$changed} 篇，请刷新页面后重试。");
+            }
             $changed++;
         }
         if ($changed > 0) {
@@ -423,10 +441,10 @@ class DocsRepository
 
     public function assertWritable(?string $origin = null): void
     {
-        if (function_exists('app') && app()->environment('production')) {
+        if (ReadonlyMode::productionActive()) {
             throw new InvalidArgumentException('生产环境为只读预览，禁止编辑文档。');
         }
-        if ((bool) config('scaffold.config_ui.readonly', false)) {
+        if (ReadonlyMode::configLocked()) {
             throw new InvalidArgumentException('当前为强制只读模式（SCAFFOLD_CONFIG_READONLY），禁止编辑文档。');
         }
         // 写权硬线(plan-53):扩展包源须软链装(写 vendor = 写真仓);vcs 拷贝一律拒写
