@@ -72,9 +72,58 @@ class Command extends BaseCommand
         return $this->secret($this->console()->prompt($question), $fallback);
     }
 
-    protected function chooseApp(array $apps): string
+    /**
+     * 「必须选一个」的通用收口：**没得选**与**没选成**两种情况都先报错再返回 `null`，调用方一律中止（FAILURE）。
+     *
+     * 挡的是同一对固定缺陷（与 `chooseSchema()` 同源，第 16/18 项各修一处，本方法给后续 4 处复用）：
+     *   ① 候选列表为空 → `choice([])` 抛 Symfony 的
+     *      `LogicException: Choice question must have at least 1 choice available.`（崩栈而非报错）；
+     *   ② 非交互模式（`--no-interaction`）下 `choice` 静默回落默认值 `null` → 调用方若当它是字符串，
+     *      就会在**别处**炸（属性赋值 / 内建函数 TypeError，或静默传下去）。
+     *
+     * 两条报错文案由调用点给全（不在这里拼模板：「没有可选的 app」与「没有可选的目录」的空格规则
+     * 不同，模板化出来的中文会别扭），本方法只管**判定顺序**与返回值契约。
+     *
+     * @param string       $question         交互提示语（显示给用户的问题）
+     * @param list<string> $choices          候选值列表（label 与返回值一致；需要 label 映射的走 `chooseSchema()`）
+     * @param string       $emptyMessage     候选为空时的报错文案
+     * @param string       $notChosenMessage 非交互回落 / 选了空值时的报错文案
+     */
+    protected function chooseRequired(string $question, array $choices, string $emptyMessage, string $notChosenMessage): ?string
     {
-        return $this->choicePrompt('选择 app', array_keys($apps));
+        if ($choices === []) {
+            $this->console()->error($emptyMessage);
+
+            return null;
+        }
+
+        $picked = $this->choicePrompt($question, $choices);
+
+        if ($picked === null || $picked === '') {
+            $this->console()->error($notChosenMessage);
+
+            return null;
+        }
+
+        return (string) $picked;
+    }
+
+    /**
+     * 选 app（`app` 参数为空时的交互回落）。
+     *
+     * 返回 `null` = 没得选或没选成，**已报错**，调用方一律 `return self::FAILURE`。
+     * 早前声明 `: string` 却直接 `return $this->choicePrompt(...)` ⇒ 非交互模式下返回 null 会抛
+     * `TypeError: Return value must be of type string, null returned`（崩栈，且报错点在返回处、
+     * 离真凶「没给 app 参数」很远）。
+     */
+    protected function chooseApp(array $apps): ?string
+    {
+        return $this->chooseRequired(
+            '选择 app',
+            array_keys($apps),
+            '没有可选的 app。请先跑 `moo:init` 初始化脚手架，或确认 config 里已配置 app。',
+            '未选择 app。非交互模式下请把 app 名作为第 1 个参数传入。',
+        );
     }
 
     /**

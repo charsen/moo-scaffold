@@ -24,11 +24,12 @@ use Symfony\Component\Console\Output\OutputInterface;
  *   ① 助手 `SharedCodegenHelpers::putOrReport()` 的三态（成功静默 / 失败上报 / 0 字节算成功）；
  *   ② 另一条同族路径 `FreshStorageGenerator::reportPutResult()`（silence 语义不同，未并入助手）；
  *   ③ 内联守卫：`Utility::addGitIgnore()`（无 console()，只能就地判）；
- *   ④ Web/Support 层 3 个 store —— 无 console，写失败抛异常（由 Controller 的 catch 落 4xx）；
- *   ⑤ 结构不变式：`src/` 下每一处文件写入都必须带失败判定（含已知欠账白名单，当前为空）。
+ *   ④ Web/Support 层 3 个 store —— 无 console，写失败/删失败一律抛异常（由 Controller 的 catch 落 4xx）；
+ *   ⑤ 结构不变式：`src/` 下每一处文件写入（`put`/`append`）与删除（`delete`）都必须带失败判定
+ *      （含已知欠账白名单，当前为空）。
  */
 
-/** 写失败的文件系统：put()/append() 一律返回 false —— 与 file_put_contents 的失败态一致。 */
+/** 写失败的文件系统：put()/append()/delete() 一律返回 false —— 与 file_put_contents / unlink 的失败态一致。 */
 function wfg_failing_fs(): Filesystem
 {
     return new class extends Filesystem
@@ -39,6 +40,11 @@ function wfg_failing_fs(): Filesystem
         }
 
         public function append($path, $data, $lock = false)
+        {
+            return false;
+        }
+
+        public function delete($paths)
         {
             return false;
         }
@@ -225,9 +231,26 @@ it('DocsRepository::reorder():写盘失败 → 抛异常，且该篇 order 行�
     });
 });
 
+it('DocsRepository::delete():删不掉 → 抛异常（控制器落 422），不静默回 200', function () {
+    wfg_sandbox(function ($dir) {
+        config(['scaffold.docs.path' => 'docs']);
+
+        $real = new DocsRepository(new Filesystem, app(Utility::class));
+        $real->save('待删', "正文\n");
+
+        // 只让 delete() 失败：isFile() / withinBase() 照走真 FS ⇒ 复刻「读得到、删不掉」现场
+        app()->instance(Filesystem::class, wfg_failing_fs());
+
+        expect(fn () => app(DocsRepository::class)->delete('待删'))
+            ->toThrow(RuntimeException::class, '删除失败');
+
+        expect(file_exists($dir . '/docs/待删.md'))->toBeTrue();   // 文件确实还在（没被假成功骗过）
+    });
+});
+
 // ─── ⑤ 结构不变式 ──────────────────────────────────────────────────────────
 
-it('结构不变式：src/ 下每一处文件写入都带失败判定（不留静默丢弃）', function () {
+it('结构不变式：src/ 下每一处文件写入 / 删除都带失败判定（不留静默丢弃）', function () {
     $src = __DIR__ . '/../../../src';
 
     /*
@@ -250,9 +273,9 @@ it('结构不变式：src/ 下每一处文件写入都带失败判定（不留�
         $lines    = explode("\n", (string) file_get_contents($file->getPathname()));
 
         foreach ($lines as $i => $line) {
-            // 只认文件系统写入：`$this->filesystem->put(` / `$this->fs->put(` / `->append(`
+            // 只认文件系统写入/删除：`$this->filesystem->put(` / `$this->fs->put(` / `->append(` / `->delete(`
             // —— 刻意不匹配 cache()->put / session()->put（那是另一套语义）
-            if (! preg_match('/->(fs|filesystem)->(put|append)\(/', $line)) {
+            if (! preg_match('/->(fs|filesystem)->(put|append|delete)\(/', $line)) {
                 continue;
             }
 
@@ -264,6 +287,14 @@ it('结构不变式：src/ 下每一处文件写入都带失败判定（不留�
             $pass = str_contains($line, '=== false')
                 || str_contains($line, '!== false')
                 || str_contains($line, 'putOrReport(');
+
+            // `delete()` 返回**纯 bool**（不是 put 那种 `int|false`），所以不存在「真值判断把 0 字节
+            // 当成失败」的陷阱 ⇒ 判定放宽成「返回值被消费」：直接做 if 条件（可带 !）或赋给变量。
+            // 写成 `if (...->delete($x))` / `if (! ...->delete($x))` 都算过；裸语句 `$this->fs->delete($x);` 不算。
+            if (! $pass) {
+                $pass = (bool) preg_match('/\bif\s*\(\s*!?\s*\$this->(fs|filesystem)->delete\(/', $line)
+                    || (bool) preg_match('/= *\$this->(fs|filesystem)->delete\(/', $line);
+            }
 
             // 允许「先收结果、随后交给 reportPutResult」这一种形态（FreshStorageGenerator 2 处）
             if (! $pass) {
@@ -281,5 +312,5 @@ it('结构不变式：src/ 下每一处文件写入都带失败判定（不留�
         }
     }
 
-    expect($offenders)->toBe([], "以下写入点丢弃了 put()/append() 的返回值，写失败会被静默吞掉：\n" . implode("\n", $offenders));
+    expect($offenders)->toBe([], "以下写入/删除点丢弃了 put()/append()/delete() 的返回值，失败会被静默吞掉：\n" . implode("\n", $offenders));
 });

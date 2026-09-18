@@ -66,7 +66,16 @@ class CreateViewCommand extends Command
         }
 
         $force      = $this->isForced();
-        $controller = $this->choicePrompt('选择控制器', array_keys($all[$schema_name]));
+        $controller = $this->chooseRequired(
+            '选择控制器',
+            array_keys($all[$schema_name]),
+            "schema「{$schema_name}」下没有控制器可生成 view。请先跑 moo:controller / moo:free 生成控制器。",
+            // 本命令只有 schema_name 参数、**没有** controller 参数 ⇒ 非交互下无出路，只能回交互终端
+            '未选择控制器。本命令的控制器只能交互选择，请去掉 --no-interaction 重跑。',
+        );
+        if ($controller === null) {
+            return self::FAILURE;   // 早前 null 直接进 CreateViewGenerator::start(string $controller) 抛 TypeError
+        }
 
         $this->tipCallCommand('moo:view ' . $schema_name);
         $result = (new CreateViewGenerator($this, $this->filesystem, $this->utility))

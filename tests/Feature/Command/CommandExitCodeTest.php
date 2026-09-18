@@ -323,3 +323,227 @@ it('RouterTool 的 $folder 形参已声明 string（越界值在调用点就失�
     expect((string) $params[1]->getType())->toBe('string')
         ->and($params[1]->getName())->toBe('folder');
 });
+
+// ─── 第 19 项：`choicePrompt` 回落 null 的其余 4 处活口 ────────────────────────
+//
+// 第 16 项修 `chooseSchema()`、第 18 项修 `chooseNamespace()`，本轮把剩下的活口一并收口：
+//   `Command::chooseApp(): string`（4 个命令走它）、`AdderCommand` 的目录与控制器两步、
+//   `CreateViewCommand` 的控制器一步。全部走新助手 `Command::chooseRequired()`。
+//
+// 为什么这几条要「行为 + 源码锚点」两层：能驱动 `handle()` 的（moo:auth / moo:adder）用行为用例；
+// 驱不动的（moo:api / moo:free / moo:view 都会先撞 `FreshStorageGenerator` 写 `_fields.yaml`，
+// testbench 的 base_path 下没有 `scaffold/database/`）只能用源码锚点钉住「helper 有没有被接上」——
+// 第 18 项的 M16 已经证明：接线断了时行为用例全绿，只有锚点会红。
+
+/**
+ * 命令壳（trait）：交互决策点 / console 出口 / input 一次性接好，供下面几个匿名命令子类 `use`。
+ *
+ * 为什么是 trait + 逐类分支、而不是一个通用工厂：**匿名类不支持 `extends $变量`**（Parse error），
+ * 父类名必须是字面量 ⇒ 「按类名造壳」只能在每个分支里各写一遍字面父类。
+ */
+trait CecCommandShell
+{
+    public BufferedOutput $sink;
+
+    /** @var null|callable(string, array): mixed null = 非交互模式下 Symfony `choice` 的真实回落值 */
+    public $chooser;
+
+    protected function console(): ConsoleUi
+    {
+        return new ConsoleUi($this->sink);
+    }
+
+    protected function choicePrompt(string $question, array $choices, $default = null, ?int $attempts = null, bool $multiple = false): mixed
+    {
+        return $this->chooser === null ? null : ($this->chooser)($question, $choices);
+    }
+
+    public function primeInput(array $params): void
+    {
+        $this->input = new ArrayInput($params, $this->getDefinition());
+    }
+}
+
+/**
+ * 造「只覆写交互决策点」的命令壳：`$args` = 构造器前两个参数（Filesystem、Router，后者仅 moo:auth 要），
+ * Utility 一律换成本文件的桩（钉死 app target 与目录扫描，免得依赖真实宿主目录）。
+ */
+function cec_choosing_command(string $class, array $args, ?callable $chooser, BufferedOutput $sink): object
+{
+    $fs      = $args[0];
+    $router  = $args[1] ?? null;
+    $utility = new class extends Utility
+    {
+        public function getAppTargets(): array
+        {
+            return ['admin' => ['path' => 'app/Admin/']];
+        }
+
+        public function getControllerNamespaces(string $app = 'admin'): array
+        {
+            return ['Light'];
+        }
+    };
+
+    $cmd = match ($class) {
+        AdderCommand::class => new class($fs, $utility, $chooser) extends AdderCommand
+        {
+            use CecCommandShell;
+
+            public function __construct(Filesystem $fs, Utility $utility, ?callable $chooser)
+            {
+                parent::__construct($fs, $utility);
+                $this->chooser = $chooser;
+            }
+        },
+        UpdateAuthorizationCommand::class => new class($fs, $utility, $router, $chooser) extends UpdateAuthorizationCommand
+        {
+            use CecCommandShell;
+
+            public function __construct(Filesystem $fs, Utility $utility, Router $router, ?callable $chooser)
+            {
+                parent::__construct($fs, $utility, $router);
+                $this->chooser = $chooser;
+            }
+        },
+        CreateViewCommand::class => new class($fs, $utility, $chooser) extends CreateViewCommand
+        {
+            use CecCommandShell;
+
+            public function __construct(Filesystem $fs, Utility $utility, ?callable $chooser)
+            {
+                parent::__construct($fs, $utility);
+                $this->chooser = $chooser;
+            }
+        },
+        default => throw new InvalidArgumentException("本文件没有 {$class} 的命令壳"),
+    };
+
+    $cmd->sink = $sink;
+
+    return $cmd;
+}
+
+/** AdderCommand 的控制器分支要真扫目录 ⇒ 需要 sandbox base_path；跑完必还原。 */
+function cec_sandbox(callable $fn): void
+{
+    $dir = sys_get_temp_dir() . '/moo_cec_' . uniqid();
+    @mkdir($dir . '/app/Admin/Light', 0755, true);
+    $orig = base_path();
+    app()->setBasePath($dir);
+
+    try {
+        $fn();
+    } finally {
+        app()->setBasePath($orig);
+        (new Filesystem)->deleteDirectory($dir);
+    }
+}
+
+it('chooseRequired():候选为空 → 先报 error 再返回 null（不再抛 Symfony LogicException 崩栈）', function () {
+    $sink = new BufferedOutput;
+    $cmd  = cec_choosing_command(CreateViewCommand::class, [app(Filesystem::class)], null, $sink);
+
+    $choose = new ReflectionMethod($cmd, 'chooseRequired');
+
+    expect($choose->invoke($cmd, '选择 x', [], '没有可选的 x。', '未选择 x。'))->toBeNull()
+        ->and($sink->fetch())->toContain('没有可选的 x');
+});
+
+it('chooseRequired():非交互回落 null → 先报 error 再返回 null', function () {
+    $sink = new BufferedOutput;
+    $cmd  = cec_choosing_command(CreateViewCommand::class, [app(Filesystem::class)], null, $sink);
+
+    $choose = new ReflectionMethod($cmd, 'chooseRequired');
+
+    expect($choose->invoke($cmd, '选择 x', ['Light'], '没有可选的 x。', '未选择 x。'))->toBeNull()
+        ->and($sink->fetch())->toContain('未选择 x');
+});
+
+it('chooseRequired():选到了 → 原样返回且零输出（happy path 没被守门改坏）', function () {
+    $sink = new BufferedOutput;
+    $cmd  = cec_choosing_command(CreateViewCommand::class, [app(Filesystem::class)], fn () => 'Light', $sink);
+
+    $choose = new ReflectionMethod($cmd, 'chooseRequired');
+
+    expect($choose->invoke($cmd, '选择 x', ['Light'], '没有可选的 x。', '未选择 x。'))->toBe('Light')
+        ->and($sink->fetch())->toBe('');
+});
+
+it('chooseApp():候选为空 / 非交互没选成，都返回 null 且报错（返回类型已收窄成 ?string）', function () {
+    $sink = new BufferedOutput;
+    $cmd  = cec_choosing_command(CreateViewCommand::class, [app(Filesystem::class)], null, $sink);
+
+    $choose = new ReflectionMethod($cmd, 'chooseApp');
+
+    expect((string) $choose->getReturnType())->toBe('?string');
+
+    expect($choose->invoke($cmd, []))->toBeNull()
+        ->and($sink->fetch())->toContain('没有可选的 app');
+
+    expect($choose->invoke($cmd, ['admin' => ['path' => 'app/Admin/']]))->toBeNull()
+        ->and($sink->fetch())->toContain('未选择 app');
+});
+
+it('moo:auth 没给 app 且非交互没选成 → 退出码 1 + 报「未选择 app」（接线行为验证）', function () {
+    config(['scaffold.only_in_local' => false]);
+
+    $sink = new BufferedOutput;
+    $cmd  = cec_choosing_command(UpdateAuthorizationCommand::class, [app(Filesystem::class), app(Router::class)], null, $sink);
+    $cmd->primeInput([]);   // 不给 app 参数
+
+    expect($cmd->handle())->toBe(1)
+        ->and($sink->fetch())->toContain('未选择 app');
+});
+
+it('moo:adder 非交互下没选成目录 → 退出码 1（早前 ucfirst(null) 抛 TypeError）', function () {
+    cec_sandbox(function () {
+        config(['scaffold.only_in_local' => false]);
+
+        $sink = new BufferedOutput;
+        $cmd  = cec_choosing_command(AdderCommand::class, [app(Filesystem::class)], null, $sink);
+        $cmd->primeInput(['app' => 'admin']);
+
+        expect($cmd->handle())->toBe(1)
+            ->and($sink->fetch())->toContain('未选择目录');
+    });
+});
+
+it('moo:adder 非交互下没选成控制器 → 退出码 1（早前 null 静默传给 ControllerAdder::start）', function () {
+    cec_sandbox(function () {
+        config(['scaffold.only_in_local' => false]);
+
+        $sink = new BufferedOutput;
+        // 目录那一步答 'Light'（否则先撞目录守卫），控制器那一步回落 null
+        $cmd = cec_choosing_command(
+            AdderCommand::class,
+            [app(Filesystem::class)],
+            static fn (string $q) => str_contains($q, '目录') ? 'Light' : null,
+            $sink,
+        );
+        $cmd->primeInput(['app' => 'admin']);
+
+        expect($cmd->handle())->toBe(1)
+            ->and($sink->fetch())->toContain('未选择控制器');
+    });
+});
+
+it('接线源码锚点：4 处 chooseApp() + moo:view 的控制器选择，null 一律转 FAILURE', function () {
+    // 压平空白再匹配 —— 否则 Pint 一换行锚点就断（这是「接线」唯一守得住的地方，别省）
+    $flat = static fn (string $class): string => (string) preg_replace(
+        '/\s+/',
+        ' ',
+        (string) file_get_contents((new ReflectionClass($class))->getFileName()),
+    );
+
+    $pattern = '/\$app = [^;]*chooseApp\(\$apps\); if \(\$app === null\) \{ return self::FAILURE;/';
+
+    foreach ([CreateApiCommand::class, FreeCommand::class, UpdateAuthorizationCommand::class, AdderCommand::class] as $class) {
+        expect($flat($class))->toMatch($pattern, "{$class}：chooseApp() 的 null 必须转成 FAILURE（少了它，红字不会打、退出码还会是 0）");
+    }
+
+    expect($flat(CreateViewCommand::class))->toMatch(
+        '/\$controller = \$this->chooseRequired\( .*?\); if \(\$controller === null\) \{ return self::FAILURE;/',
+        'CreateViewCommand：控制器没选成必须转 FAILURE（handle() 驱不动，只能锚点守）',
+    );
+});

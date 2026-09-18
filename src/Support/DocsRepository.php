@@ -376,6 +376,13 @@ class DocsRepository
 
     /**
      * 删除。slug 非法 / 文件不存在抛异常。docs 入 git，删错可 `git restore`。
+     *
+     * 与 save() 同口径：删不掉必须被感知。`Filesystem::delete()` 也是**返回值**（`@unlink` 失败只返回
+     * false，不抛）—— 静默丢弃会让 DocsController::delete() 照常回 200，而磁盘上文档还在，
+     * 用户以为删掉了（列表是重扫目录，所以刷新后它又冒出来）。
+     *
+     * @throws InvalidArgumentException slug 非法 / 文件不存在 / 路径越界
+     * @throws RuntimeException         删除失败（`Filesystem::delete()` 返回 false）时，文件仍在
      */
     public function delete(string $slug, ?string $origin = null): void
     {
@@ -387,7 +394,9 @@ class DocsRepository
         if (! $this->fs->isFile($abs) || ! $this->withinBase($abs, $origin)) {
             throw new InvalidArgumentException('文档不存在或路径越界。');
         }
-        $this->fs->delete($abs);
+        if ($this->fs->delete($abs) === false) {   // delete() 返回纯 bool，但同样不该被丢弃
+            throw new RuntimeException("删除失败，文档仍在：{$slug}");
+        }
         unset($this->allCache[$origin ?? '']);   // 列表变了,作废该源 memo
     }
 
