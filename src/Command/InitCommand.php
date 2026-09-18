@@ -28,7 +28,7 @@ class InitCommand extends Command
         ];
     }
 
-    public function handle(): void
+    public function handle(): int
     {
         $this->showTitle();
 
@@ -37,6 +37,6 @@ class InitCommand extends Command
         $result = (new InitGenerator($this, $this->filesystem, $this->utility))
             ->start($author);
 
-        $this->tipDone($result);
+        return $this->tipDone($result);
     }
 }

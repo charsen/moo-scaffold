@@ -224,13 +224,15 @@ class UpdateMultilingualGenerator extends Generator
     {
         $file          = $this->getLanguagePath($file_name, $lang);
         $relative_file = $this->getLanguagePath($file_name, $lang, true);
-        $put           = $this->filesystem->put($file, $code);
-
-        if ($put) {
-            $this->console()->updated($relative_file);
-        } else {
+        // `put()` 返回的是 `file_put_contents()` 的结果（`int|false`），**不是 bool** ——
+        // 判定必须写 `=== false`：真值判断会把「成功写入 0 字节」误判成失败。
+        if ($this->filesystem->put($file, $code) === false) {
             $this->console()->failed($relative_file);
+
+            return;
         }
+
+        $this->console()->updated($relative_file);
     }
 
     /**

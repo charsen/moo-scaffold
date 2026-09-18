@@ -271,3 +271,54 @@ it('detectGitPushed:Laravel 在 git 仓子目录(engine/)+ 已推送文件 → �
         shell_exec('rm -rf ' . escapeshellarg($base));
     }
 });
+
+it('detectGitPushed:包 schema 按**包自己的仓**检测（2026-09-18 收口 `rev-parse --show-toplevel` 后新覆盖的分支）', function () {
+    // 这条分支原先零覆盖:host 的 repoRoot 走注入的 GitInspector(绑 base_path),而包出身是
+    // **内联一份 Process**(cwd = 包根)。收口后两者都走 `GitInspector::repoRoot($gitCwd)` ——
+    // 若有人把它改回无参调用,GitInspector 会用绑定的 host cwd(这里故意放一个**不在仓里**的目录),
+    // 于是抛 NotInGitRepoException → 外层转 CompactBlockedException,本用例立刻红。
+    $base = sys_get_temp_dir() . '/scaffold-compact-pkg-' . uniqid('', true);
+    $pkg  = $base . '/moo-pkgdemo';
+    $bare = $base . '/origin.git';
+    mkdir($pkg . '/scaffold/database', 0777, true);
+    file_put_contents($pkg . '/composer.json', json_encode([
+        'name'     => 'acme/moo-pkgdemo',
+        'autoload' => ['psr-4' => ['Acme\\PkgDemo\\' => 'src/']],
+    ], JSON_UNESCAPED_SLASHES));
+    file_put_contents($pkg . '/scaffold/database/PkgDemo.yaml', "module:\n    folder: PkgDemo\n    name: 包演示模块\ntables:\n    pkg_items:\n        attrs: { name: 包条目 }\n        fields:\n            id: {  }\n");
+
+    app()->instance(\Mooeen\Scaffold\Support\PackageRegistry::class, new \Mooeen\Scaffold\Support\PackageRegistry([$pkg]));
+    app()->forgetInstance(SchemaLoader::class);
+    $loader = app(SchemaLoader::class);
+
+    // 迁移文件放在 loader 报的包 migration 目录里（不猜路径）
+    $migDir = $loader->migrationDirFor('PkgDemo');
+    mkdir($migDir, 0777, true);
+    $mig = $migDir . '/2026_01_01_000000_create_pkg_items_table.php';
+    file_put_contents($mig, '<?php // pushed migration');
+
+    shell_exec('git init -q --bare ' . escapeshellarg($bare));
+    shell_exec('cd ' . escapeshellarg($pkg) . ' && git init -q -b main && git config user.email t@t.t && git config user.name t'
+        . ' && git add -A && git commit -qm init'
+        . ' && git remote add origin ' . escapeshellarg($bare) . ' && git push -qu origin main 2>/dev/null');
+
+    try {
+        expect($loader->originOf('PkgDemo'))->toBe('moo-pkgdemo');   // 前提:出身识别成功
+
+        // host cwd 故意放在**不在任何 git 仓里**的目录:沿用 host cwd 就查不到仓 → 静默放行。
+        $hostCwd = $base . '/host';
+        mkdir($hostCwd, 0777, true);
+
+        $compacter = new MigrationCompacter(
+            $loader,
+            app(\Mooeen\Scaffold\Designer\MigrationWriter::class),
+            new \Mooeen\Scaffold\Designer\GitInspector(cwd: $hostCwd),
+            new \Illuminate\Filesystem\Filesystem,
+            $hostCwd,
+        );
+
+        expect($compacter->detectGitPushed([$mig], 'PkgDemo'))->toBe([$mig]);
+    } finally {
+        shell_exec('rm -rf ' . escapeshellarg($base));
+    }
+});

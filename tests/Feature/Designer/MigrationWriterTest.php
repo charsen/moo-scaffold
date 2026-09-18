@@ -738,7 +738,7 @@ it('render 把新增的框架列写成框架方法（deleted_at → softDeletes�
                 'current_definition'  => ['fields' => [], 'index' => []],
                 'field_changes'       => [
                     // 框架列的 YAML 定义是**空的**（真实类型由框架方法决定）——
-                    // 不特判就会走到 resolveType('varchar') 生成一个 varchar 垃圾列
+                    // 不特判就会走到 FieldTypes::canonicalize('varchar') 兜底生成一个 varchar 垃圾列
                     ['op' => 'add', 'field' => 'deleted_at', 'definition' => [], 'after_field' => 'updated_at', 'framework' => true],
                     ['op' => 'add', 'field' => 'created_at', 'definition' => ['type' => 'timestamp'], 'after_field' => null, 'framework' => true],
                 ],

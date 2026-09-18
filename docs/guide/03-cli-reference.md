@@ -126,7 +126,7 @@ php artisan moo:db:audit --schema=Platform # 只查一个
 
 ### `moo:audit:form-contract [--scope=] [--module=] [--out=] [--include-hidden] [--include-disabled] [--respect-layout] [--include-non-contract] [--include-waived] [--all]`
 
-断言「create / edit 表单实际渲染出的控件，其 field 必须被对应 Store / Update Request 收下」。原为 wisdomcity 的 `audit:form-contract`，表单契约本身属于 scaffold，命令随契约搬入本包。
+断言「create / edit 表单实际渲染出的控件，其 field 必须被对应 Store / Update Request 收下」。原为宿主项目（代号 H1）的 `audit:form-contract`，表单契约本身属于 scaffold，命令随契约搬入本包。
 
 ```bash
 php artisan moo:audit:form-contract                          # 默认只报用户可见违规
@@ -177,7 +177,7 @@ php artisan moo:audit:resource-keys --allow=moo-x:FooResource:bar_meta  # 复核
 断言「后端 scaffold 的控件类型清单」与「下游 admin SPA `former/config.ts` 的类型注册表」是**同一个集合**：后端 `FormWidgetTypes::FORMER` 是表单契约**可能下发**的 type 全集（也是 mini-app 等动态类型登记的白名单），前端 `elComponents` 是把 type 映射到渲染组件的唯一位置。两侧此前只靠注释「人工对齐」——漏一边就是「后端下发新 type、前端静默走只读兜底」或「前端注册了后端永不下发的死类型」。
 
 ```bash
-php artisan moo:audit:former-types --spa=/path/to/wisdomcity-next-admin          # 给仓根目录（按约定位置探测 config.ts）
+php artisan moo:audit:former-types --spa=/path/to/host-frontend                  # 给仓根目录（按约定位置探测 config.ts）
 php artisan moo:audit:former-types --spa=/path/to/apps/admin/src/components/former/config.ts
 php artisan moo:audit:former-types --spa=... --json                              # 机器可读
 ```

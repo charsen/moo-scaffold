@@ -112,6 +112,12 @@ final class ComposerProfiles
     /**
      * manifest 三份一致性 + 条目形态。
      *
+     * 本方法（连同 packageProblems）是 `extra.moo-private-packages` 的**权威校验口径**：
+     * 字段形态、name 重复、逐字段一致（含顺序）都以这里为准。另两处消费者口径**有意**更宽 ——
+     * `ComposerDocsCommand::privateRows()` 只读不校验（缺 local 退 test/production，生成文档不能报错收场），
+     * `AuditResourceKeysCommand::privatePackageRoots()` 读宿主单份 composer.json 且静默跳过畸形条目
+     * （只读诊断命令不能因为宿主清单写歪就崩）。三处不要合并，理由见各自注释。
+     *
      * @param array<string, array<string, mixed>> $profiles
      *
      * @return list<string>

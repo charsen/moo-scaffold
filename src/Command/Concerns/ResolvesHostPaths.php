@@ -9,7 +9,7 @@ use JsonException;
  * 「Laravel app 根目录」—— 三份 composer manifest、`public/`、`vendor/` 都在它下面。
  *
  * 实测遇到两种 host 形态，因此不写死 `engine/`：
- *   - 仓根/engine/ 才是 Laravel app（wisdomcity、moo-engine-skeleton）
+ *   - 仓根/engine/ 才是 Laravel app（H1、moo-engine-skeleton）
  *   - 仓根本身就是 Laravel app
  * 按 composer.json / artisan 探测候选，取第一个命中。
  *

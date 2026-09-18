@@ -12,8 +12,8 @@ namespace Mooeen\Scaffold\Generator;
 
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Support\Arr;
+use Mooeen\Scaffold\Support\ColumnTypeGroups;
 use Mooeen\Scaffold\Support\FieldName;
-use Mooeen\Scaffold\Support\FieldTypes;
 
 use function in_array;
 
@@ -211,7 +211,10 @@ class CreateModelGenerator extends Generator
         ];
 
         $content = $this->buildStub($meta, $this->getStub('model-trait'));
-        $this->filesystem->put($trait_file, $content);
+        if (! $this->putOrReport($trait_file, $trait_relative_file, $content)) {
+            return;
+        }
+
         if ($file_exists) {
             $this->console()->updated($trait_relative_file);
         } else {
@@ -277,7 +280,9 @@ class CreateModelGenerator extends Generator
             ];
 
             $content = $this->buildStub($data, $this->getStub('model-enum-trait'));
-            $this->filesystem->put($enum_file, $content);
+            if (! $this->putOrReport($enum_file, $relative_file, $content)) {
+                continue;
+            }
 
             if ($file_exists) {
                 $this->console()->updated($relative_file);
@@ -334,7 +339,7 @@ class CreateModelGenerator extends Generator
             $codes[] = ''; // 空一行
 
             // 处理 id 和数字类型(smallint/mediumint 同属整型,2026-06-11 补)
-            if (in_array($config['type'], FieldTypes::INT)) {
+            if (in_array($config['type'], ColumnTypeGroups::INT)) {
                 $codes[] = $this->getTabs() . "public function {$field_name}(\$int)";
                 $codes[] = $this->getTabs() . '{';
                 $codes[] = $this->getTabs(2) . '$int = is_array($int) ? $int : [$int];';
@@ -342,28 +347,28 @@ class CreateModelGenerator extends Generator
                 $codes[] = $this->getTabs() . '}';
             }
 
-            if (in_array($config['type'], FieldTypes::STRING)) {
+            if (in_array($config['type'], ColumnTypeGroups::STRING)) {
                 $codes[] = $this->getTabs() . "public function {$field_name}(\$str)";
                 $codes[] = $this->getTabs() . '{';
                 $codes[] = $this->getTabs(2) . "return \$this->where('{$fn}', 'LIKE', \"%{\$str}%\");";
                 $codes[] = $this->getTabs() . '}';
             }
 
-            if (in_array($config['type'], FieldTypes::DATE)) {
+            if (in_array($config['type'], ColumnTypeGroups::DATE)) {
                 $codes[] = $this->getTabs() . "public function {$field_name}(\$date)";
                 $codes[] = $this->getTabs() . '{';
                 $codes[] = $this->getTabs(2) . "return \$this->whereDate('{$fn}', \$date);";
                 $codes[] = $this->getTabs() . '}';
             }
 
-            if (in_array($config['type'], FieldTypes::BOOL)) {
+            if (in_array($config['type'], ColumnTypeGroups::BOOL)) {
                 $codes[] = $this->getTabs() . "public function {$field_name}(\$bool)";
                 $codes[] = $this->getTabs() . '{';
                 $codes[] = $this->getTabs(2) . "return \$this->where('{$fn}', \$bool);";
                 $codes[] = $this->getTabs() . '}';
             }
 
-            if (in_array($config['type'], FieldTypes::FLOAT)) {
+            if (in_array($config['type'], ColumnTypeGroups::FLOAT)) {
                 $codes[] = $this->getTabs() . "public function {$field_name}(\$float)";
                 $codes[] = $this->getTabs() . '{';
                 $codes[] = $this->getTabs(2) . "return \$this->where('{$fn}', \$float);";
@@ -463,7 +468,7 @@ class CreateModelGenerator extends Generator
                 $rule = "fake()->name(Arr::random(['male', 'female']))";
             } elseif (str_contains($field_name, '_code')) {
                 $rule = "fake()->numerify('C####')";
-            } elseif (in_array($attr['type'], FieldTypes::INT)) {
+            } elseif (in_array($attr['type'], ColumnTypeGroups::INT)) {
                 $rule = 'random_int(0, 1)';
             } elseif ($attr['type'] === 'varchar' || $attr['type'] === 'char') {
                 $rule = "implode(' ', fake()->words(2))";
@@ -482,10 +487,10 @@ class CreateModelGenerator extends Generator
                 // 直接裸写;string-backed 枚举(buildEnum 支持 item[0] 是字符串,如 'A')必须加引号 +
                 // escapePhpString,否则发出 `randomElement([A, B])` 裸字 → Undefined constant 致命错误
                 // (2026-06-11 修)。
-                $temp   = Arr::pluck($enums[$field_name], 1, 0);
-                $values = array_map(
+                $valueLabels = Arr::pluck($enums[$field_name], 1, 0);
+                $values      = array_map(
                     fn ($v) => is_int($v) ? (string) $v : "'" . $this->escapePhpString((string) $v) . "'",
-                    array_keys($temp)
+                    array_keys($valueLabels)
                 );
                 $rule = 'fake()->randomElement([' . implode(', ', $values) . '])';
             }
@@ -519,7 +524,10 @@ class CreateModelGenerator extends Generator
         $code     = implode(PHP_EOL, $code);
         $file_txt = str_replace('//:auto_insert_code_here::do_not_delete', $code, $file_txt);
 
-        $this->filesystem->put($file, $file_txt);
+        if (! $this->putOrReport($file, './database/seeders/DatabaseSeeder.php', $file_txt)) {
+            return;
+        }
+
         $this->console()->updated('./database/seeders/DatabaseSeeder.php');
     }
 
@@ -531,11 +539,11 @@ class CreateModelGenerator extends Generator
         $code = [];
 
         foreach ($fields as $field_name => $attr) {
-            if (in_array($attr['type'], FieldTypes::INT)) {
+            if (in_array($attr['type'], ColumnTypeGroups::INT)) {
                 $type = 'int';
-            } elseif (in_array($attr['type'], FieldTypes::BOOL)) {
+            } elseif (in_array($attr['type'], ColumnTypeGroups::BOOL)) {
                 $type = 'bool';
-            } elseif (in_array($attr['type'], FieldTypes::DATE)) {
+            } elseif (in_array($attr['type'], ColumnTypeGroups::DATE)) {
                 $type = 'Carbon|null';
             } elseif ($attr['type'] === 'array') {
                 $type = 'array';
@@ -664,7 +672,7 @@ PHP;
                 $code[] = $this->getTabs(2) . "'{$field_name}' => 'boolean',";
             }
 
-            if (in_array($attr['type'], FieldTypes::DATETIME)) {
+            if (in_array($attr['type'], ColumnTypeGroups::DATETIME)) {
                 $code[] = $this->getTabs(2) . "'{$field_name}' => 'datetime:Y-m-d H:i:s',";
             }
 
@@ -685,7 +693,7 @@ PHP;
 
         $code[] = $this->getTabs(1) . '];';
 
-        $temp = [
+        $docblockHeader = [
             $this->getTabs(1) . '/**',
             $this->getTabs(1) . ' * 属性转换',
             $this->getTabs(1) . ' * @var array',
@@ -693,7 +701,7 @@ PHP;
             $this->getTabs(1) . 'protected $casts = [',
         ];
 
-        return implode(PHP_EOL, array_merge($temp, $code));
+        return implode(PHP_EOL, array_merge($docblockHeader, $code));
     }
 
     /**

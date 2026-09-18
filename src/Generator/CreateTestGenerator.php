@@ -14,6 +14,7 @@
 namespace Mooeen\Scaffold\Generator;
 
 use Mooeen\Scaffold\Support\AppTargetRegistry;
+use Mooeen\Scaffold\Support\Paths;
 
 class CreateTestGenerator extends Generator
 {
@@ -26,7 +27,7 @@ class CreateTestGenerator extends Generator
 
         // 落点 base：tests.path（绝对 → 原样用；相对 → base_path() 前缀）。
         $configured = (string) $this->utility->getConfig('tests.path');
-        $test_base  = str_starts_with($configured, '/') ? $configured : base_path($configured);
+        $test_base  = Paths::fromBasePath($configured);
 
         foreach ((array) $attr['app'] as $app_raw) {
             $app_folder = strtolower((string) $app_raw);

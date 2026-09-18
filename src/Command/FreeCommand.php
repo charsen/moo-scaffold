@@ -69,12 +69,12 @@ class FreeCommand extends Command
     /**
      * @throws FileNotFoundException
      */
-    public function handle(): void
+    public function handle(): int
     {
         $this->showTitle();
 
         if (! $this->checkRunning()) {
-            return;
+            return self::FAILURE;
         }
 
         $force = $this->isForced();
@@ -87,9 +87,7 @@ class FreeCommand extends Command
         $apps = $this->utility->getAppTargets();
         $app  = $this->argument('app') ?: $this->chooseApp($apps);
         if (! isset($apps[$app])) {
-            $this->reportAppNotConfigured($app, 'Please check the scaffold configuration and try again.');
-
-            return;
+            return $this->reportAppNotConfigured($app, 'Please check the scaffold configuration and try again.');
         }
 
         // 先刷缓存,再定位 schema —— `-t` 给的全局唯一表 key 能反查出 schema(读 models.php),省得记模块名
@@ -97,13 +95,11 @@ class FreeCommand extends Command
 
         $file_names  = $this->schemaNames();
         $schema_name = $this->resolveSchemaArg($this->argument('schema'), $only_table, $app);
-        if ($schema_name === '') {
-            return;
+        if ($schema_name === null) {
+            return self::FAILURE;
         }
         if (! in_array($schema_name, $file_names, true)) {
-            $this->reportSchemaNotFound($schema_name);
-
-            return;
+            return $this->reportSchemaNotFound($schema_name);
         }
 
         // plan-53 fail-fast:包 schema 固定 admin(交互路径已按 app 收窄列不出来;这里拦显式传参的矛盾组合)
@@ -111,12 +107,12 @@ class FreeCommand extends Command
         if ($schema_origin !== null && $app !== 'admin') {
             $this->console()->error("「{$schema_name}」是扩展包 [{$schema_origin}] 的 schema（固定 admin），不能用于 app 「{$app}」。");
 
-            return;
+            return self::FAILURE;
         }
 
         // -t/--table 校验:必须是该 schema 下真实存在的表 key,否则报错并列出可选项
         if ($only_table !== null && ! $this->assertTableInSchema($schema_name, $only_table)) {
-            return;
+            return self::FAILURE;
         }
 
         // 在任何业务代码落盘前确认目标端确实由当前生成范围声明，避免 `--app`
@@ -130,7 +126,7 @@ class FreeCommand extends Command
             $scope = $only_table === null ? "schema [{$schema_name}]" : "表 [{$only_table}]";
             $this->console()->error("{$scope} 没有为应用端 [{$app}] 声明 controller.app，未生成业务代码。");
 
-            return;
+            return self::FAILURE;
         }
 
         $this->tipCallCommand('moo:model');
@@ -142,7 +138,7 @@ class FreeCommand extends Command
         $this->tipCallCommand('moo:controller');
         $controllerGenerator = new CreateControllerGenerator($this, $this->filesystem, $this->utility);
         if (! $controllerGenerator->start($schema_name, $force, $only_table, $app)) {
-            return;
+            return self::FAILURE;
         }
 
         // moo:test 跟 i18n/auth 一样全量(不吃 -t;-t 只过滤 Model/Resource/Controller)。生成一次,-f 才覆盖。
@@ -190,6 +186,9 @@ class FreeCommand extends Command
         if ($schema_origin === null) {
             $this->tipRunTests($test_gen->testDirs($schema_name, $app));
         }
+
+        // 流水线的 migration 阶段刻意「容错不阻断」(见 runMigrationStep 的 warn-only),所以走到这里就是成功
+        return self::SUCCESS;
     }
 
     /**
@@ -246,7 +245,7 @@ class FreeCommand extends Command
         }
         $this->console()->info(count($files) . ' 个 migration 文件已生成');
         foreach ($files as $f) {
-            $this->line('  + ' . $f);
+            $this->console()->line('  + ' . $f);
         }
 
         // 2026-09-11:同 CreateMigrationCommand —— baseline 没推进时 migration 已落盘但
@@ -267,18 +266,18 @@ class FreeCommand extends Command
         // 收成一个对齐小块:绿徽标抬头(2 空格)+ 明细缩进(4 空格)+ 上下留白,数字高亮抓眼
         $hi = fn (int|string $v): string => "<fg=cyan;options=bold>{$v}</>";
 
-        $this->newLine();
-        $this->line("  <fg=black;bg=green;options=bold> ✓ moo:free </>  <options=bold>{$schema}</> → <options=bold>{$app}</>");
+        $this->console()->newLine();
+        $this->console()->line("  <fg=black;bg=green;options=bold> ✓ moo:free </>  <options=bold>{$schema}</> → <options=bold>{$app}</>");
 
         if ($onlyTable !== null) {
-            $this->line('    单表 ' . $hi($onlyTable) . ' · model / resource / controller <fg=gray>（存在则跳过）</>');
+            $this->console()->line('    单表 ' . $hi($onlyTable) . ' · model / resource / controller <fg=gray>（存在则跳过）</>');
         } else {
             $t = count($this->utility->getModels()[$schema] ?? []);
             $c = count($this->utility->getControllers(false)[$schema] ?? []);
-            $this->line('    ' . $hi($t) . ' model · ' . $hi($t) . ' resource · ' . $hi($c) . ' controller <fg=gray>（存在则跳过）</>');
+            $this->console()->line('    ' . $hi($t) . ' model · ' . $hi($t) . ' resource · ' . $hi($c) . ' controller <fg=gray>（存在则跳过）</>');
         }
 
-        $this->line('    i18n · auth 已更新 · migration 本次 <fg=green;options=bold>+' . $migrationCount . '</>' . ($api ? ' · API 文档已生成' : ''));
-        $this->newLine();
+        $this->console()->line('    i18n · auth 已更新 · migration 本次 <fg=green;options=bold>+' . $migrationCount . '</>' . ($api ? ' · API 文档已生成' : ''));
+        $this->console()->newLine();
     }
 }

@@ -38,11 +38,11 @@ class AccountAddCommand extends Command
         try {
             return $this->doHandle($store);
         } catch (AccountWriteForbiddenException $e) {
-            $this->error($e->getMessage());
+            $this->console()->error($e->getMessage());
 
             return 3;
         } catch (\RuntimeException $e) {
-            $this->error($e->getMessage());
+            $this->console()->error($e->getMessage());
 
             return 4;
         }
@@ -50,8 +50,8 @@ class AccountAddCommand extends Command
 
     private function doHandle(AccountStore $store): int
     {
-        $username = (string) ($this->argument('username') ?? $this->ask('用户名'));
-        $password = (string) ($this->option('password') ?? $this->secret('密码'));
+        $username = (string) ($this->argument('username') ?? $this->askPrompt('用户名'));
+        $password = (string) ($this->option('password') ?? $this->secretPrompt('密码'));
         $phone    = (string) $this->option('phone');
         $role     = (string) $this->option('role');
         $enabled  = ! (bool) $this->option('disabled');
@@ -64,7 +64,7 @@ class AccountAddCommand extends Command
             'enabled'  => $enabled,
         ], $this->resolveBy());
 
-        $this->info("已创建账号 [{$row['username']}] role={$row['role']} enabled=" . ($row['enabled'] ? 'Y' : 'N'));
+        $this->console()->info("已创建账号 [{$row['username']}] role={$row['role']} enabled=" . ($row['enabled'] ? 'Y' : 'N'));
 
         return 0;
     }

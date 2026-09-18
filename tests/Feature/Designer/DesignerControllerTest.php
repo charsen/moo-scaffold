@@ -249,3 +249,49 @@ it('DELETE deleteTable returns 422 on missing confirm_key', function () {
     $r = $this->deleteJson('/scaffold/db/designer/Platform/tables/platform_regions', []);
     $r->assertStatus(422);
 });
+
+// ─── 第 9 项：接上 UI 基类 + 三处重复收口 ─────────────────────────
+
+/**
+ * 剥注释后的源码。
+ *
+ * 用 `token_get_all` 而不是正则：本文件同仓已有两次教训（`ReadonlyModeTest` / `PathsTest`），
+ * 正则剥注释会被字符串里的 `/*`、以及注释掉的代码带偏。上面的防复发锚点扫的是**字面量**，
+ * 注释里提到这些字面属于说明、不算违规。
+ */
+function designer_controller_code_without_comments(string $path): string
+{
+    $code = '';
+
+    foreach (token_get_all((string) file_get_contents($path)) as $token) {
+        if (is_array($token)) {
+            if (! in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true)) {
+                $code .= $token[1];
+            }
+
+            continue;
+        }
+
+        $code .= $token;
+    }
+
+    return $code;
+}
+
+it('DesignerController 与其余 12 个控制器同基类（第 9 项接上继承）', function () {
+    $parent = (new ReflectionClass(Mooeen\Scaffold\Http\Controllers\DesignerController::class))->getParentClass();
+
+    // scaffold 自己的 UI 控制器一律继承 Http\Controllers\Controller（提供 $utility / view() / currentOperator()）
+    expect($parent?->getName())->toBe(Mooeen\Scaffold\Http\Controllers\Controller::class)
+        // 而 Foundation\Controller 是 `scaffold.class.controller` **生成给宿主的**控制器基类，
+        // src/ 内零继承者（只有测试当 ACL harness 用）—— 两侧服务不同生态，别接错
+        ->and($parent?->getName())->not->toBe(Mooeen\Scaffold\Foundation\Controller::class);
+});
+
+it('DesignerController 不再手写视图前缀与操作者读取（防复发锚点）', function () {
+    $path = dirname(__DIR__, 3) . '/src/Http/Controllers/DesignerController.php';
+    $code = designer_controller_code_without_comments($path);
+
+    expect($code)->not->toContain("'scaffold::")          // 视图一律走 $this->view()（基类补前缀）
+        ->and($code)->not->toContain('scaffold_auth_user'); // 操作者一律走 $this->currentOperator()
+});

@@ -24,6 +24,7 @@
 namespace Mooeen\Scaffold\Command;
 
 use Mooeen\Scaffold\Command\Concerns\ResolvesHostPaths;
+use Mooeen\Scaffold\Support\Paths;
 
 class ComposerDocsCommand extends Command
 {
@@ -89,7 +90,8 @@ class ComposerDocsCommand extends Command
 
         $rendered = $this->renderBlock($profiles, $format, (bool) $this->option('bare'));
         $file     = (string) ($this->option('file') ?: 'PRIVATE-COMPOSER-PACKAGES.md');
-        $docPath  = $this->absolutePath($file, $root);
+        // --file 相对宿主仓根；绝对路径（含 Windows 盘符）原样。
+        $docPath = Paths::absolute($file, $root);
 
         if ($this->option('check')) {
             return $this->checkDoc($docPath, $rendered);
@@ -100,9 +102,9 @@ class ComposerDocsCommand extends Command
         }
 
         // 默认形态：把 marker 区间该有的内容直接打到 stdout，方便人工复制或 diff
-        // （逐行 writeln，便于控制台断言/分页，也与 --write 落盘内容逐字节一致）。
+        // （逐行输出，便于控制台断言/分页，也与 --write 落盘内容逐字节一致）。
         foreach (explode("\n", $rendered) as $line) {
-            $this->output->writeln($line);
+            $this->console()->line($line);
         }
 
         return self::SUCCESS;
@@ -171,6 +173,10 @@ class ComposerDocsCommand extends Command
 
     /**
      * 私包行：顺序严格跟 `extra.moo-private-packages`。
+     *
+     * 只读不校验：形态问题（name 重复、三份不一致）由 `ComposerProfiles::manifestProblems()` 报，
+     * 这里遇到畸形条目跳过即可 —— 生成文档不能因为清单写歪就报错收场。宿主单份 composer.json 的
+     * 第三个消费者是 `AuditResourceKeysCommand::privatePackageRoots()`，见该处注释（三处不合并）。
      *
      * @param array<string, array<string, mixed>> $profiles
      *
@@ -419,19 +425,19 @@ class ComposerDocsCommand extends Command
         ));
 
         foreach (array_keys($added) as $name) {
-            $this->line("  <fg=green>+ 新增</> {$name}");
+            $this->console()->line("  <fg=green>+ 新增</> {$name}");
         }
         foreach (array_keys($removed) as $name) {
-            $this->line("  <fg=red>- 删除</> {$name}");
+            $this->console()->line("  <fg=red>- 删除</> {$name}");
         }
         foreach ($changed as $name => $fields) {
-            $this->line("  <fg=yellow>~ 变更</> {$name}");
+            $this->console()->line("  <fg=yellow>~ 变更</> {$name}");
             foreach ($fields as $field => [$old, $new]) {
-                $this->line("      {$field}: 文档=<fg=red>" . $this->orDash($old) . '</> → manifest=<fg=green>' . $this->orDash($new) . '</>');
+                $this->console()->line("      {$field}: 文档=<fg=red>" . $this->orDash($old) . '</> → manifest=<fg=green>' . $this->orDash($new) . '</>');
             }
         }
 
-        $this->line('<fg=gray>  确认后重跑：php artisan moo:composer:docs --write（仅替换 marker 区间）</>');
+        $this->console()->line('<fg=gray>  确认后重跑：php artisan moo:composer:docs --write（仅替换 marker 区间）</>');
 
         return self::FAILURE;
     }
@@ -473,7 +479,12 @@ class ComposerDocsCommand extends Command
             return self::SUCCESS;
         }
 
-        $this->filesystem->put($docPath, $updated);
+        if ($this->filesystem->put($docPath, $updated) === false) {
+            $this->console()->error("写入失败：{$docPath}");
+
+            return self::FAILURE;
+        }
+
         $this->console()->success("已更新 {$docPath}（仅替换 marker 区间）");
 
         return self::SUCCESS;
@@ -565,17 +576,5 @@ class ComposerDocsCommand extends Command
         $value = trim((string) $value);
 
         return $value === '' ? '—' : $value;
-    }
-
-    /**
-     * 相对路径按 --root 展开；绝对路径原样返回（--file 相对宿主仓根）。
-     */
-    protected function absolutePath(string $path, string $root): string
-    {
-        if (str_starts_with($path, '/') || preg_match('/^[A-Za-z]:[\\\\\\/]/', $path) === 1) {
-            return $path;
-        }
-
-        return rtrim($root, '/') . '/' . ltrim($path, '/');
     }
 }

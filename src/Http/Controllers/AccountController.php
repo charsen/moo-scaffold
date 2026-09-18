@@ -14,6 +14,7 @@ use Mooeen\Scaffold\Http\Requests\ContextRequest;
 use Mooeen\Scaffold\Support\AccountStore;
 use Mooeen\Scaffold\Support\AccountWriteForbiddenException;
 use Mooeen\Scaffold\Support\ConfigManager;
+use Mooeen\Scaffold\Support\ReadonlyMode;
 use Mooeen\Scaffold\Utility;
 
 /**
@@ -47,7 +48,7 @@ class AccountController extends Controller
             'accounts'      => $accounts,
             'meta'          => $meta,
             'readonly'      => $this->isReadonly(),
-            'is_prod'       => app()->environment('production'),
+            'is_prod'       => ReadonlyMode::productionActive(),
             'me'            => $this->currentUser($request),
             'flash_message' => $request->session()->pull('flash_message'),
             'flash_error'   => $request->session()->pull('flash_error'),
@@ -136,17 +137,17 @@ class AccountController extends Controller
 
     private function assertCanWrite(): void
     {
-        if (app()->environment('production')) {
+        if (ReadonlyMode::productionActive()) {
             throw new AccountWriteForbiddenException('生产环境禁止写入开发人员账号');
         }
-        if ((bool) config('scaffold.config_ui.readonly', false)) {
+        if (ReadonlyMode::configLocked()) {
             throw new AccountWriteForbiddenException('当前为强制只读模式（SCAFFOLD_CONFIG_READONLY）');
         }
     }
 
     private function isReadonly(): bool
     {
-        return app()->environment('production') || (bool) config('scaffold.config_ui.readonly', false);
+        return ReadonlyMode::active();
     }
 
     private function currentUser(FormRequest $request): string

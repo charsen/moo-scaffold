@@ -16,6 +16,7 @@ use Mooeen\Scaffold\Http\Requests\Docs\SaveRequest;
 use Mooeen\Scaffold\Http\Requests\Docs\SearchRequest;
 use Mooeen\Scaffold\Support\DocsRepository;
 use Mooeen\Scaffold\Support\Markdown\DocMarkdownRenderer;
+use Mooeen\Scaffold\Support\ReadonlyMode;
 use Mooeen\Scaffold\Utility;
 
 /**
@@ -277,13 +278,10 @@ class DocsController extends Controller
     /** @return array{is_prod:bool,is_readonly:bool,locked:bool} */
     private function lockFlags(): array
     {
-        $isProd     = function_exists('app') && app()->environment('production');
-        $isReadonly = (bool) config('scaffold.config_ui.readonly', false);
-
         return [
-            'is_prod'     => $isProd,
-            'is_readonly' => $isReadonly,
-            'locked'      => $isProd || $isReadonly,
+            'is_prod'     => ReadonlyMode::productionActive(),
+            'is_readonly' => ReadonlyMode::configLocked(),
+            'locked'      => ReadonlyMode::active(),
         ];
     }
 

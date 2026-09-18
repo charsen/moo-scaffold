@@ -18,6 +18,7 @@ use InvalidArgumentException;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Support\ConsoleUi;
 use Mooeen\Scaffold\Support\PackageRegistry;
+use Mooeen\Scaffold\Support\Paths;
 use Mooeen\Scaffold\Support\TargetContext;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
@@ -327,7 +328,7 @@ class Utility
     public function getDatabasePath($folder = 'schema', $relative = false): string
     {
         $configured = (string) $this->getConfig('database.' . $folder);
-        $path       = str_starts_with($configured, '/') ? $configured : base_path($configured);
+        $path       = Paths::fromBasePath($configured);
 
         return $relative ? str_replace(base_path(), '.', $path) : $path;
     }
@@ -418,9 +419,15 @@ class Utility
     {
         $file = storage_path('scaffold/') . '.gitignore';
         if (! $this->filesystem->isFile($file)) {
-            $this->filesystem->put($file, '*' . PHP_EOL . '!.gitignore');
-            $relative_file = str_replace(base_path(), '', $file);
-            (new ConsoleUi($command))->created('.' . $relative_file);
+            $relative_file = '.' . str_replace(base_path(), '', $file);
+
+            if ($this->filesystem->put($file, '*' . PHP_EOL . '!.gitignore') === false) {
+                (new ConsoleUi($command))->failed($relative_file, '写入失败，文件未变更');
+
+                return;
+            }
+
+            (new ConsoleUi($command))->created($relative_file);
         }
     }
 

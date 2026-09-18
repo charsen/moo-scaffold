@@ -18,6 +18,10 @@
 
 namespace Mooeen\Scaffold\Command;
 
+use Illuminate\Filesystem\Filesystem;
+use Mooeen\Scaffold\Designer\GitInspector;
+use Mooeen\Scaffold\Support\Paths;
+use Mooeen\Scaffold\Utility;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Yaml\Yaml;
 
@@ -33,6 +37,15 @@ class ScaffoldMergeYamlCommand extends Command
         {path : Path to the conflicted file (relative to repo root, or absolute)}
         {--dry-run : Print the merged result to stdout without writing the file}';
 
+    protected GitInspector $git;
+
+    public function __construct(Filesystem $filesystem, Utility $utility, GitInspector $git)
+    {
+        parent::__construct($filesystem, $utility);
+
+        $this->git = $git;
+    }
+
     public function handle(): int
     {
         $path   = (string) $this->argument('path');
@@ -41,16 +54,17 @@ class ScaffoldMergeYamlCommand extends Command
         // 解析仓库根 + 相对路径
         $repoRoot = $this->gitRoot();
         if ($repoRoot === null) {
-            $this->error('当前不在 git 仓库内');
+            $this->console()->error('当前不在 git 仓库内');
 
             return self::FAILURE;
         }
 
-        $absolute = $this->absolutePath($path, $repoRoot);
+        // 绝对路径（含 Windows 盘符）原样；相对路径按 git 仓根展开。
+        $absolute = Paths::absolute($path, $repoRoot);
         $relative = $this->relativeToRoot($absolute, $repoRoot);
 
         if (! file_exists($absolute)) {
-            $this->error("文件不存在：{$absolute}");
+            $this->console()->error("文件不存在：{$absolute}");
 
             return self::FAILURE;
         }
@@ -60,7 +74,7 @@ class ScaffoldMergeYamlCommand extends Command
         $theirs = $this->readStage($relative, 3, $repoRoot);
 
         if ($ours === null || $theirs === null) {
-            $this->error("无法读取冲突双方（git stage 2/3），可能不在 rebase/merge 状态：{$relative}");
+            $this->console()->error("无法读取冲突双方（git stage 2/3），可能不在 rebase/merge 状态：{$relative}");
 
             return self::FAILURE;
         }
@@ -69,7 +83,7 @@ class ScaffoldMergeYamlCommand extends Command
         $theirsData = $this->parseYaml($theirs);
 
         if ($oursData === null || $theirsData === null) {
-            $this->error('YAML 解析失败');
+            $this->console()->error('YAML 解析失败');
 
             return self::FAILURE;
         }
@@ -78,7 +92,7 @@ class ScaffoldMergeYamlCommand extends Command
         $merged = $this->dispatchMerge($relative, $oursData, $theirsData);
 
         if ($merged === null) {
-            $this->error("无法自动合并 {$relative}：策略不支持或元数据缺失");
+            $this->console()->error("无法自动合并 {$relative}：策略不支持或元数据缺失");
 
             return self::FAILURE;
         }
@@ -86,14 +100,14 @@ class ScaffoldMergeYamlCommand extends Command
         $dumped = $this->dumpYaml($merged, $relative);
 
         if ($dryRun) {
-            $this->line($dumped);
+            $this->console()->line($dumped);
 
             return self::SUCCESS;
         }
 
         // plan-40 §三 R-1 横切补漏:跟全仓 LOCK_EX 一致
         file_put_contents($absolute, $dumped, LOCK_EX);
-        $this->info("已合并：{$relative}");
+        $this->console()->info("已合并：{$relative}");
 
         return self::SUCCESS;
     }
@@ -223,25 +237,16 @@ class ScaffoldMergeYamlCommand extends Command
     // git / IO 辅助
     // ------------------------------------------------------------------
 
+    /**
+     * 本命令问的是**进程 cwd** 所属的仓 —— 不是 `base_path()`。
+     *
+     * 为什么:cwd 是「git 冲突现场」的自然语义(由 scaffold-sync.sh 在 rebase 冲突时于仓内调用),
+     * 且测试就是靠 chdir 到临时 git 仓来验绝对路径分支。所以这里走 `GitInspector::repoRootOrNull()`
+     * 并**显式传 cwd**,而不是用容器里那个绑了 base_path 的单例(同族:cwd 的算法在 MigrationCompacter)。
+     */
     private function gitRoot(): ?string
     {
-        $proc = Process::fromShellCommandline('git rev-parse --show-toplevel');
-        $proc->run();
-        if (! $proc->isSuccessful()) {
-            return null;
-        }
-        $out = trim($proc->getOutput());
-
-        return $out === '' ? null : $out;
-    }
-
-    private function absolutePath(string $path, string $repoRoot): string
-    {
-        if ($path !== '' && $path[0] === '/') {
-            return $path;
-        }
-
-        return rtrim($repoRoot, '/') . '/' . $path;
+        return $this->git->repoRootOrNull(getcwd() ?: base_path());
     }
 
     private function relativeToRoot(string $absolute, string $repoRoot): string

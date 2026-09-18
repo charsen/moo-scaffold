@@ -93,6 +93,28 @@ function resourceKeysTable(string $model, array $metaValues): void
     }
 }
 
+/**
+ * 剥注释后的源码（正则剥注释会被字符串里的 `/*` 带偏 —— 本命令的 signature 里就有 `--allow=*` 之类）。
+ */
+function auditResourceKeys_codeWithoutComments(string $path): string
+{
+    $code = '';
+
+    foreach (token_get_all((string) file_get_contents($path)) as $token) {
+        if (is_array($token)) {
+            if (! in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true)) {
+                $code .= $token[1];
+            }
+
+            continue;
+        }
+
+        $code .= $token;
+    }
+
+    return $code;
+}
+
 it('判定器：整数键（含带洞）危险，列表与字符串键安全', function () {
     expect(\Mooeen\Scaffold\Support\NumericKeyMapDetector::isDangerousLevel([1 => '正常', 2 => '停用']))->toBeTrue()
         ->and(\Mooeen\Scaffold\Support\NumericKeyMapDetector::isDangerousLevel([1 => 'A', 3 => 'B']))->toBeTrue()
@@ -330,4 +352,46 @@ PHP,
     \Illuminate\Support\Facades\DB::table('audit_demo_items')->where('id', 1)->update(['meta' => json_encode(['a' => '甲'])]);
 
     expect(\Illuminate\Support\Facades\Artisan::call('moo:audit:resource-keys', ['--path' => [$fixture['root']], '--fail-on-danger' => true]))->toBe(0);
+});
+
+// ─── 扫描根只解析一次（2026-09-18 第 11 项）─────────────────────────
+
+it('命令：报表里的「扫描根」等于本次真正扫的那一份（roots 由 handle 透传）', function () {
+    $fixture = resourceKeysFixture([
+        'DemoResource.php' => <<<'PHP'
+<?php
+
+namespace AuditFixture\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class DemoResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return ['meta' => $this->whenHas('meta')];
+    }
+}
+PHP,
+    ]);
+
+    resourceKeysTable($fixture['model'], [['options' => [1 => '正常']]]);
+
+    \Illuminate\Support\Facades\Artisan::call('moo:audit:resource-keys', ['--path' => [$fixture['root']]]);
+
+    // 报表头必须是 handle() 实际用来扫描的那些根：printReport 若漏传/传错参数（例如空数组），
+    // 输出的就不再是这一份，读者会拿到「报的根 ≠ 扫的根」的误导信息。
+    expect(\Illuminate\Support\Facades\Artisan::output())->toContain('扫描根：' . $fixture['root']);
+});
+
+it('命令：resolveRoots() 只在 handle() 解析一次，报表复用同一份（源码锚点）', function () {
+    // 改前 printReport() 又调了一次 resolveRoots() —— 只为打印表头就重复做了
+    // 整个文件系统探测（--path 过滤 + composer.json 读取 + app_path 判定）。
+    // 这是纯重算，输出看不出差别，「只解析一次」只能靠结构锚点守。
+    $code = auditResourceKeys_codeWithoutComments(dirname(__DIR__, 3) . '/src/Command/AuditResourceKeysCommand.php');
+
+    expect($code)->toContain('private function printReport(array $report, int $limit, array $roots)')
+        // 恰好两处：方法声明 + handle() 里唯一的调用点（printReport 正文里再出现就说明又重算了）
+        ->and(substr_count($code, 'resolveRoots()'))->toBe(2);
 });

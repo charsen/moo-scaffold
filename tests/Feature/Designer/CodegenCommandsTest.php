@@ -61,12 +61,13 @@ it('ScaffoldProvider exposes commands() registration block in console mode', fun
 it('only_in_local guard rejects code-generation commands in non-local env (SECURITY POLICY)', function () {
     config(['scaffold.only_in_local' => true]);
     // testbench 环境是 'testing'(非 local)→ requiresLocalEnvironment=true 的生成器命令在 handle()
-    // 入口 checkRunning() 拦截:打印 error 并 early-return,绝不进生成器(不写任何文件)。
+    // 入口 checkRunning() 拦截:打印 error 并立刻返回 FAILURE,绝不进生成器(不写任何文件)。
+    // 退出码刻意不是 0:被安全策略挡下 ≠ 命令成功,否则 CI / 脚本把它当「跑完了」。
     // 用 moo:schema 作代表 —— moo:fresh 刻意 requiresLocalEnvironment=false(storage 缓存重建允许在
     // 任意环境跑),不在这条 guard 覆盖内。
     $this->artisan('moo:schema', ['schema_name' => 'GuardProbe'])
         ->expectsOutputToContain('only available in the local environment')
-        ->assertSuccessful();
+        ->assertExitCode(1);
 });
 
 it('moo:fresh smoke-runs on fixture engine schema', function () {

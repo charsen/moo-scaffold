@@ -4,8 +4,8 @@ namespace Mooeen\Scaffold\Designer;
 
 use Illuminate\Support\Facades\DB;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
+use Mooeen\Scaffold\Support\ColumnTypeGroups;
 use Mooeen\Scaffold\Support\Concerns\AtomicFileWrite;
-use Mooeen\Scaffold\Support\FieldTypes;
 use Mooeen\Scaffold\Support\PackageRegistry;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Finder\Finder;
@@ -45,6 +45,12 @@ class SchemaLoader
 
     /** @var array<string,string>|null schema => 出身包 key(host schema 不在内);listSchemaFiles 时重建 */
     private ?array $originMap = null;
+
+    /** in-memory cache:migration filename(无 .php)→ batch 号;migrations 表不存在时为 [] */
+    private ?array $migrationBatchCache = null;
+
+    /** in-memory cache:各 migration 目录下 *_table.php 的 [dir => [basename => mtime]](每目录一次 scandir,供 latestMigrationFor 复用;plan-53 起按出身分目录) */
+    private array $migrationFilesCache = [];
 
     public function __construct(
         private readonly Utility $utility,
@@ -928,7 +934,7 @@ class SchemaLoader
             // 用 array_key_exists 而非 !empty:false 值也要 strip(varchar 上 unsigned: false 同样
             // 是非法组合 + 噪声)
             if (array_key_exists('unsigned', $row)) {
-                $numericTypes = FieldTypes::NUMERIC;
+                $numericTypes = ColumnTypeGroups::NUMERIC;
                 if (! in_array((string) $effectiveType, $numericTypes, true)) {
                     unset($row['unsigned']);
                 }
@@ -1279,12 +1285,6 @@ class SchemaLoader
         }
     }
 
-    /** in-memory cache:migration filename(无 .php)→ batch 号;migrations 表不存在时为 [] */
-    private ?array $migrationBatchCache = null;
-
-    /** in-memory cache:各 migration 目录下 *_table.php 的 [dir => [basename => mtime]](每目录一次 scandir,供 latestMigrationFor 复用;plan-53 起按出身分目录) */
-    private array $migrationFilesCache = [];
-
     /**
      * 列指定表的 migration 历史（按文件名时间戳倒序）。
      * MVP:不解析 SQL 摘要,只读文件名 + mtime;状态走 migrations 表 batch 号;作者走文件头 @Author 行。
@@ -1627,7 +1627,7 @@ class SchemaLoader
                 $warnings = array_merge($warnings, $san['warnings']);
                 $cleaned  = $san['cleaned_attr'];
 
-                $type  = $this->canonicalizeType((string) ($cleaned['type'] ?? 'varchar'));
+                $type  = ColumnTypeGroups::canonicalize((string) ($cleaned['type'] ?? 'varchar'));
                 $sized = $this->parseSize($cleaned['size'] ?? null, $type);
                 if (isset($sized['_warn'])) {
                     $warnings[] = ['table' => $tableName, 'field' => $fieldNameStr, 'msg' => $sized['_warn']];
@@ -1637,13 +1637,13 @@ class SchemaLoader
                 // plan-40 §三 R-14:unsigned 仅 numeric 类型有意义(int 系列 + 浮点系列)。
                 // GUI 已经 disabled(unsigned_disabled),但 DevTools 可绕 Alpine state。
                 // 后端兜底:non-numeric 类型上的 unsigned 静默 strip + warn,防 yaml 出非法 + migrate 报错。
-                $numericTypes = FieldTypes::NUMERIC;
+                $numericTypes = ColumnTypeGroups::NUMERIC;
                 // 2026-05-23 P0 round 5 视觉 bug 根因:之前默认 false → 数字字段 GUI 显示 unsigned 未勾选,
                 // 但 FreshStorageGenerator:225 给 int/bigint/tinyint/decimal/float yaml 没写 unsigned 派生
                 // 默认 true(codegen 规则)。loadNormalized 是 GUI 数据源头 — 这里默认必须对齐 codegen,
                 // 否则下游 shapeField 看到的就是错值,user 满屏看到"未勾选"但 migration 出来 unsigned。
                 // 用 FreshStorageGenerator:225 的窄列表(int/bigint/tinyint/decimal/float)对齐 codegen 实际行为。
-                $codegenDefaultUnsigned = FieldTypes::UNSIGNED_DEFAULT;
+                $codegenDefaultUnsigned = ColumnTypeGroups::UNSIGNED_DEFAULT;
                 $unsignedFlag           = array_key_exists('unsigned', $cleaned)
                     ? (bool) $cleaned['unsigned']
                     : in_array($type, $codegenDefaultUnsigned, true);
@@ -1668,7 +1668,7 @@ class SchemaLoader
                 // plan-40 §六 enum-aware default 校验:int 类型 + default 是字符串 → 必须匹配 table.enums 里该字段的 key,
                 // 否则 cast 会归 0,产生静默 bug(plan-40 §一 drift #1 的根因)
                 $default  = $cleaned['default'] ?? null;
-                $intTypes = FieldTypes::INT;
+                $intTypes = ColumnTypeGroups::INT;
                 if (is_string($default) && $default !== '' && in_array($type, $intTypes, true)) {
                     $tableEnums = (array) ($table['enums'][$fieldNameStr] ?? []);
                     if (! isset($tableEnums[$default])) {
@@ -1698,7 +1698,7 @@ class SchemaLoader
         if (empty($attrRaw)) {
             return ['type' => 'bigint', 'size' => null, 'name' => 'ID', 'unsigned' => true, '_system' => 'id', 'required' => true];
         }
-        $type = $this->canonicalizeType((string) ($attrRaw['type'] ?? 'bigint'));
+        $type = ColumnTypeGroups::canonicalize((string) ($attrRaw['type'] ?? 'bigint'));
 
         $normalized = [
             'type'     => $type,
@@ -1714,26 +1714,6 @@ class SchemaLoader
         }
 
         return $normalized;
-    }
-
-    private function canonicalizeType(string $type): string
-    {
-        // Round 2 P2 yaml 类型别名兼容:Laravel migration API 用驼峰(bigInteger / longText / string ...),
-        // scaffold 内部用 MySQL 类型词汇(bigint / longtext / varchar)。strtolower 已经处理纯 case 差异
-        // (longText → longtext);这里额外把 Laravel-isms 映射到 scaffold canonical 上,让 user 写哪个都认。
-        $low = strtolower($type);
-
-        return match ($low) {
-            'bool', 'boolean'                        => 'boolean',
-            'string'                                 => 'varchar',
-            'integer'                                => 'int',
-            'biginteger', 'unsignedbiginteger'       => 'bigint',
-            'smallinteger', 'unsignedsmallinteger'   => 'smallint',
-            'mediuminteger', 'unsignedmediuminteger' => 'mediumint',
-            'tinyinteger', 'unsignedtinyinteger'     => 'tinyint',
-            'unsignedinteger'                        => 'int',
-            default                                  => $low,
-        };
     }
 
     private function parseSize(mixed $raw, string $type): array
@@ -1754,9 +1734,9 @@ class SchemaLoader
             $b = (int) $b;
 
             return match (true) {
-                in_array($type, ['varchar', 'char'], true) => ['size' => $b, 'min_size' => $a],
-                in_array($type, FieldTypes::FLOAT, true)   => ['size' => $a, 'precision' => $b],
-                default                                    => ['size' => $b, 'min_size' => $a, '_warn' => "type {$type} 不应有 'm,n' size"],
+                in_array($type, ['varchar', 'char'], true)     => ['size' => $b, 'min_size' => $a],
+                in_array($type, ColumnTypeGroups::FLOAT, true) => ['size' => $a, 'precision' => $b],
+                default                                        => ['size' => $b, 'min_size' => $a, '_warn' => "type {$type} 不应有 'm,n' size"],
             };
         }
 
@@ -1907,8 +1887,8 @@ class SchemaLoader
             return $val;
         }     // 已是 int/bool/float,不动
 
-        $intTypes   = FieldTypes::INT;
-        $floatTypes = FieldTypes::FLOAT;
+        $intTypes   = ColumnTypeGroups::INT;
+        $floatTypes = ColumnTypeGroups::FLOAT;
         $boolTypes  = ['bool', 'boolean'];
 
         if ($attr === 'size') {
@@ -1989,7 +1969,7 @@ class SchemaLoader
             'min_size' => $attr['min_size'] ?? null,
             // precision:decimal(M,D) / float / double 的小数位数(D),仅这几种类型可编辑
             'precision'          => $attr['precision'] ?? null,
-            'precision_disabled' => ! in_array($attr['type'] ?? '', FieldTypes::FLOAT, true),
+            'precision_disabled' => ! in_array($attr['type'] ?? '', ColumnTypeGroups::FLOAT, true),
             // format:跟 type 平行的自定义,如 'float:100' 让 model 自动整 ↔ 浮点 cast(见 CreateModelGenerator::getFloatAttribute)
             'format'   => $attr['format']  ?? null,
             'default'  => $attr['default'] ?? null,
@@ -1999,14 +1979,14 @@ class SchemaLoader
             // 但 FreshStorageGenerator:225 给 int/bigint/tinyint/decimal/float yaml 没写 unsigned 派生
             // 默认 true(codegen 规则)。UI 跟 codegen 反 — user 看到"未勾选"但 migration 出来是 unsigned,
             // 满屏诡异。修法:派生口径对齐 codegen 实际行为。
-            'unsigned' => (bool) ($attr['unsigned'] ?? in_array($attr['type'] ?? '', FieldTypes::UNSIGNED_DEFAULT, true)),
+            'unsigned' => (bool) ($attr['unsigned'] ?? in_array($attr['type'] ?? '', ColumnTypeGroups::UNSIGNED_DEFAULT, true)),
             'nullable' => ! (bool) ($attr['required'] ?? true),
             // dirty-tracking 锚点(F26 nullable / F32 unsigned):client 设 dirty=true 后 _buildSavePayload 才发,
             // 避免 shape 派生值污染 yaml
             '_nullable_dirty' => false,
             '_unsigned_dirty' => false,
             // F32:unsigned 是否可编辑(只对 numeric 类型开放)
-            'unsigned_disabled' => ! in_array($attr['type'] ?? '', FieldTypes::NUMERIC, true),
+            'unsigned_disabled' => ! in_array($attr['type'] ?? '', ColumnTypeGroups::NUMERIC, true),
             'index'             => 'none',                       // resolved by loadTableFull from table-level index block
             'comment'           => $attr['comment'] ?? null,
             // CSP-friendly 预算 boolean / string(view 模板里只能属性访问,不能 method call)
@@ -2070,7 +2050,7 @@ class SchemaLoader
         if ($default === null || $default === '') {
             return '';
         }
-        $numTypes = FieldTypes::NUMERIC;
+        $numTypes = ColumnTypeGroups::NUMERIC;
         if (in_array($type, $numTypes, true)) {
             return is_numeric($default) ? '' : 'is-invalid';
         }

@@ -300,10 +300,10 @@ class AccountStore
      */
     public function assertWritable(): void
     {
-        if (function_exists('app') && app()->environment('production')) {
+        if (ReadonlyMode::productionActive()) {
             throw new AccountWriteForbiddenException('生产环境禁止写入开发人员账号');
         }
-        if ((bool) $this->config->get('scaffold.config_ui.readonly', false)) {
+        if (ReadonlyMode::configLocked()) {
             throw new AccountWriteForbiddenException('当前为强制只读模式（SCAFFOLD_CONFIG_READONLY）');
         }
     }
@@ -325,6 +325,17 @@ class AccountStore
         $this->writeYaml($loaded['meta'], $accounts);
     }
 
+    /**
+     * 整体重写 YAML（持久化终点）。
+     *
+     * 写失败必须被感知：本方法零返回值，静默吞掉会让上游以为已落盘 ——
+     * AccountController::store() 会照常打「新增账号 [...] 成功」绿条，磁盘上却还是旧账号。
+     * Web/Support 层没有 console 可打 failed，口径是**抛异常**（同 AtomicFileWrite、
+     * 以及 ConfigManager 经 EnvFileEditor / PhpFileEditor 的写法）；AccountController
+     * 已 `catch (\Throwable $e)` 把 message 落进 `flash_error` 红条并抑制成功绿条。
+     *
+     * @throws RuntimeException 写入失败（`Filesystem::put()` 返回 false）时，文件保持原内容
+     */
     private function writeYaml(array $meta, array $accounts): void
     {
         $path = $this->path();
@@ -339,7 +350,9 @@ class AccountStore
                 'accounts' => $accounts,
             ], 4, 4, Yaml::DUMP_OBJECT_AS_MAP | Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
 
-        $this->fs->put($path, $body);
+        if ($this->fs->put($path, $body) === false) {   // put() 是 int|false，只能与 false 严格比
+            throw new RuntimeException("写入失败，账号文件未变更：{$path}");
+        }
         @chmod($path, 0600);
     }
 

@@ -39,12 +39,12 @@ class CreateControllerCommand extends Command
         ];
     }
 
-    public function handle(): void
+    public function handle(): int
     {
         $this->showTitle();
 
         if (! $this->checkRunning()) {
-            return;
+            return self::FAILURE;
         }
 
         $targetApp = $this->option('app');
@@ -55,11 +55,11 @@ class CreateControllerCommand extends Command
 
         $only_table  = $this->resolveOnlyTable();
         $schema_name = $this->resolveSchemaArg($this->argument('schema_name'), $only_table);
-        if ($schema_name === '') {
-            return;
+        if ($schema_name === null) {
+            return self::FAILURE;
         }
         if ($only_table !== null && ! $this->assertTableInSchema($schema_name, $only_table)) {
-            return;
+            return self::FAILURE;
         }
 
         $force = $this->isForced();
@@ -68,6 +68,6 @@ class CreateControllerCommand extends Command
         $result = (new CreateControllerGenerator($this, $this->filesystem, $this->utility))
             ->start($schema_name, $force, $only_table, $targetApp);
 
-        $this->tipDone($result);
+        return $this->tipDone($result);
     }
 }

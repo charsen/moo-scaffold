@@ -60,12 +60,12 @@ class AdderCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(): void
+    public function handle(): int
     {
         $this->showTitle();
 
         if (! $this->checkRunning()) {
-            return;
+            return self::FAILURE;
         }
 
         $apps = $this->utility->getAppTargets();
@@ -74,9 +74,7 @@ class AdderCommand extends Command
             $app = $this->chooseApp($apps);
         }
         if (! isset($apps[$app])) {
-            $this->reportAppNotConfigured($app);
-
-            return;
+            return $this->reportAppNotConfigured($app);
         }
 
         $folder = $this->argument('folder');
@@ -94,7 +92,7 @@ class AdderCommand extends Command
         if ($origin === false) {
             $this->console()->error("目录「{$folder}」来自 extra_modules，但本机未发现对应的软链扩展包 —— 无法增量（请在软链装该包的开发环境操作）。");
 
-            return;
+            return self::FAILURE;
         }
 
         $controllers = $origin !== null
@@ -113,7 +111,7 @@ class AdderCommand extends Command
         if ($action === '') {
             $this->console()->warn('action 必填：至少输入一个 action 名（格式 action [request] [resource]，空格分隔）。');
 
-            return;
+            return self::FAILURE;
         }
 
         $this->tipCallCommand('Controller Adder');
@@ -129,7 +127,7 @@ class AdderCommand extends Command
             }
         }
 
-        $this->tipDone((bool) $make_controller);
+        return $this->tipDone((bool) $make_controller);
     }
 
     protected function parseAction(?string $action_txt): array

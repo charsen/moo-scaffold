@@ -161,7 +161,12 @@ class UpdateAuthorizationGenerator extends Generator
             return;
         }
 
-        $this->filesystem->put($file, $this->buildPhpArrayFile($config, 'ACL 授权字典：app > whitelist / module > controller > action keys'));
+        $content = $this->buildPhpArrayFile($config, 'ACL 授权字典：app > whitelist / module > controller > action keys');
+
+        if (! $this->putOrReport($file, './config/actions.php', $content)) {
+            return;
+        }
+
         $this->console()->updated('./config/actions.php');
     }
 
@@ -219,7 +224,12 @@ class UpdateAuthorizationGenerator extends Generator
                 continue;
             }
 
-            $this->filesystem->put($file_path, $this->buildPhpArrayFile($data, "ACL 授权文案（{$lang}）：app / module / controller / action 的显示名与描述"));
+            $content = $this->buildPhpArrayFile($data, "ACL 授权文案（{$lang}）：app / module / controller / action 的显示名与描述");
+
+            if (! $this->putOrReport($file_path, "./lang/{$lang}/actions.php", $content)) {
+                continue;
+            }
+
             $this->console()->updated("./lang/{$lang}/actions.php");
         }
     }
@@ -380,7 +390,10 @@ class UpdateAuthorizationGenerator extends Generator
             return;
         }
 
-        $this->filesystem->put($file, Yaml::dump($document, 8, 4, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+        if (! $this->putOrReport($file, $relativeFile, Yaml::dump($document, 8, 4, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK))) {
+            return;
+        }
+
         $this->console()->updated($relativeFile);
     }
 

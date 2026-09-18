@@ -2,6 +2,7 @@
 
 use Mooeen\Scaffold\Designer\SchemaLoader;
 use Mooeen\Scaffold\Designer\SchemaLoadException;
+use Mooeen\Scaffold\Support\ColumnTypeGroups;
 use Mooeen\Scaffold\Tests\Feature\Designer\Support\FixtureSchema;
 
 /**
@@ -260,26 +261,45 @@ YAML;
 
 // ─── Round 2 P2:type alias 兼容 ──────────────────────────────
 
-it('canonicalizeType maps Laravel migration API names to scaffold canonical types', function () {
-    $ref = new ReflectionMethod($this->loader, 'canonicalizeType');
-    $ref->setAccessible(true);
-    // Laravel API → scaffold canonical
-    expect($ref->invoke($this->loader, 'longText'))->toBe('longtext');
-    expect($ref->invoke($this->loader, 'mediumText'))->toBe('mediumtext');
-    expect($ref->invoke($this->loader, 'tinyText'))->toBe('tinytext');
-    expect($ref->invoke($this->loader, 'bigInteger'))->toBe('bigint');
-    expect($ref->invoke($this->loader, 'smallInteger'))->toBe('smallint');
-    expect($ref->invoke($this->loader, 'mediumInteger'))->toBe('mediumint');
-    expect($ref->invoke($this->loader, 'tinyInteger'))->toBe('tinyint');
-    expect($ref->invoke($this->loader, 'integer'))->toBe('int');
-    expect($ref->invoke($this->loader, 'unsignedBigInteger'))->toBe('bigint');
-    expect($ref->invoke($this->loader, 'string'))->toBe('varchar');
-    expect($ref->invoke($this->loader, 'bool'))->toBe('boolean');
-    expect($ref->invoke($this->loader, 'dateTime'))->toBe('datetime');     // strtolower 自动
+it('类型归一走单一来源 ColumnTypeGroups::canonicalize：Laravel migration API 名 → scaffold canonical', function () {
+    // 单一来源 = Support\ColumnTypeGroups::canonicalize()。原 SchemaLoader::canonicalizeType（私有、完整版）
+    // 与 SchemaDiffService::normalizeType / MigrationWriter::resolveType（两份**残缺副本**，只认
+    // bool/boolean）已在 2026-09-18 全部收口到那里。本用例原先用 ReflectionMethod 打私有的旧副本，
+    // 收口后改打公开 API —— 顺带把"私有实现"从契约里拿掉。
+    expect(ColumnTypeGroups::canonicalize('longText'))->toBe('longtext');
+    expect(ColumnTypeGroups::canonicalize('mediumText'))->toBe('mediumtext');
+    expect(ColumnTypeGroups::canonicalize('tinyText'))->toBe('tinytext');
+    expect(ColumnTypeGroups::canonicalize('bigInteger'))->toBe('bigint');
+    expect(ColumnTypeGroups::canonicalize('smallInteger'))->toBe('smallint');
+    expect(ColumnTypeGroups::canonicalize('mediumInteger'))->toBe('mediumint');
+    expect(ColumnTypeGroups::canonicalize('tinyInteger'))->toBe('tinyint');
+    expect(ColumnTypeGroups::canonicalize('integer'))->toBe('int');
+    expect(ColumnTypeGroups::canonicalize('unsignedBigInteger'))->toBe('bigint');
+    expect(ColumnTypeGroups::canonicalize('string'))->toBe('varchar');
+    expect(ColumnTypeGroups::canonicalize('bool'))->toBe('boolean');
+    expect(ColumnTypeGroups::canonicalize('dateTime'))->toBe('datetime');     // strtolower 自动
     // 已是 canonical 形态保持不变
-    expect($ref->invoke($this->loader, 'bigint'))->toBe('bigint');
-    expect($ref->invoke($this->loader, 'varchar'))->toBe('varchar');
+    expect(ColumnTypeGroups::canonicalize('bigint'))->toBe('bigint');
+    expect(ColumnTypeGroups::canonicalize('varchar'))->toBe('varchar');
     // char 是一等 canonical 类型(UUID 主键 = char(36),MigrationWriter/生成器全链路支持),
     // 绝不能归一成 varchar —— 那会把定长列/UUID 主键改写成变长列
-    expect($ref->invoke($this->loader, 'char'))->toBe('char');
+    expect(ColumnTypeGroups::canonicalize('char'))->toBe('char');
+});
+
+it('反残缺副本锚点：Designer 侧三处类型归一不再各写一份', function () {
+    // 为什么钉这个：残缺副本（只处理 bool/boolean）在"输入已被 normalize"时碰巧无害，
+    // 所以它不会以任何失败的形式暴露自己 —— 只能靠锚点挡住它被复制回来。
+    $dir   = dirname(__DIR__, 3) . '/src/Designer/';
+    $files = ['SchemaLoader.php', 'SchemaDiffService.php', 'MigrationWriter.php'];
+
+    foreach ($files as $file) {
+        $src = (string) file_get_contents($dir . $file);
+
+        expect($src)->toContain('ColumnTypeGroups::canonicalize');
+
+        foreach (['canonicalizeType', 'normalizeType', 'resolveType'] as $dead) {
+            expect(str_contains($src, "function {$dead}"))
+                ->toBeFalse("{$file} 不该再有自己的 {$dead}() —— 类型归一只允许在 Support\\ColumnTypeGroups");
+        }
+    }
 });

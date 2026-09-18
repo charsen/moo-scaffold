@@ -49,7 +49,7 @@ final class TargetContext
 
         $base = $this->paths[$kind];
 
-        return $sub === '' ? $base : rtrim($base, '/') . '/' . ltrim($sub, '/');
+        return $sub === '' ? $base : Paths::join($base, $sub);
     }
 
     /**

@@ -242,3 +242,57 @@ it('--bare --write 时 marker 区间内只写裸表，随后 --bare --check 通�
         ->expectsOutputToContain('文档与三份 manifest 一致')
         ->assertExitCode(0);
 });
+
+it('--file 相对路径按 --root 展开（可含子目录）；绝对路径原样用', function () {
+    $root = composerDocsHostFixture();
+
+    // ① 相对子目录：`--file=docs/PACKAGES.md` 必须落在 --root 下
+    mkdir($root . '/docs');
+    $nested = $root . '/docs/PACKAGES.md';
+    file_put_contents($nested, "# 子目录文档\n\n<!-- BEGIN moo-manifest-table -->\n(待生成)\n<!-- END moo-manifest-table -->\n");
+
+    $this->artisan('moo:composer:docs', ['--root' => $root, '--file' => 'docs/PACKAGES.md', '--write' => true])
+        ->expectsOutputToContain('已更新 ' . $nested)
+        ->assertExitCode(0);
+
+    expect((string) file_get_contents($nested))
+        ->toContain('| charsen/moo-scaffold |')
+        ->not->toContain('（待生成）');
+
+    // ② 绝对路径：目标在 --root 之外，也必须按原值写（不被拼上仓根）
+    $outsideDir = sys_get_temp_dir() . '/moo-docs-abs-' . bin2hex(random_bytes(4));
+    mkdir($outsideDir, 0777, true);
+    $GLOBALS['mooComposerDocsFixtures'][] = $outsideDir;
+
+    $outside = $outsideDir . '/PACKAGES.md';
+    file_put_contents($outside, "# 仓外文档\n\n<!-- BEGIN moo-manifest-table -->\n(待生成)\n<!-- END moo-manifest-table -->\n");
+
+    $this->artisan('moo:composer:docs', ['--root' => $root, '--file' => $outside, '--write' => true])
+        ->expectsOutputToContain('已更新 ' . $outside)
+        ->assertExitCode(0);
+
+    expect((string) file_get_contents($outside))->toContain('| charsen/moo-scaffold |');
+});
+
+it('--write 写回失败时非 0 退出（不能打了「已更新」却其实没写进去）', function () {
+    $root   = composerDocsHostFixture();
+    $doc    = $root . '/PRIVATE-COMPOSER-PACKAGES.md';
+    $before = (string) file_get_contents($doc);
+
+    // 只让 put() 失败，其余读写照旧走真文件系统 —— 复刻「读得到、写不进」这个现场
+    $this->app->instance(Filesystem::class, new class extends Filesystem
+    {
+        public function put($path, $contents, $lock = false)
+        {
+            return false;
+        }
+    });
+
+    $this->artisan('moo:composer:docs', ['--root' => $root, '--write' => true])
+        ->expectsOutputToContain('写入失败')
+        ->doesntExpectOutputToContain('已更新')
+        ->assertExitCode(1);
+
+    // 除了不打「已更新」，文件内容也必须确实没被动过
+    expect(file_get_contents($doc))->toBe($before);
+});

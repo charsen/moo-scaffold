@@ -37,31 +37,32 @@ class CreateViewCommand extends Command
         ];
     }
 
-    public function handle(): void
+    public function handle(): int
     {
         $this->showTitle();
 
         if (! $this->checkRunning()) {
-            return;
+            return self::FAILURE;
         }
 
         $schema_name = $this->argument('schema_name');
         if (empty($schema_name)) {
             // plan-53:moo:view 本 plan 不碰包(前端未结合)—— 列表只给 host schema
             $schema_name = $this->chooseSchema($this->hostSchemaNames());
+            if ($schema_name === null) {
+                return self::FAILURE;
+            }
         } elseif ($this->schemaOrigin((string) $schema_name) !== null) {
             $this->console()->error("「{$schema_name}」是扩展包 schema —— moo:view（前端脚手架）暂不支持扩展包。");
 
-            return;
+            return self::FAILURE;
         }
 
         (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start(false, true);
 
         $all = $this->utility->getControllers(false);
         if (! isset($all[$schema_name])) {
-            $this->reportSchemaNotFound($schema_name);
-
-            return;
+            return $this->reportSchemaNotFound($schema_name);
         }
 
         $force      = $this->isForced();
@@ -71,6 +72,6 @@ class CreateViewCommand extends Command
         $result = (new CreateViewGenerator($this, $this->filesystem, $this->utility))
             ->start($schema_name, $controller, $force);
 
-        $this->tipDone($result);
+        return $this->tipDone($result);
     }
 }

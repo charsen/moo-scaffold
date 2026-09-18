@@ -63,6 +63,15 @@ class Command extends BaseCommand
         return $this->confirm($this->console()->prompt($question), $default);
     }
 
+    /**
+     * 隐藏输入(不回显)。与 askPrompt / choicePrompt / confirmPrompt 同一条路径：
+     * 提示语由 ConsoleUi 统一加标记，命令层不再直连 `$this->secret()`。
+     */
+    protected function secretPrompt(string $question, bool $fallback = true): mixed
+    {
+        return $this->secret($this->console()->prompt($question), $fallback);
+    }
+
     protected function chooseApp(array $apps): string
     {
         return $this->choicePrompt('选择 app', array_keys($apps));
@@ -96,8 +105,14 @@ class Command extends BaseCommand
     /**
      * plan-53:schema 选择带出身标注(`System〔moo-system 扩展包〕`),选了即定出身、无独立 host/pkg 问题;
      * $forApp 非 admin 时按上下文收窄 —— 包 schema 固定 admin,mobi/web 等语境下不列(天然无矛盾)。
+     *
+     * 返回 null = 没得选或没选成,两种情况都**先报错**再返回,调用方一律中止(FAILURE):
+     *   ① 选项列表为空(一个 schema 都没落 / app 收窄后列空)—— 早前这里会直接抛 Symfony 的
+     *      `LogicException: Choice question must have at least 1 choice available.`(崩栈,不是报错);
+     *   ② 非交互模式(`--no-interaction`)下 choice 回落到默认 null —— 早前 `(string) null` 变成 `''`
+     *      冒充"合法的空 schema 名",调用方只判 `=== ''` 就 `return;`,于是**零输出、退出码 0**。
      */
-    protected function chooseSchema(array $schemas, string $question = '选择 schema（模块）', ?string $forApp = null): string
+    protected function chooseSchema(array $schemas, string $question = '选择 schema（模块）', ?string $forApp = null): ?string
     {
         $labels = [];   // label => name(标注只进选项文本,返回值恒为纯 schema 名)
         foreach ($schemas as $name) {
@@ -109,9 +124,22 @@ class Command extends BaseCommand
             $labels[$label] = (string) $name;
         }
 
-        $picked = $this->choicePrompt($question, array_keys($labels));
+        if ($labels === []) {
+            $this->console()->error('没有可选的 schema。请先跑 `moo:init` 初始化脚手架，或确认当前 app 下有对应模块。');
 
-        return $labels[$picked] ?? (string) $picked;
+            return null;
+        }
+
+        $picked = $this->choicePrompt($question, array_keys($labels));
+        $name   = $labels[$picked] ?? (string) $picked;
+
+        if ($name === '') {
+            $this->console()->error('未选择 schema。非交互模式下请显式传入 schema 名，或用 -t 指定表 key 自动反查。');
+
+            return null;
+        }
+
+        return $name;
     }
 
     protected function confirmConsoleCommand(string $command): bool
@@ -131,14 +159,25 @@ class Command extends BaseCommand
         return $this->option('force') === null;
     }
 
-    protected function reportAppNotConfigured(string $app, string $detail = 'Please check the scaffold controller configuration.'): void
+    /**
+     * 报「app 未配置」并交回退出码 —— 调用方写 `return $this->reportAppNotConfigured($app);`。
+     * 这样「给用户看的那句话」与「进程退出码」同源,不会出现「报了 error 却退出 0」。
+     */
+    protected function reportAppNotConfigured(string $app, string $detail = 'Please check the scaffold controller configuration.'): int
     {
         $this->console()->error("App \"{$app}\" is not configured. {$detail}");
+
+        return self::FAILURE;
     }
 
-    protected function reportSchemaNotFound(string $schema): void
+    /**
+     * 同 reportAppNotConfigured:报「未找到 schema」并以 FAILURE 结束。
+     */
+    protected function reportSchemaNotFound(string $schema): int
     {
         $this->console()->error("未找到 schema 文件 \"{$schema}\"。");
+
+        return self::FAILURE;
     }
 
     /**
@@ -168,15 +207,21 @@ class Command extends BaseCommand
     }
 
     /**
-     * 提示执行完成
+     * 提示执行完成 —— **返回值即退出码**(`true` → SUCCESS / `false` → FAILURE),调用方写
+     * `return $this->tipDone($result);`。
+     *
+     * 刻意让「屏幕上那句 完成。/失败。」与「进程退出码」由这一处同时决定:早前命令 `handle(): void`
+     * 时,`tipDone(false)` 打了红字「失败。」而退出码仍是 0,CI / 脚本据此判成功。
      */
-    protected function tipDone($result = true): void
+    protected function tipDone($result = true): int
     {
         if ($result) {
             $this->console()->success('完成。');
         } else {
             $this->console()->error('失败。');
         }
+
+        return $result ? self::SUCCESS : self::FAILURE;
     }
 
     /**
@@ -201,7 +246,7 @@ class Command extends BaseCommand
         }
 
         $this->console()->info('💡 路由契约测已就位，择机跑（补完真断言后更佳）：');
-        $this->line('   php artisan test ' . implode(' ', $dirs));
+        $this->console()->line('   php artisan test ' . implode(' ', $dirs));
     }
 
     /**
@@ -231,7 +276,7 @@ class Command extends BaseCommand
         }
 
         $this->console()->error("表 key \"{$table}\" 在 schema \"{$schema_name}\" 中不存在。");
-        $this->line('  可选表 key：' . ($valid === [] ? '（无）' : implode(', ', $valid)));
+        $this->console()->line('  可选表 key：' . ($valid === [] ? '（无）' : implode(', ', $valid)));
 
         return false;
     }
@@ -258,9 +303,16 @@ class Command extends BaseCommand
 
     /**
      * 定位要操作的 schema 单一入口:① 显式给了就用;② 没给但 `-t` 指定了表 → 按全局唯一表 key
-     * 反查,免去再选模块;③ 都没给 → 交互选。反查失败返回 '',由调用方据此提前退出。
+     * 反查,免去再选模块;③ 都没给 → 交互选。
+     *
+     * 返回 `null` = **定位失败**(反查不到该表所属 schema / 没有可选的 schema / 非交互下没选成),
+     * 返回 `string` = 拿到确定的 schema 名。调用方一律按 null 中止(FAILURE)。
+     *
+     * **刻意不再用 `''` 表示失败**:空串同时也是「用户本来就没给 schema」的初始态,`$schema_name === ''`
+     * 这行读起来分不清是"没给"还是"没找到";而 chooseSchema 在非交互模式下回落的正是 `''`,
+     * 于是"拿不到"这件事一路静默到 `未找到 schema ""`。null 与 `''` 分开后两义各有明确归属。
      */
-    protected function resolveSchemaArg(?string $schema, ?string $table, ?string $forApp = null): string
+    protected function resolveSchemaArg(?string $schema, ?string $table, ?string $forApp = null): ?string
     {
         if (! empty($schema)) {
             return (string) $schema;
@@ -275,7 +327,7 @@ class Command extends BaseCommand
             }
             $this->console()->error("找不到表 [{$table}] 所属的 schema —— 先跑 `moo:fresh`，或检查表名拼写。");
 
-            return '';
+            return null;
         }
 
         return $this->chooseSchema($this->schemaNames(), '选择 schema（模块）', $forApp);

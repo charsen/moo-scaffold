@@ -5,7 +5,7 @@
  *   「下游 admin SPA `former/config.ts` 的 elComponents 注册表」是同一个集合。
  *
  * 用法：
- *   php artisan moo:audit:former-types --spa=/path/to/wisdomcity-next-admin
+ *   php artisan moo:audit:former-types --spa=/path/to/host-frontend
  *   php artisan moo:audit:former-types --spa=/path/to/apps/admin/src/components/former/config.ts
  *   php artisan moo:audit:former-types --spa=... --json
  *
@@ -29,6 +29,7 @@
 namespace Mooeen\Scaffold\Command;
 
 use Mooeen\Scaffold\Support\FormWidgetTypes;
+use Mooeen\Scaffold\Support\Paths;
 
 class AuditFormerTypesCommand extends Command
 {
@@ -61,7 +62,7 @@ class AuditFormerTypesCommand extends Command
      * 不做全盘递归查找（递归容易撞到别处的同名文件，判定就不可信了）。
      */
     private const SPA_CONFIG_CANDIDATES = [
-        'apps/admin/src/components/former/config.ts',   // wisdomcity-next-admin（pnpm monorepo）
+        'apps/admin/src/components/former/config.ts',   // 多应用 pnpm monorepo（H1 前端仓）
         'src/components/former/config.ts',              // 单应用 Vue 工程
     ];
 
@@ -79,11 +80,12 @@ class AuditFormerTypesCommand extends Command
                 $json,
                 'usage',
                 '必须用 --spa= 指定 SPA 仓根目录或 former/config.ts 的路径 —— 不给就不知道前端清单，无法判定。',
-                ['用法：php artisan moo:audit:former-types --spa=/path/to/wisdomcity-next-admin'],
+                ['用法：php artisan moo:audit:former-types --spa=/path/to/host-frontend'],
             );
         }
 
-        $path = $this->absolutePath($raw);
+        // --spa 相对路径按当前工作目录展开（CLI 里 `--spa=../spa` 的自然语义）。
+        $path = Paths::absolute($raw, getcwd() ?: base_path());
 
         if (! file_exists($path)) {
             return $this->reportError(
@@ -159,7 +161,7 @@ class AuditFormerTypesCommand extends Command
         ];
 
         if ($json) {
-            $this->line((string) json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
+            $this->console()->line((string) json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
 
             return $consistent ? self::SUCCESS : self::FAILURE;
         }
@@ -176,47 +178,47 @@ class AuditFormerTypesCommand extends Command
      */
     private function printReport(array $payload): void
     {
-        $this->table(
+        $this->console()->table(
             ['侧', '来源', '数量'],
             [
                 ['后端', $payload['backend']['source'], (string) $payload['backend']['count']],
                 ['前端', $payload['frontend']['file'] . '#' . $payload['frontend']['source'], (string) $payload['frontend']['count']],
             ],
         );
-        $this->line('<fg=gray>后端文件：' . ($payload['backend']['file'] !== '' ? $payload['backend']['file'] : '—') . '</>');
-        $this->line('');
+        $this->console()->line('<fg=gray>后端文件：' . ($payload['backend']['file'] !== '' ? $payload['backend']['file'] : '—') . '</>');
+        $this->console()->line('');
 
         if ($payload['aliases'] !== []) {
-            $this->line('别名映射（前端名 => 后端名）：');
-            $this->table(
+            $this->console()->line('别名映射（前端名 => 后端名）：');
+            $this->console()->table(
                 ['前端名', '后端名'],
                 array_map(static fn (string $to, string $from): array => [$from, $to], array_values($payload['aliases']), array_keys($payload['aliases'])),
             );
-            $this->line('');
+            $this->console()->line('');
         }
 
         if ($payload['consistent']) {
-            $this->info('✓ 两侧控件类型清单一致（' . $payload['backend']['count'] . ' 项，集合相同；顺序不构成语义）。');
+            $this->console()->success('两侧控件类型清单一致（' . $payload['backend']['count'] . ' 项，集合相同；顺序不构成语义）。');
 
             return;
         }
 
-        $this->warn(sprintf(
+        $this->console()->warn(sprintf(
             '✗ 两侧控件类型清单不一致：只在前端 %d 项 / 只在后端 %d 项。',
             count($payload['front_only']),
             count($payload['backend_only']),
         ));
 
         foreach ($payload['front_only'] as $type) {
-            $this->line("  <fg=red>只在前端</> {$type}");
+            $this->console()->line("  <fg=red>只在前端</> {$type}");
         }
         foreach ($payload['backend_only'] as $type) {
-            $this->line("  <fg=yellow>只在后端</> {$type}");
+            $this->console()->line("  <fg=yellow>只在后端</> {$type}");
         }
 
-        $this->line('');
-        $this->line('<fg=gray>收口：改一边的清单让两侧集合一致 —— 后端改 `Support\\FormWidgetTypes::FORMER`，</>');
-        $this->line('<fg=gray>前端改 `former/config.ts` 的 elComponents（新 type 必须在前端注册，否则渲染成只读兜底）。</>');
+        $this->console()->line('');
+        $this->console()->line('<fg=gray>收口：改一边的清单让两侧集合一致 —— 后端改 `Support\\FormWidgetTypes::FORMER`，</>');
+        $this->console()->line('<fg=gray>前端改 `former/config.ts` 的 elComponents（新 type 必须在前端注册，否则渲染成只读兜底）。</>');
     }
 
     /**
@@ -240,20 +242,6 @@ class AuditFormerTypesCommand extends Command
         }
 
         return null;
-    }
-
-    /**
-     * 相对路径按当前工作目录展开（CLI 里 `--spa=../spa` 的自然语义）；绝对路径原样返回。
-     */
-    private function absolutePath(string $path): string
-    {
-        if (str_starts_with($path, '/') || preg_match('/^[A-Za-z]:[\\\\\\/]/', $path) === 1) {
-            return $path;
-        }
-
-        $cwd = getcwd();
-
-        return ($cwd !== false ? rtrim($cwd, '/') : rtrim(base_path(), '/')) . '/' . ltrim($path, '/');
     }
 
     /**
@@ -431,7 +419,7 @@ class AuditFormerTypesCommand extends Command
     private function reportError(bool $json, string $code, string $message, array $hints = []): int
     {
         if ($json) {
-            $this->line((string) json_encode([
+            $this->console()->line((string) json_encode([
                 'error'   => $code,
                 'message' => $message,
                 'hints'   => $hints,
@@ -442,7 +430,7 @@ class AuditFormerTypesCommand extends Command
 
         $this->console()->error($message);
         foreach ($hints as $hint) {
-            $this->line("<fg=gray>{$hint}</>");
+            $this->console()->line("<fg=gray>{$hint}</>");
         }
 
         return self::INVALID;

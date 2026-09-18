@@ -12,6 +12,7 @@ use Mooeen\Scaffold\Http\Requests\ContextRequest;
 use Mooeen\Scaffold\Support\AiSettingStore;
 use Mooeen\Scaffold\Support\ConfigManager;
 use Mooeen\Scaffold\Support\ConfigWriteForbiddenException;
+use Mooeen\Scaffold\Support\ReadonlyMode;
 use Mooeen\Scaffold\Utility;
 
 /**
@@ -71,7 +72,7 @@ class ConfigController extends Controller
             'groups'        => $groups,
             'summary'       => $summary,
             'readonly'      => $this->manager->isReadonly(),
-            'is_prod'       => function_exists('app') && app()->environment('production'),
+            'is_prod'       => ReadonlyMode::productionActive(),
             'active'        => 'overview',
             'flash_group'   => $request->session()->pull('flash_group'),
             'flash_message' => $request->session()->pull('flash_message'),
@@ -155,7 +156,7 @@ class ConfigController extends Controller
             'rows'       => $this->manager->readEnvMirror(),
             'all_groups' => $this->manager->groups(),
             'readonly'   => $this->manager->isReadonly(),
-            'is_prod'    => function_exists('app') && app()->environment('production'),
+            'is_prod'    => ReadonlyMode::productionActive(),
             'active'     => '__env',
         ]);
     }
@@ -171,7 +172,7 @@ class ConfigController extends Controller
             'settings'   => $this->aiStore->read(),
             'all_groups' => $this->manager->groups(),
             'readonly'   => $this->aiStore->isReadonly(),
-            'is_prod'    => function_exists('app') && app()->environment('production'),
+            'is_prod'    => ReadonlyMode::productionActive(),
             'active'     => '__ai',
             // 展示用项目相对路径(绝对前缀是宿主根、纯噪音;落 base_path 外 Str::after 优雅回退绝对)
             'yaml_path'     => \Illuminate\Support\Str::after($this->aiStore->path(), base_path() . '/'),

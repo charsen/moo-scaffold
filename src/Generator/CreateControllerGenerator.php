@@ -16,8 +16,8 @@ use Mooeen\Scaffold\Foundation\FormRequest;
 use Mooeen\Scaffold\Rules\Mobile;
 use Mooeen\Scaffold\Rules\NumericArray;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
+use Mooeen\Scaffold\Support\ColumnTypeGroups;
 use Mooeen\Scaffold\Support\FieldName;
-use Mooeen\Scaffold\Support\FieldTypes;
 use Mooeen\Scaffold\Utility;
 
 use function in_array;
@@ -275,9 +275,9 @@ class CreateControllerGenerator extends Generator
         $options        = $values = ['['];
         foreach ($rules['enum_class'] as $enum) {
             $use_enums_code[] = "use {$enum_namespace}{$enum};";
-            $tmp_field        = Str::snake($enum, '_');
-            $options[]        = $this->getTabs(3) . "'{$tmp_field}' => {$enum}::valueLabels(),";
-            $values[]         = $this->getTabs(3) . "'{$tmp_field}' => {$enum}::values(),";
+            $enumFieldName    = Str::snake($enum, '_');
+            $options[]        = $this->getTabs(3) . "'{$enumFieldName}' => {$enum}::valueLabels(),";
+            $values[]         = $this->getTabs(3) . "'{$enumFieldName}' => {$enum}::values(),";
         }
         $options[] = $values[] = $this->getTabs(2) . ']';
         unset($rules['enum_class']);
@@ -309,13 +309,19 @@ class CreateControllerGenerator extends Generator
             ];
             $stub = 'request-base-trait';
         }
-        $trait_file   = "{$folder}{$trait_name}.php";
-        $trait_exists = $this->filesystem->isFile($trait_file);
-        $this->filesystem->put($trait_file, $this->buildStub($meta, $this->getStub($stub)));
+        $trait_file          = "{$folder}{$trait_name}.php";
+        $trait_exists        = $this->filesystem->isFile($trait_file);
+        $trait_relative_file = $this->relDisplay($trait_file, $this->originCtx);
+        $content             = $this->buildStub($meta, $this->getStub($stub));
+
+        if (! $this->putOrReport($trait_file, $trait_relative_file, $content)) {
+            return [];
+        }
+
         if ($trait_exists) {
-            $this->console()->updated($this->relDisplay($trait_file, $this->originCtx), 'Updated request trait');
+            $this->console()->updated($trait_relative_file, 'Updated request trait');
         } else {
-            $this->console()->created($this->relDisplay($trait_file, $this->originCtx), 'Created request trait');
+            $this->console()->created($trait_relative_file, 'Created request trait');
         }
 
         // Request 文件可手动修改规则；trait 已存在且 controller 也存在说明是二次执行，
@@ -377,9 +383,9 @@ class CreateControllerGenerator extends Generator
                 foreach ($rules as $field_name => $rule) {
                     if (isset($enums[$field_name]) or isset($index[$field_name])) {
                         $rule = str_replace('required', 'nullable', $rule);
-                        foreach ($rule as $tk => $tmp) {
-                            if (str_contains($tmp, '$this->getUnique') or str_contains($tmp, 'min:')) {
-                                unset($rule[$tk]);
+                        foreach ($rule as $ruleKey => $singleRule) {
+                            if (str_contains($singleRule, '$this->getUnique') or str_contains($singleRule, 'min:')) {
+                                unset($rule[$ruleKey]);
                             }
                         }
                         $codes[] = $this->getTabs(3) . "'{$field_name}' => [" . implode(', ', $this->addQuotation($rule)) . '],';
@@ -537,7 +543,10 @@ class CreateControllerGenerator extends Generator
             'base_resources' => $this->utility->getConfig('class.resources.base'),
         ];
         $content = $this->buildStub($data, $this->getStub('controller-resource-actions-trait'));
-        $this->filesystem->put($file, $content);
+        if (! $this->putOrReport($file, 'Traits/HandlesResourceActions.php', $content)) {
+            return;
+        }
+
         $this->console()->created('Traits/HandlesResourceActions.php');
     }
 
@@ -574,7 +583,10 @@ class CreateControllerGenerator extends Generator
                 ];
 
                 $content = $this->buildStub($data, $this->getStub($controller['trait_stub']));
-                $this->filesystem->put($base_file, $content);
+                if (! $this->putOrReport($base_file, "{$relative_path}/BaseActionTrait.php", $content)) {
+                    continue;
+                }
+
                 $this->console()->created("{$relative_path}/BaseActionTrait.php");
             }
         }
@@ -614,10 +626,10 @@ class CreateControllerGenerator extends Generator
 
             // 2026-06-11 修:原来只认 int/tinyint/bigint,漏 smallint/mediumint/decimal/float/double
             // → 生成的 Request 对这些数值列零类型校验。
-            // 2026-09-11:改为 FieldTypes 单一来源 —— 这类"漏一个成员"的事故本仓复发过两次,
+            // 2026-09-11:改为 ColumnTypeGroups 单一来源 —— 这类"漏一个成员"的事故本仓复发过两次,
             // 只有把成员收到一处才谈得上"改一处不漏四处"。
-            $isIntType   = in_array($attr['type'], FieldTypes::INT, true);
-            $isFloatType = in_array($attr['type'], FieldTypes::FLOAT, true);
+            $isIntType   = in_array($attr['type'], ColumnTypeGroups::INT, true);
+            $isFloatType = in_array($attr['type'], ColumnTypeGroups::FLOAT, true);
             if ($isIntType || $isFloatType) {
                 // decimal/float/double → numeric;整数列 format float: → numeric;雪花 bigint → numeric;其余整型 → integer
                 if ($isFloatType || (isset($attr['format']) && str_contains($attr['format'], 'float:'))) {
@@ -644,23 +656,23 @@ class CreateControllerGenerator extends Generator
 
             // 字符串类型都加 string 规则;text 系列(text/tinytext/mediumtext/longtext)同样是字符串,
             // 原先漏掉 → 生成的 Request 里 text 字段缺 'string' 验证。max/min 仍只给 char/varchar(text 无 size)。
-            if (in_array($attr['type'], FieldTypes::STRING)) {
+            if (in_array($attr['type'], ColumnTypeGroups::STRING)) {
                 $filed_rules[] = 'string';
             }
 
-            if (in_array($attr['type'], FieldTypes::BOOL, true)) {
+            if (in_array($attr['type'], ColumnTypeGroups::BOOL, true)) {
                 $filed_rules[] = 'in:0,1';
             }
 
-            if (in_array($attr['type'], FieldTypes::DATE)) {
+            if (in_array($attr['type'], ColumnTypeGroups::DATE)) {
                 $filed_rules[] = 'date';
             }
 
-            if (isset($attr['min_size']) && in_array($attr['type'], FieldTypes::STRING_SIZE)) {
+            if (isset($attr['min_size']) && in_array($attr['type'], ColumnTypeGroups::STRING_SIZE)) {
                 $filed_rules[] = "min:{$attr['min_size']}";
             }
 
-            if (isset($attr['size']) && in_array($attr['type'], FieldTypes::STRING_SIZE)) {
+            if (isset($attr['size']) && in_array($attr['type'], ColumnTypeGroups::STRING_SIZE)) {
                 $filed_rules[] = "max:{$attr['size']}";
             }
 
@@ -760,7 +772,7 @@ class CreateControllerGenerator extends Generator
         }
 
         // 大文本类型不进列表查询字段（避免 SELECT 拖累、列表回包过大）
-        $excluded_types = FieldTypes::TEXT_LARGE;
+        $excluded_types = ColumnTypeGroups::TEXT_LARGE;
 
         $fields = array_filter(
             $fields,
@@ -1023,7 +1035,10 @@ PHP,
         $codes[]  = $this->getTabs(1) . $insert_holder;
 
         $file_txt = str_replace($insert_holder, implode(PHP_EOL, $codes), $file_txt);
-        $this->filesystem->put($file, $file_txt);
+        if (! $this->putOrReport($file, $file_relative, $file_txt)) {
+            return;
+        }
+
         $this->console()->updated($file_relative);
     }
 }

@@ -30,18 +30,18 @@ class FreshStorageCommand extends Command
         ];
     }
 
-    public function handle(): void
+    public function handle(): int
     {
         $this->showTitle();
 
         if (! $this->checkRunning()) {
-            return;
+            return self::FAILURE;
         }
 
         $clean  = $this->option('clean') === null;
         $result = (new FreshStorageGenerator($this, $this->filesystem, $this->utility))
             ->start($clean);
 
-        $this->tipDone($result);
+        return $this->tipDone($result);
     }
 }

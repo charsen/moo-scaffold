@@ -46,10 +46,18 @@ class InitGenerator extends Generator
                     "SCAFFOLD_AUTHOR=\"{$author}\"",
                     $env_txt
                 );
-                $this->filesystem->put($file, $env_txt);
+                if (! $this->putOrReport($file, '.env', $env_txt)) {
+                    return;
+                }
+
                 $this->console()->updated('.env', 'Updated `SCAFFOLD_AUTHOR`');
             } else {
-                $this->filesystem->append($file, "\nSCAFFOLD_AUTHOR=\"{$author}\"");
+                if ($this->filesystem->append($file, "\nSCAFFOLD_AUTHOR=\"{$author}\"") === false) {
+                    $this->console()->failed('.env', '写入失败，`SCAFFOLD_AUTHOR` 未添加');
+
+                    return;
+                }
+
                 $this->console()->added('.env', 'Added `SCAFFOLD_AUTHOR`');
             }
         }

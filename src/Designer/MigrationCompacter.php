@@ -370,23 +370,12 @@ class MigrationCompacter
                 return [];
             }
 
-            // repoRoot 同样按出身:host 走 GitInspector(宿主 cwd 固定);包按 gitCwd 现算,
-            // 失败 = 无法确认 → fail-closed 抛(与 branch/detached 同一待遇)
-            if ($origin === null) {
-                $repoRoot = $this->git->repoRoot();
-            } else {
-                $rootProc = new Process(['git', 'rev-parse', '--show-toplevel'], $gitCwd);
-                $rootProc->setTimeout(10);
-                $rootProc->run();
-                if (! $rootProc->isSuccessful() || trim($rootProc->getOutput()) === '') {
-                    throw new CompactBlockedException(
-                        "无法确认扩展包 [{$origin}] 的 git 仓根，拒绝合并；确认未推送可 force",
-                        CompactBlockedException::REASON_GIT_UNCERTAIN,
-                    );
-                }
-                $repoRoot = trim($rootProc->getOutput());
-            }
-            $pushed = [];
+            // repoRoot 同样按出身 —— host 与包都走 GitInspector,只是 cwd 不同。原先包出身是**内联一份
+            // Process**,绕开了注入的 $git;收口后「该问哪个 cwd」只此一处(cwd 的算法见上面 $gitCwd)。
+            // 失败 = 无法确认 → 由外层 catch(\Throwable) 转 CompactBlockedException(与 branch/detached 同一待遇)。
+            // 注:报错文案从此走外层通用包装(含 git 原始诊断 + 出错的 cwd),不再单独拼「扩展包 [x] 的 git 仓根」。
+            $repoRoot = $this->git->repoRoot($gitCwd, 10);
+            $pushed   = [];
             foreach ($absPaths as $abs) {
                 $rel = $this->relPathFromRepoRoot($abs, $repoRoot);
                 if ($rel === $abs) {
