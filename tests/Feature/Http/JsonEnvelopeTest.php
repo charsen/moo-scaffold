@@ -81,7 +81,6 @@ it('结构不变式：src/Http 下不再新增裸 response()->json()（白名单
     ];
     // ③ 迁移中的**欠账**：每迁完一个控制器就删掉对应行（只减不增）
     $knownDebt = [
-        'DocsController.php',
         'CloudController.php',
         'ApiController.php',
         'EnforceAdminOnly.php',
