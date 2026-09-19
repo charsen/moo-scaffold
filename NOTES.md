@@ -3,6 +3,48 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-18，**前端统一响应解包层 `public/javascript/api.js`（`window.ScaffoldApi`）落地 + 它的 3 个坑**：
+  **动机**：同一个后端契约前端有**两套互不兼容的读法** —— `designer.js:389,406` 把 `json.error` 当**对象**
+  （取 `.msg` / `.code` / `.detail`），`docs-home.js:54`、`docs-editor.js:163,255` 当**字符串**（直接 `toast`）。
+  同一个 `error` 键两种解析法 ⇒ 每次后端改动要在两边各改一遍还容易漏。本层把「判成败 / 取业务数据 / 取错误文案」
+  收敛成 `isOk()` / `data()` / `errorText()` / `errorCode()` / `toError()` 五个纯函数，全站复用。
+  **迁移期双形态兼容是设计目标，不是妥协**：后端正逐控制器迁信封，新旧响应会并存一段时间，
+  故本层两种都吃（新 `{ok,data}` / `{ok:false,error:{code,msg,detail}}`；旧 裸数据 / `{error:"字符串"}` /
+  `{message}` / `{_proxy_status:N}`）⇒ **迁移可按控制器灰度**，不必一次性改完前端。
+  **坑 1（已在层内修）：`errorText` 的 `fallback` 必须压过 HTTP 状态码。** 空 body + 502 时状态码说不出
+  「用户当时在做什么」，而调用方知道（`'保存失败'` > `'HTTP 502'`）。优先级定为
+  服务端文案 > `fallback` > `HTTP <码>` > `'请求失败'`；想两者都要就调用方自己传 `'保存失败（HTTP 502）'`。
+  **坑 2（已在层内修，且是本轮新发现的真雷）：`isOk()` 里 2xx 上的 `error` 键是领域字段，不是失败。**
+  本地 Markdown 预览（`PlansController::preview:77` / `ReleaseRecordsController::preview:78`）返回
+  `{html:'<已渲染正文>', error:<frontmatter 警告|null>}` **+ HTTP 200** —— 预览成功了、正文也渲染了，
+  只是 frontmatter 有问题要在编辑器就地提示。原先 `if (j.error) return false` 会把它判成**请求失败**。
+  今天不发病（该页走 `$.ajax().done/.fail`，jQuery 不会为 HTTP 200 触发 `.fail`），但本层的**存在意义**
+  就是当唯一判据 ⇒ 一到迁移就炸。修法：`error` 键**只在 `httpStatus === 0`**（拿不到状态码）时才当失败信号。
+  安全性依据：旧形态里真正带 `error` 的失败（`EnforceAdminOnly:61` 等三个中间件、`DocsController::delete:234`）
+  **一律配 4xx**，状态码那句已经拦住，不依赖这条启发式。**注意这与 `{html,error:null}` 是同一族**
+  （`error` 为 null 也走这条路径），故两者用同一套守卫覆盖。
+  **坑 3（刻意不对称，别"顺手改齐"）：`errorText` 里 `fallback` 压过状态码，`errorCode` 里状态码压过 `fallback`。**
+  因为 `fallback` 是调用方自己传的入参，`errorCode` 返回它等于把入参原样还回去 —— 零信息量；
+  而 `HTTP_502` 至少能区分「网关挂了」和「业务报错」。要文案兜底的场景用 `errorText`。
+  **守卫是 node 脚本，不进 Playwright**：本层是纯函数、无 DOM/网络依赖，用 e2e 验它是杀鸡用牛刀
+  （还要起宿主 + 录登录态），而它又是迁移期**唯一**的兼容保障 ⇒ `tests/javascript/scaffold-api.test.js`
+  （32 断言覆盖**全部** 10 种响应形态）+ `npm run test:js`，秒级、无宿主、退出码即结果。
+  `playwright.config.ts` 的 `testDir` 是 `./tests/Browser` + `testMatch **/*.spec.ts`，`phpunit.xml`
+  只扫 `tests/Feature` 的 `*Test.php` ⇒ 新目录**不会**被两边误收。
+  **变异验证 3 处（失败集合互不相交 ⇒ 每条分支都被独立守住）**：把 `fallback` 挪到状态码之后 → 2 红
+  （`body 空+502+fallback`、`null+fallback`）；删 `j.message` 分支 → 1 红（`errorText 取 message`）；
+  把 `status === 0 && j.error` 改回无条件的 `j.error` → 1 红（`{html,error:"警告"} + 200`）。
+  **接线**：`shell.blade.php:85` 插在 jquery 之后、`main.js` 与 `{{ $scripts ?? '' }}` 之前（页面脚本要用它）。
+  `@filemtime(...) ?: time()` 是照抄同文件 `alpine-init.js:33` 的既有写法（testbench 下文件不存在也不报错）。
+  **发布无需改 provider**：`ScaffoldProvider:48` 是**目录级**映射 `public/ → public/vendor/scaffold`，
+  新增 JS 自动随之发布。但宿主里拿到的仍是**拷贝**（见 `tests/Browser/README.md`「public/ 资源是拷贝不是软链」），
+  改 `public/` 后必须 `php artisan vendor:publish --tag=public --force` 宿主才生效。
+  **仍未处理**：`designer.js:375-411` 的 `_post`/`_get` 是**两份逐字重复**的解包逻辑
+  （`json.error?…:{code:'HTTP_'+status,…}` + `json.data?json.data:json`），正是本层要收掉的第一号消费者；
+  `local-markdown-editor.js` 同文件内 `result.error` 有**两种语义**（`:39` 成功路径上是 frontmatter 领域字段，
+  `:81` 失败路径上是错误文案）—— 迁它时必须分开处理，不能整文件套 `isOk()`。
+  `pages/api-request.js:1301` 读的 `json.errors` 是**上游被代理**的 Laravel 校验体，与 Scaffold 自己的信封无关，**不要包**。
+
 - 2026-09-18，**`Support/` 层 4 处静默写入收口：Web/Support 层没有 console，写失败一律抛异常**（接上一条的第 4 点）：
   **为什么是「抛」而不是「打 failed」**：这 4 处（`AccountStore::writeYaml`、`AiSettingStore::writeYaml`、
   `DocsRepository::save` / `reorder`）都在 Web 链路里，**没有 `console()` 可打**。本仓同层早有正统范式：
