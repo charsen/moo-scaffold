@@ -7,6 +7,11 @@
  *
  * 本层把「怎么判定成败 / 怎么取业务数据 / 怎么取错误文案」收敛成一处，全站复用。
  *
+ * 输入形态只有两种，别自造第三种：
+ *   - jQuery `jqXHR` —— `pick()` 自动读 `.responseJSON` / `.responseText`
+ *   - **fetch 的 `fromFetch(res, json)`** —— `res.json()` 会**消费掉 body**，
+ *     所以必须显式把「HTTP 状态 + 已解析体」一起打包；直接传 `res` 会丢掉服务端文案。
+ *
  * **迁移期双形态兼容**：后端正逐控制器迁移，新旧响应在一段时间内并存，所以本层两种都吃
  * （见 `isOk()` / `data()`）。这让迁移可以**按控制器灰度进行**，而不必一次性改完前端。
  *
@@ -94,16 +99,28 @@
         return true; // 裸数据 / {ok:true,…payload} / {status:'ok'} / 2xx+领域 error 字段
     }
 
-    /** 取业务数据。新信封取 `data`；旧形态原样返回（迁移期兼容）。 */
+    /**
+     * 取业务数据。
+     *
+     * 返回值必须与迁移前的旧写法**逐形状等价** —— 旧代码是
+     * `return (json && json.data) ? json.data : json;`，即**真值判断**。
+     * 所以这里对旧形态刻意保留真值判断、而不是写成 `j.data !== undefined`：
+     * 后者会让 `{data:0}` / `{data:null}` / `{data:''}` 从「返回整包」变成「返回那个假值」，
+     * 是旧代码下**不会发生**的形状变化（代理响应 `{data:<上游 body>, _proxy_status:N}` 会踩到）。
+     *
+     * 唯一**有意**的差异只在**新信封**上（旧代码从没见过 `ok` 键）：信封里出现 `data` 键就是
+     * 「这就是载荷」，哪怕载荷本身是 `null` / `0` / `''` / `false` 也照样取出来 —— 否则
+     * `{ok:true, data:null}` 会被当成"没载荷"而把整个信封漏给调用方。
+     */
     function data(src) {
         var j = pick(src);
         if (!j || typeof j !== 'object') {
             return j;
         }
-        if (typeof j.ok === 'boolean' && j.data !== undefined) {
-            return j.data;
+        if (typeof j.ok === 'boolean' && 'data' in j) {
+            return j.data; // 新信封
         }
-        return j;
+        return j.data ? j.data : j; // 旧形态：忠实复刻 `json.data ? json.data : json`
     }
 
     /**
@@ -166,11 +183,34 @@
         return fallback || 'UNKNOWN';
     }
 
-    /** 把失败统一成一个 Error 形状的对象 —— 便于 `throw ScaffoldApi.toError(xhr)`。 */
+    /**
+     * 把 **fetch 的 `Response` + 已解析体** 打包成本层认得的输入形态。
+     *
+     * 为什么需要它：`fetch` 和 `$.ajax` 不一样 —— `res.json()` 会把 body **消费掉**，
+     * 之后 `pick(res)` 只能拿到 `Response` 自己（它没有 `error` / `message` 字段），
+     * 于是服务端文案会**丢**、只剩状态码。所以 fetch 的调用方必须把「状态」和「已解析体」
+     * 一起交回来；本函数就是那个**唯一的规范形态**，别让各处自己拼 `{status, responseJSON}`。
+     *
+     * 用法：`ScaffoldApi.toError(ScaffoldApi.fromFetch(res, json), '请求失败')`
+     */
+    function fromFetch(res, json) {
+        return { status: httpStatus(res), responseJSON: json };
+    }
+
+    /**
+     * 把失败统一成一个 Error 形状的对象 —— 便于 `throw ScaffoldApi.toError(x)`。
+     *
+     * `detail` 必须一起带出来：本仓 `designer.js` 会读它做分支
+     * （`e.detail?.reason`，见该文件「compactBlockedReason」那句）。旧实现是
+     * `e.detail = err.detail`，缺省即 `undefined` —— 这里保持同样语义，不擅自改成 `[]`。
+     */
     function toError(src, fallback) {
+        var j = pick(src);
+        var err = (j && typeof j === 'object' && j.error && typeof j.error === 'object') ? j.error : null;
         return {
             code: errorCode(src, fallback),
             msg: errorText(src, fallback),
+            detail: err ? err.detail : undefined,
             http: httpStatus(src),
         };
     }
@@ -178,6 +218,7 @@
     window.ScaffoldApi = {
         pick: pick,
         httpStatus: httpStatus,
+        fromFetch: fromFetch,
         isOk: isOk,
         data: data,
         errorText: errorText,

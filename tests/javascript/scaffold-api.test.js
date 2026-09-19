@@ -84,11 +84,47 @@ eq('code 无 error.code 时状态码压过 fallback（fallback 是调用方入�
     A.errorCode(jq(500, { message: 'x' }), 'SAVE_FAILED'), 'HTTP_500');
 eq('code 走 _proxy_status 时也用不了 fallback', A.errorCode(jq(200, { _proxy_status: 403 }), 'SAVE_FAILED'), 'HTTP_403');
 
+console.log('== data() 对旧形态必须与旧写法逐形状等价 ==');
+// 旧写法是 `return (json && json.data) ? json.data : json;` —— **真值判断**。
+// 下面这些形状是收敛 designer.js._post/_get 时实测出的 5 处真差异来源，逐条钉住。
+// （新信封那一侧允许不同：信封里出现 data 键就是载荷，哪怕是 falsy。）
+eq('裸数据无 data 键 → 整包', A.data(jq(200, { q: 'x' })), { q: 'x' });
+eq('{data:{…}} 无 ok 键 → 取 data（旧代码同样取 data）', A.data(jq(200, { data: { a: 1 } })), { a: 1 });
+eq('{data:[]} 空数组是真值 → 取 data', A.data(jq(200, { data: [] })), []);
+eq('{data:null} 无 ok 键 → 整包（旧代码真值判断，不取 null）', A.data(jq(200, { data: null })), { data: null });
+eq('{data:0} 无 ok 键 → 整包', A.data(jq(200, { data: 0 })), { data: 0 });
+eq('{data:""} 无 ok 键 → 整包', A.data(jq(200, { data: '' })), { data: '' });
+eq('{data:false} 无 ok 键 → 整包', A.data(jq(200, { data: false })), { data: false });
+eq('代理形态 {data:<上游>, _proxy_status:200} → 取上游 body',
+    A.data(jq(200, { data: { id: 1 }, _proxy_status: 200 })), { id: 1 });
+eq('{html,error:null} 无 data 键 → 整包', A.data(jq(200, { html: '<p>x</p>', error: null })), { html: '<p>x</p>', error: null });
+// 新信封侧：出现 data 键就是载荷，falsy 也取
+eq('新信封 {ok:true,data:null} → null（有意区别于旧形态）', A.data(jq(200, { ok: true, data: null })), null);
+eq('新信封 {ok:true,data:0} → 0', A.data(jq(200, { ok: true, data: 0 })), 0);
+eq('新信封 {ok:true,data:false} → false', A.data(jq(200, { ok: true, data: false })), false);
+eq('新信封无 data 键 → 整包', A.data(jq(200, { ok: true, redirect: '/x' })), { ok: true, redirect: '/x' });
+
+console.log('== toError 必须带出 detail（designer.js 会读 e.detail?.reason 做分支）==');
+eq('detail 从 error.detail 带出', A.toError(jq(422, { ok: false, error: { code: 'COMPACT_BLOCKED', msg: 'M', detail: { reason: 'dirty' } } })).detail, { reason: 'dirty' });
+eq('旧形态没有 error 对象 → detail 为 undefined（与原 e.detail = err.detail 同语义，不擅自改成 []）',
+    typeof A.toError(jq(422, { error: '炸了' })).detail, 'undefined');
+eq('detail 键存在但值为 undefined', 'detail' in A.toError(jq(422, { error: '炸了' })), true);
+
+console.log('== fromFetch：fetch 的 res.json() 会消费 body，必须显式打包状态 ==');
+const okRes = { status: 200 };
+const errRes = { status: 422 };
+eq('fromFetch 成功体 → isOk true', A.isOk(A.fromFetch(okRes, { ok: true, data: { a: 1 } })), true);
+eq('fromFetch 取到 data 层', A.data(A.fromFetch(okRes, { ok: true, data: { a: 1 } })), { a: 1 });
+eq('fromFetch 失败体 → isOk false', A.isOk(A.fromFetch(errRes, { ok: false, error: { code: 'X', msg: 'm', detail: [] } })), false);
+eq('fromFetch 保住服务端文案（直接传 res 会丢）', A.errorText(A.fromFetch(errRes, { ok: false, error: { code: 'X', msg: '字段重复' } })), '字段重复');
+eq('对照：直接传 Response 只剩状态码', A.errorText(A.fromFetch(errRes, {})), 'HTTP 422');
+eq('fromFetch 缺 status 时 httpStatus 为 0', A.httpStatus(A.fromFetch({}, {})), 0);
+
 console.log('== 健壮性 ==');
 eq('responseText 能解析', A.data(jqText(200, '{"ok":true,"data":{"k":9}}')).k, 9);
 eq('responseText 非 JSON 不抛异常', A.data(jqText(200, '<html>')), null);
 eq('pick(undefined) 不抛异常', A.pick(undefined), null);
-eq('toError 形状统一', A.toError(jq(422, { ok: false, error: { code: 'C', msg: 'M', detail: [] } })), { code: 'C', msg: 'M', http: 422 });
+eq('toError 形状统一', A.toError(jq(422, { ok: false, error: { code: 'C', msg: 'M', detail: [] } })), { code: 'C', msg: 'M', detail: [], http: 422 });
 
 console.log('\n' + (failures.length === 0 ? '✅ ALL PASS' : '❌ ' + failures.length + ' FAILED') + '（' + pass + ' passed）');
 process.exit(failures.length === 0 ? 0 : 1);
