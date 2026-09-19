@@ -36,9 +36,14 @@
         request(root.dataset.preview, { slug: root.dataset.slug, content: content.value })
             .done(function (result) {
                 if (current !== sequence) return;
-                frontmatterError.hidden = !result.error;
-                frontmatterErrorText.textContent = result.error || '';
-                preview.innerHTML = result.html;
+                // ⚠ 必须经解包层取载荷：响应信封是 `{ok:true, data:{html, error}}`，
+                //   而这里的 `error` 是 **frontmatter 领域字段**（预览成功、正文已渲染，
+                //   只是 frontmatter 有问题要就地提示），**不是**失败信号 —— 别用 isOk() 判它。
+                //   解包层双形态兼容，故旧 `{html, error}` 响应也照样能取到。
+                var payload = window.ScaffoldApi.data(result);
+                frontmatterError.hidden = !payload.error;
+                frontmatterErrorText.textContent = payload.error || '';
+                preview.innerHTML = payload.html;
                 if (window.scaffoldDocsRenderMermaid) window.scaffoldDocsRenderMermaid(preview);
                 if (window.scaffoldDocsRenderCode) window.scaffoldDocsRenderCode(preview);
             })
@@ -64,21 +69,27 @@
         var serialized = submitted === savedContent ? raw : (useCRLF ? submitted.replace(/\n/g, '\r\n') : submitted);
         request(root.dataset.save, { slug: root.dataset.slug, content: serialized, version: version })
             .done(function (result) {
-                version = result.version;
+                // ⚠ 取 `data.version` 而不是 `result.version`：信封化之后顶层只剩 `ok`/`data`，
+                //   漏了这层解包会拿到 undefined，下一次保存就带着空 version 撞 409 冲突。
+                version = window.ScaffoldApi.data(result).version;
                 raw = serialized;
                 savedContent = submitted;
                 setStatus(content.value === submitted ? '已保存' : '未保存', content.value === submitted ? 'saved' : 'dirty');
             })
             .fail(function (xhr, reason) {
                 var result = xhr.responseJSON || {};
+                // 这两条是**框架生成**的、不走控制器，所以**不套信封**，保持原样读取：
+                //   `errors.*` = Laravel 校验失败（SaveRequest）的 validation bag
                 var validation = result.errors && result.errors.content && result.errors.content[0];
                 if (validation) {
                     frontmatterError.hidden = false;
                     frontmatterErrorText.textContent = validation;
                 }
+                // 其余失败是 `abort_*` 抛出的 HttpException（403/404/409/422）与异常出口，
+                // 形态都是 `{message}` —— 交给解包层统一取文案（它同时吃 `{error:"…"}` / `{error:{msg}}`）。
                 var message = reason === 'timeout'
                     ? '保存超时，结果尚未确认。请重试，当前输入已保留。'
-                    : (validation || result.message || result.error || '保存失败，请重试，当前输入已保留。');
+                    : (validation || window.ScaffoldApi.errorText(xhr, '保存失败，请重试，当前输入已保留。'));
                 setStatus(message, 'error');
             })
             .always(function () { saving = false; save.disabled = false; });

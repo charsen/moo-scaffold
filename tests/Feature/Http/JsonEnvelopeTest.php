@@ -83,8 +83,6 @@ it('结构不变式：src/Http 下不再新增裸 response()->json()（白名单
     $knownDebt = [
         'DocsController.php',
         'CloudController.php',
-        'PlansController.php',
-        'ReleaseRecordsController.php',
         'ApiController.php',
         'EnforceAdminOnly.php',
         'EnforceDesignerPermission.php',
