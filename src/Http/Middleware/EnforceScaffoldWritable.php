@@ -6,6 +6,7 @@ namespace Mooeen\Scaffold\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Mooeen\Scaffold\Support\JsonEnvelope;
 use Mooeen\Scaffold\Support\ReadonlyMode;
 
 /**
@@ -64,7 +65,7 @@ class EnforceScaffoldWritable
         $prefix = trim((string) config('scaffold.route.prefix', 'scaffold'), '/');
         if ($request->is($prefix . '/plans/*', $prefix . '/release-records/*')
             && (! app()->environment('local') || ReadonlyMode::configLocked())) {
-            return $this->forbidden($request, '仅本地且未开启强制只读时允许编辑。');
+            return $this->forbidden($request, 'EDIT_LOCAL_ONLY', '仅本地且未开启强制只读时允许编辑。');
         }
 
         $isProduction = ReadonlyMode::productionActive();
@@ -85,13 +86,20 @@ class EnforceScaffoldWritable
             ? '生产环境禁止改 designer / accounts / config（影响代码与账号体系）'
             : '当前为强制只读模式（SCAFFOLD_CONFIG_READONLY），禁止改 designer / accounts / config';
 
-        return $this->forbidden($request, $reason);
+        return $this->forbidden($request, 'WRITE_LOCKED', $reason);
     }
 
-    private function forbidden(Request $request, string $message)
+    /**
+     * 双形态拒绝回执：AJAX / JSON 请求走统一失败信封（403 + 机器码），
+     * 表单请求走 flash_error + 303 回退（带输入，便于用户改完再提交）。
+     *
+     * `$code` 故意**不给默认值** —— 与基类 `error()` 的 `$http` 同款约束，
+     * 强制每个调用点表态拒绝原因，前端才有得分支（否则只会拿到一句中文文案）。
+     */
+    private function forbidden(Request $request, string $code, string $message)
     {
         if ($request->ajax() || $request->expectsJson()) {
-            return response()->json(['error' => $message], 403);
+            return JsonEnvelope::error($code, $message, 403);
         }
         if ($request->hasSession()) {
             $request->session()->flash('flash_error', $message);

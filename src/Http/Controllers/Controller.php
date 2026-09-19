@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\View\View;
+use Mooeen\Scaffold\Support\JsonEnvelope;
 use Mooeen\Scaffold\Utility;
 
 /**
@@ -48,17 +49,15 @@ class Controller extends BaseController
     /**
      * 统一 JSON 成功信封：`{"ok": true, "data": {...}}` —— `/scaffold` 后台全站唯一的成功形状。
      *
-     * 这套形状不是新造的：它就是 `DesignerController` 原有的私有 `ok()`，一直是本仓事实标准。
-     * 上提到基类是为了把 `/scaffold` 的 JSON 出口收敛成**一个**，让前端能只写一层解包
-     * （`public/javascript/api.js`），而不是像以前那样每个页面各写一套 —— 收敛前后端有 10 种形态、
-     * 前端 55 处错误提取分两套互不兼容的读法（docs 系把 `error` 当字符串、designer 系当对象）。
+     * 实现已收口到 `Support\JsonEnvelope`（那里是**单一出口**）：信封有两类产出方，
+     * 控制器只是其中之一 —— 三个 `Enforce*` 中间件不继承本基类，却同样要产出信封。
+     * 留这两个薄壳是为了**不动既有调用点**：控制器里一律照旧写 `$this->ok(...)`。
      *
-     * ⚠ **不适用于** `ApiProxyController`：那里的 body 是**上游 API 的原样透传**，套信封会破坏代理语义；
-     * 它的 `_proxy_status` 契约（HTTP 恒 200 + body 里带真实状态）也必须原样保留。
+     * ⚠ **不适用于** `ApiProxyController`：那里的 body 是**上游 API 的原样透传**，套信封会破坏代理语义。
      */
     protected function ok(array $data = []): JsonResponse
     {
-        return response()->json(['ok' => true, 'data' => $data]);
+        return JsonEnvelope::ok($data);
     }
 
     /**
@@ -70,17 +69,11 @@ class Controller extends BaseController
      * ⚠ `$http` 故意**不给默认值**，强制调用点表态：失败要么 4xx 要么 5xx，别一律 200 ——
      * 否则前端 `if (! res.ok)` 那条路（designer.js 一直依赖它）会失效。
      *
-     * @param string $code   机器可读错误码（如 `SLUG_INVALID` / `HTTP_403`）
-     * @param string $msg    人类可读文案
-     * @param int    $http   HTTP 状态码
-     * @param array  $detail 附加字段（校验明细等）
+     * 实现同样收口到 `Support\JsonEnvelope`（机器码 / 文案 / 状态码的语义说明见那里）。
      */
     protected function error(string $code, string $msg, int $http, array $detail = []): JsonResponse
     {
-        return response()->json([
-            'ok'    => false,
-            'error' => ['code' => $code, 'msg' => $msg, 'detail' => $detail],
-        ], $http);
+        return JsonEnvelope::error($code, $msg, $http, $detail);
     }
 
     /**

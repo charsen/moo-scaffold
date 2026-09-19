@@ -777,6 +777,8 @@ class DesignerController extends Controller
     // ─── helpers ──────────────────────────────────────────────────────
     // ok() / error() 已上提到基类 `Mooeen\Scaffold\Http\Controllers\Controller`
     // （统一 JSON 信封，签名逐字相同 ⇒ 本文件所有调用点无需改动）。
+    // 真正的**单一实现**是 `Mooeen\Scaffold\Support\JsonEnvelope`，基类那两个只是薄壳 ——
+    // 中间件也要产出信封、又不继承控制器基类，所以实现落在 Support 层（别在这里再拼一份）。
     // 这个控制器原本就是全站事实标准的来源，行为未变。
 
     private function summarizeTable(array $tableDiff): string
