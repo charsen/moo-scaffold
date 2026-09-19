@@ -19,7 +19,7 @@
  *   新信封：{ok:true, data:{…}}                    成功
  *           {ok:false, error:{code,msg,detail}} + HTTP 失败
  *   旧形态：裸数据 {q,results,…} / {ok:true,…payload}   ← 无 error 键即视为成功
- *           {error:"字符串"}（docs / 中间件）/ {message:"…"}（异常出口）
+ *           {error:"字符串"}（三个 Enforce* 中间件，全部配 403）/ {message:"…"}（异常出口）
  *           {_proxy_status:N, message}（API 代理：HTTP 恒 200，真实状态在 body 里）
  *
  * ⚠ `ApiProxyController` 的响应**不走信封**（上游 body 必须原样透传），本层对它单独分支，
@@ -91,8 +91,8 @@
         // + HTTP 200 —— 预览**成功了**，正文也渲染了，只是 frontmatter 有问题、
         // 需要在编辑器里就地提示。若在这里判失败，一次成功的预览会被前端当成请求失败。
         //
-        // 旧形态里真正带 `error` 的失败（三个 Enforce* 中间件、DocsController）
-        // 一律配 4xx/5xx，上面那句状态码判断已经拦住了，不依赖这条启发式。
+        // 旧形态里真正带 `error` 的失败（三个 Enforce* 中间件，403）一律配 4xx/5xx，
+        // 上面那句状态码判断已经拦住了，不依赖这条启发式。
         if (status === 0 && j.error) {
             return false;
         }
