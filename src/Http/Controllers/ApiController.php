@@ -21,6 +21,8 @@ use Mooeen\Scaffold\Http\Requests\Api\CacheRequest;
 use Mooeen\Scaffold\Http\Requests\Api\EndpointRequest;
 use Mooeen\Scaffold\Http\Requests\Api\IndexRequest;
 use Mooeen\Scaffold\Support\AclActionResolver;
+use Mooeen\Scaffold\Support\ActionDoc;
+use Mooeen\Scaffold\Support\ActionMeta;
 use Mooeen\Scaffold\Support\ApiSchemaService;
 use Mooeen\Scaffold\Utility;
 
@@ -292,8 +294,8 @@ class ApiController extends Controller
                     continue;
                 }
 
-                $actionMeta = $this->utility->normalizeApiActionMeta($attr, true);
-                $deprecated = $this->utility->isApiActionDeprecated($attr);
+                $actionMeta = ActionMeta::normalize($attr, true);
+                $deprecated = ActionMeta::isDeprecated($attr);
 
                 $temp[$actionName] = [
                     // 手写 yaml 可缺 name 字段,裸取 → ErrorException 炸文档/调试页;
@@ -401,7 +403,7 @@ class ApiController extends Controller
             return [];
         }
 
-        return $this->utility->normalizeMenusTransform($this->utility->parseYamlFile($yamlFile));
+        return ActionMeta::normalizeMenus($this->utility->parseYamlFile($yamlFile));
     }
 
     /**
@@ -442,12 +444,12 @@ class ApiController extends Controller
             abort(404, 'API Action Invalid');
         }
         $method     = strtoupper((string) $actionData['request'][0]);
-        $actionMeta = $this->utility->normalizeApiActionMeta($actionData, true);
-        $deprecated = $this->utility->isApiActionDeprecated($actionData);
+        $actionMeta = ActionMeta::normalize($actionData, true);
+        $deprecated = ActionMeta::isDeprecated($actionData);
         $uri        = $actionData['request'][1];
 
         // 2. 去掉方法后缀，获取真实 action 名（用于 Reflection）
-        $realActionName = $this->utility->removeActionNameMethod($actionName);
+        $realActionName = ActionMeta::removeMethodSuffix($actionName);
 
         // 3. 构建完整控制器类名
         $controllerFullClass = $this->resolveControllerClass($app, $folderPath, $controllerClass);
@@ -475,7 +477,7 @@ class ApiController extends Controller
             $tempName = ($realActionName === 'store') ? 'create' : 'edit';
             if (empty($data['prototype'])) {
                 foreach ($yamlData['actions'] as $key => $val) {
-                    if ($this->utility->removeActionNameMethod($key) === $tempName && ! empty($val['prototype'] ?? '')) {
+                    if (ActionMeta::removeMethodSuffix($key) === $tempName && ! empty($val['prototype'] ?? '')) {
                         $data['prototype'] = $val['prototype'];
                         break;
                     }
@@ -546,7 +548,7 @@ class ApiController extends Controller
             return [];
         }
 
-        $request = $this->utility->getActionRequestClass($reflectionClass->getMethod($ruleAction));
+        $request = ActionDoc::getActionRequestClass($reflectionClass->getMethod($ruleAction));
         if ($request === null || ! method_exists($request, 'rules')) {
             return [];
         }

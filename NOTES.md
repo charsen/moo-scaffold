@@ -3,6 +3,51 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-19，**`Utility` 拆分 · 阶段 3b：DOCMETA 外迁 `Support\ActionMeta` + `Support\ActionDoc`，按「读/写两侧」切，且这批不留转发**：
+  **为什么切两刀而不是一个类**：DOCMETA 那 12 个成员其实是两种职责混在一起 ——
+  「从反射与 DocBlock **读出**字段」（`parsePMCNames`/`parseActionInfo`/`parseActionName`/`parseActionDesc`/
+  `getActionRequestClass` + 私有 `parseByLanguages`/`normalizeDocComment`）与「把读出的字段**归一**成稳定形状」
+  （`normalizeApiActionMeta`/`isApiActionDeprecated`/`normalizeMenusTransform`/`removeActionNameMethod` + 私有
+  `formatDisplayDate`）。两者唯一的外界依赖也不同：前者只读 `scaffold.languages`，后者纯计算。合成一个类会让
+  「改解析正则」要给另一侧的归一用例找理由 —— 侧不同，测试的鉴别力就互相污染。
+  **`Utility::parseYamlFile()` 没跟着走**：它依赖 `$this->filesystem` 且要吞掉损坏 YAML 的异常，是 `Utility` 里
+  唯一还合理的「有状态」残留（`getResourcePath` / `getControllerNamespaces` 等同理，留待 3b-2 / 3c）。
+  **这批不留 `@deprecated` 转发 —— 与 3a 的 NAME 组相反，理由要写清**：3a 留转发是因为那两个是**静态**方法，
+  `Utility::stripControllerSuffix()` 可能被含动态拼接的调用点命中，而转发成本只有一行；本批是**实例**方法，
+  一条委托就是一整个方法体，留着等于把 god-class 撑回去 —— 而「宿主引用 `Utility` **零处**」3a 已核。
+  **判据**：外迁目标满足「零 DI 成本 + 全仓调用点可穷举 + 漏改会以 `Call to undefined method` **响亮**失败」
+  三条就不留转发；留转发只在「漏改会**静默**（语义等价的分叉实现）或调用点**不可穷举**（动态调用 / 跨仓）」时才值得。
+  **外部消费者复核（AGENTS.md 要求）**：`wisdomcity/engine` / `moo-system` / `moo-radar` 引用 `Utility` **零处**；
+  **`haikoupifang` 是个反例、要记清楚** —— 它 `engine/composer.json` 写 `mooeen/scaffold: *` 且
+  `repositories.packages = {type: path, url: ../packages/*}`，指向的是它**自己** 2024-01-08 的
+  `packages/moo-scaffold` 快照（那份 `Utility` 的 API 都不一样：`parseActionNames()` / 双参 `parseActionName()`），
+  **不是本仓** ⇒ 它既不是消费者也不构成改动约束。上一阶段把 `haikoupifang` 写成「四个消费方之一」有歧义，此处订正。
+  **账**：`Utility` 854 → 603 行、公开面 41 → 32（现 33 个公开成员含构造器 + 1 个私有 `getResourcePath`）；
+  迁移 33 个 src 调用点（`CreateApiGenerator` 19 / `ApiController` 8 / `UpdateAuthorizationGenerator` 4 /
+  `RouteController` 2），`ParseActionDescTest` 从 `app(Utility::class)` 改为静调。
+  **守卫的鉴别力（10 处打哑，红集互不相同 —— 这正是不给它们合并的理由）**：
+  M1 给 `Utility` 加回一条 `parseActionName` 转发 ⇒ **{已不存在锚点, 公开面预算}**；
+  M2 加一个**不在外迁清单里**的新公开方法 ⇒ **只有公开面预算**（证明预算锚点有独立于「已不存在」的鉴别力）；
+  M3b 既加回转发、又把一个内部调用点改回 `$this->utility->` ⇒ {已不存在, 预算, 结构锚点}，**M3b 减 M1 = 恰好结构锚点**；
+  M4 `ActionMeta::formatDate` 放宽成 public ⇒ 只有 private 锚点；M5 去掉 `final` ⇒ 只有形状锚点；
+  M6 `removeMethodSuffix` 正则去掉尾部 `$` ⇒ 只有「不吃近似词」；M7 `isDeprecated` 的 `=== 1` 放宽成 `> 0` ⇒
+  只有「只有 1 算」；M8 `normalizeMenus` 不再丢标量项 ⇒ 只有「标量→丢掉」；M9 `parseActionInfo` 的 whitelist 恒 false
+  ⇒ 只有「无 `@acl` ⇒ 白名单」；M10 `getActionRequestClass` 不再校验参数名 ⇒ 只有「名字不对 ⇒ null」。
+  ⇒ **结构锚点抓不到「有人把方法加回来」，「已不存在」抓不到「加了别的新公开方法」，形状锚点抓不到「私有助手被放宽」**
+  —— 六类锚点各有盲区，缺一不可。
+  **它推翻了 3a 条里那条持久结论**：3a 写「只被类内调用的 3 个方法收成 `private`」，其中 `formatDisplayDate` /
+  `parseByLanguages` 已随本阶段离开 `Utility`（成为 `ActionMeta::formatDate` / `ActionDoc::parseByLanguages` 的 private），
+  `Utility` 现在只剩 `getResourcePath` 一个 private。`UtilitySurfaceTest` 的对应断言从「3 个保持 private」升级为
+  「9 个已不存在 + 真源确实在对面 + 留在这儿的老邻居还在」。
+  **踩坑（可复用）**：`parsePMCNames` 的测试替身第一版把 `@package_name` 挂在 `__construct` 的 docblock 上 ⇒
+  `ReflectionClass::getDocComment()` 读到 `false`、三处名全空。匿名类的**类级** docblock 要写成
+  `return new /** … */ class { … };`（docblock 插在 `new` 与 `class` 之间），已探针实测可被反射读到。
+  **全量 1 failed / 3 skipped / 1125 passed（4375 断言）**（3a 基线 1110 passed / 4274）；红仍是
+  `ConfigControllerTest:305` 那条 env 耦合基线（**已实测**：`git stash` 回 3a 同样红、加 `SCAFFOLD_AUTHOR=charsen`
+  即转绿 ⇒ 非本次回归）；`pint` 对这 10 个文件**零改动**（写入前后 `diff -r src tests` 为空，无夹带重排）。
+  **剩余阶段**：3b-2 = REGISTRY 14 个读方法 → `Support\StorageRegistry`（顺带把两个 `extends Utility` 测试桩
+  改成绑容器假件，那本来就是更好的测试缝）；3c = PATHS，必须与 `TUNING-PLAN.md` §三 P2 合并考虑。
+
 - 2026-09-19，**`Utility` 拆分 · 阶段 3a：先量持有面与组间重叠，再决定「一次切四类」不值得**：
   **先量**：852 行 / 45 个公开成员（1 构造器 + 42 实例 + 2 静态）= 5 组职责 —— CORE 配置与身份(3)、PATHS 路径(13)、
   REGISTRY 聚合缓存读取(14)、DOCMETA docblock 与动作元信息(12)、NAME 控制器名归一(2)；src 调用点
@@ -13,14 +58,16 @@
   `Adder\Adder` / `Http\Controllers\Controller`）；5 个测试内匿名命令壳、2 个测试内 `extends Utility` 匿名子类
   （覆写 `getControllerNamespaces()` / `getAppTargets()`，正是 REGISTRY 组）；`ResolvesOriginContext` trait
   硬调 `$this->utility->targetContext($origin)` ⇒ 拆 PATHS 必须连 trait 一起改。
-  **外部消费者核查**（AGENTS.md 要求）：已知四个消费方引用 `Mooeen\Scaffold\Utility` **零处**、`$this->utility->`
+  **外部消费者核查**（AGENTS.md 要求）：已知四个**候选**消费方引用 `Mooeen\Scaffold\Utility` **零处**、`$this->utility->`
   **零处**，宿主只消费 `Concerns\*` / `Foundation\*` / `Rules\*` / `Exceptions\BaseException` / `Contracts\*` /
   `Translation\MergingLoader`；宿主**无一处** `extends Scaffold\Http\Controllers\Controller`（宿主继承的
   `Foundation\Controller` 直接 `extends Illuminate\Routing\Controller`，**不含 `$utility`**）⇒ `Utility` 是包内
-  实现细节，不是下游编译接口。
+  实现细节，不是下游编译接口。**（注：这四个的名单有歧义 —— `haikoupifang` 其实是自带 2024 旧快照、不是消费者，
+  见本文件上方 3b 条的订正）**
   **本次做的（零/低风险三件）**：① 只被类内调用的 3 个方法收成 `private`（`formatDisplayDate` ←
   `normalizeApiActionMeta`；`getResourcePath` ← `targetContext`；`parseByLanguages` ← `parsePMCNames`/`parseActionInfo`；
-  全仓 + Blade + 动态调用 `->{`/`->$` 均已核零外部调用点）⇒ 公开面 44 → 41；
+  全仓 + Blade + 动态调用 `->{`/`->$` 均已核零外部调用点）⇒ 公开面 44 → 41；**（注：`formatDisplayDate` 与
+  `parseByLanguages` 已于 3b 离开 `Utility`，现在只剩 `getResourcePath` 一个 private —— 见本文件上方 3b 条）**；
   ② NAME 组外迁 `Support\ControllerName`（`final` + 全静态 `strip()`/`ensure()`，与 `Paths`/`FieldName` 同形），
   7 个 src 文件迁移，`Utility` 上只留两行 `@deprecated` 转发 —— **转发不用删**：删了只省 6 行，留转发让未迁移的
   宿主不炸，成本是一行委托（它的等价性由测试钉住，见下）；③ 收口**上一条登记的遗留**：`addGitIgnore(ConsoleUi
@@ -34,11 +81,12 @@
   **全量 1 failed / 3 skipped / 1110 passed（4274 断言）**（基线 1105 passed / 4240 断言，+5 例 / +34 断言），
   红仍是 `ConfigControllerTest:305` 那条 env 耦合基线（见本文件另条）；`pint --dirty --test` 15 files PASS，
   写入式 pint 只删掉 4 个因本次改动而失效的 `use Mooeen\Scaffold\Utility;`（已逐文件核 diff，无夹带重排）。
-  **剩余阶段**（不建议一次做完）：3b = REGISTRY 14 个读方法 → `Support\StorageRegistry`（顺带把两个
-  `extends Utility` 测试桩改成绑容器假件，那本来就是更好的测试缝）+ DOCMETA 里 5 个无状态纯函数
-  （`parseActionName`/`parseActionDesc`/`getActionRequestClass`/`isApiActionDeprecated`/`normalizeMenusTransform`）
-  零 DI 成本外迁 `Support\ActionDoc`；3c = PATHS，**必须与 `TUNING-PLAN.md` §三 P2（给 `targetContext` 补 host 臂
-  controller/request 的 path+namespace）合并考虑**，否则同一个 `targetContext` 要改两次。
+  **剩余阶段**（不建议一次做完）：3b **已拆成两批，3b-1（DOCMETA）已完成** —— 见本文件上方
+  2026-09-19 阶段 3b 条（实际外迁了 9 个公开方法到 `Support\ActionMeta` + `Support\ActionDoc` 两个类，
+  比原计划只列 5 个纯函数多；`parseYamlFile` 留在 `Utility`）；**3b-2 = REGISTRY 14 个读方法 →
+  `Support\StorageRegistry`**（顺带把两个 `extends Utility` 测试桩改成绑容器假件，那本来就是更好的测试缝）；
+  3c = PATHS，**必须与 `TUNING-PLAN.md` §三 P2（给 `targetContext` 补 host 臂 controller/request 的
+  path+namespace）合并考虑**，否则同一个 `targetContext` 要改两次。
 
 - 2026-09-19，**阶段 3 收口：删掉前端仅剩的两处「旧形态」容忍（顶层字符串 `error` + 无状态码兜底）**：
   **删了什么**：`ScaffoldApi.errorText()` 里 `typeof j.error === 'string' → return j.error`；

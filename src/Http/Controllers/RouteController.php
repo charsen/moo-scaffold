@@ -10,6 +10,7 @@ use Illuminate\Routing\Router;
 use Mooeen\Scaffold\Http\Requests\Route\IndexRequest;
 use Mooeen\Scaffold\Support\AclActionResolver;
 use Mooeen\Scaffold\Support\AclDocumentLoader;
+use Mooeen\Scaffold\Support\ActionMeta;
 use Mooeen\Scaffold\Support\ControllerName;
 use Mooeen\Scaffold\Utility;
 use ReflectionClass;
@@ -389,7 +390,7 @@ class RouteController extends Controller
             $yamlFile = $apiPath . '_menus_transform.yaml';
 
             $this->menusTransformCache[$app] = $this->filesystem->isFile($yamlFile)
-                ? $this->utility->normalizeMenusTransform($this->utility->parseYamlFile($yamlFile))
+                ? ActionMeta::normalizeMenus($this->utility->parseYamlFile($yamlFile))
                 : [];
         }
 
@@ -439,7 +440,7 @@ class RouteController extends Controller
         }
 
         foreach ($yamlData['actions'] as $key => $actionData) {
-            $realAction = $this->utility->removeActionNameMethod((string) $key);
+            $realAction = ActionMeta::removeMethodSuffix((string) $key);
             if ($realAction === $action) {
                 return [
                     'name'      => is_array($actionData) ? (string) ($actionData['name'] ?? '') : '',
