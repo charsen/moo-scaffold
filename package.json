@@ -4,6 +4,7 @@
     "description": "Playwright e2e suite for scaffold designer UI(独立于宿主项目 npm 依赖)",
     "scripts": {
         "build:css": "npx sass public/sass/index.scss public/css/index.css --style=compressed --no-source-map",
+        "test:js": "node tests/javascript/scaffold-api.test.js",
         "test:e2e": "playwright test",
         "test:e2e:safe": "bash tests/Browser/safe-run.sh",
         "test:e2e:ui": "playwright test --ui",
