@@ -59,7 +59,7 @@ it('POST /scaffold/docs/save 落盘(含中文嵌套路径)+ 返回 redirect', fu
         'slug'    => '设计/流程',
         'content' => "---\ntitle: 流程\n---\n正文",
     ]);
-    $r->assertOk()->assertJson(['ok' => true, 'slug' => '设计/流程']);
+    $r->assertOk()->assertJson(['ok' => true, 'data' => ['slug' => '设计/流程']]);
     expect(is_file($this->docsDir . '/设计/流程.md'))->toBeTrue();
 });
 
@@ -72,13 +72,13 @@ it('POST /scaffold/docs/save 非法 slug(穿越)→ 422', function () {
 it('POST /scaffold/docs/preview 渲染 shortcode chip(复用 DocMarkdownRenderer)', function () {
     $r = $this->postJson('/scaffold/docs/preview', ['content' => "# 标题\n\n[[db: Market]]"]);
     $r->assertOk();
-    expect($r->json('html'))->toContain('doc-shortcode--db');
+    expect($r->json('data.html'))->toContain('doc-shortcode--db');
 });
 
 it('POST /scaffold/docs/delete 删除文件', function () {
     file_put_contents($this->docsDir . '/tmp.md', "x\n");
-    $this->postJson('/scaffold/docs/delete', ['slug' => 'tmp'])
-        ->assertOk()->assertJson(['ok' => true]);
+    $r = $this->postJson('/scaffold/docs/delete', ['slug' => 'tmp'])->assertOk()->assertJson(['ok' => true]);
+    expect($r->json('data.redirect'))->toContain('/scaffold/docs');
     expect(is_file($this->docsDir . '/tmp.md'))->toBeFalse();
 });
 
@@ -87,7 +87,7 @@ it('POST /scaffold/docs/reorder 全局编号写回 + 顺序生效', function () 
     file_put_contents($this->docsDir . '/b.md', "---\ntitle: B\ngroup: 指南\norder: 2\n---\n");
 
     $this->postJson('/scaffold/docs/reorder', ['slugs' => ['b', 'a']])
-        ->assertOk()->assertJson(['ok' => true, 'changed' => 2]);
+        ->assertOk()->assertJson(['ok' => true, 'data' => ['changed' => 2]]);
     expect(file_get_contents($this->docsDir . '/b.md'))->toContain('order: 10');
     expect(file_get_contents($this->docsDir . '/a.md'))->toContain('order: 20');
 });
@@ -121,10 +121,10 @@ it('GET /scaffold/docs/search 命中标题与正文,返回 href;q 太短 → 422
     file_put_contents($this->docsDir . '/y.md', "---\ntitle: 无关\ngroup: 指南\n---\n不相关。\n");
 
     $r = $this->getJson('/scaffold/docs/search?q=' . urlencode('网关'))->assertOk();
-    expect($r->json('results'))->toHaveCount(1);
-    expect($r->json('results.0.slug'))->toBe('x');
-    expect($r->json('results.0.href'))->toContain('doc=');
-    expect($r->json('truncated'))->toBeFalse();
+    expect($r->json('data.results'))->toHaveCount(1);
+    expect($r->json('data.results.0.slug'))->toBe('x');
+    expect($r->json('data.results.0.href'))->toContain('doc=');
+    expect($r->json('data.truncated'))->toBeFalse();
 
     $this->getJson('/scaffold/docs/search?q=x')->assertStatus(422);
 });
@@ -138,8 +138,8 @@ it('GET /scaffold/docs/edit 新建模板不再写死 order(缺省沉组尾显「
 it('GET /scaffold/docs/picker → JSON 含 endpoints + tables 数组', function () {
     $r = $this->get('/scaffold/docs/picker');
     $r->assertOk();
-    expect($r->json('endpoints'))->toBeArray();
-    expect($r->json('tables'))->toBeArray();
+    expect($r->json('data.endpoints'))->toBeArray();
+    expect($r->json('data.tables'))->toBeArray();
 });
 
 it('只读模式 POST /scaffold/docs/save → 403(EnforceScaffoldWritable 锁 docs/*)', function () {
@@ -159,8 +159,8 @@ it('POST save 带 src=包 → 落包 docs/,host 不落;redirect 带 src', functi
     app()->instance(\Mooeen\Scaffold\Support\PackageRegistry::class, new \Mooeen\Scaffold\Support\PackageRegistry([$pkgRoot]));
 
     $r = $this->postJson('/scaffold/docs/save', ['slug' => 'pkg篇', 'content' => '正文', 'src' => 'dpkg']);
-    $r->assertOk()->assertJson(['ok' => true]);
-    expect($r->json('redirect'))->toContain('src=dpkg');
+    $r->assertOk()->assertJson(['ok' => true, 'data' => ['slug' => 'pkg篇']]);
+    expect($r->json('data.redirect'))->toContain('src=dpkg');
     expect(is_file($pkgRoot . '/docs/pkg篇.md'))->toBeTrue();
     expect(is_file($this->docsDir . '/pkg篇.md'))->toBeFalse();
 
@@ -171,4 +171,54 @@ it('POST save 未知 src → 422(写操作不静默回退 host)', function () {
     $this->postJson('/scaffold/docs/save', ['slug' => 'x', 'content' => 'y', 'src' => 'ghost-pkg'])
         ->assertStatus(422);
     expect(is_file($this->docsDir . '/x.md'))->toBeFalse();
+});
+
+// ─── 统一 JSON 信封（第 2 项 · 阶段 2） ───
+
+it('失败端点的信封：{ok:false,error:{code,msg,detail}} + 真 HTTP 码', function () {
+    // `UNKNOWN_SOURCE` 是「写操作不静默回退 host」那条守卫的机器可读码，三个写端点共用同一段
+    // 判断 ⇒ 三处必须完全同形。前端从「把 error 当字符串 toast」改成读 `error.msg`，
+    // 所以这里同时反证 `error` 不再是字符串（否则前端会 toast 出 [object Object]）。
+    foreach (['save', 'reorder', 'delete'] as $endpoint) {
+        $payload = $endpoint === 'reorder'
+            ? ['slugs' => ['a'], 'src' => 'ghost-pkg']
+            : ['slug' => 'x', 'content' => 'y', 'src' => 'ghost-pkg'];
+
+        $res  = $this->postJson('/scaffold/docs/' . $endpoint, $payload)->assertStatus(422);
+        $body = json_decode($res->getContent(), true);
+
+        expect($body['ok'])->toBeFalse()
+            ->and($body['error']['code'])->toBe('UNKNOWN_SOURCE')
+            ->and($body['error']['msg'])->toContain('ghost-pkg')
+            ->and($body['error']['detail'])->toBeArray()   // 缺省也必须是数组：形状恒定，前端才敢直接取
+            ->and($body['error'])->not->toBeString();
+    }
+    expect(is_file($this->docsDir . '/x.md'))->toBeFalse();
+});
+
+it('成功端点的信封：payload 一律在 data 下，顶层只有 ok / data', function () {
+    file_put_contents($this->docsDir . '/x.md', "---\ntitle: 网关\ngroup: 指南\n---\n网关正文。\n");
+    file_put_contents($this->docsDir . '/y.md', "y\n");
+
+    $body = fn ($res) => json_decode($res->getContent(), true);
+
+    $bodies = [
+        'preview' => $body($this->postJson('/scaffold/docs/preview', ['content' => '# 标题'])->assertOk()),
+        'reorder' => $body($this->postJson('/scaffold/docs/reorder', ['slugs' => ['x', 'y']])->assertOk()),
+        'picker'  => $body($this->get('/scaffold/docs/picker')->assertOk()),
+        'search'  => $body($this->get('/scaffold/docs/search?q=' . urlencode('网关'))->assertOk()),
+    ];
+
+    foreach ($bodies as $b) {
+        // 顶层只能有 ok / data 两个键 —— 反证没有哪个载荷键(html/changed/endpoints/…)
+        // 漏在顶层。这条是「全量统一」这个决定的守卫：旧形态就是载荷直接铺在顶层。
+        expect(array_keys($b))->toBe(['ok', 'data'])
+            ->and($b['ok'])->toBeTrue();
+    }
+
+    // 逐端点钉住「载荷在 data 的哪个键上」—— 前端解包后读的就是这些
+    expect($bodies['preview']['data'])->toHaveKey('html')
+        ->and($bodies['reorder']['data'])->toHaveKey('changed')
+        ->and($bodies['picker']['data'])->toHaveKeys(['endpoints', 'tables'])
+        ->and($bodies['search']['data'])->toHaveKeys(['q', 'results', 'truncated']);
 });

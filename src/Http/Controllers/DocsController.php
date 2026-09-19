@@ -32,6 +32,15 @@ use Mooeen\Scaffold\Utility;
  *   GET  /scaffold/docs/search        全文搜索（标题/slug/正文，跨全源，只读 JSON）。
  *   GET  /scaffold/docs/_diagram      Mermaid 隔离渲染帧（单独放宽 CSP）。
  *   GET  /scaffold/docs/picker        引用 picker 的接口/表 catalog（JSON）。
+ *
+ * 三个 JSON **错误**码：`UNKNOWN_SOURCE`（非法/未发现源，写操作不静默回退 host）、
+ * `REORDER_FAILED` / `SAVE_FAILED` / `DELETE_FAILED`（repo 抛出的领域失败）。
+ * 全部走基类 `ok()` / `error()` 信封（`{ok:true,data:{…}}` /
+ * `{ok:false,error:{code,msg,detail}}` + HTTP 码）；前端一律经 `window.ScaffoldApi`
+ * 解包（见 `docs-editor.js` / `docs-home.js`）。
+ *
+ * ⚠ 本文件内**不要**出现裸 JSON 出口的字面写法（连注释里也不要）——
+ * `JsonEnvelopeTest` 的结构不变式是**按文件内容**扫的，注释里的字面量同样会把它扫红。
  */
 class DocsController extends Controller
 {
@@ -108,7 +117,7 @@ class DocsController extends Controller
             }
         }
 
-        return response()->json(['q' => $q, 'results' => $results, 'truncated' => $truncated]);
+        return $this->ok(['q' => $q, 'results' => $results, 'truncated' => $truncated]);
     }
 
     /**
@@ -157,15 +166,15 @@ class DocsController extends Controller
 
         $src = $this->normalizeSrc($data['src'] ?? '');
         if ($src !== null && ! $this->repo->isKnownSource($src)) {
-            return response()->json(['error' => "未知文档源 [{$src}]。"], 422);   // 写操作不静默回退 host
+            return $this->error('UNKNOWN_SOURCE', "未知文档源 [{$src}]。", 422);   // 写操作不静默回退 host
         }
         try {
             $changed = $this->repo->reorder(array_values($data['slugs']), $src);
         } catch (\Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 422);
+            return $this->error('REORDER_FAILED', $e->getMessage(), 422);
         }
 
-        return response()->json(['ok' => true, 'changed' => $changed]);
+        return $this->ok(['changed' => $changed]);
     }
 
     public function edit(ReadRequest $req): View
@@ -202,16 +211,15 @@ class DocsController extends Controller
 
         $src = $this->normalizeSrc($data['src'] ?? '');
         if ($src !== null && ! $this->repo->isKnownSource($src)) {
-            return response()->json(['error' => "未知文档源 [{$src}]。"], 422);   // 写操作不静默回退 host
+            return $this->error('UNKNOWN_SOURCE', "未知文档源 [{$src}]。", 422);   // 写操作不静默回退 host
         }
         try {
             $slug = $this->repo->save($data['slug'], (string) $data['content'], $src);
         } catch (\Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 422);
+            return $this->error('SAVE_FAILED', $e->getMessage(), 422);
         }
 
-        return response()->json([
-            'ok'       => true,
+        return $this->ok([
             'slug'     => $slug,
             'redirect' => route('docs.index', ['doc' => $slug] + ($src !== null ? ['src' => $src] : [])),
         ]);
@@ -222,7 +230,7 @@ class DocsController extends Controller
         $data = $req->validated();
         $body = $this->repo->parseRaw((string) $data['content'])['body'];
 
-        return response()->json(['html' => $this->renderer->render($body)]);
+        return $this->ok(['html' => $this->renderer->render($body)]);
     }
 
     public function delete(DeleteRequest $req): JsonResponse
@@ -231,15 +239,15 @@ class DocsController extends Controller
 
         $src = $this->normalizeSrc($data['src'] ?? '');
         if ($src !== null && ! $this->repo->isKnownSource($src)) {
-            return response()->json(['error' => "未知文档源 [{$src}]。"], 422);   // 写操作不静默回退 host
+            return $this->error('UNKNOWN_SOURCE', "未知文档源 [{$src}]。", 422);   // 写操作不静默回退 host
         }
         try {
             $this->repo->delete($data['slug'], $src);
         } catch (\Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 422);
+            return $this->error('DELETE_FAILED', $e->getMessage(), 422);
         }
 
-        return response()->json(['ok' => true, 'redirect' => route('docs.index', $src !== null ? ['src' => $src] : [])]);
+        return $this->ok(['redirect' => route('docs.index', $src !== null ? ['src' => $src] : [])]);
     }
 
     /** '' / 'host' 归一为 null(host)。 */
@@ -267,7 +275,7 @@ class DocsController extends Controller
 
     public function picker(SchemaLoader $loader): JsonResponse
     {
-        return response()->json([
+        return $this->ok([
             'endpoints' => $this->apiCatalog(),
             'tables'    => $this->dbCatalog($loader),
         ]);
