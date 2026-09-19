@@ -10,7 +10,7 @@
 
 namespace Mooeen\Scaffold\Generator;
 
-use Mooeen\Scaffold\Utility;
+use Mooeen\Scaffold\Support\ControllerName;
 use Symfony\Component\Yaml\Yaml;
 
 class CreateApiGenerator extends Generator
@@ -170,7 +170,7 @@ class CreateApiGenerator extends Generator
 
         foreach ($routes as $route) {
             [$controllerClass, $actionName] = explode('@', $route['action']);
-            $shortName                      = Utility::stripControllerSuffix(class_basename($controllerClass));
+            $shortName                      = ControllerName::strip(class_basename($controllerClass));
             $method                         = $this->normalizeMethod($route['method']);
 
             if (! isset($grouped[$shortName])) {

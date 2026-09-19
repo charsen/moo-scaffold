@@ -17,6 +17,7 @@ use Mooeen\Scaffold\Rules\Mobile;
 use Mooeen\Scaffold\Rules\NumericArray;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Support\ColumnTypeGroups;
+use Mooeen\Scaffold\Support\ControllerName;
 use Mooeen\Scaffold\Support\FieldName;
 use Mooeen\Scaffold\Utility;
 
@@ -123,7 +124,7 @@ class CreateControllerGenerator extends Generator
                 $table_attrs     = $this->utility->getOneTable($attr['table_name']);
                 $fields          = $table_attrs['fields'];
                 $enums           = $table_attrs['enums'];
-                $controller_name = Utility::stripControllerSuffix($class);
+                $controller_name = ControllerName::strip($class);
 
                 // 验证规则处理
                 $rules = $this->rebuildFieldsRules($fields, $enums);

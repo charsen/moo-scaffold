@@ -12,7 +12,7 @@ namespace Mooeen\Scaffold\Generator;
 
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Support\Str;
-use Mooeen\Scaffold\Utility;
+use Mooeen\Scaffold\Support\ControllerName;
 
 class CreateViewGenerator extends Generator
 {
@@ -32,7 +32,7 @@ class CreateViewGenerator extends Generator
         $attr = $all[$schema_name][$controller];
 
         // 删除字符串尾部的 Controller 字符
-        $attr['class'] = Utility::stripControllerSuffix($controller);
+        $attr['class'] = ControllerName::strip($controller);
 
         $module             = Str::snake($attr['module']['folder'], '-');
         $entity             = Str::snake($attr['class'], '-');

@@ -17,6 +17,7 @@ use Illuminate\Filesystem\Filesystem;
 use InvalidArgumentException;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Support\ConsoleUi;
+use Mooeen\Scaffold\Support\ControllerName;
 use Mooeen\Scaffold\Support\PackageRegistry;
 use Mooeen\Scaffold\Support\Paths;
 use Mooeen\Scaffold\Support\TargetContext;
@@ -147,8 +148,10 @@ class Utility
 
     /**
      * 日期统一展示为 Y-m-d
+     *
+     * 内部专用：唯一调用点是 {@see normalizeApiActionMeta()}。
      */
-    public function formatDisplayDate(string $value): string
+    private function formatDisplayDate(string $value): string
     {
         $value = trim($value);
         if ($value === '') {
@@ -212,8 +215,10 @@ class Utility
 
     /**
      * Get Resource Path
+     *
+     * 内部专用：唯一调用点是 {@see targetContext()} 的 host 臂。
      */
-    public function getResourcePath($relative = false): string
+    private function getResourcePath($relative = false): string
     {
         $path = base_path($this->getConfig('resource.path'));
 
@@ -414,27 +419,32 @@ class Utility
 
     /**
      * 添加 git ignore 文件
+     *
+     * 收 `ConsoleUi` 而非原来的无类型 `$command`（2026-09-19，NOTES 登记的遗留项）——输出出口
+     * 由调用方决定，本方法不再内联 `new ConsoleUi(...)`。
      */
-    public function addGitIgnore($command): void
+    public function addGitIgnore(ConsoleUi $console): void
     {
         $file = storage_path('scaffold/') . '.gitignore';
         if (! $this->filesystem->isFile($file)) {
             $relative_file = '.' . str_replace(base_path(), '', $file);
 
             if ($this->filesystem->put($file, '*' . PHP_EOL . '!.gitignore') === false) {
-                (new ConsoleUi($command))->failed($relative_file, '写入失败，文件未变更');
+                $console->failed($relative_file, '写入失败，文件未变更');
 
                 return;
             }
 
-            (new ConsoleUi($command))->created($relative_file);
+            $console->created($relative_file);
         }
     }
 
     /**
      * 根据语言解析
+     *
+     * 内部专用：调用点只有 {@see parsePMCNames()} 与 {@see parseActionInfo()}。
      */
-    public function parseByLanguages(string $string): array
+    private function parseByLanguages(string $string): array
     {
         $languages = $this->getConfig('languages');
         $string    = str_replace("'", '&apos;', $string);
@@ -825,28 +835,20 @@ class Utility
     }
 
     /**
-     * controller 类名归一化：去掉末尾的 `Controller` 后缀。
-     *
-     * **只剥尾缀** —— `UserController` → `User`，但中间含 `Controller` 的名字不动
-     * （`ControllerManager` 原样返回）。历史上各端混用 `str_replace`（删全部出现）/
-     * `Str::replaceLast`（删最后一次）语义不一，对病态名字结果发散；这里收敛到 `Str::replaceEnd` 同义。
-     * 短名 / FQCN 都可传（后缀在末尾，不受前缀影响）。
+     * @deprecated 2026-09-19 起实现已外迁到 {@see ControllerName::strip()}，此处仅为尚未迁移的宿主转发。
+     *             新代码请直调 `ControllerName::strip()`。
      */
     public static function stripControllerSuffix(string $class): string
     {
-        return str_ends_with($class, 'Controller')
-            ? substr($class, 0, -10) // strlen('Controller') === 10
-            : $class;
+        return ControllerName::strip($class);
     }
 
     /**
-     * controller 类名归一化：保证以 `Controller` 结尾（缺则补，已有不重复，空串原样返回）。
-     * 跟 {@see stripControllerSuffix()} 互为逆操作，同为单一真源。
+     * @deprecated 2026-09-19 起实现已外迁到 {@see ControllerName::ensure()}，此处仅为尚未迁移的宿主转发。
+     *             新代码请直调 `ControllerName::ensure()`。
      */
     public static function ensureControllerSuffix(string $class): string
     {
-        return $class === '' || str_ends_with($class, 'Controller')
-            ? $class
-            : $class . 'Controller';
+        return ControllerName::ensure($class);
     }
 }

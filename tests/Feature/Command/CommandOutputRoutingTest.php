@@ -14,9 +14,9 @@ declare(strict_types=1);
  *
  * 有意例外（在此登记，不进扫描）：
  *   - `src/Http/Controllers/DesignerController::error()` 是 HTTP JSON 响应助手，与控制台无关；
- *   - `src/Support/Markdown/DocShortcodeResolver::error()` 是它自己的错误收集器；
- *   - `src/Utility::addGitIgnore($command)` 仍 `new ConsoleUi($command)` —— 它是 Utility 的公开方法
- *     且参数无类型，改成收 ConsoleUi 属公开签名变更，留待 Utility 拆分时一并处理。
+ *   - `src/Support/Markdown/DocShortcodeResolver::error()` 是它自己的错误收集器。
+ * （原第 3 条例外 `Utility::addGitIgnore($command)` 于 2026-09-19 消除：该方法改收 `ConsoleUi` 参数，
+ *   不再内联 `new ConsoleUi(...)`。）
  */
 it('命令层与 RouterTool 不直连原生输出，一律走 console()', function () {
     $root = dirname(__DIR__, 3);

@@ -3,6 +3,43 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-19，**`Utility` 拆分 · 阶段 3a：先量持有面与组间重叠，再决定「一次切四类」不值得**：
+  **先量**：852 行 / 45 个公开成员（1 构造器 + 42 实例 + 2 静态）= 5 组职责 —— CORE 配置与身份(3)、PATHS 路径(13)、
+  REGISTRY 聚合缓存读取(14)、DOCMETA docblock 与动作元信息(12)、NAME 控制器名归一(2)；src 调用点
+  52 / 70 / 54 / 45 / 8。**决定拆分顺序的不是方法数，是「组间文件重叠」**：PATHS∩REGISTRY=14 文件、
+  PATHS∩CORE=13、REGISTRY∩CORE=9、PATHS∩DOCMETA=8 —— 按职责切多类会把 14+ 个文件的构造函数
+  从 1 个参数变成 2~3 个，而**功能行为零变化**，且会与后续 `ApiController` / `SchemaLoader` 拆分改同一批文件。
+  **持有面**：22 个 src 类构造注入 `Utility`，其中 4 个是基类（`Command\Command` / `Generator\Generator` /
+  `Adder\Adder` / `Http\Controllers\Controller`）；5 个测试内匿名命令壳、2 个测试内 `extends Utility` 匿名子类
+  （覆写 `getControllerNamespaces()` / `getAppTargets()`，正是 REGISTRY 组）；`ResolvesOriginContext` trait
+  硬调 `$this->utility->targetContext($origin)` ⇒ 拆 PATHS 必须连 trait 一起改。
+  **外部消费者核查**（AGENTS.md 要求）：已知四个消费方引用 `Mooeen\Scaffold\Utility` **零处**、`$this->utility->`
+  **零处**，宿主只消费 `Concerns\*` / `Foundation\*` / `Rules\*` / `Exceptions\BaseException` / `Contracts\*` /
+  `Translation\MergingLoader`；宿主**无一处** `extends Scaffold\Http\Controllers\Controller`（宿主继承的
+  `Foundation\Controller` 直接 `extends Illuminate\Routing\Controller`，**不含 `$utility`**）⇒ `Utility` 是包内
+  实现细节，不是下游编译接口。
+  **本次做的（零/低风险三件）**：① 只被类内调用的 3 个方法收成 `private`（`formatDisplayDate` ←
+  `normalizeApiActionMeta`；`getResourcePath` ← `targetContext`；`parseByLanguages` ← `parsePMCNames`/`parseActionInfo`；
+  全仓 + Blade + 动态调用 `->{`/`->$` 均已核零外部调用点）⇒ 公开面 44 → 41；
+  ② NAME 组外迁 `Support\ControllerName`（`final` + 全静态 `strip()`/`ensure()`，与 `Paths`/`FieldName` 同形），
+  7 个 src 文件迁移，`Utility` 上只留两行 `@deprecated` 转发 —— **转发不用删**：删了只省 6 行，留转发让未迁移的
+  宿主不炸，成本是一行委托（它的等价性由测试钉住，见下）；③ 收口**上一条登记的遗留**：`addGitIgnore(ConsoleUi
+  $console)`（见本文件下方 2026-09-18「ConsoleUi 唯一出口」条目里那条「遗留一处」）。
+  **这批守卫的鉴别力（5 处打哑，红集互不相同 —— 这正是不给它们合并的理由）**：M1 `formatDisplayDate` 回 public
+  ⇒ **2 红**（private 锚点 + 公开面预算，两条各守一面）；M2 `ControllerName::strip` 改成旧「删全部」语义 ⇒
+  **3 红**（语义三条：只剥末尾 / 不动中间开头 / 互逆），而**等价性那条是绿的**；M3 让 `Utility::stripControllerSuffix`
+  自带一份分叉实现 ⇒ **恰好 1 红 = 等价性那条**，语义三条全绿；M4 把某个 src 内部调用点改回废弃转发 ⇒
+  **恰好 1 红 = 结构锚点**，行为测试全绿；M5 `addGitIgnore` 首参退回无类型 ⇒ **恰好 1 红 = 首参类型锚点**。
+  ⇒ **「等价性」抓不到语义对错，「语义」抓不到分叉实现，「行为」抓不到「内部又调回废弃转发」**，三者缺一不可。
+  **全量 1 failed / 3 skipped / 1110 passed（4274 断言）**（基线 1105 passed / 4240 断言，+5 例 / +34 断言），
+  红仍是 `ConfigControllerTest:305` 那条 env 耦合基线（见本文件另条）；`pint --dirty --test` 15 files PASS，
+  写入式 pint 只删掉 4 个因本次改动而失效的 `use Mooeen\Scaffold\Utility;`（已逐文件核 diff，无夹带重排）。
+  **剩余阶段**（不建议一次做完）：3b = REGISTRY 14 个读方法 → `Support\StorageRegistry`（顺带把两个
+  `extends Utility` 测试桩改成绑容器假件，那本来就是更好的测试缝）+ DOCMETA 里 5 个无状态纯函数
+  （`parseActionName`/`parseActionDesc`/`getActionRequestClass`/`isApiActionDeprecated`/`normalizeMenusTransform`）
+  零 DI 成本外迁 `Support\ActionDoc`；3c = PATHS，**必须与 `TUNING-PLAN.md` §三 P2（给 `targetContext` 补 host 臂
+  controller/request 的 path+namespace）合并考虑**，否则同一个 `targetContext` 要改两次。
+
 - 2026-09-19，**阶段 3 收口：删掉前端仅剩的两处「旧形态」容忍（顶层字符串 `error` + 无状态码兜底）**：
   **删了什么**：`ScaffoldApi.errorText()` 里 `typeof j.error === 'string' → return j.error`；
   `ScaffoldApi.isOk()` 里 `if (status === 0 && j.error) return false;`。
@@ -684,8 +721,10 @@
   服务契约（`DesignerController` 三处直接展示，测试 `toStartWith('⚠ ')` 锁着），改消息会破坏 web 端。
   **验证**：打哑两处（去掉 `warn()` 去重 + 还原一个调用点）⇒ **恰好 3 条失败**（2 条去重 dataset + 1 条锚点），
   恢复后 12/12 绿；全量 **980 passed / 1 failed / 3 skipped**（基线 968 + 新增 12 条）= **净增失败 0**。
-  **遗留一处**：`Utility::addGitIgnore($command)` 仍写 `new ConsoleUi($command)` —— 它是 `Utility` 的公开方法
-  且参数无类型，收成 `ConsoleUi` 属公开签名变更，留待 Utility 拆分时一并处理（已在锚点测试里登记为有意例外）。
+  **该处遗留已于 2026-09-19 消除**：原先 `Utility::addGitIgnore($command)` 仍写 `new ConsoleUi($command)`，因它是
+  `Utility` 的公开方法且参数无类型、收成 `ConsoleUi` 属公开签名变更，当时留待 Utility 拆分时一并处理，并在锚点
+  测试里登记为有意例外。现已收成 `addGitIgnore(ConsoleUi $console)`，锚点测试里那第 3 条例外**已删**（原条目的
+  「已登记为有意例外」结论作废）；细节见本文件顶部 2026-09-19 的「`Utility` 拆分 · 阶段 3a」条目。
 
 - 2026-09-18，**批量变量改名的「纯重命名」证法 —— 不要靠人眼读 diff**：
   变量名可读性整治（`$temp` / `$tmp_field` / `$fc` / `$ic` / `$ch` / `$b` / `$a` 这类缩写与一名多义）属机械改写，

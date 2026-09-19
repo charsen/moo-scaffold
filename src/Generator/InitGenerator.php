@@ -23,7 +23,7 @@ class InitGenerator extends Generator
 
         $this->updateEnvFile($author);
 
-        $this->utility->addGitIgnore($this->command);
+        $this->utility->addGitIgnore($this->console());
 
         return true;
     }
