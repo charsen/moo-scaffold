@@ -4,6 +4,8 @@ namespace Mooeen\Scaffold\Http\Controllers;
 
 use Composer\InstalledVersions;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use Mooeen\Monitor\Cloud\CloudSync;
 use Mooeen\Monitor\MonitorProvider;
@@ -25,6 +27,10 @@ use Throwable;
  *
  * 推送逻辑与 CloudPushCommand 同骨架(CloudSync::sync + pruneLocal),不在请求链路常驻,
  * 仅 user 显式点按时跑一次。
+ *
+ * 回执统一走基类信封:`backOk()` / `backError()` 只会分发到 `ok()` / `error()` ——
+ * 全站不再有第三种 JSON 形状(旧版是 `{ok,message}`,既有 ok 布尔又有 message 字符串)。
+ * 表单请求(本页两个按钮都是原生 POST)仍走 flash + 回列表,与 JSON 分支并行不耦合。
  */
 class CloudController extends Controller
 {
@@ -382,7 +388,7 @@ class CloudController extends Controller
     {
         $cfg = (array) config('moo-monitor.cloud', []);
         if (! ($cfg['enabled'] ?? false) || empty($cfg['base_url']) || empty($cfg['token'])) {
-            return $this->back($request, false, 'cloud 未启用（MOO_MONITOR_CLOUD_ENABLED），或 MOO_MONITOR_CLOUD_TOKEN 未配置（URL 已有默认值）。');
+            return $this->backError($request, 'CLOUD_NOT_CONFIGURED', 'cloud 未启用（MOO_MONITOR_CLOUD_ENABLED），或 MOO_MONITOR_CLOUD_TOKEN 未配置（URL 已有默认值）。');
         }
 
         $sync      = $this->cloudSync;
@@ -449,38 +455,38 @@ class CloudController extends Controller
             // 部分完成事实不能丢；各类型独立尝试后，再统一列出仍待重试的类型。
             $prefix = $progress !== [] ? implode(' · ', $progress) . '；' : '';
 
-            return $this->back($request, false, $prefix . implode('；', $failures));
+            return $this->backError($request, 'PUSH_INCOMPLETE', $prefix . implode('；', $failures));
         }
 
         if ($skipped > 0 && $confirmed === 0 && $rejected === 0 && $recycled === 0) {
             // 分类型开关、同类型任务正在执行等跳过原因必须原样反馈；不能统一伪装成配置关闭，
             // 也不能显示「已确认 0 条」假成功。
-            return $this->back($request, false, '推送未执行：' . implode('；', $skipNotes) . '。');
+            return $this->backError($request, 'PUSH_SKIPPED', '推送未执行：' . implode('；', $skipNotes) . '。');
         }
 
         $msg = $progress !== [] ? implode(' · ', $progress) : '已确认 0 条';
 
-        return $this->back($request, true, $msg);
+        return $this->backOk($request, $msg);
     }
 
     /** 清理 local 开发噪音：Cloud 软删未解决项，本地丢弃 pending；已解决与已同步锚点不动。 */
     public function discard(ContextRequest $request)
     {
         if (! app()->environment('local')) {
-            return $this->back($request, false, '仅 local 开发环境允许清理开发噪音。');
+            return $this->backError($request, 'NOT_LOCAL_ONLY', '仅 local 开发环境允许清理开发噪音。');
         }
         if (ReadonlyMode::configLocked()) {
-            return $this->back($request, false, '当前为只读模式，禁止清理开发噪音。');
+            return $this->backError($request, 'READONLY_LOCKED', '当前为只读模式，禁止清理开发噪音。');
         }
 
         $cfg = (array) config('moo-monitor.cloud', []);
         if (! ($cfg['enabled'] ?? false) || empty($cfg['base_url']) || empty($cfg['token'])) {
-            return $this->back($request, false, 'Cloud 未启用或 URL / Token 未配置，无法联动清理 local 开发噪音。');
+            return $this->backError($request, 'CLOUD_NOT_CONFIGURED', 'Cloud 未启用或 URL / Token 未配置，无法联动清理 local 开发噪音。');
         }
 
         $sync = $this->cloudSync;
         if (! is_callable([$sync, 'discardLocalNoise'])) {
-            return $this->back($request, false, '当前 moo-monitor-laravel 版本不支持清理开发噪音，请先升级。');
+            return $this->backError($request, 'DISCARD_UNSUPPORTED', '当前 moo-monitor-laravel 版本不支持清理开发噪音，请先升级。');
         }
 
         $labels         = ['runtimes' => '运行时错误', 'slow_sql' => '慢 SQL'];
@@ -519,14 +525,14 @@ class CloudController extends Controller
             }
             $prefix = $progress !== [] ? implode(' · ', $progress) . '；' : '';
 
-            return $this->back($request, false, $prefix . implode('；', $failures));
+            return $this->backError($request, 'DISCARD_INCOMPLETE', $prefix . implode('；', $failures));
         }
 
         $message = ($cloudDeleted > 0 || $localDiscarded > 0)
             ? "已清理 local 开发噪音：Cloud 已删除 {$cloudDeleted} 条未解决记录，本地已丢弃 {$localDiscarded} 条待推记录；已解决记录保持不动。"
             : '没有需要清理的 local 开发噪音。';
 
-        return $this->back($request, true, $message);
+        return $this->backOk($request, $message);
     }
 
     /** @return array{label:string,dir:string,icon:string,open:int,cursor:?string,pending:?int} */
@@ -557,13 +563,32 @@ class CloudController extends Controller
         return substr($token, 0, 6) . '••••••' . substr($token, -4);
     }
 
-    private function back(FormRequest $request, bool $ok, string $message)
+    /**
+     * 失败回执:JSON 请求走统一失败信封(带机器可读 `$code`),表单请求走 flash_error + 回列表。
+     *
+     * `$code` 故意**不给默认值** —— 与基类 `error()` 的 `$http` 同款约束,强制每个调用点
+     * 表态失败原因,前端才有得分支(否则只会拿到一句中文文案)。
+     */
+    private function backError(FormRequest $request, string $code, string $message): JsonResponse|RedirectResponse
     {
-        if ($request->ajax() || $request->expectsJson()) {
-            return response()->json(['ok' => $ok, 'message' => $message], $ok ? 200 : 422);
-        }
-        $request->session()->flash($ok ? 'flash_message' : 'flash_error', $message);
+        if (! $request->ajax() && ! $request->expectsJson()) {
+            $request->session()->flash('flash_error', $message);
 
-        return redirect()->route('cloud.index');
+            return redirect()->route('cloud.index');
+        }
+
+        return $this->error($code, $message, 422);
+    }
+
+    /** 成功回执:JSON 请求走统一成功信封,表单请求走 flash_message + 回列表。 */
+    private function backOk(FormRequest $request, string $message): JsonResponse|RedirectResponse
+    {
+        if (! $request->ajax() && ! $request->expectsJson()) {
+            $request->session()->flash('flash_message', $message);
+
+            return redirect()->route('cloud.index');
+        }
+
+        return $this->ok(['message' => $message]);
     }
 }
