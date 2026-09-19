@@ -77,7 +77,8 @@ eq('jqXHR 形态同样取得到', Api.data({ status: 200, responseJSON: { ok: tr
 const failEnvelope = { status: 422, responseJSON: { ok: false, error: { code: 'UNKNOWN_SOURCE', msg: '未知文档源 [ghost]。', detail: [] } } };
 eq('失败：errorText 取到 msg（旧写法会 toast 出 [object Object]）', Api.errorText(failEnvelope, '保存失败'), '未知文档源 [ghost]。');
 eq('失败：旧读法确实会拿到对象（所以必须走 errorText）', typeof failEnvelope.responseJSON.error, 'object');
-eq('失败：旧形态 {error:"…"} 仍能取到文案（迁移期双形态）', Api.errorText({ status: 422, responseJSON: { error: '炸了' } }, '保存失败'), '炸了');
+eq('失败：顶层字符串 error 的读法已删 ⇒ 回退到调用方文案（让"还有人产旧形态"可见）',
+    Api.errorText({ status: 422, responseJSON: { error: '炸了' } }, '保存失败'), '保存失败');
 
 console.log('== 形态层：旧读法必须清零 ==');
 

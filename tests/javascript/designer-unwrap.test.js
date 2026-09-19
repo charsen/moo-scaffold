@@ -82,7 +82,10 @@ async function catchErr(promise) {
 
     console.log('== 旧形态与降级 ==');
     const e2 = await catchErr(designer._unwrap(res(422, { error: '炸了' })));
-    eq('字符串 error 也能取到文案（旧实现此处会得到 undefined）', e2.message, '炸了');
+    // 顶层字符串 `error` 的读法 2026-09-19 已从 ScaffoldApi 删除 ⇒ 文案落到 `_unwrap` 传的 fallback。
+    // 这条断言是**故意**钉住降级后的行为：host 若还产 `{error:"…"}`，toast 会显示「请求失败」而不是
+    // 那句内容 —— 看得见的回退，好过被静默当作正常文案。
+    eq('字符串 error 不再被当文案（容忍已删）⇒ 落到 fallback', e2.message, '请求失败');
     eq('字符串 error 下 detail 为 undefined（保持原语义）', typeof e2.detail, 'undefined');
     eq('无 error 对象时 code 降级为 HTTP_<码>', e2.code, 'HTTP_422');
     eq('e.status 仍是真实状态码', e2.status, 422);

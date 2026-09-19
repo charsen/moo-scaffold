@@ -3,6 +3,47 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-19，**阶段 3 收口：删掉前端仅剩的两处「旧形态」容忍（顶层字符串 `error` + 无状态码兜底）**：
+  **删了什么**：`ScaffoldApi.errorText()` 里 `typeof j.error === 'string' → return j.error`；
+  `ScaffoldApi.isOk()` 里 `if (status === 0 && j.error) return false;`。
+  **为什么能删**：顶层字符串 `error` 的最后两个产出方（`DocsController`、三个 Enforce* 中间件）2026-09-19
+  都迁进了信封，而框架层走 `{message}`、代理走 `_proxy_status`，都不产这个形态；
+  `isOk()` 全仓**唯一**调用点是 `designer.js._unwrap()`，经 `fromFetch(res, json)` 进来**必然**带数字状态码
+  ⇒ `status === 0` 不可达，且这条启发式**判据不稳**（同一个 `{html, error:'frontmatter 警告'}`：
+  带 200 时算成功 —— 2xx 上的 `error` 是领域字段；不带状态码时算失败）。
+  **行为变化（有意的）**：`errorText(jq(422, {error:'炸了'}))` 从 `'炸了'` 变 `'HTTP 422'`；
+  `isOk({error:'炸了'})`（无状态码）从 `false` 变 `true`。**方向**：容忍会把「还有人产旧形态」**静默**
+  变成一句看起来正常的 toast，删掉后同场景落到 `fallback` / `HTTP <码>` —— **回退可见**才是想要的信号。
+  **它推翻了下方一条旧结论**：2026-09-18 那条把「字符串 `error` 能拿到真文案（旧实现得到 `new Error(undefined)`）」
+  写成**有意的改善**，该改善只在那天的迁移期成立，随容忍一并删除。
+  **守卫同步**（3 个 JS 守卫文件共 109 断言全绿）：`scaffold-api.test.js` 把两条断言改成钉「删后行为」、
+  `toError` 的 `detail` 断言改用框架层形态喂入、`errorText 取值优先级` 那条改用新信封喂入
+  （否则它自己会变成**假绿**——旧喂入形状下它仍写着「body 优先于 fallback」）；`docs-unwrap.test.js` /
+  `designer-unwrap.test.js` 各一条改成钉「落到 fallback / `请求失败`」。
+  **刻意没动**：框架层 `{message}` 读法（永久契约，见上一条）、代理 `_proxy_status`、`data()` 的真值分支。
+
+- 2026-09-19，**`{message}` 不是「旧形态」而是「框架层」的形态 —— 前端 `j.message` 读法是永久契约**：
+  **误判**：信封迁移收尾时我把 `{message:"…"}` 记成「第 6 种旧形态、迁完就删」，`api.js` 里
+  `errorText()` 那句 `if (j.message)` 也被标成「旧：BaseException（已迁完）/ API 代理」。
+  **实测推翻**（探针打真 HTTP 栈）：合成 `abort(404, '文案')` + `getJson` ⇒ body **恰好** `{"message":"文案"}`；
+  `postJson` 缺参 ⇒ `{"message":"…","errors":{…}}`；连打 31 次 `plans.save`（`throttle:30,1`）⇒ 第 31 次
+  `{"message":"Too Many Attempts."}`。而 `abort*()` 在 `src/` 里有 **20+ 处**（`Support\LocalMarkdownEditor` 的
+  403/409/422、`PlansController:25`、`ApiController:421-442`、`Requests\LocalMarkdown\PreviewRequest:14,16`）。
+  **判据**：`abort()` 是 Laravel 的惯用法，给它们套信封 = 接管 exception handler（`Exceptions::renderable`），
+  收益为零、风险全在框架升级上 ⇒ **框架层永久在信封之外**，前端 `j.message` 读法是**契约**而非兼容分支。
+  真正「已无产出方」的只有 `{error:"字符串"}`（Docs + 三个 Enforce* 中间件迁完后就没了）——
+  两者曾被写在同一句「这两支只剩容忍，阶段 3 一起删」里，**别照那句删**。
+  **两侧守卫配对（这条链才算闭合）**：PHP 侧新增 `tests/Feature/Http/FrameworkErrorShapeTest.php` 4 条 ——
+  合成 `abort(404)` 的 body 恰好 `['message']` 且**反证**没有 `ok`/`error` 键、真产线 409（version 不符）的文案
+  **逐字**等于「文件已被修改，请重新打开后再编辑。」+ 磁盘未被改动、校验袋顶层**恰好** `['message','errors']`、
+  限流边界**恰好**第 31 次 429；JS 侧 `api.js`/`scaffold-api.test.js` 补框架层 5 条（404 / 429 / 校验袋文案，
+  以及校验袋过 `data()` 后 `errors` 原样保留 —— `local-markdown-editor.js` 直读 `errors.content[0]`）。
+  **突变（红集不相交 1/3）**：① 把 `LocalMarkdownEditor:72` 的 409 文案改一个字 ⇒ **恰好 1 红** ——
+  既有的 3 条 409 用例只断状态码、全绿 ⇒ 新用例是**唯一**钉住这句用户可见文案的地方；
+  ② 用 `Exceptions::renderable` 模拟「顺手把框架层也套上信封」⇒ **3 红**（404/409/429），
+  校验袋那条**保持绿**（`ValidationException` 不是 `HttpException`）。
+  **方法论**：清理「旧形态」前先问一句「**这个形态的产出方是谁**」—— 别把框架层当成自家旧代码。
+
 - 2026-09-19，**`designer.js` 的 `_post`/`_get` 去重（接上一条，统一信封阶段 2 的第一个消费者）**：
   **改了什么**：两个方法原先各抄了一份**逐字相同**的解包尾巴（失败即 `new Error` + 挂 `code`/`detail`/`status`，
   成功取 `data`），现抽成 `async _unwrap(res)`，两者只剩 `return this._unwrap(res);`。

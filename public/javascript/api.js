@@ -12,20 +12,25 @@
  *   - **fetch 的 `fromFetch(res, json)`** —— `res.json()` 会**消费掉 body**，
  *     所以必须显式把「HTTP 状态 + 已解析体」一起打包；直接传 `res` 会丢掉服务端文案。
  *
- * **迁移期双形态兼容**：后端正逐控制器迁移，新旧响应在一段时间内并存，所以本层两种都吃
- * （见 `isOk()` / `data()`）。这让迁移可以**按控制器灰度进行**，而不必一次性改完前端。
+ * **迁移已收口（2026-09-19）**：本包自有的产出方（控制器 / 中间件 / 业务异常）**全部**上了信封，
+ * 所以下面「非信封」那几类**不是迁移欠账、不能按旧形态删掉** —— 它们各有活产出方或永久契约。
  *
- * 后端形态对照（**阶段 2 后端已于 2026-09-19 全部上信封**）：
+ * 后端形态对照：
  *   新信封：{ok:true, data:{…}}                    成功
- *           {ok:false, error:{code,msg,detail}} + HTTP 失败 —— 控制器 / 中间件 / 业务异常三类产出方
- *   旧形态：裸数据 {q,results,…} / {ok:true,…payload}   ← 无 error 键即视为成功
- *           {_proxy_status:N, message}（API 代理：HTTP 恒 200，真实状态在 body 里）——
- *             **唯一**仍在产 `{message}` 的出口，也是信封的**永久例外**（body 必须原样透传）
- *           {error:"字符串"}（**已无产出方**）/ {message:"…"}（异常出口：BaseException，**已迁完**）
- *             —— 这两支只剩容忍，阶段 3 与 `isOk` 的兜底一起删
+ *           {ok:false, error:{code,msg,detail}} + HTTP 失败 —— 控制器 / 中间件 / 业务异常三类
  *
- * ⚠ `ApiProxyController` 的响应**不走信封**（上游 body 必须原样透传），本层对它单独分支，
- *   别按新信封解读它的 body。
+ *   ① **框架层**（永久例外，刻意不套）：`abort(404,'文案')` → `{message:"文案"}`（`src/` 里 20+ 处）、
+ *      校验袋 `{message, errors}`、限流 `{message:"Too Many Attempts."}`。给它们套信封等于接管
+ *      Laravel 的 exception handler，收益为零 ⇒ **`errorText()` 的 `j.message` 读法是契约、不是兼容**。
+ *      后端一侧的守卫见 `tests/Feature/Http/FrameworkErrorShapeTest.php`。
+ *   ② **API 代理**（`ApiProxyController`，上游 body 必须原样透传）：失败 `{_proxy_status:N, message}` ——
+ *      HTTP 恒 200、真实状态在 body 里；成功可能是 `{data:<上游 body>}`，也可能上游关联数组直接作顶层。
+ *   ③ **裸数据 / {ok:true,…payload}**：DesignerController 的早期形态，与代理共用 `data()` 的
+ *      真值分支（`j.data ? j.data : j`；那条分支**刻意**保留真值判断，别"顺手统一"成 `!== undefined`）。
+ *
+ *   顶层字符串 `error`（`{error:"字符串"}`）这一支**已删**（2026-09-19）：它的最后两个产出方
+ *   —— DocsController 与三个 Enforce* 中间件 —— 都迁进了信封，框架层与代理又不产它；
+ *   `isOk()` 里那条「无状态码时把 `error` 键当失败」的兜底同时删除（判据见该函数注释）。
  */
 (function (window) {
     'use strict';
@@ -65,8 +70,8 @@
     /** 判定成败。HTTP 状态码优先，再看 body 里的标记。 */
     function isOk(src) {
         // HTTP 状态优先，而且对「失败」而言它**已经足够**：
-        // `{_proxy_status:N, message}`（API 代理）body 里没有任何成败标记，只有状态码能判 ——
-        // 注意代理的 HTTP 恒 200，所以那条出口真正靠的是下面 `_proxy_status` 的分支。
+        // 框架层（`abort(404,'文案')` / 限流 429 / CSRF 419）与 API 代理的 body 里**没有成败标记**
+        // —— 前者只有 `message`、后者靠 `_proxy_status`（HTTP 恒 200，见下面的分支）。
         // 反过来，2xx 上的 `error` 键**不一定**是失败 —— 见下面的领域字段分支。
         var status = httpStatus(src);
         if (status >= 400) {
@@ -85,20 +90,17 @@
             return j._proxy_status >= 200 && j._proxy_status < 300;
         }
 
-        // ⚠ `error` 键**只在拿不到状态码时**才当失败信号。
-        //
-        // 因为 2xx 上的 `error` 可能是**领域字段**而不是失败：本地 Markdown 预览
-        // （`PlansController::preview` / `ReleaseRecordsController::preview`，
-        // src/Http/Controllers/PlansController.php:77）返回的是
-        //     {html: '<已渲染正文>', error: <frontmatter 警告 | null>}
-        // + HTTP 200 —— 预览**成功了**，正文也渲染了，只是 frontmatter 有问题、
-        // 需要在编辑器里就地提示。若在这里判失败，一次成功的预览会被前端当成请求失败。
-        //
-        // 真正带 `error` 的失败（三个 Enforce* 中间件，403 —— 现已迁入信封，但状态码照旧 4xx）
-        // 一律配 4xx/5xx，上面那句状态码判断已经拦住了，不依赖这条启发式。
-        if (status === 0 && j.error) {
-            return false;
-        }
+        // 走到这里都算成功。**曾有一条 `if (status === 0 && j.error) return false;` 的兜底**
+        // （「拿不到状态码时把 `error` 键当失败信号」），2026-09-19 已删，两条理由：
+        //   ① **不可达**：`isOk()` 全仓唯一调用点是 `designer.js._unwrap()`，它经
+        //      `fromFetch(res, json)` 进来、**必然**带着 fetch 的数字状态码；
+        //      本层的输入形态契约只有「jqXHR」与「fromFetch 打包」两种（见文件头），
+        //      「无状态码的已解析 body」根本不是一种输入 ⇒ `status === 0` 只在 opaque / 网络错
+        //      时出现，而那时 `pick()` 也拿不到 body。
+        //   ② **判据本身不稳**：同一个 `{html, error:'frontmatter 警告'}`，带 200 时算成功
+        //      （2xx 上的 `error` 是**领域字段**，见本地 Markdown 预览的形态）、
+        //      不带状态码时算失败 —— 同一形状两个结论。判成败只该看「状态码 + body 的成败标记」，
+        //      别再引入「`error` 键像不像失败」这类启发式。
         return true; // 裸数据 / {ok:true,…payload} / {status:'ok'} / 2xx+领域 error 字段
     }
 
@@ -123,7 +125,7 @@
         if (typeof j.ok === 'boolean' && 'data' in j) {
             return j.data; // 新信封
         }
-        return j.data ? j.data : j; // 旧形态：忠实复刻 `json.data ? json.data : json`
+        return j.data ? j.data : j; // 代理 / 早期形态：忠实复刻 `json.data ? json.data : json`（真值判断）
     }
 
     /**
@@ -142,17 +144,19 @@
     function errorText(src, fallback) {
         var j = pick(src);
         if (j && typeof j === 'object') {
-            if (typeof j.error === 'string' && j.error) {
-                // 旧形态 `{error:"字符串"}` —— 产出方**已全部迁完**
-                // （DocsController 2026-09-19 上午、三个 Enforce* 中间件同日下午），
-                // 本分支现在是**纯容忍**：留着只为不在途中打红，阶段 3 与 `isOk` 的兜底一起删。
-                return j.error;
-            }
             if (j.error && typeof j.error === 'object' && j.error.msg) {
-                return j.error.msg; // 新：{code,msg,detail}
+                return j.error.msg; // 新信封：{code,msg,detail}
             }
+            // 顶层字符串 `error`（`{error:"字符串"}`）的读法**已于 2026-09-19 删除** ——
+            // 最后两个产出方是 DocsController 与三个 Enforce* 中间件，两者都已迁入信封；
+            // 框架层走下面的 `j.message`、代理走 `_proxy_status`，都不产这个形态。
+            // 删掉是为了**让回退可见**：host 若还照旧写法返回 `{error:"…"}`，文案会落到
+            // `fallback` / `HTTP <码>`（有信号），而不是被静默当作文案（看起来一切正常）。
             if (j.message) {
-                return j.message; // 旧：业务异常（BaseException，已迁完）/ API 代理
+                // **框架层**（`abort()` 文案 / 校验袋 / `Too Many Attempts.`）+ API 代理 ——
+                // 永久形态、不在信封迁移范围内，删了这句「文件已被修改，请重新打开后再编辑」
+                // 这类排障文案会降级成 `HTTP 409`（后端侧守卫见 FrameworkErrorShapeTest）。
+                return j.message;
             }
         }
         if (fallback) {

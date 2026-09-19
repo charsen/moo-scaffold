@@ -6,8 +6,10 @@
  *   而它又是后端信封迁移期**唯一**的兼容保障 —— 一行的优先级写反，全站 toast 都在撒谎，
  *   所以必须有一个能在 CI / 无宿主环境跑起来、秒级返回的守卫。
  *
- * 覆盖面：迁移期间新旧**全部**响应形态（新信封 / 业务异常出口 / 裸数据 / {error} / {message}
- * / {_proxy_status} / 无 status 的已解析 json / responseText 兜底），确认双形态兼容、迁移可灰度进行。
+ * 覆盖面：本层要吃下的**全部**输入形态 —— 新信封 / 业务异常出口 / **框架层形态（abort 的 {message}、
+ * 校验袋、429）** / 裸数据 / {_proxy_status} / 无 status 的已解析 json / responseText 兜底。
+ * 其中框架层那几支是**长期契约**（后端一侧守卫见 `tests/Feature/Http/FrameworkErrorShapeTest.php`）；
+ * 反过来，顶层字符串 `error` 那一支**已删**（2026-09-19，无产出方），下面两条钉的是「删掉之后」的行为。
  *
  * 跑法：`npm run test:js`（或直接 `node tests/javascript/scaffold-api.test.js`，退出码即结果）
  */
@@ -54,15 +56,27 @@ eq('异常出口 isOk 失败（522 已 >= 400）', A.isOk(exc('BASE_EXCEPTION', 
 eq('异常出口 errorText 取 msg', A.errorText(exc('BASE_EXCEPTION', '字段类型非法')), '字段类型非法');
 eq('异常出口 errorCode 取派生机器码（不再是 HTTP_522）', A.errorCode(exc('FORM_LAYOUT_EXCEPTION', 'x')), 'FORM_LAYOUT_EXCEPTION');
 
-console.log('== 旧形态（迁移期间并存 —— 双形态兼容的核心保证）==');
+console.log('== 框架层形态：{message} / 校验袋 / 429 —— 永久契约，不是兼容分支 ==');
+// 后端一侧的守卫见 tests/Feature/Http/FrameworkErrorShapeTest.php：
+// `abort(404,'文案')` 渲的就是 `{"message":"文案"}`，校验袋是 `{message, errors}`，限流是 `{"message":"Too Many Attempts."}`。
+// 这三支**不该**被信封化（要接管 Laravel 的 exception handler），所以下面的读法是长期契约。
+eq('abort 404 的排障文案能取到（不是只剩 HTTP 404）',
+    A.errorText(jq(404, { message: '文件已被修改，请重新打开后再编辑。' }), '保存失败'), '文件已被修改，请重新打开后再编辑。');
+eq('abort 404 判失败', A.isOk(jq(404, { message: 'x' })), false);
+eq('限流 429 的文案能取到', A.errorText(jq(429, { message: 'Too Many Attempts.' })), 'Too Many Attempts.');
+eq('校验袋的 message 能取到', A.errorText(jq(422, { message: 'The slugs field is required.', errors: { slugs: ['…'] } })), 'The slugs field is required.');
+eq('校验袋过 data() 后 errors 原样保留（调用方直读 errors.<field>[0]）',
+    A.data(jq(422, { message: 'm', errors: { content: ['c'] } })).errors.content[0], 'c');
+
+console.log('== 非信封输入（代理 / 早期形态 —— 迁移后仍要吃的）==');
 eq('裸数据 = 成功', A.isOk(jq(200, { q: 'x', results: [], truncated: false })), true);
 eq('裸数据 data 原样透出', A.data(jq(200, { q: 'x', results: [] })).q, 'x');
 eq('{ok:true,redirect} 成功', A.isOk(jq(200, { ok: true, redirect: '/x' })), true);
-eq('{error:"字符串"} 失败', A.isOk(jq(422, { error: '炸了' })), false);
-eq('errorText 取字符串 error', A.errorText(jq(422, { error: '炸了' })), '炸了');
-eq('{message} + 500 失败（body 无成败标记，只能靠状态码判）', A.isOk(jq(500, { message: 'boom' })), false);
+eq('{error:"字符串"} + 422 靠状态码判失败（该形态的顶层读法已删，状态码照旧拦住）', A.isOk(jq(422, { error: '炸了' })), false);
+eq('字符串 error 不再被当文案（容忍已删）⇒ 回退到 HTTP 码', A.errorText(jq(422, { error: '炸了' })), 'HTTP 422');
+eq('{message} + 500 失败（框架层 body 无成败标记，只能靠状态码判）', A.isOk(jq(500, { message: 'boom' })), false);
 eq('errorText 取 message', A.errorText(jq(500, { message: 'boom' })), 'boom');
-eq('{status:"ok"} 成功', A.isOk(jq(200, { status: 'ok' })), true);
+eq('{status:"ok"} 成功（ApiController 早期形态）', A.isOk(jq(200, { status: 'ok' })), true);
 eq('{html,error:null} 成功（error 为 null 不算失败）', A.isOk(jq(200, { html: '<p>x</p>', error: null })), true);
 
 console.log('== 2xx 上的 error 是领域字段，不是失败 ==');
@@ -70,7 +84,8 @@ console.log('== 2xx 上的 error 是领域字段，不是失败 ==');
 //   返回 {html, error:<frontmatter 警告|null>} + 200 —— 预览成功，只是 frontmatter 有问题
 eq('{html,error:"警告"} + 200 仍是成功（预览已渲染）',
     A.isOk(jq(200, { html: '<p>x</p>', error: 'frontmatter 缺 order' })), true);
-eq('无状态码时才用 error 键判失败（保守兜底）', A.isOk({ error: '炸了' }), false);
+// 原有一条 `status === 0 && j.error ⇒ 失败` 的兜底已删（不可达 + 判据不稳，见 api.js 该函数注释）
+eq('无状态码 + error 键不再判失败（该兜底已删）', A.isOk({ error: '炸了' }), true);
 eq('{error:"…"} + 403 靠状态码判失败', A.isOk({ status: 403, responseJSON: { error: '只有 admin' } }), false);
 
 eq('{_proxy_status:403} 失败（HTTP 恒 200）', A.isOk(jq(200, { _proxy_status: 403, message: 'no' })), false);
@@ -82,7 +97,8 @@ eq('json: 新信封失败', A.isOk({ ok: false, error: { code: 'X', msg: 'm' } }
 eq('json: {message} 无标记 → 视成功（调用方必须自己给 status）', A.isOk({ message: 'm' }), true);
 
 console.log('== errorText 取值优先级 ==');
-eq('有服务端文案时 body 优先于 fallback', A.errorText(jq(422, { error: '字段重复' }), '保存失败'), '字段重复');
+eq('有服务端文案时 body 优先于 fallback',
+    A.errorText(jq(422, { ok: false, error: { code: 'X', msg: '字段重复', detail: [] } }), '保存失败'), '字段重复');
 eq('body 空 + 502 + fallback → 用 fallback', A.errorText(jq(502, {}), '保存失败'), '保存失败');
 eq('body 空 + 502 无 fallback → 用 HTTP 状态码', A.errorText(jq(502, {})), 'HTTP 502');
 eq('null + fallback → 用 fallback', A.errorText(null, '保存失败'), '保存失败');
@@ -114,9 +130,9 @@ eq('新信封无 data 键 → 整包', A.data(jq(200, { ok: true, redirect: '/x'
 
 console.log('== toError 必须带出 detail（designer.js 会读 e.detail?.reason 做分支）==');
 eq('detail 从 error.detail 带出', A.toError(jq(422, { ok: false, error: { code: 'COMPACT_BLOCKED', msg: 'M', detail: { reason: 'dirty' } } })).detail, { reason: 'dirty' });
-eq('旧形态没有 error 对象 → detail 为 undefined（与原 e.detail = err.detail 同语义，不擅自改成 []）',
-    typeof A.toError(jq(422, { error: '炸了' })).detail, 'undefined');
-eq('detail 键存在但值为 undefined', 'detail' in A.toError(jq(422, { error: '炸了' })), true);
+eq('body 里没有 error 对象（框架层 / 空 body）→ detail 为 undefined（与原 e.detail = err.detail 同语义，不擅自改成 []）',
+    typeof A.toError(jq(422, { message: '框架层文案' })).detail, 'undefined');
+eq('detail 键存在但值为 undefined', 'detail' in A.toError(jq(422, { message: '框架层文案' })), true);
 
 console.log('== fromFetch：fetch 的 res.json() 会消费 body，必须显式打包状态 ==');
 const okRes = { status: 200 };
