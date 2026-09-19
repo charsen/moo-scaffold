@@ -214,6 +214,11 @@ class ApiController extends Controller
     /**
      * 缓存"上次填了啥"的请求参数(用户切换接口后恢复表单状态)。
      * 不缓存响应——调试器永远走真实请求,不让用户看到旧数据。
+     *
+     * 回执走统一成功信封(旧形态是无 ok 布尔的裸 `{status:'ok'}`)。**调用方不读这个 body**:
+     * 唯一的消费者 `public/javascript/pages/api-request.js` 里那句 `$.ajax` 是 fire-and-forget,
+     * 既没有 success 也没有 error 回调 ⇒ 形状变化对它零影响。这里**不编造载荷**:
+     * 端点没有可返回的数据,`status:'ok'` 与信封的 `ok:true` 语义重复,故给空 data。
      */
     public function cache(CacheRequest $req)
     {
@@ -231,7 +236,7 @@ class ApiController extends Controller
             }
         }
 
-        return response()->json(['status' => 'ok']);
+        return $this->ok();
     }
 
     // ---- Private Methods ----
