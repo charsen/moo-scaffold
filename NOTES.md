@@ -689,9 +689,8 @@
   ⇒ **裸检出上恒红**。所以它红**不代表掩码逻辑坏了**，别去查 `maskValue`；要转绿应显式注入 `putenv`/`$_ENV`（思路同本文件里
   「测『配置文件』不要靠运行时 `config()` 注值」那条），或把断言收窄为「默认值列不出现明文」。
   **基线口径**（本文件其余结论若提到「全绿」，指的是这个基线下无净增失败）：
-  `SESSION_DRIVER=array CACHE_STORE=array QUEUE_CONNECTION=sync composer test` = **984 passed / 1 failed / 3 skipped**，
-  那 1 failed 就是本条。（该数会随新增用例上移：965 → 968（类型归一 +3）→ 980（输出出口 +12）→ 984（只读口径 +4）→ 997（路径归一 +13）→ 1000（同名类锚点 +3）。
-  判断回归看的是**净增失败数**，不是绝对数。）
+  `SESSION_DRIVER=array CACHE_STORE=array QUEUE_CONNECTION=sync composer test` = **1 failed / 3 skipped，其余全绿**，
+  那 1 failed 就是本条。（通过的绝对数会随新增用例上移，**判断回归看的是净增失败数，不是绝对数**。）
 - 2026-09-18，**escape 三件套（含 `quoteYamlString`）已全收口，全仓无内联副本**：`FreshStorageGenerator::buildFields()`
   的 `en` / `zh-CN` 槽位原先手写 `str_replace("'", "''", ...)`，是**全仓唯一残留的内联 escape**（trait `SharedCodegenHelpers`
   从 plan-40 起就有 `quoteYamlString()`，`CreateApiGenerator` 那时也删掉了自己的私有副本，只有这里漏收）。
@@ -716,10 +715,14 @@
   `stat_file_type_meta`）—— **枚举字典本身不走 Resource**（走 `FormRequest::options()` → `FormWidgetCollection`，
   本来就是 `[{label,value}]`），所以"枚举数据到处都是"不等于"到处都是这个坑"，不要据此做全生态大改。
 
-- 2026-09-11，**裸检出跑 Pest 必须显式指定非 DB 驱动**：本仓无 `.env`，Testbench 起的 Laravel 11+ 默认 `SESSION_DRIVER` / `CACHE_STORE` / `QUEUE_CONNECTION` 全是 `database`，而测试库没有 `sessions` / `cache` 表 ⇒ 所有走 session / cache 的 HTTP 用例 500。
-  **症状有迷惑性**：失败数会随你修的维度**递减**（只设 `SESSION_DRIVER=array` 时 167 failed → 72 failed，报错从 `no such table: sessions` 变成 `no such table: cache`），看起来像"快修好了"，其实只是还差下一项。正确跑法：
-  `SESSION_DRIVER=array CACHE_STORE=array QUEUE_CONNECTION=sync composer test`
-  **判据**：报错出现 `no such table: <非业务表>`（sessions / cache / jobs 等框架表）时先怀疑驱动，不要去补 migration —— 本仓是包，自身没有业务表，Testbench 也不跑宿主 migration。
+- 2026-09-11（2026-09-19 更正机制），**裸跑 Pest 必须显式指定非 DB 驱动**：Testbench 骨架 `vendor/orchestra/testbench-core/laravel/config/{session,cache,queue}.php` 的**真实默认值本来是 `array` / `array` / `sync`，裸跑本该全绿**；
+  真正把它盖掉的是**同目录下被遗留的 `.env`**。该文件由 testbench 控制台命令自动从同目录 `.env.example` 拷来（`testbench-core/src/Foundation/Console/Concerns/CopyTestbenchFiles.php:106`），
+  而那份 `.env.example` 里写死 `SESSION_DRIVER=cookie` / `CACHE_STORE=database` / `QUEUE_CONNECTION=database`；命令正常退出会删掉它，**被中断就留在 vendor 里静默污染之后每一次裸跑**（本仓根目录无 `.env`，所以此前误判成"框架默认就是 database"）。
+  **症状随遗留内容变形，都不像驱动问题**：`no such table: sessions` / `no such table: cache`；也见过 `Attempt to read property "cookies" on null` at `CookieSessionHandler::read`（driver 被改成 `cookie`，栈里只有 session 处理器，看不出是配置问题）。
+  失败数还会随你修的维度**递减**（只设 `SESSION_DRIVER=array` 时 167 failed → 72 failed，报错从 `no such table: sessions` 变成 `no such table: cache`），看起来像"快修好了"，其实只是还差下一项。
+  **稳的跑法**（有无遗留都成立）：`SESSION_DRIVER=array CACHE_STORE=array QUEUE_CONNECTION=sync composer test`（`composer test` 就等于 `./vendor/bin/pest`，`composer` 不在 PATH 时直接跑后者）。
+  **定位**：探针打印 `config('session.driver')`；或把 `vendor/orchestra/testbench-core/laravel/.env` 挪开再裸跑对照（挪开后裸跑转绿即坐实是它）。
+  **判据**：见到 `<非业务表> no such table` 或 `CookieSessionHandler` 先怀疑驱动/遗留 `.env`，不要去补 migration —— 本仓是包，自身没有业务表，Testbench 也不跑宿主 migration。
 - 2026-09-11，**历史脱敏的边界 + 一处判断更正**：本轮那 15 个未推送 commit 里的宿主名 / 域名 / 绝对路径已用 `git filter-branch`（限定 `origin/master..master`）就地脱敏 —— 改写后**最终文件内容一字未变**（`git diff <旧 sha> master` 为空）、commit 数不变（15）、工作区干净，且**正常 `git push` 即可**（`origin/master` 是新 master 的祖先，远程是快进，**不需要强推**）。动手前已整仓备份 `.git`（48M → `/tmp`）。
   **更正**：起初只按「文件内容」搜（`git log -S<串>`）得出"含内部名的只有 3 个 commit、且全未推送"。这个结论**不完整** —— `-S` **只搜内容 diff，不搜 commit message**。补搜 message 后发现另有 **6 个 commit 的 message 里也含该宿主名**，而且它们**早已随 `2.1.10` / `2.1.11` / `2.1.12` 三个 tag 发布到两个远程**（`master` 与 `dev` 都在）。
   清那 6 条要 rewrite **已发布**历史 + 强推 2 个远程 + **重打 tag**（tag 不可变、下游可能按 tag 取包），代价与风险远超收益 —— **决定不清**，仅记录在此。
