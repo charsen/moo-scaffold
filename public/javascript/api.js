@@ -19,7 +19,7 @@
  *   新信封：{ok:true, data:{…}}                    成功
  *           {ok:false, error:{code,msg,detail}} + HTTP 失败
  *   旧形态：裸数据 {q,results,…} / {ok:true,…payload}   ← 无 error 键即视为成功
- *           {error:"字符串"}（三个 Enforce* 中间件，全部配 403）/ {message:"…"}（异常出口）
+ *           {error:"字符串"}（**已无产出方**）/ {message:"…"}（异常出口：BaseException）
  *           {_proxy_status:N, message}（API 代理：HTTP 恒 200，真实状态在 body 里）
  *
  * ⚠ `ApiProxyController` 的响应**不走信封**（上游 body 必须原样透传），本层对它单独分支，
@@ -140,7 +140,10 @@
         var j = pick(src);
         if (j && typeof j === 'object') {
             if (typeof j.error === 'string' && j.error) {
-                return j.error; // 旧：DocsController / 三个中间件
+                // 旧形态 `{error:"字符串"}` —— 产出方**已全部迁完**
+                // （DocsController 2026-09-19 上午、三个 Enforce* 中间件同日下午），
+                // 本分支现在是**纯容忍**：留着只为不在途中打红，阶段 3 与 `isOk` 的兜底一起删。
+                return j.error;
             }
             if (j.error && typeof j.error === 'object' && j.error.msg) {
                 return j.error.msg; // 新：{code,msg,detail}

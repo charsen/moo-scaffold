@@ -7,6 +7,7 @@ namespace Mooeen\Scaffold\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Mooeen\Scaffold\Support\AccountStore;
+use Mooeen\Scaffold\Support\JsonEnvelope;
 
 /**
  * 覆盖两处 admin-only：
@@ -58,7 +59,9 @@ class EnforceAdminOnly
 
         $message = $isConfigWrite ? '只有 admin 可以修改配置。' : '人员管理仅 admin 可访问。';
         if ($request->ajax() || $request->expectsJson()) {
-            return response()->json(['error' => $message], 403);
+            // 两个分支同码：根因都是「当前用户不是 admin」，差异在 msg（前端拿文案即可，不必分机器码）。
+            // 与 CloudController 的 CLOUD_NOT_CONFIGURED「同根因共用一码」同口径。
+            return JsonEnvelope::error('ADMIN_ONLY', $message, 403);
         }
         if ($request->hasSession()) {
             $request->session()->flash('flash_error', $message);
