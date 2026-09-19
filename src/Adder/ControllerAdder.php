@@ -11,7 +11,7 @@
 namespace Mooeen\Scaffold\Adder;
 
 use Illuminate\Support\Str;
-use Mooeen\Scaffold\Utility;
+use Mooeen\Scaffold\Support\ControllerName;
 
 class ControllerAdder extends Adder
 {
@@ -45,7 +45,7 @@ class ControllerAdder extends Adder
         }
 
         if ($new_controller) {
-            $controller = Utility::ensureControllerSuffix($controller);
+            $controller = ControllerName::ensure($controller);
             $controller = ucfirst($controller);
             $file_path  = $this->buildNewController($folder, $controller);
 
@@ -144,7 +144,7 @@ class ControllerAdder extends Adder
             return $controller_file;
         }
 
-        $controller = Utility::stripControllerSuffix($controller);
+        $controller = ControllerName::strip($controller);
         $meta       = [
             'author'               => $this->utility->getConfig('author'),
             'date'                 => date('Y-m-d H:i'),

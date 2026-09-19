@@ -6,6 +6,7 @@ use Mooeen\Scaffold\Support\AccountStore;
 use Mooeen\Scaffold\Support\AiSettingStore;
 use Mooeen\Scaffold\Support\Concerns\InteractsWithConsoleUi;
 use Mooeen\Scaffold\Support\Concerns\SharedCodegenHelpers;
+use Mooeen\Scaffold\Support\ConsoleUi;
 use Mooeen\Scaffold\Support\DocsRepository;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Console\Output\BufferedOutput;
@@ -23,7 +24,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * 本文件四层覆盖：
  *   ① 助手 `SharedCodegenHelpers::putOrReport()` 的三态（成功静默 / 失败上报 / 0 字节算成功）；
  *   ② 另一条同族路径 `FreshStorageGenerator::reportPutResult()`（silence 语义不同，未并入助手）；
- *   ③ 内联守卫：`Utility::addGitIgnore()`（无 console()，只能就地判）；
+ *   ③ `Utility::addGitIgnore()` 的失败分支（2026-09-19 起该方法的输出出口收成 `ConsoleUi` 参数）；
  *   ④ Web/Support 层 3 个 store —— 无 console，写失败/删失败一律抛异常（由 Controller 的 catch 落 4xx）；
  *   ⑤ 结构不变式：`src/` 下每一处文件写入（`put`/`append`）与删除（`delete`）都必须带失败判定
  *      （含已知欠账白名单，当前为空）。
@@ -136,7 +137,7 @@ it('reportPutResult:0 字节算写成功 → 报 updated/created，只有真 fal
     expect($buffer->fetch())->toContain('rel/fail.yaml');
 });
 
-// ─── ③ 内联守卫：Utility::addGitIgnore（无 console()，只能就地判）──────────────
+// ─── ③ Utility::addGitIgnore（2026-09-19 起收 ConsoleUi 参数）────────────────────
 
 it('Utility::addGitIgnore:写失败 → 打 failed 而不是 created', function () {
     $utility = new Utility;
@@ -148,7 +149,7 @@ it('Utility::addGitIgnore:写失败 → 打 failed 而不是 created', function 
     @unlink(storage_path('scaffold/.gitignore'));
 
     $buffer = new BufferedOutput;
-    $utility->addGitIgnore($buffer);
+    $utility->addGitIgnore(new ConsoleUi($buffer));
 
     $out = $buffer->fetch();
     expect($out)->toContain('写入失败');

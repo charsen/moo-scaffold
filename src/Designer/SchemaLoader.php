@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Support\ColumnTypeGroups;
 use Mooeen\Scaffold\Support\Concerns\AtomicFileWrite;
+use Mooeen\Scaffold\Support\ControllerName;
 use Mooeen\Scaffold\Support\PackageRegistry;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Finder\Finder;
@@ -693,9 +694,9 @@ class SchemaLoader
             unset($existing['class']);
         } else {
             // 2026-05-21 归一化:controller class 必带 Controller 后缀,跟 generator 端一致 ——
-            // 收口到 Utility::ensureControllerSuffix 单一真源。
+            // 收口到 ControllerName::ensure 单一真源。
             // designer GUI 用户漏写后缀(只填 "Memo")会让 routes 引用 MemoController 但文件名 Memo.php → 类找不到 → 接口调试 sidebar 缺该模块。
-            $existing['class'] = Utility::ensureControllerSuffix($class);
+            $existing['class'] = ControllerName::ensure($class);
         }
         if (array_key_exists('app', $cCtrl) && is_array($cCtrl['app'])) {
             $appList = array_values(array_filter(

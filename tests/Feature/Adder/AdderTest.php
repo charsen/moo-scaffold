@@ -7,6 +7,7 @@ use Illuminate\Console\View\Components\Factory;
 use Illuminate\Filesystem\Filesystem;
 use Mooeen\Scaffold\Adder\ControllerAdder;
 use Mooeen\Scaffold\Adder\RouterAdder;
+use Mooeen\Scaffold\Support\ControllerName;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
@@ -86,24 +87,24 @@ function adder_makeRouterAdder(): RouterAdder
     return new RouterAdder(test()->adderConsole, test()->adderFs, test()->adderUtility);
 }
 
-// ─── Utility 后缀归一化(单一真源,ControllerAdder::start 直接调,无 getTabs,可真断言) ──
+// ─── ControllerName 后缀归一化(单一真源,ControllerAdder::start 直接调,无 getTabs,可真断言) ──
 
 it('ensureControllerSuffix 补尾缀、已有不重复、空串原样', function () {
-    expect(Utility::ensureControllerSuffix('User'))->toBe('UserController');
-    expect(Utility::ensureControllerSuffix('UserController'))->toBe('UserController');
-    expect(Utility::ensureControllerSuffix(''))->toBe('');
+    expect(ControllerName::ensure('User'))->toBe('UserController');
+    expect(ControllerName::ensure('UserController'))->toBe('UserController');
+    expect(ControllerName::ensure(''))->toBe('');
 });
 
 it('stripControllerSuffix 只剥尾缀、中间含 Controller 不动', function () {
-    expect(Utility::stripControllerSuffix('UserController'))->toBe('User');
-    expect(Utility::stripControllerSuffix('User'))->toBe('User');
-    expect(Utility::stripControllerSuffix('ControllerManager'))->toBe('ControllerManager');
+    expect(ControllerName::strip('UserController'))->toBe('User');
+    expect(ControllerName::strip('User'))->toBe('User');
+    expect(ControllerName::strip('ControllerManager'))->toBe('ControllerManager');
 });
 
 it('ensure/strip 互为逆操作(短名与 FQCN 都成立)', function () {
-    expect(Utility::stripControllerSuffix(Utility::ensureControllerSuffix('Memo')))->toBe('Memo');
-    expect(Utility::ensureControllerSuffix(Utility::stripControllerSuffix('MemoController')))->toBe('MemoController');
-    expect(Utility::stripControllerSuffix('App\\Admin\\Controllers\\Light\\MemoController'))
+    expect(ControllerName::strip(ControllerName::ensure('Memo')))->toBe('Memo');
+    expect(ControllerName::ensure(ControllerName::strip('MemoController')))->toBe('MemoController');
+    expect(ControllerName::strip('App\\Admin\\Controllers\\Light\\MemoController'))
         ->toBe('App\\Admin\\Controllers\\Light\\Memo');
 });
 
