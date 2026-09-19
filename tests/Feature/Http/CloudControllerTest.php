@@ -294,3 +294,139 @@ it('清理按钮只在 local + 可用 Monitor + 已接入 Cloud 时显示', func
         ->and($localHtml)->not->toContain('data-challenge=')
         ->and($stagingHtml)->not->toContain('data-confirm="将清理当前项目的 local 开发噪音');
 });
+
+/**
+ * 统一 JSON 信封（`{ok:true,data}` / `{ok:false,error:{code,msg,detail}}`）。
+ *
+ * 本页两个按钮都是**原生表单** POST，所以旧 `back()` 的 JSON 分支此前在 PHP 测试与
+ * e2e 里都是**零覆盖** —— 形状曾经是 `{ok:bool, message:string}`（第三种形态：
+ * 有 ok 布尔却把文案放顶层）。下面 8 条把这层锁住：形状恒定 + 表单分支文案逐字不变。
+ */
+it('JSON 失败回执：{ok:false,error:{code,msg,detail}} + 422，不再是顶层 message', function () {
+    config(['moo-monitor.cloud.enabled' => false]);
+
+    $r = $this->postJson('/scaffold/cloud/push');
+    $r->assertStatus(422);
+
+    $body = $r->json();
+    expect(array_keys($body))->toBe(['ok', 'error'])          // 顶层恰好两键，旧的 message 不许再漏出来
+        ->and($body['ok'])->toBeFalse()
+        ->and($body['error']['code'])->toBe('CLOUD_NOT_CONFIGURED')
+        ->and($body['error']['detail'])->toBe([])
+        ->and(array_keys($body['error']))->toBe(['code', 'msg', 'detail']);
+});
+
+it('JSON 与表单两个分支共用同一份文案：error.msg 与 flash_error 逐字一致', function () {
+    config(['moo-monitor.cloud.enabled' => false]);
+
+    $this->post('/scaffold/cloud/push')->assertRedirect();
+    $flash = (string) session('flash_error');
+
+    $json = $this->postJson('/scaffold/cloud/push');
+
+    expect($json->json('error.msg'))->toBe($flash)
+        ->and($flash)->toContain('cloud 未启用');              // 别把 msg 换成泛化文案导致排障信息丢失
+});
+
+it('JSON 成功回执：{ok:true,data:{message}} + 200（顶层 message 收进 data）', function () {
+    Http::fake(['*' => Http::response(['ok' => true])]);
+    $sync = Mockery::mock(CloudSync::class);
+    $sync->shouldReceive('types')->once()->andReturn(['runtimes']);
+    $sync->shouldReceive('sync')->once()->with('runtimes', false, false)->andReturn([
+        'skipped' => false, 'ok' => true, 'error' => null, 'pushed' => 1, 'rejected' => 0,
+    ]);
+    $sync->shouldReceive('pruneLocal')->once()->with('runtimes', Mockery::type('int'))->andReturn([
+        'purged' => 0, 'prunedOpen' => 0,
+    ]);
+    app()->instance(CloudSync::class, $sync);
+
+    $r = $this->postJson('/scaffold/cloud/push');
+    $r->assertOk();
+
+    $body = $r->json();
+    expect(array_keys($body))->toBe(['ok', 'data'])           // 成功信封顶层恰好两键
+        ->and($body['ok'])->toBeTrue()
+        ->and($body['data']['message'])->toBe('已确认 1 条');
+});
+
+it('JSON 推送部分完成 → PUSH_INCOMPLETE，且已确认事实留在 msg 里（不因失败而丢）', function () {
+    Http::fake(['*' => Http::response(['ok' => true])]);
+    $sync = Mockery::mock(CloudSync::class);
+    $sync->shouldReceive('types')->once()->andReturn(['runtimes']);
+    $sync->shouldReceive('sync')->once()->with('runtimes', false, false)->andReturn([
+        'skipped'  => false,
+        'ok'       => false,
+        'error'    => '1 条记录等待重试；其余记录已确认，不会重复上报',
+        'pushed'   => 1,
+        'rejected' => 0,
+    ]);
+    app()->instance(CloudSync::class, $sync);
+
+    $r = $this->postJson('/scaffold/cloud/push');
+    $r->assertStatus(422);
+
+    expect($r->json('error.code'))->toBe('PUSH_INCOMPLETE')
+        ->and($r->json('error.msg'))->toContain('已确认 1 条')
+        ->and($r->json('error.msg'))->toContain('运行时错误 推送未完成');
+});
+
+it('JSON 推送全跳过 → PUSH_SKIPPED（与「部分失败」是两个不同的机器码）', function () {
+    Http::fake(['*' => Http::response(['ok' => true])]);
+    config(['moo-monitor.cloud.push.runtimes' => false, 'moo-monitor.cloud.push.slow_sql' => false]);
+
+    $r = $this->postJson('/scaffold/cloud/push');
+    $r->assertStatus(422);
+
+    expect($r->json('error.code'))->toBe('PUSH_SKIPPED')
+        ->and($r->json('error.msg'))->toContain('推送未执行');
+});
+
+it('JSON 清理非 local → NOT_LOCAL_ONLY，且不触达 Monitor', function () {
+    app()->instance('env', 'staging');
+    $sync = Mockery::mock(CloudSync::class);
+    $sync->shouldNotReceive('discardLocalNoise');
+    app()->instance(CloudSync::class, $sync);
+
+    $r = $this->postJson('/scaffold/cloud/discard');
+    $r->assertStatus(422);
+
+    expect($r->json('error.code'))->toBe('NOT_LOCAL_ONLY')
+        ->and($r->json('error.msg'))->toContain('仅 local 开发环境');
+});
+
+it('JSON 清理成功 → 成功信封（data.message 带上 Cloud 删除 / 本地丢弃两条计数）', function () {
+    app()->instance('env', 'local');
+    $sync = Mockery::mock(CloudSync::class);
+    $sync->shouldReceive('types')->once()->andReturn(['runtimes', 'slow_sql']);
+    $sync->shouldReceive('discardLocalNoise')->once()->with('runtimes')->andReturn([
+        'skipped' => false, 'ok' => true, 'cloud_deleted' => 3, 'local_discarded' => 2,
+    ]);
+    $sync->shouldReceive('discardLocalNoise')->once()->with('slow_sql')->andReturn([
+        'skipped' => false, 'ok' => true, 'cloud_deleted' => 4, 'local_discarded' => 1,
+    ]);
+    app()->instance(CloudSync::class, $sync);
+
+    $r = $this->postJson('/scaffold/cloud/discard');
+    $r->assertOk();
+
+    $body = $r->json();
+    expect(array_keys($body))->toBe(['ok', 'data'])
+        ->and($body['data']['message'])->toContain('Cloud 已删除 7 条未解决记录')
+        ->and($body['data']['message'])->toContain('本地已丢弃 3 条待推记录');
+});
+
+it('JSON 清理部分失败 → DISCARD_INCOMPLETE（与 PUSH_INCOMPLETE 分开命名）', function () {
+    app()->instance('env', 'local');
+    $sync = Mockery::mock(CloudSync::class);
+    $sync->shouldReceive('types')->once()->andReturn(['runtimes']);
+    $sync->shouldReceive('discardLocalNoise')->once()->with('runtimes')->andReturn([
+        'skipped' => false, 'ok' => false, 'error' => '云端炸了',
+    ]);
+    app()->instance(CloudSync::class, $sync);
+
+    $r = $this->postJson('/scaffold/cloud/discard');
+    $r->assertStatus(422);
+
+    expect($r->json('error.code'))->toBe('DISCARD_INCOMPLETE')
+        ->and($r->json('error.msg'))->toContain('云端炸了');
+});
