@@ -775,18 +775,9 @@ class DesignerController extends Controller
     }
 
     // ─── helpers ──────────────────────────────────────────────────────
-    private function ok(array $data): JsonResponse
-    {
-        return response()->json(['ok' => true, 'data' => $data]);
-    }
-
-    private function error(string $code, string $msg, int $http, array $detail = []): JsonResponse
-    {
-        return response()->json([
-            'ok'    => false,
-            'error' => ['code' => $code, 'msg' => $msg, 'detail' => $detail],
-        ], $http);
-    }
+    // ok() / error() 已上提到基类 `Mooeen\Scaffold\Http\Controllers\Controller`
+    // （统一 JSON 信封，签名逐字相同 ⇒ 本文件所有调用点无需改动）。
+    // 这个控制器原本就是全站事实标准的来源，行为未变。
 
     private function summarizeTable(array $tableDiff): string
     {
