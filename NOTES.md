@@ -3,6 +3,72 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-19，**`designer.js` 的 `_post`/`_get` 去重（接上一条，统一信封阶段 2 的第一个消费者）**：
+  **改了什么**：两个方法原先各抄了一份**逐字相同**的解包尾巴（失败即 `new Error` + 挂 `code`/`detail`/`status`，
+  成功取 `data`），现抽成 `async _unwrap(res)`，两者只剩 `return this._unwrap(res);`。
+  实现走全局 `ScaffoldApi`（`public/javascript/api.js` 在 shell 里排在 `main.js` 与 `{{ $scripts ?? '' }}` 之前 ⇒
+  两个加载点 `db/designer/show.blade.php:1426`、`db/designer/index.blade.php:191` 都在 `<x-slot:scripts>` 里，顺序成立）。
+  **动手前 grep 出一个会静默坏掉的点**：这个 `Error` 上有三个字段在**别的函数**里被读，光看 helper 本身看不出来 ——
+  `e.code`（6 处分支：`AI_NOT_CONFIGURED`×4 / `COMPACT_BLOCKED` / `SUSPECTED_RENAMES` / `EMPTY_DIFF`）、
+  `e.detail`（`compactBlockedReason` 读 `e.detail?.reason`，`:1802`）、`e.status`（`_shouldRetrySave`，`:718`）。
+  ⇒ 顺手回答了旧笔记那条**「`e.code` 是只用于显示还是也参与分支」的待核：参与分支**，不能当展示字段。
+  ⇒ `ScaffoldApi.toError()` 因此**必须**加 `detail`（原来只返 `{code,msg,http}`，直接换上去 `compactBlockedReason`
+  会静默退化成 `'blocked'`）。缺省保持旧语义 `undefined`，**没**擅自改成 `[]`（旧代码是 `e.detail = err.detail`）。
+  **新发现的坑：`fetch` 的 `res.json()` 会消费 body** ⇒ 之后 `pick(res)` 只能拿到 `Response` 自己（它没有
+  `error`/`message` 字段），服务端文案会**丢**、只剩状态码。故给 `api.js` 加了 `fromFetch(res, json)`：
+  把「HTTP 状态 + 已解析体」打包成本层认得的**唯一规范形态**（jQuery 侧仍是自动读 `responseJSON` 的 `jqXHR`），
+  别让各处自己拼 `{status, responseJSON}`。测试里留了一条**对照**断言专门钉住「直接传 `res` 只剩状态码」。
+  **行为等价性**：`{ok:true, redirect}`（无 `data` 键，`DocsController::delete` 的形态）新旧都**原样透出整包**，
+  不是只给 `redirect` —— 我第一版测试写成只给 `redirect` 反而是**我的期望错了**，实现是对的。
+  另一处**有意的改善**：字符串 `error`（`{error:"炸了"}`）旧实现会得到 `new Error(undefined)`（message 是字面量 `"undefined"`、
+  `code` 也是 undefined），新实现拿到真文案 + `code='HTTP_422'`。designer 各端点从不返回字符串 error，故不影响。
+  **守卫 `tests/javascript/designer-unwrap.test.js`（22 断言）分两层，实测确实正交**：
+  ① 行为 —— 4 种响应形态下 `_unwrap` 抛出的 Error 必须带齐 `code`/`message`/`detail`/`status`；
+  ② 形态不变式 —— `return this._unwrap(res);` 恰好 2 处、`json.error ? json.error` 与 `if (!res.ok)` 各 0 处。
+  **打哑 2 处**：删 `e.detail = err.detail;` → 恰好 2 红（且只红在本文件）；把 `_get` 改回内联解包 →
+  **21 条行为断言全绿**、只有形态不变式红 ⇒ 「去重」这件事**只有源码扫描守得住**，别指望行为用例。
+  **`designer.js` 能在 node 里加载**（不需要 jsdom）⇒ 页面脚本与解包层的**接线**也能无宿主观测：
+  只要两个 shim（`document.addEventListener` 收 `alpine:init`、`Alpine.data` 收组件工厂），
+  手动触发 `alpine:init` 后 `comps['dbDesigner']()` 拿到组件对象，`_unwrap` 不依赖 `this`、可直接调；
+  假 `Response` 只需 `{ status, json: async () => body }`。
+  **`npm run test:js` 入口改为自动发现的 `tests/javascript/run-all.js`**：在 `package.json` 里手写文件列表会
+  **悄悄腐烂**（新增守卫忘了加进脚本 ⇒ 永远不跑、CI 照样全绿），「守卫没在跑」比「守卫失败」危险。
+  每文件开子进程跑（守卫自带 `process.exit`，隔离后互不影响）。**`node --test tests/javascript/` 不适用** ——
+  它把目录整体当一个用例，且会被守卫脚本的 `process.exit` 判成 failure（已实测）。
+  同时 `.auth/admin.json` 的**登录态 7 天过期**会让整轮 e2e 假红（47 failed / 401 / 失败快照是登录页；
+  `theme-logo.spec` 那唯一一条用空登录态的用例**反而变绿**）—— 续期命令与 10 秒预检探针写在 `tests/Browser/README.md`。
+
+- 2026-09-19，**收敛 `data()` 时「旧形态必须逐形状等价」—— 5 处真差异，其中 1 处是陷阱（接上一条）**：
+  旧写法是 `return (json && json.data) ? json.data : json;`，是**真值判断**；我第一版 `ScaffoldApi.data()`
+  写成 `typeof j.ok === 'boolean' && j.data !== undefined ? j.data : j`，实测出 5 处差异：
+  **`{data:{…}}` 无 `ok` 键**（旧取 `data`、新漏整包 —— 唯一会真出错的）、
+  `{data:null}` / `{data:0}` / `{data:""}` / `{data:false}`（旧整包、新返回假值）。
+  修法：**旧形态分支刻意保留真值判断** `return j.data ? j.data : j;`，**不要**"顺手统一"成 `!== undefined`；
+  唯一**有意**的差异只留在**新信封**上（旧代码从没见过 `ok` 键）：信封里出现 `data` 键就是载荷，
+  哪怕是 falsy 也取出来 —— 否则 `{ok:true, data:null}` 会把整个信封漏给调用方。
+  **代理形态 `{data:<上游 body>, _proxy_status:N}` 属旧形态一侧**，必须走真值分支（今天 `designer.js` 不调代理，
+  但契约得留对）。**守卫补到 54 断言**（新增 13 条逐形状钉子）；**打哑 1 处**：把真值判断换成 `!== undefined`
+  → **恰好 4 红**（`{data:null/0/""/false}`），证明这组钉子真的抓得住。
+  **教训：收敛一个"取值"函数时，别只测"新形态对不对"，要把旧写法在**所有**形状上的输出列出来逐个对齐** ——
+  我第一版只测了 `{ok:true,data:{…}}` 和裸数据这两种"一致"的形状，5 处差异一条都没覆盖。
+
+- 2026-09-19，**e2e A/B 对照实测：`designer.js` 去重**零回归，但那 4 条红是**宿主绑定**不是回归**：
+  同一宿主、同一 env、同一条命令跑三轮，比**失败集合**（不是比 passed 数）：
+  | 版本 | passed | failed 集合 |
+  |---|---|---|
+  | 改前（HEAD 的 `designer.js`）| 44 | `:111` `:132` `:143` `:159` |
+  | 改后 第 1 轮 | 43 | 同上 **+ `:624`** |
+  | 改后 第 2 轮 | 44 | 同改前，**恰好 4 条** |
+  ⇒ **`:624`（"加临时字段 → 删除"）是偶发**（它自己的 `waitForResponse` 只给 5s），**不是回归**；
+  ⇒ 另 4 条两边**逐条相同** ⇒ 属 README 早写明的「不覆盖 env 的典型症状」：
+  `:111` 断 `Infrastructure`（spec 默认 `SCHEMAS_LIST` 是 LLE 的 6 个显示名，本宿主没有）、
+  `:132` 找 `platform_pages` 侧栏项、`:143` 期望 `float:1000000`（`E2E_FIELD_FORMAT` 默认值）、
+  `:159` 期望 `region_name` 索引（`E2E_INDEX_FIELDS_CSV` 默认值）—— 都靠 `E2E_SCHEMAS_CSV` /
+  `E2E_TABLE_IN_LIST` / `E2E_FIELD_FORMAT` / `E2E_INDEX_FIELDS_CSV` 覆盖，**与本轮改动无关**。
+  **顺带修正一条旧结论**：换宿主跑时**不止** `E2E_API_SCHEMAS_CSV` 要覆盖，上面这 4 个也得覆盖，
+  否则必然 4 红而看着像回归。
+
+
 - 2026-09-18，**前端统一响应解包层 `public/javascript/api.js`（`window.ScaffoldApi`）落地 + 它的 3 个坑**：
   **动机**：同一个后端契约前端有**两套互不兼容的读法** —— `designer.js:389,406` 把 `json.error` 当**对象**
   （取 `.msg` / `.code` / `.detail`），`docs-home.js:54`、`docs-editor.js:163,255` 当**字符串**（直接 `toast`）。
