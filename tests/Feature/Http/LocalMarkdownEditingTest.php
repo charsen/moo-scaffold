@@ -44,19 +44,19 @@ it('edits raw Markdown and saves exact content through Host normalization middle
         ->assertOk()->assertViewHas('raw', $this->raw)->assertDontSee('id="doc_delete"', false);
     $content  = "---\r\ntitle: Frontmatter title\r\ngroup: 自定义分组\r\norder: 2\r\ntags: [回归, 本地]\r\ncustom: keep\r\n---\r\n\r\n# 新正文\r\n\r\n<!-- preserved -->\r\n\r\n  ";
     $response = $this->postJson('/scaffold/' . $route . '/save', ['slug' => $this->slug, 'content' => $content, 'version' => hash('sha256', $this->raw)])
-        ->assertOk()->assertJsonPath('version', hash('sha256', $content));
+        ->assertOk()->assertJsonPath('data.version', hash('sha256', $content));
     expect(file_get_contents($this->directory . '/' . $this->slug))->toBe($content);
     $this->get('/scaffold/' . $route . '?' . http_build_query([$query => $this->slug]))
         ->assertOk()->assertSee('Frontmatter title')->assertSee('自定义分组')->assertSee('回归')
         ->assertDontSee('custom: keep')->assertDontSee('preserved');
-    $this->postJson('/scaffold/' . $route . '/save', ['slug' => $this->slug, 'content' => '', 'version' => $response->json('version')])->assertOk();
+    $this->postJson('/scaffold/' . $route . '/save', ['slug' => $this->slug, 'content' => '', 'version' => $response->json('data.version')])->assertOk();
     expect(file_get_contents($this->directory . '/' . $this->slug))->toBe('');
 })->with('record sections');
 
 it('previews frontmatter safely without writing and keeps plan relative links', function ($route, $scope, $query) {
     $content = "---\ntitle: Preview metadata\n---\n\n# Preview body\n\n<!-- hidden -->\n\n<script>alert(1)</script>\n\n[Self](中文.md)";
     $html    = $this->postJson('/scaffold/' . $route . '/preview', ['slug' => $this->slug, 'content' => $content])
-        ->assertOk()->json('html');
+        ->assertOk()->json('data.html');
     expect($html)->toContain('Preview body')->not->toContain('Preview metadata', 'hidden', '<script>alert(1)</script>');
     if ($scope === 'plans') {
         expect($html)->toContain(route('plans.index', ['doc' => $this->slug]));
@@ -165,10 +165,47 @@ it('uses actual group minima even when all orders exceed the default', function 
     expect(array_column(app(PlansRepository::class)->all(), 'slug'))->toBe([$this->slug, 'z.md', 'a.md']);
 });
 
+it('preview 的信封：frontmatter 警告放在 data.error 下且 ok 仍为 true（不是失败信号）', function ($route) {
+    // 这是本仓最容易踩的一处契约陷阱：preview 的 `error` 是**领域字段**
+    // （预览成功、正文已渲染，只是 frontmatter 有问题要在编辑器里就地提示），
+    // 所以它必须在 `data` 里、且**不能**让 `ok` 变 false ——
+    // 若写成「有 error 键即失败」，前端会把一次成功的预览判成请求失败。
+    $content = "---\ntitle: [\n---\n# Body";
+    $res     = $this->postJson('/scaffold/' . $route . '/preview', ['slug' => $this->slug, 'content' => $content])
+        ->assertOk();
+
+    $body = json_decode($res->getContent(), true);
+    expect($body['ok'])->toBeTrue()
+        ->and($body['data'])->toHaveKeys(['html', 'error'])
+        ->and($body['data']['error'])->toContain('Frontmatter')
+        // 反证：`error` 不许出现在顶层 —— 顶层只能是 ok / data
+        ->and($body)->not->toHaveKey('error')
+        ->and($body)->not->toHaveKey('html');
+})->with('record sections');
+
+it('save 的信封：{ok:true,data:{version}}，顶层不再有 version', function ($route) {
+    $content = "# Saved body\n";
+    $res     = $this->postJson('/scaffold/' . $route . '/save', [
+        'slug' => $this->slug, 'content' => $content, 'version' => hash('sha256', $this->raw),
+    ])->assertOk();
+
+    $body = json_decode($res->getContent(), true);
+    expect($body)->toBe(['ok' => true, 'data' => ['version' => hash('sha256', $content)]]);
+})->with('record sections');
+
+it('失败路径不套信封：校验失败仍是 Laravel 的 validation bag（前端靠它做就地提示）', function ($route) {
+    // `errors.*` 由框架的 ValidationException 生成，**不经控制器** ⇒ 不套信封。
+    // 前端 `local-markdown-editor.js` 的 .fail 分支依赖 `responseJSON.errors.content[0]`，
+    // 这条把它钉住，避免有人"顺手"把异常出口也包进 ok:false,error:{…} 而打掉就地提示。
+    $this->postJson('/scaffold/' . $route . '/save', ['slug' => $this->slug, 'content' => ['bad'], 'version' => str_repeat('a', 64)])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('content');
+})->with('record sections');
+
 it('reports invalid frontmatter in preview and rejects saving without changing the file', function ($route) {
     foreach (["---\ntitle: [\n---\n# Body", "---\norder: true\n---\n# Body", "---\ntitle: Incomplete\n# Body"] as $content) {
         $preview = $this->postJson('/scaffold/' . $route . '/preview', ['slug' => $this->slug, 'content' => $content])->assertOk();
-        expect($preview->json('error'))->toContain('Frontmatter');
+        expect($preview->json('data.error'))->toContain('Frontmatter');
         $this->postJson('/scaffold/' . $route . '/save', ['slug' => $this->slug, 'content' => $content, 'version' => hash('sha256', $this->raw)])
             ->assertUnprocessable()->assertJsonValidationErrors('content');
         expect(file_get_contents($this->directory . '/' . $this->slug))->toBe($this->raw);
@@ -206,7 +243,7 @@ it('acknowledges same-content retries with an old version without replacing the 
     $path = $this->directory . '/' . $this->slug;
     clearstatcache(true, $path);
     $before = stat($path);
-    $this->postJson('/scaffold/' . $route . '/save', $payload)->assertOk()->assertJsonPath('version', hash('sha256', '# Saved'));
+    $this->postJson('/scaffold/' . $route . '/save', $payload)->assertOk()->assertJsonPath('data.version', hash('sha256', '# Saved'));
     clearstatcache(true, $path);
     $after = stat($path);
     expect($after['ino'])->toBe($before['ino'])->and($after['mtime'])->toBe($before['mtime']);
