@@ -14,6 +14,7 @@ use Brick\VarExporter\VarExporter;
 use Illuminate\Support\Str;
 use Mooeen\Scaffold\Foundation\Controller;
 use Mooeen\Scaffold\Support\AclActionResolver;
+use Mooeen\Scaffold\Support\ActionDoc;
 use Symfony\Component\Yaml\Yaml;
 
 class UpdateAuthorizationGenerator extends Generator
@@ -50,7 +51,7 @@ class UpdateAuthorizationGenerator extends Generator
 
         foreach ($routes as $route) {
             [$controller, $action] = explode('@', $route['action']);
-            $PMC_names             = $this->utility->parsePMCNames($this->getController($controller));
+            $PMC_names             = ActionDoc::parsePMCNames($this->getController($controller));
             $module_key            = $app . '-' . Str::snake($PMC_names['module']['name']['en'], '-');
             $module_key            = $this->getMd5($module_key);
             $modules[$module_key]  = $PMC_names['module']['name'];
@@ -59,8 +60,8 @@ class UpdateAuthorizationGenerator extends Generator
             $controller_key               = $this->getMd5($controller_key);
             $controllers[$controller_key] = $PMC_names['controller']['name'];
 
-            $action_info      = $this->utility->parseActionInfo($this->getMethod($controller, $action));
-            $action_name      = $this->utility->parseActionName($this->getMethod($controller, $action));
+            $action_info      = ActionDoc::parseActionInfo($this->getMethod($controller, $action));
+            $action_name      = ActionDoc::parseActionName($this->getMethod($controller, $action));
             $route_action_key = Controller::aclPlainKey(str_replace('@', '::', $route['action']));
             $acl              = $this->aclResolver()->resolve($controller, $action);
             if (($acl['keys'] ?? []) === []) {
@@ -449,7 +450,7 @@ class UpdateAuthorizationGenerator extends Generator
             return $fallback;
         }
 
-        return $this->utility->parseActionInfo($methodInfo['reflection']);
+        return ActionDoc::parseActionInfo($methodInfo['reflection']);
     }
 
     private function aclResolver(): AclActionResolver
