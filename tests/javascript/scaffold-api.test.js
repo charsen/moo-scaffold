@@ -6,8 +6,8 @@
  *   而它又是后端信封迁移期**唯一**的兼容保障 —— 一行的优先级写反，全站 toast 都在撒谎，
  *   所以必须有一个能在 CI / 无宿主环境跑起来、秒级返回的守卫。
  *
- * 覆盖面：迁移期间新旧**全部**响应形态（新信封 / 裸数据 / {error} / {message} / {_proxy_status}
- * / 无 status 的已解析 json / responseText 兜底），确认双形态兼容、迁移可灰度进行。
+ * 覆盖面：迁移期间新旧**全部**响应形态（新信封 / 业务异常出口 / 裸数据 / {error} / {message}
+ * / {_proxy_status} / 无 status 的已解析 json / responseText 兜底），确认双形态兼容、迁移可灰度进行。
  *
  * 跑法：`npm run test:js`（或直接 `node tests/javascript/scaffold-api.test.js`，退出码即结果）
  */
@@ -45,6 +45,14 @@ eq('data 取 data 层', A.data(jq(200, { ok: true, data: { a: 1 } })), { a: 1 })
 eq('isOk 失败', A.isOk(jq(422, { ok: false, error: { code: 'X', msg: 'm', detail: [] } })), false);
 eq('errorText 取 error.msg', A.errorText(jq(422, { ok: false, error: { code: 'X', msg: 'm', detail: [] } })), 'm');
 eq('errorCode 取 error.code', A.errorCode(jq(422, { ok: false, error: { code: 'X', msg: 'm', detail: [] } })), 'X');
+
+console.log('== 业务异常出口（第 6 种旧形态 {message:"…"} 已于 2026-09-19 退休）==');
+// BaseException::render()：信封 + **异常自身的 code 作 HTTP 状态**（默认 522，FormLayoutException=402）
+// 走的就是上面「新信封」那一支，不需要任何专用分支 —— 这几条只是把这个出口钉在册子上。
+const exc = (code, msg) => jq(522, { ok: false, error: { code, msg, detail: [] } });
+eq('异常出口 isOk 失败（522 已 >= 400）', A.isOk(exc('BASE_EXCEPTION', 'boom')), false);
+eq('异常出口 errorText 取 msg', A.errorText(exc('BASE_EXCEPTION', '字段类型非法')), '字段类型非法');
+eq('异常出口 errorCode 取派生机器码（不再是 HTTP_522）', A.errorCode(exc('FORM_LAYOUT_EXCEPTION', 'x')), 'FORM_LAYOUT_EXCEPTION');
 
 console.log('== 旧形态（迁移期间并存 —— 双形态兼容的核心保证）==');
 eq('裸数据 = 成功', A.isOk(jq(200, { q: 'x', results: [], truncated: false })), true);

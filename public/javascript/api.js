@@ -15,12 +15,14 @@
  * **迁移期双形态兼容**：后端正逐控制器迁移，新旧响应在一段时间内并存，所以本层两种都吃
  * （见 `isOk()` / `data()`）。这让迁移可以**按控制器灰度进行**，而不必一次性改完前端。
  *
- * 后端形态对照：
+ * 后端形态对照（**阶段 2 后端已于 2026-09-19 全部上信封**）：
  *   新信封：{ok:true, data:{…}}                    成功
- *           {ok:false, error:{code,msg,detail}} + HTTP 失败
+ *           {ok:false, error:{code,msg,detail}} + HTTP 失败 —— 控制器 / 中间件 / 业务异常三类产出方
  *   旧形态：裸数据 {q,results,…} / {ok:true,…payload}   ← 无 error 键即视为成功
- *           {error:"字符串"}（**已无产出方**）/ {message:"…"}（异常出口：BaseException）
- *           {_proxy_status:N, message}（API 代理：HTTP 恒 200，真实状态在 body 里）
+ *           {_proxy_status:N, message}（API 代理：HTTP 恒 200，真实状态在 body 里）——
+ *             **唯一**仍在产 `{message}` 的出口，也是信封的**永久例外**（body 必须原样透传）
+ *           {error:"字符串"}（**已无产出方**）/ {message:"…"}（异常出口：BaseException，**已迁完**）
+ *             —— 这两支只剩容忍，阶段 3 与 `isOk` 的兜底一起删
  *
  * ⚠ `ApiProxyController` 的响应**不走信封**（上游 body 必须原样透传），本层对它单独分支，
  *   别按新信封解读它的 body。
@@ -63,7 +65,8 @@
     /** 判定成败。HTTP 状态码优先，再看 body 里的标记。 */
     function isOk(src) {
         // HTTP 状态优先，而且对「失败」而言它**已经足够**：
-        // `{message:"…"}`（异常出口）body 里没有任何成败标记，只有状态码能判。
+        // `{_proxy_status:N, message}`（API 代理）body 里没有任何成败标记，只有状态码能判 ——
+        // 注意代理的 HTTP 恒 200，所以那条出口真正靠的是下面 `_proxy_status` 的分支。
         // 反过来，2xx 上的 `error` 键**不一定**是失败 —— 见下面的领域字段分支。
         var status = httpStatus(src);
         if (status >= 400) {
@@ -91,8 +94,8 @@
         // + HTTP 200 —— 预览**成功了**，正文也渲染了，只是 frontmatter 有问题、
         // 需要在编辑器里就地提示。若在这里判失败，一次成功的预览会被前端当成请求失败。
         //
-        // 旧形态里真正带 `error` 的失败（三个 Enforce* 中间件，403）一律配 4xx/5xx，
-        // 上面那句状态码判断已经拦住了，不依赖这条启发式。
+        // 真正带 `error` 的失败（三个 Enforce* 中间件，403 —— 现已迁入信封，但状态码照旧 4xx）
+        // 一律配 4xx/5xx，上面那句状态码判断已经拦住了，不依赖这条启发式。
         if (status === 0 && j.error) {
             return false;
         }
@@ -149,7 +152,7 @@
                 return j.error.msg; // 新：{code,msg,detail}
             }
             if (j.message) {
-                return j.message; // 旧：BaseException / API 代理
+                return j.message; // 旧：业务异常（BaseException，已迁完）/ API 代理
             }
         }
         if (fallback) {

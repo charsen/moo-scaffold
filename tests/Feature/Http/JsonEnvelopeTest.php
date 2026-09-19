@@ -14,11 +14,11 @@ use Mooeen\Scaffold\Utility;
  *      形状恒定，前端才敢只写一层解包；
  *   ② 整个 `src/` 里不许再出现**绕过信封**的裸 `response()->json()`。
  *
- * 白名单分两段：
- *   - `$allowed`（**永久**）：`JsonEnvelope.php` 是信封的**单一实现**（唯一出口，中间件与控制器共用）；
- *     `ApiProxyController.php` 必须原样透传上游 body（套信封会破坏代理语义），`_proxy_status` 契约也得保留。
- *   - `$knownDebt`（**欠账清单**，只减不增，机制照 `WriteFailureGuardTest` 的 `$knownDebt`）：
- *     每迁完一处就删掉对应行。扫描范围 2026-09-19 已从 `src/Http` 扩到整个 `src/`。
+ * 白名单（`$allowed`，**永久**两处）：
+ *   - `JsonEnvelope.php` 是信封的**单一实现**（唯一出口，中间件 / 控制器 / 异常三者共用）；
+ *   - `ApiProxyController.php` 必须原样透传上游 body（套信封会破坏代理语义），`_proxy_status` 契约也得保留。
+ * 阶段 2 后端的迁移欠账清单（`$knownDebt`）已于 2026-09-19 清零并删除 —— 扫描范围同时从
+ * `src/Http` 扩到整个 `src/`（原范围漏掉了 `src/Exceptions/BaseException.php`）。
  */
 
 /** 暴露基类的 protected `ok()` / `error()` —— 它们没有别的公开入口。 */
@@ -78,13 +78,14 @@ it('结构不变式：整个 src/ 只有一处信封实现 + 一处代理透传�
     // ① 信封的**单一实现**（`ok()` / `error()` 正是在这里裸返回的 —— 它就是那个"唯一出口"）
     // ② **永久排除**：ApiProxyController —— body 是上游 API 原样透传，套信封会破坏代理语义；
     //    它的 `_proxy_status` 契约（HTTP 恒 200 + body 带真实状态）也必须保留
+    //
+    // 阶段 2 后端迁移**已收口**（2026-09-19）：原先还有一份「欠账清单」`$knownDebt`
+    // （Cloud / Api / 三个 Enforce* / BaseException 逐个迁完就删一行），现在已清零。
+    // 若将来又需要一段迁移期，照着再引入一个只减不增的 debt 列表（机制照 `WriteFailureGuardTest` 的
+    // `$knownDebt`），别把新出口直接塞进 `$allowed`。
     $allowed = [
         'JsonEnvelope.php',
         'ApiProxyController.php',
-    ];
-    // ③ 迁移中的**欠账**：每迁完一处就删掉对应行（只减不增）
-    $knownDebt = [
-        'BaseException.php',
     ];
 
     $offenders = [];
@@ -104,14 +105,14 @@ it('结构不变式：整个 src/ 只有一处信封实现 + 一处代理透传�
         if (! preg_match('/(?<![\$\w])response\(\)->json\(/', (string) file_get_contents($file->getPathname()))) {
             continue;
         }
-        if (! in_array($file->getFilename(), [...$allowed, ...$knownDebt], true)) {
+        if (! in_array($file->getFilename(), $allowed, true)) {
             $offenders[] = $file->getFilename();
         }
     }
 
     expect($offenders)->toBe(
         [],
-        '新增 JSON 出口请走 Support\JsonEnvelope（控制器可继续写 $this->ok() / $this->error()）；确实要裸返回就加进本文件的白名单并写清理由。',
+        '新增 JSON 出口请走 Support\JsonEnvelope（控制器可继续写 $this->ok() / $this->error()、异常写 render()）；确实要裸返回就加进本文件的白名单并写清理由。',
     );
 });
 
