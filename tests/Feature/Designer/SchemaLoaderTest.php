@@ -116,7 +116,7 @@ it('loadTableFull returns rich shape with attrs / fields / index', function () {
         ->toHaveKey('enums')
         ->toHaveKey('prefix');
     expect($t['fields'])->toBeArray()->not->toBeEmpty();
-    // fields 是 list of {key, name, type, ...} objects(shapeField 结果),不是 dict
+    // fields 是 list of {key, name, type, ...} objects(FieldShaper::shape 结果),不是 dict
     // 只锁 id / created_at / updated_at(MUST have)— deleted_at 是 yaml 可选字段(软删表才有),
     // 不能强 assertion 否则 yaml drift 时此 test 假阳;真实回归用下面 rebuildFieldRows 专项 test 锁
     $fieldKeys = array_column($t['fields'], 'key');

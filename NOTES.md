@@ -3,9 +3,23 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-20，**`FieldShaper::shapeField` 更名为 `shape`（纯命名，独立一条提交）—— 并顺手把「跨语言契约引用」收成可 grep 的形态**：
+  **为什么独立一条**：改名是 cosmetic，混进「零行为变化的搬家」里会让那次改动失去 A/B 鉴别力（第 6 项的字节级保真证明会被这行改名搅浑）。
+  **引用面比想象的大**：`shapeField` 除 PHP 两处（签名 + 调用点）与测试 13 处外，还出现在 **`public/javascript/designer.js` 4 处**
+  与 **`src/Http/Views/db/designer/show.blade.php` 1 处** —— 都是注释，但都是**跨语言契约的锚**（JS 侧派生的 `f.X` 必须跟 PHP 产出的 shape 对齐）。
+  **定了一条命名规则并落到引用上：本类自己的文件用裸 `shape`；其它文件（含跨语言注释）一律写 `FieldShaper::shape`。**
+  这样 `grep -rn FieldShaper` 能**一次找齐所有耦合点** —— 改之前 JS 里写的是裸 `shapeField`，grep 类名根本找不到它，这正是这类注释最容易腐烂的原因。
+  **⚠ 机械替换必须逐处复核**：`SchemaLoader::shapeField` 被无脑全局替换成 **`SchemaLoader::FieldShaper::shape`**（两段类名叠字），
+  我第一次修又过头成 `SchemaLoader::shape`，第三次才对。**教训：带限定符的旧串（`A::old`）不能用裸标识符做全局替换** ——
+  限定符会留在原地与新类名叠起来；替换完必须专门 grep **叠字形态**（`::X::`、`X::X`）来兜底。
+  **e2e 判据**（六·五·零，用的是 skill 里 2026-09-19 那条细分）：`public/` 与 blade 确有改动，但按查法
+  `git diff -U0 <file> | grep -E "^[+-]" | grep -vE "^(\+\+\+|---)"` 逐行看，**每一行都以 `//` 开头**（blade 侧在 `{{-- --}}` 注释块内）
+  ⇒ **纯注释改动、行为为零** ⇒ 不 publish、不 e2e。
+  **验证**：`pint --test` PASS 349 files；全量 pest **1 failed / 3 skipped / 1288 passed / 5277 assertions** —— 与改名**逐项相同**，
+  这就是「纯命名」的机器证明；目标测试 22 例 / 330 断言也不变（连断言数都不动，说明动的只是标识符）。
 - 2026-09-20，**第 6 项：`SchemaLoader` 的 `loadTableFull` 族 4 方法外迁 `Designer\FieldShaper` —— 唯一「整族零状态」的切片，也是判据第一次量到第三层**：
   **净变化**：`SchemaLoader` **1504 → 1357 行**、方法 **44 → 40**；新类 **181 行**（含类注释）。
-  搬走 4 个 = `shapeField`（99 行块，入口）+ `computeSizeClass` / `computeDefaultClass` / `computeDefaultTitle`。
+  搬走 4 个 = `shape`（原 `shapeField`，99 行块，入口）+ `computeSizeClass` / `computeDefaultClass` / `computeDefaultTitle`。
   **机械替换只有两类**：接收者 `$this->computeX(` → `self::computeX(`（5 处）、签名加 `static`（4 处，入口同时 `private` → `public`）。
   正文与「搬前切片 + 两类替换」做了**字节级比对 ⇒ 零差异**（pint 唯一改动 = 文件末尾补一个空行，`class_attributes_separation`；**谁改的、改了哪一行必须定位到，不接受不明改动**）。
   **方法集合差集自证**：`旧-新` 恰为那 4 个、`新-旧` 为空、4 个恰落在新家 —— 做法是从 `git show HEAD:<旧文件>` 与两个新文件抽
@@ -38,7 +52,7 @@
   互调改重复实现 / 拿掉一个 `static` / 多带一条 `use`）。**预检变异先在外迁前跑了一轮**（10 处、打在旧宿主上）才敢搬 ——
   否则可能带着一个**空转的测试**搬家。**其中 M5 漏网是真缺口**：`$rowReadonly = $isSystem || ($name === 'id')` 的
   `$name === 'id'` 兜底没有反例（我所有 `id` 用例都带了 `_system` 标记）⇒ 补「**没有** `_system` 标记的 `id` 行」反例后才咬住。
-  **影响面**：宿主 + 四个下游仓 grep `shapeField|FieldShaper` **零命中**；且它原本是 `private`，**类外调用在 PHP 层面本就不可能**
+  **影响面**：宿主 + 四个下游仓 grep `FieldShaper` **零命中**；且它原本是 `private`，**类外调用在 PHP 层面本就不可能**
   ⇒ 影响面**由构造保证为 0**，不只靠扫。**e2e 可跳过**（六·五·零，有据）：改动只在 `src/`，`git status` 里无 `public/` 与 `*.blade.php`。
 - 2026-09-20，**第 6 项顺手量出的两个既有问题（**刻意不动**，各属独立过堂；记下来免得下次再量一遍）**：
   ① 〔**真缺陷，值得单独开项**〕`computeDefaultClass` 的 `$type === 'bool'` 支**只认字面 `bool`**，而 `SchemaLoader` 归一后写回的是
@@ -46,7 +60,7 @@
   ⇒ **真实链路上 bool 字段的 default 校验从未生效**（GUI 上 bool 字段 default 填任意垃圾不会红框）。与 `ColumnTypeGroups` 注释里
   记过的「有人写了更窄的 inline 列表 ⇒ 整类列静默丢掉校验」**同型**，也再次印证该注释那句「成员只有一处定义，才谈得上改一处不漏四处」。
   已用测试把现状**钉死**（字面 `bool` 命中 / canonical `boolean` 不命中，两条互为对照）⇒ 将来修它时那条断言会立刻照出来，
-  正是「先钉现状、再谈修复」的用例。② `shapeField` 的 `$tableLocked` 参数**整个函数体零使用**（只在紧邻注释里被提到）；
+  正是「先钉现状、再谈修复」的用例。② `shape`（原 `shapeField`）的 `$tableLocked` 参数**整个函数体零使用**（只在紧邻注释里被提到）；
   已用「同一 `$attr` 分别传 `true` / `false`、结果必须**全等**」把它钉住 —— 等价于把代码注释里那句「表锁只锁表级操作、
   字段编辑一律允许」的**意图**也钉成了断言。
 

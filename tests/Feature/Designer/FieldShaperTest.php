@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /**
- * `loadTableFull` 族（`shapeField` + `computeSizeClass` / `computeDefaultClass` / `computeDefaultTitle`）
+ * `loadTableFull` 族（`shape` + `computeSizeClass` / `computeDefaultClass` / `computeDefaultTitle`）
  * 的**行为钉尸**测试。
  *
  * **为什么先有测试、后有外迁**：这一族 4 个私有方法 / 151 行块，此前在 `tests/` 里**零直接覆盖**。
@@ -77,19 +77,19 @@ function fshCall(string $method, mixed ...$args): mixed
 /** 族入口（行为段一律走这里，不自报到具体方法名）。 */
 function fshShape(string $name, array $attr, bool $tableLocked = true): array
 {
-    return fshCall('shapeField', $name, $attr, $tableLocked);
+    return fshCall('shape', $name, $attr, $tableLocked);
 }
 
 it('宿主解析点有效：fshSubject() 指向的类存在且持有入口方法', function () {
     expect(class_exists(fshSubject()))->toBeTrue()
-        ->and((new ReflectionClass(fshSubject()))->hasMethod('shapeField'))->toBeTrue();
+        ->and((new ReflectionClass(fshSubject()))->hasMethod('shape'))->toBeTrue();
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
  * §1 形状契约 —— 键集一个不多一个不少（UI 模板按属性访问，加键/删键都不是无痕操作）
  * ═══════════════════════════════════════════════════════════════════════ */
 
-it('§1 shapeField 产出的键集合恰好等于这 37 个', function () {
+it('§1 shape 产出的键集合恰好等于这 37 个', function () {
     $keys = array_keys(fshShape('id', ['type' => 'bigint']));
     sort($keys);
 
@@ -125,7 +125,7 @@ it('§2 id 行：只读、**不可删**、ID 提示；且 index_disabled 不由�
 
     // ⚠ 反例（必须存在，否则上面那句没鉴别力）：**没有** `_system` 标记的 `id` 行，只读性只能来自
     //   `$name === 'id'` 这条兜底。真实链路上 `normalizeIdField` 总会补 `_system`，所以这条兜底
-    //   在生产数据下是冗余的 —— 但外迁后 `shapeField` 变成**公开 API**，兜底就变成「调用方不必记住
+    //   在生产数据下是冗余的 —— 但外迁后 `shape` 变成**公开 API**，兜底就变成「调用方不必记住
     //   打标记」的真实契约，不能当成死代码删掉。（本反例是变异测试实测漏网后补的：当时把
     //   `|| ($name === 'id')` 整段删掉，15 条断言全绿。）
     $bare = fshShape('id', ['type' => 'bigint']);
@@ -439,7 +439,7 @@ function fshCodeOnly(string $php, bool $keepStrings = true): string
 /** 迁走的 4 个方法名（唯一真源，§6 各条共用）。 */
 function fshMemberNames(): array
 {
-    return ['computeDefaultClass', 'computeDefaultTitle', 'computeSizeClass', 'shapeField'];
+    return ['computeDefaultClass', 'computeDefaultTitle', 'computeSizeClass', 'shape'];
 }
 
 /** 某类**自己声明**的方法名（升序）。 */
@@ -484,7 +484,7 @@ it('§6 宿主形状：final + 无构造函数 + 4 个方法恰好齐全且全�
     ));
     sort($public);
     // 只有入口是 public；3 个 compute* 保持 private（搬出去不等于顺手扩大可见面）
-    expect($public)->toBe(['shapeField']);
+    expect($public)->toBe(['shape']);
 })->skip(! class_exists(fshNewHost()), '外迁前新宿主尚不存在');
 
 it('§6 零状态锚点：新宿主没有任何属性（连 static 缓存都没有）', function () {
@@ -508,9 +508,9 @@ it('§6 零依赖锚点：纯计算 —— 不碰 $this / 容器 / 文件系统 
 it('§6 族内互调只走 self::，三处调用次数被钉死（重复实现 / 忘改接收者都会红）', function () {
     $code = fshCodeOnly((string) file_get_contents(fshSourcePath()));
 
-    // computeSizeClass 在 shapeField 里被调 2 次（size_class + size_title 各一）
+    // computeSizeClass 在 shape 里被调 2 次（size_class + size_title 各一）
     expect(substr_count($code, 'self::computeSizeClass('))->toBe(2);
-    // computeDefaultClass 被调 2 次（shapeField 1 次 + computeDefaultTitle 内部 1 次）
+    // computeDefaultClass 被调 2 次（shape 1 次 + computeDefaultTitle 内部 1 次）
     expect(substr_count($code, 'self::computeDefaultClass('))->toBe(2);
     expect(substr_count($code, 'self::computeDefaultTitle('))->toBe(1);
 })->skip(! class_exists(fshNewHost()), '外迁前新宿主尚不存在');
@@ -531,9 +531,9 @@ it('§6 接线锚点：SchemaLoader::loadTableFull 调新宿主，且不留本�
     $loader = new ReflectionClass(SchemaLoader::class);
 
     // 入口必须显式指向新宿主
-    expect($code)->toContain('FieldShaper::shapeField(')
-        // 不留 `$this->shapeField(` 本地调用 / 不留同名转发方法（`hasMethod` 那条已挡转发，这里挡调用点）
-        ->and($code)->not->toContain('$this->shapeField(');
+    expect($code)->toContain('FieldShaper::shape(')
+        // 不留 `$this->shape(` 本地调用 / 不留同名转发方法（`hasMethod` 那条已挡转发，这里挡调用点）
+        ->and($code)->not->toContain('$this->shape(');
 
     // 属性面上也不许再出现本族的痕迹
     $props = array_map(static fn (ReflectionProperty $p): string => $p->getName(), $loader->getProperties());
@@ -544,5 +544,5 @@ it('§6 接线锚点：SchemaLoader::loadTableFull 调新宿主，且不留本�
 
 it('§6 fshSubject() 已翻到新宿主 ⇒ §1~§5 的断言现在跑在新类上（断言一字未动）', function () {
     expect(fshSubject())->toBe(fshNewHost())
-        ->and((new ReflectionMethod(fshSubject(), 'shapeField'))->isStatic())->toBeTrue();
+        ->and((new ReflectionMethod(fshSubject(), 'shape'))->isStatic())->toBeTrue();
 })->skip(! class_exists(fshNewHost()), '外迁前新宿主尚不存在');
