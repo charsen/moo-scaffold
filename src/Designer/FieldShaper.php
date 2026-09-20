@@ -33,7 +33,7 @@ final class FieldShaper
     /**
      * Shape a single field row for UI consumption (deliverables: 'Field shape returned').
      */
-    public static function shapeField(string $name, array $attr, bool $tableLocked): array
+    public static function shape(string $name, array $attr, bool $tableLocked): array
     {
         // plan 19 §2.6:tableLocked 只锁表 key / 删表 / 模块 folder,字段编辑(包括加/改/改名)一律允许。
         $isSystem     = isset($attr['_system']);

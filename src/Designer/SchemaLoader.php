@@ -156,7 +156,7 @@ class SchemaLoader
         $fields = [];
         foreach ($t['fields'] as $name => $attr) {
             // 字段形状归一见 Designer\FieldShaper（纯函数）；index / index_disabled 的下文补在这里，不归它
-            $fields[] = FieldShaper::shapeField($name, $attr, $t['locked']);
+            $fields[] = FieldShaper::shape($name, $attr, $t['locked']);
         }
 
         // 反向映射:把表级 index 块里的单字段索引落到对应字段的 index 列
@@ -1102,7 +1102,7 @@ class SchemaLoader
                 // 2026-05-23 P0 round 5 视觉 bug 根因:之前默认 false → 数字字段 GUI 显示 unsigned 未勾选,
                 // 但 FreshStorageGenerator:225 给 int/bigint/tinyint/decimal/float yaml 没写 unsigned 派生
                 // 默认 true(codegen 规则)。loadNormalized 是 GUI 数据源头 — 这里默认必须对齐 codegen,
-                // 否则下游 shapeField 看到的就是错值,user 满屏看到"未勾选"但 migration 出来 unsigned。
+                // 否则下游 FieldShaper::shape 看到的就是错值,user 满屏看到"未勾选"但 migration 出来 unsigned。
                 // 用 FreshStorageGenerator:225 的窄列表(int/bigint/tinyint/decimal/float)对齐 codegen 实际行为。
                 $codegenDefaultUnsigned = ColumnTypeGroups::UNSIGNED_DEFAULT;
                 $unsignedFlag           = array_key_exists('unsigned', $cleaned)
