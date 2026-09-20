@@ -3,6 +3,50 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-20，**e2e 收尾脚本 `safe-run.sh` 的清理段已收口「静默失败」；并新增第 4 个「它的日志不可信」的实例**：
+  **原缺陷**：清理段第一行 `git -C "$HOST_DB_PATH" checkout . >/dev/null 2>&1` 失败时**完全无声**，脚本照常打印
+  「已清理本次新增的未跟踪产物 N 项」⇒ 宿主 `scaffold/database/Platform.yaml` 留在 ` M`（**已跟踪**文件残留）却报「干净」。
+  本文档下面那条实测就是它；同处写着的**「候选后续小项」现已作为独立小项完成**。
+  **修法三条，缺一条它就还会说谎**：① 回滚失败可见 —— `if ! checkout_err="$(git -C "$HOST_DB_PATH" checkout . 2>&1)"`，
+  失败时打出路径 + git 原话；② 删产物失败可见（成功才计入「已清理 N 项」）；③ **跑后差集自证** ——
+  `git status --porcelain -- "$DB_REL"` 与该层**跑前的脏清单**（`DB_BASELINE`）求差，仍有残留就点名列出。
+  层路径交给 `git rev-parse --show-prefix` 算 —— 自拼前缀会被 macOS `/tmp` → `/private/tmp` 软链坑到（`case` 前缀静默失配）。
+  **为什么只能扫源码守**：这类「工具自己说谎」的回归，行为用例测不到（脚本照样退出 0）⇒
+  `tests/Feature/DevTooling/SafeRunScriptTest.php`（`bash -n` + 反例旧写法不许出现在可执行行 + 差集自证片段必须在）。
+  **守卫要剥掉 `#` 注释行**：脚本文件头自己就会引用旧写法当反面教材，不剥会把反例断言绊红。
+  **改这类 shell 收尾脚本别拿真 e2e 当试验场**：在 `/tmp` 临时 git 仓复刻宿主形状（`.snapshots/` + 一个已跟踪 yaml），
+  把脚本最后一行换成「模拟 churn」，三场景验证 —— happy 零告警 / broken 三段告警齐出 / 预存未跟踪本地资产既不删也不误报。
+  **造「`git checkout` 失败」不能用同名目录**：`rm file && mkdir file && touch file/keep` 之后 git **会删掉目录写回文件**（退出码 0）；
+  必须 `chmod 500` 让目录不可写（退出码 **255**）。
+  **第 4 个「日志不可信」实例（新增，会伪装成「没红」）**：Playwright 开跑前清**仓根** `test-results/` 会被**环境的批量删除保护**
+  拦下 ⇒ `npm run test:e2e:safe` **2 秒退出、一个用例都没跑**，输出却像「没红」。**判据 = 有没有 `list` reporter 的用例行**；
+  修法 `git clean -fdx test-results`（用 git 绕开同一个 `rm` 保护）。目录在**仓根**（`.gitignore` 是根锚定 `/test-results/`）。
+- 2026-09-20，**e2e 在 H1 的实测基线订正 + 三个 env 占位符的实测值（旧记录 `47 / 0 / 7` 已过期）**：
+  补齐本文档推荐跑法里那五个 env 后，H1 上完整套件 **`50 passed / 0 failed / 7 skipped`**（总数 **57**；期间新增了
+  `docs-center.spec.ts` 等 3 条 ⇒ 旧的 `47 / 0 / 7`、总数 54 都过期）。**不补 env 的形态是稳定的 `39 passed / 7 failed / 7 skipped`**
+  —— 4 条宿主数据绑定 + **3 条 API smoke**（后者因 `E2E_API_SCHEMAS_CSV` 默认取 H2 的 `Light/Order/User`，H1 没有这些 schema
+  ⇒ preview **500**，后端给的是 `SCHEMA_LOAD_FAILED: YAML file not found`）。**见到 7 红先查是不是漏了 env，别当回归。**
+  三个占位符的实测值（DOM + yaml 双向核对，不是猜）：`E2E_TABLE_IN_LIST=platform_regions`（spec 默认的 `platform_pages` 在 H1 不存在）；
+  `E2E_INDEX_FIELDS_CSV=parent_id`（`index` = `{id: primary, parent_id: index}`）；`E2E_FIELD_FORMAT=''`
+  （`media_duration` = `{size:10, precision:6, default:"0.000000"}`，**没有 `format` 键** ⇒ 必须留空，别猜 `float:1000000`；
+  UI 上 format 列按「本表是否用到」自动隐藏）。
+  **新收尾段在生产条件里自证有效**：一轮清掉 3 个 migration、零告警，宿主跑后与跑前**差集为空**。
+  ⚠ 宿主走 vhost 域名时，**Chromium 会拦 `http://<该域名>` 并报 `net::ERR_BLOCKED_BY_CLIENT`**（长得像网络故障）：
+  `localhost` / `127.0.0.1` 都能开、`https://<同一域名>` 反而**真去连**（`CONNECTION_REFUSED`）⇒ 拦的是「HTTP + 该主机名」这一对，与路径无关。
+  绕法用本机反向代理（`127.0.0.1:<port>` → 该 vhost，补 `Host:` 头 + 改写响应体与 `Location` 里的原主机名），别再调 Chromium 开关。
+- 2026-09-20，**随包发布的示例文件不许出现「形态与真口令无法区分」的值，且必须配内容守卫**：
+  `stubs/accounts.example.yaml` **入 git、随 composer 包发到每个宿主**，文件头自己写着「请勿写入真实密码」，
+  但它一直没有守卫、示例口令是 **6 位纯数字**，**而且注释里又把那个值抄了一遍**（缺陷是「字段 + 注释」**两处** —— 只改字段挡不住）。
+  **改法**：示例值换成 `change-me` 这类一眼就知道要改的占位，注释同步改成「这是占位符，不是可用口令」。
+  **影响面判定**：全仓搜 `accounts.example` 只有 `Support\AccountStore.php` 一条**路径注释** —— 该 stub 只是给人看的模板
+  （运行时读写的是宿主里的 `scaffold/accounts.yaml`）⇒ **纯示例语义变更、零运行时影响**。
+  **守卫三条（`tests/Feature/Support/AccountsExampleTemplateTest.php`），判定口径刻意宽松**：
+  ① **结构完好**（文件在 + 能解析 + `accounts` 非空 + 有 `password` 键 + 文件头那句警告还在）；② 示例口令**非纯数字** + **自带占位语义**；
+  ③ 源码层锚点：注释里不许有「引号包起来的 ≥6 位纯数字」（只看源码、不看解析结果）。
+  **为什么 ① 必须有**：解析型守卫在「文件被删 / `accounts` 变空 / 键被拿掉」时会拿到 `null`，而 `preg_match('/^\d+$/', null)` 恒为 0
+  ⇒ **全绿却什么都没守住**。**为什么钉形态不钉字面量**：`toBe('change-me')` 会让「换个占位词」变成假红，
+  下一个人会直接把断言改掉、守卫就废了。
+  ⚠ **守卫的失败信息不许回显值（连长度都别给）** —— 否则真有人写进真口令时，**CI 日志反而变成新的泄漏面**；只给行号与计数。
 - 2026-09-20，**第 5 项执行（用户选档 B）：`SchemaLoader` 的 `saveModule` 族 12 方法外迁 `Designer\SchemaPayloadMerger`**：
   **净变化**：`SchemaLoader` **2132 → 1504 行**（净删 628）、方法 **56 → 44**；新类 **677 行**（含类注释；
   **方法体逐字搬**，只做两处机械替换：接收者 `$this` → `self::`、`private function` → `public static function`）。
@@ -19,6 +63,9 @@
   旧宿主改成 `SchemaPayloadMerger::sanitizeEnumLabel($value)`。
   ③ 文件末尾 `sanitizeEnumLabel` 之前那个 docblock 讲的是 `coerceFieldValue`（历史上两个 docblock 连着写、**挂错位置**）
   ——**既有瑕疵原样照搬未修**，免得把「搬代码」和「排版清理」混在同一次改动里。已写进类注释，可作后续独立小项。
+  **（2026-09-20 已收口）**：该 docblock 已移回 `coerceFieldValue` 头上，并由 `SchemaPayloadMergerTest` §13 的结构锚点守住
+  ——**挪回去即红**；其中「全文只允许一份 Coerce 说明」是**计数型**断言，专挡「复制一份回 `sanitizeEnumLabel` 头上」
+  （「紧邻某位置」型断言看不见这个方向，变异实测会漏网）。纯注释移动、零行为变化（已用 token 比对机械证明）。
   **测试（先写后搬，「同一批断言跨两个宿主」）**：新建 `tests/Feature/Designer/SchemaPayloadMergerTest.php`
   **94 例 / 177 断言**。`spmSubject()` 外迁前返回 `SchemaLoader::class`、外迁后返回新类，
   **断言一字未动**；`spmCall()` 按 `isStatic()` 自动在 `invoke($实例,…)` / `invokeArgs(null,…)` 间切换
@@ -65,6 +112,7 @@
   （**别 checkout 整个宿主仓**——开发者手头常有别的未提交改动）。
   **候选后续小项**：把 `safe-run.sh` 清理段那条 checkout 的 `>/dev/null 2>&1` 去掉（至少留 `rc` 判定），
   它现在的失败是**完全静默**的，这正是本轮要靠人工兜的原因。
+  **（2026-09-20 已完成）**：已在独立小项里去掉静默（失败可见 + 差集自证），详见顶部同名条目。
 
 - 2026-09-20，**第 5 项（`SchemaLoader`）前提核验：§五 的「方法小」实测不成立；且同一个类里「该切」与「不该切」两个族并存**：
   **量法**（已沉淀为 `moo-scaffold-optimize` skill 的 `scripts/family_scan.py`）：方法块大小 + 「每个私有方法的
