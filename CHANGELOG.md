@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.2.0
+
+- **`/scaffold` 全部 API 端点统一为 `{message}` JSON 信封**（**行为变更**）。此前各控制器各自拼装响应、错误回执形态不一，消费者要逐处容错；现由 `Support\JsonEnvelope` 统一产出，机器码由异常类名派生（`BaseException` 迁移），三个 `Enforce*` 中间件与控制器基类同时收敛，并在框架层与前端层各加一道守卫。前端新增 `public/javascript/api.js` 统一解包层 `ScaffoldApi`，`designer.js` / `docs-editor.js` / `docs-home.js` / `local-markdown-editor.js` 全部改走它，旧的「两形态容忍」代码删除。**下游需注意**：① 直接消费 `/scaffold` JSON 的代码要按新信封解析；② 若曾 `vendor:publish` 前端资源，需重新发布以取得 `api.js` 与更新后的页面脚本。
+- **`Utility` god-class 拆分**（重构，行为保真）：`src/Utility.php` 由 845 行降至 331 行，按职责外迁到 `Support\` 下的独立类，**不留转发** —— 3a 名归一 → `Support\ControllerName`（`addGitIgnore` 遗留项一并收口）；3b 文档元信息 → `Support\ActionMeta` + `Support\ActionDoc`（9 方法 / 33 调用点）；3b-2 路径 → `Support\Paths`（10 公开 + 1 private）；3b-3 登记表读取 → `Support\StorageRegistry`（9 方法 / 32 调用点）。两个高频名字归一方法保留一版 `@deprecated` 静态转发。**下游需注意**：直接调用 `Utility::getStoragePath()`（→ `Support\Paths`）/ `Utility::getModels()`（→ `Support\StorageRegistry`）等已外迁成员的地方需要改指向。
+- **跨包姓名契约移出 scaffold**：改由私有 `moo-contract` 定义，scaffold 侧不再持有该契约。
+- **`moo:account:add` 修复**：非交互模式下会静默创建空密码账号。
+- 低风险优化收口 18 / 19 项：选择回落 `null` 的 4 处活口、删文件失败静默、路径 / 类型 / 只读 / 遍历 / 缓存 / 退出码 / 写失败守卫等。
+- 回归：`MigrationWriter` 的 `emitUp` / `emitDown` 镜像新增三层守卫；`/scaffold` 信封的框架层与前端层两侧守卫。
+
 ## 2.1.25
 
 - **新增通用字段契约 `Mooeen\Scaffold\Forms\FieldTypes`**：把「字段类型 → 规则 / 参数 / 归一化 / 展示」收成一份声明式登记，供所有表单生产者共享。`params` 是参数元 schema（`kind` / `default` / `min` / `max` / `max_length` / `max_items`，**不写 `default` 即必填**），`rules()` 只产出类型专属规则、`required` / `nullable` 由框架统一前置，并兼容可空文本参数；单选项集有上限，复杂主数据应由消费领域提供独立引用类型。新增运行时依赖 `brick/math` 做数值边界校验。
