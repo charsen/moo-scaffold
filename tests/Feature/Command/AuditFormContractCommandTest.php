@@ -233,6 +233,9 @@ test('handle() 只做编排：五段各自成私有方法，handle() 本体不�
     // 想知道「哪些开关影响计数」「一行 CSV 怎么来的」都得从里面刨。现拆成
     // 解析 → 口径 → 执行 → 落账 → 输出 五段，handle() 只留编排。
     // 用反射量长度而不是扫源码：精确、不依赖缩进，报错自带方法名。
+    //
+    // 注：`dropForgotten` / `staleWaivedMarkers` 原属本清单，2026-09-20 随豁免标记族
+    // 外迁到 `Support\FormContractMarkers`（见 tests/Feature/Support/FormContractMarkersTest.php）。
     $rc = new ReflectionClass(\Mooeen\Scaffold\Command\AuditFormContractCommand::class);
 
     foreach ([
@@ -242,8 +245,6 @@ test('handle() 只做编排：五段各自成私有方法，handle() 本体不�
         'emptyTotals',
         'inspectController',
         'inspectFormPath',
-        'dropForgotten',
-        'staleWaivedMarkers',
         'recordFindings',
         'reportFindings',
     ] as $method) {

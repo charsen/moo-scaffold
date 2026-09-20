@@ -3,6 +3,66 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-20，**第 9 项：同一命令的「豁免标记」族 3 方法 + 1 个私有常量外迁 `Support\FormContractMarkers` —— 首个「常量跟着方法一起搬」的切片，也是「同一份命令拆两次」的第二次**：
+  **净变化**（含第 8 项）：`AuditFormContractCommand` **757 → 592 行**、方法 **18 → 12**（第 8 项后 15、本项后 12）；本项新类 **113 行**。
+  搬走 3 个 = `waivedMarkers`（Request 源码里 `// @moo-waived <字段>: <原因>` → `字段名 => 原因`）/
+  `dropForgotten`（剔除控制器层 `->forget('<field>')` 掉的字段）/ `staleWaivedMarkers`（标记了却当期不构成检出的「陈旧标记」），
+  外加私有常量 `WAIVED_MARKER_PATTERN` —— 它是 `waivedMarkers` 内部 `self::` 引用的，**不带过去新家就编译不过**。
+  **判据三层**：① 族外调用点恰好 3 个、全挤在 `inspectFormPath()` 的同一条流水线上（解析 → 剔除 → 陈旧检测）；
+  ② 族内内聚 —— 三个方法合起来就是「豁免标记」这一条职责；③ 零状态 —— 零 `$this`、零容器 / facade / `config()`
+  （唯一的「新」是 `new ReflectionClass`，属纯反射；§4 用**正向断言**把它和 `self::WAIVED_MARKER_PATTERN` 一起钉住）。
+  **⚠ 已有的结构锚点会随外迁失效 —— 这是「改前先绿」的第 4 种反向陷阱**：`AuditFormContractCommandTest` 那条
+  「五段各自成私有方法」的 10 项清单里含 `dropForgotten` / `staleWaivedMarkers` ⇒ **必须在同一次改动里把这两项删掉**，
+  否则搬完立刻红。前三种是：跳过型锚点写错看不见（第 7 项）、`__*` 魔术方法混进「公开面」（第 7 项）、`array_diff` 保键（第 7 项）。
+  **应对（已写进技能）**：外迁前先 `grep -rn <族内方法名>` 全仓，把「别处钉住这个族的结构锚点」一起列进出迁清单。
+  **两种机器证明**：① 方法**+常量**集合差集 —— `旧-新` 恰为那 3 个方法 + 该常量、`新-旧` 为空、新类方法恰 3 个；
+  ② **字节级重建比对（两级重建）** —— `HEAD → 施加第 8 项的变换 = pre-N → 施加本项变换`，**旧家 592 行、新家 113 行双双零差异**。
+  **验证链**：`pint --test` **PASS 356 files**；全量 pest **1 failed / 3 skipped / 1320 passed / 5529 assertions**，
+  对比第 8 项后（1 / 3 / 1312 / 5485）⇒ **+8 passed · +44 assertions**。⚠ **+44 而不是 +48 要算得清**：
+  本项新测试是 **8 例 / 48 断言**，另 **−4 断言**来自上面那条既有锚点清单**同步删了 2 项**（每项 `hasMethod` + `isPrivate` = 2 断言）
+  ⇒ 净 +44。**这种「增量不等于新增文件读数」的缺口必须逐项对上，否则就是有断言被静默改掉**。
+  **mutation 合计 32 处、漏网 0**：预检（打旧宿主）10/10 + 搬后（打新宿主）10/10 + 结构型 **12/12**
+  （含「常量没跟着搬」「常量没删干净」两条**常量专属**变异，以及**半迁移实验**）。
+  **跨宿主测试**（`tests/Feature/Support/FormContractMarkersTest.php`，8 例 / 48 断言）+ 解析夹具
+  `tests/Feature/Support/Fixtures/Markers/MarkerRequest.php`（三种形态：正常 / 字段名含 `.` 与 `*` / 无冒号不算命中）。
+  **⚠ 夹具有个坑**：`@moo-waived` 单独一行（无冒号）**不会**被 `\s+` 跨行吃成命中 —— 因为字段名类 `[A-Za-z0-9_.\*]+`
+  不匹配空白，`\s+` 回溯到底也接不上；但也因此**必须**在夹具里显式放这一行，否则这条边界永远没被测过。
+  **跨仓影响 0**（命令 `public` 面不变；`ScaffoldProvider` 注册的类名不变）。**e2e 可跳过**（六·五·零：无 `public/`、无 `*.blade.php`）。
+- 2026-09-20，**第 8 项：`AuditFormContractCommand` 的「扫描目标推导」族 3 方法外迁 `Support\ControllerScanTarget` —— 「整族零状态」队列用尽后、第一批「零状态薄类」**：
+  **净变化**：`AuditFormContractCommand` **757 → 674 行**、方法 **18 → 15**；新类 **116 行**（含类注释）。搬走 3 个 =
+  `resolveRoot`（`--scope` → 绝对扫描根）/ `controllerNamespace`（扫描根 → 控制器命名空间，PSR-4 优先 + `base_path()` 兜底）/
+  `requestNamespace`（控制器命名空间 → Request 命名空间）。
+  **⚠ 侦察订正（推翻技能里的既有记录）**：早前记的是「命名空间解析 4 方法 / 113 行块（含 `inspectController`）」，
+  本次复核**推翻** —— `inspectController` 与命名空间解析**不是一个职责**（它是执行驱动、还调族外 `inspectFormPath`），
+  真正内聚的是 **3 方法 / 73 行**。刻意**不搬**的同族两个：`resolveNamespace`（读 `$this->option('namespace')` +
+  `$this->console()->error()`）、`resolveControllerFiles`（glob + `$this->console()->warn()`）—— 要命令行上下文，
+  搬走反而把「纯推导」弄脏。**「同族」不等于「同职责」——归簇要按职责，不是按名字像不像。**
+  **判据三层**：① 族外调用点恰好 3 个、各自单入口（`handle()` / `resolveNamespace()` / `inspectController()`）；
+  ② 族内内聚（合起来就是「把 `--scope` 变成一个 (根目录, 控制器命名空间, Request 命名空间) 三元组」）；
+  ③ 零状态 —— 零 `$this`、零容器 / facade / `config()` / `new`；唯一保留的两个全局是 `Paths::isAbsolute()` 与 `base_path()`，
+  §4 用**正向断言**钉住（「不是漏扫，是有意的」）。
+  **⚠ 切片形态与前三项都不同：族块是「3 段非连续区间」**（`resolveNamespace` / `resolveControllerFiles` 夹在中间）
+  ⇒ 脚本要做**多块切片**，旧家按原始行号删 **2 个区间**（`145..160` / `211..277`）。
+  **两种机器证明**：① 方法集合差集 —— `旧-新` 恰为那 3 个、`新-旧` 为空、新类普通方法恰 3 个；
+  ② **字节级重建比对** —— 从 `git show HEAD:` 取原文，机械施加「6 处字符串替换（use 清单 / 3 个调用点 / 1 处 docblock 跨类引用 /
+  1 处分区注释）+ 3 处可见性替换（`private function` → `public static function`）」，**旧家 674 行、新家 116 行双双零差异**；
+  另做**反向还原证明**（新家 3 段还原可见性后 == 原文切片，逐字节）。
+  **验证链**：全量 pest **1 failed / 3 skipped / 1312 passed / 5485 assertions**（本项前 1 / 3 / 1303 / 5426
+  ⇒ **+9 passed · +59 assertions**，与新测试（9 例 / 59 断言）**逐项相等**；**skipped 仍 3** = §4 那 5 例由 skip 自动转绿）；
+  **mutation 合计 28 处、漏网 0**：预检（打旧宿主）9/9 + 搬后（打新宿主）9/9 + 结构型 10/10（含半迁移实验）。
+  **跨宿主测试**：`cstSubject()` 一行翻宿主 + `cstCall()` 按 `ReflectionMethod::isStatic()` 自动切 `invoke(null, …)` /
+  `invoke(app(...), …)`；§1 末条与 §3 末条各钉了一处 `〔现状 · 疑似缺陷〕`（`--scope=/` 被 `rtrim` 吃成空串；
+  `\ControllersX` 子串命中被连带替换成 `RequestsX`）—— **只钉不改**。
+  另：`controllerNamespace` 的**「最长前缀胜出」规则在现 autoload 配置下不可观测**（`src` 与 `tests` 两条前缀目录互不包含），
+  测试里改成**认账句**而不是假装测到了 —— 别让测试名宣称一件没测的事。
+- 2026-09-20，**同一文件连续两次外迁时，脚本层的两个新坑（都只在「第二次」才暴露）**：
+  ① **「先删区间、再做内容替换」，顺序不能反**。本批的 `use` 清单替换是 **2 行 → 3 行**（多插一条 import）⇒ 它**后面的行号整体 +1**；
+  若先替换再按**原始坐标**删行，脚本直接 `AssertionError: (675, 674)`（第 9 项第一版就栽在这）。
+  ② **字节级自证的切片坐标必须取自「相邻前态」**：第 9 项的 pre-N 是「施加完第 8 项之后」的文件（674 行、与 `HEAD` 同编号），
+  切片必须从**它**取；从「本次删完之后的 pre-C（592 行）」取会整体偏移 8 行 ⇒ `assert SL_METHODS.count(...) == 3` 直接炸。
+  **通用形态**：**多级重建 + 坐标基准 = 每一级的入参文本**，别用末态坐标去切中间态。
+  另顺带一条格式坑：`pint` 的 `unary_operator_spaces` 会**重排手写的 `=>` 对齐**（我按列对齐反而被改回去）⇒
+  落盘后一律 `pint --test`，别信手写对齐。
 - 2026-09-20，**第 7 项：`ScaffoldController` 的「接口发布历史」族 7 方法外迁 `Support\PublishHistoryService` —— 首个**非零状态**外迁，也是「注依赖型」的第一个样板**：
   **净变化**：`ScaffoldController` **795 → 508 行**（净 −287 = `numstat` +6 / −293）、方法 **21 → 14**；新类 **342 行**（含类注释）。搬走 7 个 =
   `getApiPublishHistory` / `groupApiPublishHistory` / `paginatePublishHistoryGroup`（3 个**入口**）+ `loadPublishHistoryActions` /
@@ -1227,7 +1287,9 @@
   既不判绝对/相对也不做 base 拼接，是另一种语义，别硬塞进 `Paths`。
   同理 `DocsRepository:547` / `PlansMarkdownRenderer:47` / `LocalMarkdownEditor:86` 的 `str_starts_with($slug, '/')`
   是**「拒绝绝对 slug」的输入校验**（安全守卫），不是绝对性判定，不动。
-  `AuditFormContractCommand::resolveRoot()` 倒是真判定（还额外 `realpath` + 去尾斜杠），已改用 `Paths::isAbsolute()`。
+  `Support\ControllerScanTarget::resolveRoot()` 倒是真判定（还额外 `realpath` + 去尾斜杠），已改用 `Paths::isAbsolute()`；
+  ⚠ 2026-09-20 第 8 项起该方法已从 `AuditFormContractCommand` 外迁到 `Support\ControllerScanTarget`（本条原写的
+  `AuditFormContractCommand::resolveRoot()` 已失效，按「跨类引用要带类名」的口径同步订正）。
   **锚点**：`tests/Feature/Support/PathsTest.php` 扫 `src/`（`token_get_all()` 剥注释，同 `ReadonlyModeTest` 的坑），
   禁止两类字面在 `Paths.php` 之外出现：`?\s*$x\s*:\s*base_path\(` 与 `rtrim(...,'/') . '/' . ltrim(...)`。
   **覆盖盲区（收口前）已补齐**：`ScaffoldMergeYamlCommand` **零测试**（它由 scaffold-sync.sh 在 rebase 冲突时调用，
