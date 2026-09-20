@@ -3,6 +3,55 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-20，**第 7 项：`ScaffoldController` 的「接口发布历史」族 7 方法外迁 `Support\PublishHistoryService` —— 首个**非零状态**外迁，也是「注依赖型」的第一个样板**：
+  **净变化**：`ScaffoldController` **795 → 508 行**（净 −287 = `numstat` +6 / −293）、方法 **21 → 14**；新类 **342 行**（含类注释）。搬走 7 个 =
+  `getApiPublishHistory` / `groupApiPublishHistory` / `paginatePublishHistoryGroup`（3 个**入口**）+ `loadPublishHistoryActions` /
+  `summarizePublishOperations` / `resolvePublishHistoryAuthor` / `buildApiDebugUrl`（4 个**助手**）。
+  **判据三层在本项长什么样**（沿用第 6 项那三层，但**形态完全不同**）：① 单入口可达的族 —— 族外只从 `getDashboardStats`
+  经那 3 个入口进来，**跨文件调用者 0**；② 族内**内聚** —— 全部围绕「一份历史 yaml → 一条首页记录 → 一个 tab 的一页」；
+  ③ 拆完两边各自成立 —— 新家 = **发布历史读取**，旧家 = 首页/路由/字典页**渲染**。
+  **⚠ 三条与第 6 项的关键差异（这才是本项的价值）**：
+  ① **不是零状态**：要读文件系统、走 `cache()`、走 `route()` ⇒ 拿不到「全静态 + 零属性」那一型，只能注依赖；
+  ② **但仍然拿到了字节级保真证明** —— 诀窍是**让注入的属性名与旧宿主逐字相同**（`$filesystem` / `$utility`，正是基类
+  `Controller` 里那两个属性名）⇒ 方法体里的 `$this->filesystem->…` / `$this->utility->…` **一个字都不用改**，
+  机械替换只剩「3 个入口 `private` → `public`」这一处（各命中 1 次）。**结论：`注依赖` 不等于 `必须改接收者`** ——
+  「零状态族」之所以好搬，是因为**没有接收者要改**，而不是因为「全静态」；只要把依赖用**同名属性**注进去，有状态族同样能拿到零差异证明。
+  ③ 族块在文件里是**一整段连续区间**（285 行）⇒ 切片脚本从第 5/6 项的「多块 + 区间合并自检」退化成「单区间」，
+  自检只需两条：首尾形态（首 `    /**`、末 `    }`）+ 3 处替换各命中 1 次。
+  **公开面刻意不扩大**：3 个入口 `public`、4 个助手仍 `private`；§8 结构锚点把公开面钉成**恰好 3 个**。
+  **跨宿主测试的写法**（`tests/Feature/Support/PublishHistoryServiceTest.php`，**15 例 / 149 断言**）：`phSubject()` 外迁前
+  `ScaffoldController::class`、外迁后 `PublishHistoryService::class`；⚠ **宿主实例一律用 `app(phSubject())` 拿，刻意不写死构造参数** ——
+  外迁要给旧宿主 ctor 加**第 4 个参数**（新服务），写死参数会让这个文件在搬家前后不再是「同一批断言」。
+  **验证链**：`pint --test` **PASS 351 files**；全量 pest **1 failed / 3 skipped / 1303 passed / 5426 assertions**，
+  对比本项前（1 / 3 / 1288 / 5277）⇒ **+15 passed · +149 assertions**，与新增测试（15 例 / 149 断言）**逐项相等**；
+  **skipped 仍是 3** —— 这正是「§8 那 6 例从 skip 自动转绿、新增 15 例全绿」的证据（净 skipped 不变）。
+  **mutation 合计 44 处、漏网 0**：预检（打在**旧宿主**上，搬之前先证测试有咬合力）**17/17** + 搬后（打在**新宿主**）**17/17**
+  + 结构型 **10/10**（去 `final` / 改成继承 UI 控制器基类 / 把助手提成 public / 漏搬一个方法 / ctor 多注一个依赖 /
+  方法体里偷引入 `config()` / 控制器留一处指回自己 / 常量没删干净 / 常量值被改 / **半迁移实验**）。
+  **两种机器证明**：① 方法集合差集 —— `旧-新` 恰为那 7 个、`新-旧` 为空、7 个恰落在新家（21 → 14 方法，新类普通方法恰 7 个 + ctor）；
+  ② **字节级重建比对** —— 从 `git show HEAD:` 取搬前切片、只做那 3 处替换，与新类正文 **285 行零差异**。
+- 2026-09-20，**第 7 项外迁顺手照出的两个「测试自己写错」的坑（都不是源码问题，但都会伪装成源码问题）**：
+  ① **「公开面恰好 N 个」这类锚点必须先跳过 `__*` 魔术方法**。`phOwnMethodNames()` 原本按「本类声明且 public」筛，
+  `__construct` 命中 ⇒ `['__construct', 3 个入口]` ≠ 3 个入口，§8 首跑直接红。**`__construct` 是依赖入口、不是家族成员**，
+  混进「公开面」会让断言指代不清。⚠ 因为**外迁前 §8 整体 skip**，这个错误**没有机会提前暴露**，只能靠搬完那次红 ——
+  这是「结构锚点看着写对了、跑起来才知道指代不清」的典型，**写跳过型锚点时更要按「跑起来会拿到什么」推一遍**。
+  ② **`array_diff` 保键**：断言「原 action 的键都在，只多 `debug_url`」时写 `array_diff(...)  ->toBe(['debug_url'])`，
+  实际拿到的是 `[7 => 'debug_url']` ⇒ 一律 `array_values()` 归一。与已记过的「`usort`/`array_column` 一类保键语义」同族。
+  **半迁移实验再验一次**（S10）：把 `phSubject()` 翻回旧宿主 ⇒ 必须**报红**而不是被 skip（skip 条件仍是「新类这个类存不存在」，
+  不是「我改完了没有」）。这条从第 6 项沿用至今，**每项都复验、每次都成立**。
+- 2026-09-20，**第 7 项顺手量到的既有遗留（**保持原样**，属独立过堂）+ 一处注释口径兑现**：
+  ① `resolvePublishHistoryAuthor` 对 `$meta['author']` 只做 `(string)` 强转、`getApiPublishHistory` 对 `$meta['app']` 同形
+  ⇒ yaml 里把 `author` / `app` 写成数组或映射会触发 PHP 的 **Array-to-string**（外部数据形状漂移，与 `cloudConsoleUrl`
+  防过的 `project.slug` 那条**同型**）。本项**只钉现状、不修**：修它 = 行为变更，混进「零变化的搬家」没法 A/B。
+  已写进新类 docblock 的「已知遗留」段。② 顺带兑现第 6 项定的「**跨类引用要带类名**」：`summarizeAppsCached` 的 docblock 里那句
+  「同 `getApiPublishHistory` 模式」已改成「同 `PublishHistoryService::getApiPublishHistory` 模式」——
+  这样 `grep -rn PublishHistoryService` 能一次找齐**所有**耦合点（含注释），不留裸方法名。
+  ③ **跨仓影响 0**：`PublishHistoryService` 是全新类；控制器 ctor 多一个参数不影响任何消费方（全走容器解析）；
+  四个下游仓 grep `ScaffoldController`，命中的要么是指向 `Foundation\Controller` 的**别名**、要么是本包的**旧快照副本**。
+  **e2e 可跳过**（六·五·零，有据）：改动只在 `src/` + `tests/`，无 `public/`、无 `*.blade.php`。
+  ④ **与 `TUNING-PLAN.md` §五 那行「publish-history 维持关闭」不冲突**：那行关的是「**简化/收口它的既有行为**」，
+  本项是「**把这一族从控制器搬到 `Support\`**」= 搬家，行为零变更；且那行的重开条件「下游消费面变化或实测数据」
+  在本项**未触发**（跨文件调用者 0、无新消费面）。
 - 2026-09-20，**`FieldShaper::shapeField` 更名为 `shape`（纯命名，独立一条提交）—— 并顺手把「跨语言契约引用」收成可 grep 的形态**：
   **为什么独立一条**：改名是 cosmetic，混进「零行为变化的搬家」里会让那次改动失去 A/B 鉴别力（第 6 项的字节级保真证明会被这行改名搅浑）。
   **引用面比想象的大**：`shapeField` 除 PHP 两处（签名 + 调用点）与测试 13 处外，还出现在 **`public/javascript/designer.js` 4 处**
