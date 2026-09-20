@@ -69,7 +69,7 @@ final class PublishHistoryService
             static fn ($file): bool => str_ends_with($file->getBasename(), '.yaml')
         );
 
-        // 列表/分组/分页只需 meta 级数据,而历史文件随每次 moo:api 无限增长(wn 半月已 187 个,
+        // 列表/分组/分页只需 meta 级数据,而历史文件随每次 moo:api 无限增长(H1 半月已 187 个,
         // 全量 yaml parse ≈ 600ms/请求)。按「文件名+mtime+apps」签名缓存:发布/删除即换签名,
         // 立刻反映新数据,无 TTL 等待;cache 不可用时退化为现算,首页不受牵连(2026-06-10 修)。
         $sig = [];
@@ -116,7 +116,7 @@ final class PublishHistoryService
             $author      = $this->resolvePublishHistoryAuthor($meta, $file->getPathname());
             $publishedAt = $meta['published_at'] ?? date('Y-m-d H:i:s', $file->getMTime());
             // action 明细(含 debug_url,每条一次 route())不在这里构建 —— 全量构建是
-            // 文件数 × action 数(wn 已 1 万+)的开销,而视图只展示当前分页 10 条。
+            // 文件数 × action 数(H1 已 1 万+)的开销,而视图只展示当前分页 10 条。
             // 改为 paginatePublishHistoryGroup 切完页后按需 loadPublishHistoryActions。
 
             $data[] = [
