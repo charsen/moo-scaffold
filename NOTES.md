@@ -3,6 +3,99 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-20，**第 5 项执行（用户选档 B）：`SchemaLoader` 的 `saveModule` 族 12 方法外迁 `Designer\SchemaPayloadMerger`**：
+  **净变化**：`SchemaLoader` **2132 → 1504 行**（净删 628）、方法 **56 → 44**；新类 **677 行**（含类注释；
+  **方法体逐字搬**，只做两处机械替换：接收者 `$this` → `self::`、`private function` → `public static function`）。
+  搬走 12 个 = `applyModuleBlock` / `changeSnapshot` / `applyTableAttrs` / `applyTableModel` /
+  `applyTableController` / `applyRenameHints` / `rebuildFieldRows` / `sortRowAttrs` / `rebuildTableIndex` /
+  `applyEnums` / `sanitizeEnumLabel` / `coerceFieldValue`。
+  **可见性**：**10 个 `public static`**（`saveModule` 的 9 个 sub-method + 供族外复用的 `sanitizeEnumLabel`）
+  + **2 个 `private static`**（`sortRowAttrs` / `coerceFieldValue`，只给 `rebuildFieldRows` 用）。
+  **三个刻意留下的决定**：
+  ① `applyTableController` 的 `app(AppTargetRegistry::class)->assertConfigured(...)`（`$origin === null` 分支）
+  **原样保留**——属包 schema 传非 null `$origin` 即绕开；不做「注入校验回调」改造（那要改签名 + 在调用方加闭包，
+  超出「只搬代码」）。它是新类**唯一的非纯点**，已写进类注释。
+  ② `sanitizeEnumLabel` 有**族外调用方**（`SchemaLoader::sanitizeFieldAttrs` 的 default sanitize）⇒ 新家给它 `public`，
+  旧宿主改成 `SchemaPayloadMerger::sanitizeEnumLabel($value)`。
+  ③ 文件末尾 `sanitizeEnumLabel` 之前那个 docblock 讲的是 `coerceFieldValue`（历史上两个 docblock 连着写、**挂错位置**）
+  ——**既有瑕疵原样照搬未修**，免得把「搬代码」和「排版清理」混在同一次改动里。已写进类注释，可作后续独立小项。
+  **测试（先写后搬，「同一批断言跨两个宿主」）**：新建 `tests/Feature/Designer/SchemaPayloadMergerTest.php`
+  **94 例 / 177 断言**。`spmSubject()` 外迁前返回 `SchemaLoader::class`、外迁后返回新类，
+  **断言一字未动**；`spmCall()` 按 `isStatic()` 自动在 `invoke($实例,…)` / `invokeArgs(null,…)` 间切换
+  （带引用参数的 `applyRenameHints` / `applyModuleBlock` 用 `[&$a, &$b, …]`，引用能穿透包装函数进 `invokeArgs`，
+  已用最小探针单独验证、不是推断）。§1~§12 是行为钉尸（逐条钉 2026-05-20 / 2026-05-23 round N / plan-40 §三 R-14 /
+  plan-51 等既有修复不变量），**§13 是结构锚点**（`final` / 无构造器 / 零属性 / 方法集合恰好 12 且全 static /
+  公开面恰 10 / 剥注释后零 `$this` 零旧宿主引用 / `use` 清单恰好 3 个 / 族内互调次数 1+1+3 /
+  容器调用恰 2 处且 context 字面量各一 / 旧宿主 `hasMethod()` 全 false / 五个实例态 memo 仍在旧宿主）。
+  **外迁牵动的既有锚点（改前先 grep 一遍旧名字，本次共 10 处）**：
+  - **8 处反射**：`applyRenameHints` ×2（`SchemaLoaderWriteTest:1033,1047`）、`rebuildTableIndex` ×3
+    （`UniqueSemanticsTest:269,285,300`）、`rebuildFieldRows` ×2（`SchemaLoaderTest:189,212`）、
+    `applyRenameHints`（`SchemaLoaderTest:35`）。改法 **两处都要动**：`new ReflectionMethod($obj, 'x')` →
+    `(新类::class, 'x')` **且** `invoke/invokeArgs($obj, …)` → `(null, …)`；只改一处会报「非静态方法不能静态调」。
+  - **源码文本断言**：`EscapeCoverageTest` 断 `SchemaLoader.php` 里含 `'$this->sanitizeEnumLabel($rawVal)'`
+    ⇒ 必须指到新文件并改成 `self::sanitizeEnumLabel($rawVal)`（留着旧路径就是**假绿**）；顺带补一条
+    「`SchemaPayloadMerger::sanitizeEnumLabel($value)` 调用点在」的锚（否则删掉这行调用，default 就静默不再 sanitize）。
+  - **「正向锚点」**：`UtilitySurfaceTest:508` 列了所有调 `ControllerName::` 的文件（作用 = 证明扫描非空过）
+    ⇒ `src/Designer/SchemaLoader.php` 要**换成** `src/Designer/SchemaPayloadMerger.php`，**不能只删**。
+  - **未用 import**：族一走，`ControllerName` / `AppTargetRegistry` 在旧宿主只剩 import 行 ⇒ 由 Pint 抓出并清除。
+  **验证链**：`pint --dirty --test` **PASS 7 files**；全量 pest **1 failed / 3 skipped / 1259 passed / 4914 assertions**，
+  对比基线（1165 / 4736）⇒ **+94 passed / +178 assertions，增量恰等于新测试文件**（94 例 / 177 断言 + EscapeCoverage 新增 1 条），
+  **无一处既有断言被改**；唯一那条红仍是**已知 env 耦合基线红**（`ConfigControllerTest:305`）。
+  **mutation 24 处全部被咬住、漏网 0**（覆盖全部 12 个方法：模块块 / 快照 / attrs / model / controller 后缀 /
+  `$origin` 门控 / 撞名守护 / 多字段索引改名 / system 字段保留 / null=未改 / `__CLEAR__` / canonical 排序 /
+  unsigned strip / unique-app / decimal 不并 `min,max` / canonical 顺序表 / unique-db 翻译 / single 保原序 /
+  `__pending_` 占位 / 数字串 value 判定 / 剥尖括号 / cap 64 / precision 强转 / bool 的 `false`/`0` 分支）。
+  **⚠ M01 揭出一个真守卫缺口（值得记）**：删掉 `applyModuleBlock` 的 `! empty($client['module'])` 判定后
+  **94 条用例全绿** —— 因为 `array_merge($existing, [])` 在「raw 已有 module 节点」时**恒等于** `$existing`，
+  是**行为等价的变异**、不是漏网。补一条「**raw 原本没有该节点**」的分叉用例（原版不建键、变异版建出空 `module`）
+  才咬住。**判据**：变异没被咬住时先问「这两版在我给的输入上真会分叉吗」；不会分叉 ⇒ 是**用例输入不够刁**。
+  **e2e（宿主 = H1，`E2E_BASE_URL=http://<H1>`，不补那 4 个宿主绑定 env）**：
+  B（改后）**46 passed / 4 failed / 7 skipped**，失败集合 = **恰好 `designer.spec.ts:111 / :132 / :143 / :159`**
+  （本轮**连那条已知漂移都没出现**）；对比第 4 项 A 基线（45 / 5 / 7 = 上述 4 条 **+ `:561`**）
+  ⇒ **B 的失败集合 ⊂ A 的失败集合，零回归**。
+  **⚠ e2e 新坑（第三个「`safe-run.sh` 日志不可信」的实例）**：脚本自述「已清理本次新增的未跟踪产物 3 项」，
+  但**已跟踪文件没被还原** —— 宿主 `engine/scaffold/database/Platform.yaml` 与
+  `.snapshots/Platform.yaml` 仍留在 ` M`（diff = 真写 spec 留下的 churn：`updated_at` 重戳
+  `'2026-09-20 12:42:19'` + snapshot 里 `region_code` 的 `name` 从 `''` 变 `地区编码`）。
+  脚本里那条 `git -C "$HOST_DB_PATH" checkout .` 明明在清理段第一行、也很难不进——**但它本轮没生效**
+  （stderr 被 `>/dev/null 2>&1` 吞掉，原因未定位）。**手工重跑同一条命令立刻成功**（`Updated 2 paths from the index`）。
+  ⇒ **跑完必须自己核，而且要看 `M` 不只是 `??`**：
+  `git -C <宿主> status --porcelain`（期望只剩宿主本来就有的项）；
+  有 `M` 就 `git -C <宿主>/engine/scaffold/database checkout .` 单独还原那一层
+  （**别 checkout 整个宿主仓**——开发者手头常有别的未提交改动）。
+  **候选后续小项**：把 `safe-run.sh` 清理段那条 checkout 的 `>/dev/null 2>&1` 去掉（至少留 `rc` 判定），
+  它现在的失败是**完全静默**的，这正是本轮要靠人工兜的原因。
+
+- 2026-09-20，**第 5 项（`SchemaLoader`）前提核验：§五 的「方法小」实测不成立；且同一个类里「该切」与「不该切」两个族并存**：
+  **量法**（已沉淀为 `moo-scaffold-optimize` skill 的 `scripts/family_scan.py`）：方法块大小 + 「每个私有方法的
+  public 入口可达集」反向闭包。`SchemaLoader` = **2132 行 / 56 方法**。
+  **证伪「方法小」**：`rebuildFieldRows` **152 行块**、`normalize` **130**、`shapeField` 99、`rebuildTableIndex` 95、
+  `saveModule` 69、`applyTableController` 66、`coerceFieldValue` / `applyEnums` / `applyRenameHints` 各 60
+  ⇒ **2 个 >100 行块、11 个 51–100**。`TUNING-PLAN.md` §五 对 `SchemaLoader(2128)` 的判词是
+  「高内聚、**方法小**、流程顺」—— 其中**「方法小」这一条实测不成立**。
+  **但结论不是「大类该拆」，而是两族相反**（这才是关键）：
+  - **`saveModule` 族 = 真垂直切片**：**11 个私有 / 605 行块**，**只被 `saveModule` 一个入口可达**
+    （`applyModuleBlock` / `changeSnapshot` / `applyTableAttrs` / `applyTableModel` / `applyTableController` /
+    `applyRenameHints` / `rebuildFieldRows` / `sortRowAttrs` / `rebuildTableIndex` / `applyEnums` / `coerceFieldValue`）。
+    其中 **10 个不读任何实例属性、也不调任何族外方法**；唯一例外 `applyEnums → sanitizeEnumLabel`（仍在族内）。
+    族的**全部对外接触面只有 5 个**（`assertOriginWritable` / `originOf` / `yamlPath` / `writeSchemaYaml` /
+    `sanitizeEnumLabel`），而且**这 5 个只被入口 `saveModule` 自己用到**——那 11 个私有方法一个都不碰。
+    ⇒ 与第 4 项（Group C）**同形**：单入口、族内自洽、零新增状态；IO / 缓存 / origin 守卫全留在 `saveModule`。
+  - **`normalize` 族 = 明确不该切**：6 个私有 / 289 行块（`normalize` / `normalizeIdField` / `parseSize` /
+    `promoteInlineUnique` / `sanitizeFieldAttrs` / `suggestKey`），却被 **8 个 public 入口**可达
+    ⇒ 它是共享的规范化底座，切它要动 8 个入口 —— **正是 §五 反对的「加间接层」**。
+  **一个补强证据**：`SchemaLoader.php:528-531` 自己就写着「v6.3 #3：plan §4 C-2 `saveModule` 从 200 行平铺拆成
+  5 个 sub-method…`saveModule` 自身降为 30 行 orchestration」——**族已经存在且已有名字**，本项**不是新造分层**，
+  只是把它们换个家（`saveModule` 仍调同样那 11 个方法，**调用次数不变 ⇒ 间接层不增加**）。
+  **覆盖情况（比第 4 项好得多）**：`SchemaLoaderWriteTest.php` **55 例 / 24 处 `->saveModule(`**、
+  `SchemaLoaderTest.php` 20 例；另有 **6 处直接反射族内私有方法**需重指
+  （`applyRenameHints` ×2 @ `SchemaLoaderWriteTest:1033,1047`；`rebuildTableIndex` ×3 @ `UniqueSemanticsTest:269,285,300`；
+  `rebuildFieldRows` ×2 @ `SchemaLoaderTest:189,212`）。`applyTableController` 在
+  `FreshStorageGenerator.php:129` 只是**注释提及**、不是调用。
+  **两个语法坑（本次都踩）**：① `grep -rln "A\|B"` 在 BSD grep 下**静默零命中**——我一度以为 `saveModule`
+  **零测试覆盖**，实际有 **24 处**；② 判 `$this->x` 是属性还是方法的负向前瞻 `(?!\s*\()` 写进
+  `python -c "…"` 双引号串会被 shell 吃掉反斜杠（`\s` 变 `s`），结论会错得看不出来。
+
 - 2026-09-20，**第 4 项收口：`ApiController` 的「参数形状归一族」外迁 `Support\ApiParameterFormatter`**（重开 §五 旧决定的四条新证据见下一条）：
   **净变化**：`ApiController` **1237 → 808 行**（净 -429）、方法 **38 → 23**、`use Illuminate\Support\Arr` 随之移除
   （该文件里 `Arr::` 三处命中全在这族内）；新类 **549 行**（含类注释；**方法体逐字搬**，只有接收者
