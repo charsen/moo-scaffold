@@ -956,3 +956,39 @@ it('§13 spmSubject() 已翻到新宿主 ⇒ §1~§12 的断言现在跑在新�
     expect(spmSubject())->toBe('Mooeen\\Scaffold\\Designer\\SchemaPayloadMerger');
     expect((new ReflectionMethod(spmSubject(), 'applyEnums'))->isStatic())->toBeTrue();
 });
+
+it('§13 docblock 各归其位:coerceFieldValue 的说明不再挂在 sanitizeEnumLabel 头上', function () {
+    $src = (string) file_get_contents(spmSourcePath());
+
+    /** 取「紧邻某方法签名之前的最后一个 docblock」。用带形参的完整签名定位, 避免命中类注释里的方法映射表。 */
+    $docBefore = function (string $signature) use ($src): string {
+        $pos = strpos($src, $signature);
+        expect($pos)->not->toBeFalse();
+
+        // ⚠ 必须截到「签名位置」为止: 若在整份 $src 上截, 会把该 docblock **之后**的
+        // 其它方法的 docblock 一起圈进来(本条断言第一版就是这么假红的)。
+        $head  = substr($src, 0, (int) $pos);
+        $start = strrpos($head, '/**');
+        expect($start)->not->toBeFalse();
+
+        return substr($head, (int) $start);
+    };
+
+    // sanitizeEnumLabel 头上必须是它自己的说明(Round 2 P2 防 XSS), 不许再挂着别人的
+    expect($docBefore('public static function sanitizeEnumLabel(string $val): string'))
+        ->toContain('Round 2 P2 防下游 XSS')
+        ->not->toContain('Coerce client-submitted');
+
+    // coerceFieldValue 必须拿回原本挂错位置的那一段(它可以无 docblock, 但若有就得是自己的)
+    expect($docBefore('private static function coerceFieldValue(string $attr, mixed $val, ?string $type): mixed'))
+        ->toContain('Coerce client-submitted')
+        ->toContain('GUI 上所有 input.value 都是 string');
+
+    // ⚠ 全文只允许存在**一份** Coerce 说明 —— 这一条同时挡两个方向:
+    //   删掉它(0 份 ⇒ coerceFieldValue 失去自己的文档)与把它「复制」回 sanitizeEnumLabel 头上
+    //   (2 份 ⇒ 复现历史缺陷里那段孤儿注释)。
+    //   为什么不能只靠上面那条「紧邻签名」的断言: 把 Coerce 块插到 Round 2 P2 块**之前**时,
+    //   最靠近 sanitizeEnumLabel 签名的**仍然是** Round 2 P2 ⇒ 那条断言看不见它。
+    //   (这不是推理, 是变异测试实测漏网后补的 —— 复现历史形状的变异当时全绿。)
+    expect(substr_count($src, 'Coerce client-submitted'))->toBe(1);
+});

@@ -41,9 +41,11 @@ use Mooeen\Scaffold\Support\ControllerName;
  *   （属包的 schema 传非 null $origin 即不校验，端契约归包自身）。刻意不做「注入校验回调」的改造：
  *   那会改签名 + 在调用方加一层闭包，超出「只搬代码」的范围。要收口请另开一项。
  *
- * ⚠ 另有一处**既有瑕疵原样保留**：文件末尾 `sanitizeEnumLabel` 之前那个 docblock 讲的是
- *   `coerceFieldValue`（历史上两个 docblock 连着写、挂错了位置）。搬迁时逐字照搬未修，
- *   以免把「搬代码」和「排版清理」混在同一次改动里。
+ * 历史瑕疵已单独收口（2026-09-20，第 5 项之后的小项）：`sanitizeEnumLabel` 之前那个 docblock 讲的
+ *   其实是 `coerceFieldValue`（两个 docblock 历史上连着写、挂错了位置）。搬迁时逐字照搬**未修**，
+ *   以免把「搬代码」与「排版清理」混在同一次改动里；现已在独立一项里把该 docblock 移回
+ *   `coerceFieldValue` 头上，并由 `SchemaPayloadMergerTest` §13 的结构锚点守住（挪回去即红）。
+ *   纯注释移动，零行为变化。
  */
 final class SchemaPayloadMerger
 {
@@ -591,14 +593,6 @@ final class SchemaPayloadMerger
     }
 
     /**
-     * Coerce client-submitted field attr to the type that matches yaml conventions.
-     *
-     * GUI 上所有 input.value 都是 string('200' / '2' / '0' / 'true'),直接写 yaml 会被引号包起来,
-     * 跟手写的 yaml(size: 192 / default: 0)不一致。这里按 effective type 反 cast 回原生类型。
-     *
-     * 只处理 size/default(其他 attr client 已是正确类型:type/index/comment 是 string,required 是 boolean)。
-     */
-    /**
      * Round 2 P2 防下游 XSS:enum label(label_en / label_zh)收 client 时 sanitize。
      * 策略:strip 控制字符 + HTML 尖括号 + quote + 反斜杠;cap 64(防写盘膨胀)。
      * 中文 / 标点 / 数字保留。label_en 还有 PascalCase 上游 regex,这里只是兜底。
@@ -618,6 +612,14 @@ final class SchemaPayloadMerger
         return $clean;
     }
 
+    /**
+     * Coerce client-submitted field attr to the type that matches yaml conventions.
+     *
+     * GUI 上所有 input.value 都是 string('200' / '2' / '0' / 'true'),直接写 yaml 会被引号包起来,
+     * 跟手写的 yaml(size: 192 / default: 0)不一致。这里按 effective type 反 cast 回原生类型。
+     *
+     * 只处理 size/default(其他 attr client 已是正确类型:type/index/comment 是 string,required 是 boolean)。
+     */
     private static function coerceFieldValue(string $attr, mixed $val, ?string $type): mixed
     {
         // precision 永远 int(decimal/double/float 的小数位数)
