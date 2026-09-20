@@ -28,7 +28,7 @@ class AclDocumentLoader
     public function loadApp(string $app, string $appName = ''): array
     {
         $default = $this->defaultDocument($app, $appName);
-        $file    = $this->utility->getAclPath() . $app . '.yaml';
+        $file    = Paths::acl() . $app . '.yaml';
         if (! $this->filesystem->isFile($file)) {
             return $default;
         }
@@ -171,7 +171,7 @@ class AclDocumentLoader
     /** 检查 app 的 ACL yaml 是否已生成 */
     public function exists(string $app): bool
     {
-        return $this->filesystem->isFile($this->utility->getAclPath() . $app . '.yaml');
+        return $this->filesystem->isFile(Paths::acl() . $app . '.yaml');
     }
 
     private function defaultDocument(string $app, string $appName): array

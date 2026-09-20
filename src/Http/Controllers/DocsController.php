@@ -16,6 +16,7 @@ use Mooeen\Scaffold\Http\Requests\Docs\SaveRequest;
 use Mooeen\Scaffold\Http\Requests\Docs\SearchRequest;
 use Mooeen\Scaffold\Support\DocsRepository;
 use Mooeen\Scaffold\Support\Markdown\DocMarkdownRenderer;
+use Mooeen\Scaffold\Support\Paths;
 use Mooeen\Scaffold\Support\ReadonlyMode;
 use Mooeen\Scaffold\Utility;
 
@@ -310,7 +311,7 @@ class DocsController extends Controller
     private function apiCatalog(): array
     {
         $apps = array_keys((array) $this->utility->getConfig('controller', []));
-        $base = $this->utility->getApiPath('schema');
+        $base = Paths::api('schema');
         $out  = [];
 
         foreach ($apps as $app) {

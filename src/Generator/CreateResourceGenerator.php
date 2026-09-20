@@ -14,6 +14,7 @@ use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Support\ColumnTypeGroups;
 use Mooeen\Scaffold\Support\FieldName;
+use Mooeen\Scaffold\Support\Paths;
 
 class CreateResourceGenerator extends Generator
 {
@@ -24,7 +25,7 @@ class CreateResourceGenerator extends Generator
      */
     public function start(string $schema_name, bool $force = false, ?string $only_table = null, ?string $target_app = null): bool
     {
-        $all = $this->filesystem->getRequire($this->utility->getStoragePath() . 'models.php');
+        $all = $this->filesystem->getRequire(Paths::storage() . 'models.php');
 
         if (! isset($all[$schema_name])) {
             $this->console()->error("未找到 schema 文件 \"{$schema_name}\"。");
@@ -141,12 +142,12 @@ class CreateResourceGenerator extends Generator
         foreach ($apps as $app) {
             $registry->get((string) $app);
 
-            $relativePath = $this->utility->getAppResourcePath($app, true);
+            $relativePath = Paths::appResource($app, true);
             $targets[]    = [
                 'app'           => $app,
-                'path'          => $this->utility->getAppResourcePath($app),
+                'path'          => Paths::appResource($app),
                 'relative_path' => $relativePath,
-                'namespace'     => $this->utility->formatNameSpace($relativePath),
+                'namespace'     => Paths::namespaceOf($relativePath),
                 'flat'          => false,
             ];
         }

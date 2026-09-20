@@ -14,7 +14,7 @@ use Orchestra\Testbench\TestCase as Orchestra;
  * Testbench 启最小 Laravel app(用 testbench-core/laravel 作为 base_path,
  * 自带 minimal config — 避开宿主 engine/config 里 third-party 包依赖冲突)。
  *
- * scaffold path 用 absolute(指向同 repo 的 engine,开发回归用)。Utility::getDatabasePath
+ * scaffold path 用 absolute(指向同 repo 的 engine,开发回归用)。Paths::database()
  * 已支持 abs path(plan-33),不再被 base_path() prefix。
  *
  * 开源使用者 fork 后,要么在 phpunit.xml 改 path,要么自备 fixture yaml。

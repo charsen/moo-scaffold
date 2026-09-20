@@ -13,6 +13,7 @@ namespace Mooeen\Scaffold\Generator;
 use Mooeen\Scaffold\Support\ActionDoc;
 use Mooeen\Scaffold\Support\ActionMeta;
 use Mooeen\Scaffold\Support\ControllerName;
+use Mooeen\Scaffold\Support\Paths;
 use Symfony\Component\Yaml\Yaml;
 
 class CreateApiGenerator extends Generator
@@ -73,8 +74,8 @@ class CreateApiGenerator extends Generator
         $this->staleMode        = in_array($staleMode, [self::STALE_MODE_KEEP, self::STALE_MODE_DEPRECATE, self::STALE_MODE_DELETE], true)
             ? $staleMode
             : self::STALE_MODE_DEPRECATE;
-        $this->apiPath         = $this->utility->getApiPath('schema') . $app . '/';
-        $this->apiRelativePath = $this->utility->getApiPath('schema', true) . $app . '/';
+        $this->apiPath         = Paths::api('schema') . $app . '/';
+        $this->apiRelativePath = Paths::api('schema', true) . $app . '/';
 
         // 处理 <ROOT_PATH> 为空字符串
         $namespace       = ($namespace === '<ROOT_PATH>' || $namespace === '/') ? '' : $namespace;
@@ -1132,8 +1133,8 @@ class CreateApiGenerator extends Generator
             return;
         }
 
-        $historyPath  = $this->utility->getApiPath('history');
-        $relativePath = $this->utility->getApiPath('history', true);
+        $historyPath  = Paths::api('history');
+        $relativePath = Paths::api('history', true);
         $this->checkDirectory($historyPath);
 
         $publishedAt     = date('Y-m-d H:i:s');

@@ -42,7 +42,7 @@ class CreateTestGenerator extends Generator
             }
 
             // FQCN：namespace_pre + module + controller，跟 CreateControllerGenerator 同源。
-            $namespace_pre = $this->utility->formatNameSpace($this->utility->getControllerPath($config_key, true));
+            $namespace_pre = Paths::namespaceOf(Paths::controller($config_key, true));
             $fqcn          = $namespace_pre . $module . '\\' . $controller;
 
             $app_dir   = ucfirst($app_folder);

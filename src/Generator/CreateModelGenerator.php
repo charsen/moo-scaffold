@@ -14,6 +14,7 @@ use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Support\Arr;
 use Mooeen\Scaffold\Support\ColumnTypeGroups;
 use Mooeen\Scaffold\Support\FieldName;
+use Mooeen\Scaffold\Support\Paths;
 
 use function in_array;
 
@@ -32,12 +33,12 @@ class CreateModelGenerator extends Generator
      */
     public function start(string $schema_name, bool $force = false, bool $factory = false, ?string $only_table = null): bool
     {
-        $this->model_path          = $this->utility->getModelPath();
-        $this->model_relative_path = $this->utility->getModelPath(true);
-        $this->base_namespace      = $this->utility->formatNameSpace($this->model_relative_path);
+        $this->model_path          = Paths::model();
+        $this->model_relative_path = Paths::model(true);
+        $this->base_namespace      = Paths::namespaceOf($this->model_relative_path);
         $this->factory_path        = database_path('factories/');
 
-        $all = $this->filesystem->getRequire($this->utility->getStoragePath() . 'models.php');
+        $all = $this->filesystem->getRequire(Paths::storage() . 'models.php');
 
         if (! isset($all[$schema_name])) {
             $this->console()->error("未找到 schema 文件 \"{$schema_name}\"。");

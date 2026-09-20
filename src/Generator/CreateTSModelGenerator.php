@@ -31,7 +31,7 @@ class CreateTSModelGenerator extends Generator
         $this->model_path          = $this->utility->getConfig('frontend.models');
         $this->model_relative_path = str_replace([base_path('../'), '../'], ['', '/'], $this->model_path);
 
-        $all = $this->filesystem->getRequire($this->utility->getStoragePath() . 'models.php');
+        $all = $this->filesystem->getRequire(Paths::storage() . 'models.php');
 
         if (! isset($all[$schema_name])) {
             $this->console()->error("未找到 schema 文件 \"{$schema_name}\"。");

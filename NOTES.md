@@ -3,6 +3,106 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-19，**`Utility` 拆分 · 阶段 3b-2：PATHS 外迁 `Support\Paths`，并修掉结构锚点的「接收者盲区」**：
+  **顺序被推翻了 —— 先 PATHS 再 REGISTRY，不是原计划的反过来**：决定顺序的是「组间文件重叠 + 谁依赖谁」。
+  PATHS∩REGISTRY = 14 文件（3a 量得），且 REGISTRY 的方法**依赖 PATHS**（`getStoragePath` ×7）又依赖 IO
+  （`parseYamlFile`）。先动 REGISTRY ⇒ 那 14~22 个文件要改构造函数 + 重写 2 个 `extends Utility` 测试桩
+  （真 DI 成本）；先动 PATHS ⇒ **纯文本替换**（方法体逐字未动，只换接收者与名字）。先做便宜且纯机械的那个，
+  它还会缩小 REGISTRY 那批要引用的面。**3a / 3b 两条末尾的「剩余阶段」已按此订正。**
+  **迁了什么（11 个 + 1 个 private）**：`getModelPath`→`model()`、`getResourcePath`→`resource()`、
+  `getAppResourcePath`→`appResource()`、`getControllerPath`→`controller()`、`getMigrationPath`→`migration()`、
+  `getStoragePath`→`storage()`、`getApiPath`→`api()`、`getAclPath`→`acl()`、`getDatabasePath`→`database()`、
+  `getSchemaPath`→`schema()`、`formatNameSpace`→`namespaceOf()`（去掉与类名重复的 `get*Path` 前缀）。
+  `getResourcePath` 是 3a 收成的 private、也是 `Utility` 当时**仅剩**的那个 private —— 它一并走了，
+  `Utility` 自此**再无私有方法**。**为什么进 `Paths` 而不是开新类**：`Support\Paths` 本就是「路径」这件事的家
+  （归一：`isAbsolute` / `join` / `absolute` / `fromBasePath`），把路径**位置**放进去是同一职责。
+  **`Utility::isApiFileExist()` 没跟着走**：它做「解析 + 断言文件存在」，存在性检查是 IO、不是纯解析；
+  它现在调 `Paths::api()` 再自己 `$this->filesystem->isFile()`。
+  **账**：`Utility` 603 → 483 行、公开面 32 → 22（20 个真邻居 + 2 个 3a 转发）、私有 1 → 0；
+  33 个文件变更（23 src + 9 tests + `NOTES.md`），+852 / −266 —— 其中收尾订正只动注释，
+  但把 6 个此前没碰过的文件拉进了 `pint --dirty` 的检查范围。
+  **补上了三处「有意保留的不对称」的语义锁 —— 这才是本阶段最该记的**：外迁时方法体逐字未动，
+  但当时只在 `UtilitySurfaceTest` 钉了结构面（旧名不再存在）。语义面靠 `TargetContextTest` **间接对照**，
+  而那是拿 `Paths` 当**基准**去比 `targetContext` —— `Paths` 自身改坏它照样绿（基准跟着一起动）。
+  偏偏 `Paths.php` 的类注释写着这三处不对称「都有用例钉着」：**在补齐 `PathsTest` 之前那句话是假承诺**
+  （文档承诺了不存在的守卫，比不写更危险）。补的三条都带**对照**，不是把当前值抄一遍
+  （抄一遍的用例会跟实现一起变，等于没钉）：① `storage(true)` 去的是 `storage_path()`、
+  `migration(true)` 去的**仍是** `base_path()`（两条互为对照）；② `database()` 走 `fromBasePath()`（认绝对），
+  `model()` / `api()` 走裸 `base_path($config)`（不认）—— 两条断言必须**不同**，否则用例失去鉴别力；
+  ③ `acl()` 硬编码：故意补一个 `scaffold.acl.path` 配置再断言它不生效。
+  **顺带发现一个签名陷阱（既有形态，未改，已钉住）**：这 10 个方法里 5 个是 `($relative)`、
+  5 个是 `(键名, $relative)`，且**第一参的类型化状态不一致** —— `api()` / `appResource()` 已类型化
+  ⇒ 误用 `api(true)` 直接 TypeError（**响亮**，好）；`controller()` / `database()` / `schema()` 未类型化
+  ⇒ `controller(true)` **静默**返回 `base_path()` 本身、`schema(true)` **静默**返回
+  `".../scaffold/database/1"`（`true` 被拼成 `"1"`）—— 路径**错但像对的**，最难查。
+  **我自己写这组用例时先踩了一次**（这正是把它写成锚点的原因）。收紧签名（`?string` / `string`）是候选后续项：
+  零调用点会破、且能把静默变响亮，但属 API 决定 —— 按本项目「既有形态不顺手改」的惯例没在 3b-2 里做。
+  **踩坑（本阶段最可复用的教训）：结构锚点的「接收者白名单」就是它的盲区** ——
+  ① 迁移调用点的正则只锚 `$this->utility->` / `Utility::` / `app(Utility::class)->`，漏掉了
+  `tests/.../TargetContextTest.php` 里的 `$u->getModelPath()`（**变量接收者**），于是**漏检与漏改同时发生**：
+  锚点全绿、直到运行期 `Call to undefined method Utility::getModelPath()` 才炸。
+  ⇒ 锚点的价值全在「它能不能看见真实世界的写法」，看不见的写法就是它的盲区。
+  ② 矫枉过正成「接收者无关」（`/(?:->|::)\s*(name)\s*\(/`）又**误伤正确代码**：新宿主**继承了同名方法**
+  （`ActionDoc::parsePMCNames()` 就是原 `Utility::parsePMCNames()`），按名字扫必然自伤，6 个文件被判红。
+  ⇒ 正解是「按**宿主身份**放行，而不是按方法名放行」：把**接收者**也捕出来，
+  `ActionDoc` / `ActionMeta` / `Paths`（带命名空间前缀的归一成短名）放行，`self` / `static` 只在三个新宿主
+  **自己的文件**里放行。`app\(Utility::class\)` 这个备选必须写在类名备选**之前**，否则会被类名分支先吃掉。
+  ③ 改完后锚点**判红了自己**：新加的回归守卫里写着 fixture 字符串 `'$u->getModelPath();'` ——
+  **字符串字面量里的方法名不是调用**。于是扫描文本再丢掉 `T_CONSTANT_ENCAPSED_STRING` /
+  `T_ENCAPSED_AND_WHITESPACE`（helper 由 `utility_usage_without_comments` 更名 `utility_scannable_code`）。
+  **守卫的鉴别力（7 处打哑，红集互不相交）**：M-A `storage()` 的去前缀改成 `base_path()` ⇒ 只有「不对称之一」；
+  M-B `acl()` 改成读配置 ⇒ 只有「不对称之三」；M-C `database()` 改成裸 `base_path()` ⇒ 只有「不对称之二」；
+  M-D `namespaceOf()` 去掉 `ucfirst` ⇒ 只有 namespaceOf 用例；M-E `controller()` 两参换位 ⇒
+  {参数形状, model/… 语义} 两条；M-F 给 `Utility` 加回一条 `@deprecated` 转发 ⇒ {已不存在, 公开面预算}，
+  **扫描锚点不红**；M-G 外部文件里加 `$u->getModelPath()` ⇒ **只有扫描锚点**。
+  ⇒ M-F 与 M-G 红集**不相交**，正好证明「定义面」与「调用面」两条锚点互相独立。
+  变异后 `Paths.php` / `Utility.php` 均以 sha256 校验**字节还原**。
+  **全量 1 failed / 3 skipped / 1134 passed（4508 断言）**（3b 基线实测 `1125 / 4375`；
+  本阶段 +9 例 / +133 断言 —— +8 例 / +115 断言来自 `PathsTest` 6 → 14，+1 例 / +5 断言来自注释面锚点，
+  +13 断言来自「参数形状」锚点从「钉疣」改写成「钉不变量 + 正面断言响亮」）；
+  红仍是 `ConfigControllerTest:305` 那条 env 耦合基线
+  （`SCAFFOLD_AUTHOR=charsen` 即转绿）；`pint --dirty` 32 files **零改动**
+  （写入前后 `git diff --stat` 逐字节一致，无夹带重排）。
+  **收尾订正：「代码面」锚点看不见注释，于是注释里的旧名活了下来**：结构锚点故意剥掉注释与字符串
+  （理由见下），所以**注释里的旧名它永远看不见**。收尾时全仓扫了一遍注释，逮到 **6 处**把已不存在的名字
+  当**现役方法**在解释行为的注释：`tests/TestCase.php`（`Utility::getDatabasePath`）、
+  `src/Adder/Adder.php` + `tests/.../AdderTest.php`（`formatNameSpace`）、两个 HTTP 测试（`getApiPath`）、
+  `AclDocumentLoaderTest`（`getAclPath`）。**注释是给人读的**，人照着它去找方法会找不到（比没有注释更坏）
+  ⇒ 全部订正为新宿主，并补一条**注释面锚点**（`utility_old_names_in_comments()` + 5 文件白名单）
+  与代码面锚点互补，防这类漂移重演。
+  **补这条时判据先错了一次，而且错得有价值**：第一版把 `UTILITY_MOVED_METHODS` **整张清单**拿去扫注释，
+  立刻把 4 个文件判红 —— 其中 `src/Support/ActionDoc.php` 的映射表、以及三个测试里对
+  **现役** `ActionDoc::parseActionDesc()` 的正常描述，全成了"违规"。根因是**两件事被当成了一件**：
+  这 22 个名字里，12 个是「**改了名**」（PATHS 11 + `formatDisplayDate` + 4 个 ActionMeta 归一方法），
+  10 个只是「**换了宿主、名字没变**」（`parsePMCNames` / `parseActionInfo` / `parseActionName` /
+  `parseActionDesc` / `getActionRequestClass` / `parseByLanguages`）—— 后者名字在全仓**仍然存在**，
+  读者照着它能找到方法，压根不是漂移。⇒ 清单拆成 `UTILITY_RENAMED_METHODS`（注释面判据用它）
+  + `UTILITY_RELOCATED_METHODS`（注释面放行），并集留作「`Utility` 上不得再有」与代码面扫描的口径。
+  **这就是「锚点的判据要按事实分家，而不是按清单一把扫」**：一把扫的锚点会不断用假阳性逼你加白名单，
+  而白名单一多，锚点就退化成噪音。
+  打哑实测：注释里写 `getApiPath` / `formatNameSpace`（改名名）⇒ **红**；写 `parseActionDesc`
+  （仅换宿主的名）⇒ **不红** —— 分家是真的。文件 sha256 字节还原。
+  **收尾第二件事：把「静默错值」收紧成「响亮 TypeError」（用户拍板做）**：外迁时方法体逐字未动，
+  于是把 `Utility` 原来的参数类型也原样搬来了 —— 而那批签名里 `$relative` 与键名参数大多**无类型**，
+  误用会**静默**产出错路径：`controller(true)` 把 `true` 当键名 ⇒ `config('scaffold.1')` 取到 null ⇒
+  返回 `base_path()` **本身**；`schema(true)` 更隐蔽 —— `true` 被拼成 `"1"` ⇒ `".../scaffold/database/1"`。
+  ⇒ 10 个方法的 `$relative` 一律 `bool`、键名参数一律 `string`（`schema()` 的 `$file_name` 用 `?string`，
+  `null` = 只要目录），**方法体仍未动一个字**。
+  **前提必须实测、不能想当然**：`declare(strict_types=1)` 是**逐文件**的 —— 调用方文件没声明时
+  `true` 会被强制转成 `'1'`，静默问题照旧。实测本仓 **202 个非 blade src 文件 + 136 个 tests 文件全部声明**、
+  **Blade 视图零处调 `Paths::`**（视图不继承 strict_types，是唯一潜在漏洞口）⇒ 全仓每个调用点都在严格模式下。
+  `PathsTest` 的「参数形状」锚点随之从「钉住那个疣」改成「钉住不变量 + 正面断言响亮」：
+  末参恒 `bool $relative`、键名参恒 `string`（`schema()` 是 `?string`），且 `controller/database/schema/api/appResource(true)`
+  必须抛 TypeError（断言里连**方法名**一起钉：TypeError 的消息本身就含 `Paths::controller(`）。
+  **只有「有键名位」的 5 个**能这么断言 —— `model(true)` / `storage(true)` 本来就是合法调用
+  （`$relative` 就是首参），第一版把它们也算进去，立刻红。
+  **踩坑（可复用）**：`toThrow(TypeError::class, $msg)` 的第二参是**异常消息的子串**，不是自定义说明 ——
+  第一版拿它当「哪条断言失败」的说明写，报 `Expected: <异常消息> To contain: Paths::controller(true) 应当 TypeError`。
+  要附说明得换形态，或者让异常消息自己承担（本次正是后者：`Paths::{$method}(` 既是断言也是说明）。
+  **剩余阶段**：3b-3 = REGISTRY 14 个读方法 → `Support\StorageRegistry`（现在更便宜：PATHS 已就位）；
+  3c = PATHS/CORE 收尾，**必须与 `TUNING-PLAN.md` §三 P2（给 `targetContext` 补 host 臂 controller/request
+  的 path+namespace）合并考虑**，否则同一个 `targetContext` 要改两次。
+
 - 2026-09-19，**`Utility` 拆分 · 阶段 3b：DOCMETA 外迁 `Support\ActionMeta` + `Support\ActionDoc`，按「读/写两侧」切，且这批不留转发**：
   **为什么切两刀而不是一个类**：DOCMETA 那 12 个成员其实是两种职责混在一起 ——
   「从反射与 DocBlock **读出**字段」（`parsePMCNames`/`parseActionInfo`/`parseActionName`/`parseActionDesc`/
@@ -45,8 +145,13 @@
   **全量 1 failed / 3 skipped / 1125 passed（4375 断言）**（3a 基线 1110 passed / 4274）；红仍是
   `ConfigControllerTest:305` 那条 env 耦合基线（**已实测**：`git stash` 回 3a 同样红、加 `SCAFFOLD_AUTHOR=charsen`
   即转绿 ⇒ 非本次回归）；`pint` 对这 10 个文件**零改动**（写入前后 `diff -r src tests` 为空，无夹带重排）。
-  **剩余阶段**：3b-2 = REGISTRY 14 个读方法 → `Support\StorageRegistry`（顺带把两个 `extends Utility` 测试桩
-  改成绑容器假件，那本来就是更好的测试缝）；3c = PATHS，必须与 `TUNING-PLAN.md` §三 P2 合并考虑。
+  **剩余阶段**（⚠ **本条的顺序已被推翻** —— 见本文件上方 2026-09-19 的 **3b-2 条**）：
+  原计划「3b-2 = REGISTRY 14 个读方法 → `Support\StorageRegistry`（顺带把两个 `extends Utility` 测试桩
+  改成绑容器假件，那本来就是更好的测试缝）；3c = PATHS，必须与 `TUNING-PLAN.md` §三 P2 合并考虑」。
+  实际执行时**先做了 PATHS、把 REGISTRY 推后**（理由：先动 REGISTRY 要那 14 个重叠文件改构造函数，
+  先动 PATHS 是纯文本替换）。⇒ 修正后的剩余：**3b-3 = REGISTRY → `Support\StorageRegistry`**
+  （顺带把两个 `extends Utility` 测试桩改成绑容器假件）；**3c = PATHS/CORE 收尾**，
+  必须与 `TUNING-PLAN.md` §三 P2 合并考虑。
 
 - 2026-09-19，**`Utility` 拆分 · 阶段 3a：先量持有面与组间重叠，再决定「一次切四类」不值得**：
   **先量**：852 行 / 45 个公开成员（1 构造器 + 42 实例 + 2 静态）= 5 组职责 —— CORE 配置与身份(3)、PATHS 路径(13)、

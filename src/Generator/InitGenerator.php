@@ -11,6 +11,7 @@
 namespace Mooeen\Scaffold\Generator;
 
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
+use Mooeen\Scaffold\Support\Paths;
 
 class InitGenerator extends Generator
 {
@@ -69,9 +70,9 @@ class InitGenerator extends Generator
     private function createFolder(): void
     {
         $folders = [
-            $this->utility->getDatabasePath('schema'),
+            Paths::database('schema'),
             storage_path('scaffold/'),
-            // $this->utility->getApiPath('schema'),
+            // Paths::api('schema'),
         ];
 
         foreach ($folders as $folder) {
