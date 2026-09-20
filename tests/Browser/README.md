@@ -39,6 +39,35 @@ E2E_BASE_URL=http://127.0.0.1:8088 npm run test:e2e:auth
 
 > headless / agent 无窗口时：在宿主里 tinker 铸一个**双层** EncryptCookies cookie 注入即可（`ScaffoldAuth::makeCookie('admin')` → 套 `CookieValuePrefix` + `encrypter->encrypt` → `rawurlencode` 写进 `admin.json` 的 `scaffold_auth`，domain `127.0.0.1` / path `/`）。`/scaffold` 挂 `web` 组，直接注单层 makeCookie 值会被 EncryptCookies 解坏、一直跳登录。
 
+**⚠ 登录态会过期，过期后的症状极易误判成"代码改坏了"**：cookie TTL 默认 7 天
+（`ScaffoldAuth::getTtlMinutes()` = `60*24*7`）。过期后的现场是：**几乎全部 spec 一起红**、
+错误报文为 `{"ok":false,"status":401}`、失败时的页面快照是**登录页**。
+两个判据可以一眼定性：① 报的是 401 而不是断言不匹配；② `theme-logo.spec.ts` 是**唯一**显式用空登录态
+（`test.use({ storageState: { cookies: [], origins: [] } })`）的 spec，**过期后反而是它唯一变绿**、有效时反而红
+—— 看到这个"倒挂"就是登录态问题，不是回归。
+
+续期不用重新交互登录，让宿主**框架自己**产出正确的双层值即可（别手搓 `CookieValuePrefix` + `encrypter`，
+加解密参数很容易差一点、表现为"一直跳登录"）：
+
+```bash
+cd <宿主>
+php artisan tinker --execute='
+$auth = app(\Mooeen\Scaffold\Auth\ScaffoldAuth::class);
+$name = $auth->getCookieName();
+$resp = response("ok")->cookie($auth->makeCookie("<admin 用户名>"));
+$resp = app(\Illuminate\Cookie\Middleware\EncryptCookies::class)->handle(request(), fn () => $resp);
+foreach ($resp->headers->getCookies() as $c) { if ($c->getName() === $name) { $val = $c->getValue(); } }
+$state = ["cookies" => [["name" => $name, "value" => $val, "domain" => "<宿主域名>", "path" => "/",
+    "expires" => time() + 60*60*24*7, "httpOnly" => true, "secure" => false, "sameSite" => "Strict"]],
+    "origins" => []];
+file_put_contents("<本仓>/tests/Browser/.auth/admin.json", json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+'
+```
+
+写完先做个 10 秒的探针再跑整套：带这份 state 打开 `/scaffold/db/designer`，
+断言 **URL 没被跳到 `/scaffold/login`**、`window.ScaffoldApi` 是 object、且无 console error ——
+能过再跑 12 分钟的套件。
+
 ## 3. 跑
 
 ```bash

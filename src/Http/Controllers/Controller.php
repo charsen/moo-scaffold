@@ -3,9 +3,11 @@
 namespace Mooeen\Scaffold\Http\Controllers;
 
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\View\View;
+use Mooeen\Scaffold\Support\JsonEnvelope;
 use Mooeen\Scaffold\Utility;
 
 /**
@@ -42,6 +44,36 @@ class Controller extends BaseController
     protected function view(string $view, array $data = [], array $mergeData = []): View
     {
         return view()->make("scaffold::{$view}", $data, $mergeData);
+    }
+
+    /**
+     * 统一 JSON 成功信封：`{"ok": true, "data": {...}}` —— `/scaffold` 后台全站唯一的成功形状。
+     *
+     * 实现已收口到 `Support\JsonEnvelope`（那里是**单一出口**）：信封有两类产出方，
+     * 控制器只是其中之一 —— 三个 `Enforce*` 中间件不继承本基类，却同样要产出信封。
+     * 留这两个薄壳是为了**不动既有调用点**：控制器里一律照旧写 `$this->ok(...)`。
+     *
+     * ⚠ **不适用于** `ApiProxyController`：那里的 body 是**上游 API 的原样透传**，套信封会破坏代理语义。
+     */
+    protected function ok(array $data = []): JsonResponse
+    {
+        return JsonEnvelope::ok($data);
+    }
+
+    /**
+     * 统一 JSON 失败信封：`{"ok": false, "error": {code, msg, detail}}` + HTTP 状态码。
+     *
+     * 签名与 `DesignerController::error()` 逐字一致（那是本仓事实标准），所以迁移调用点不必改。
+     * `$code` 给前端做**分支判断**（机器可读），`$msg` 给人看（直接进 toast），`$detail` 放字段级信息。
+     *
+     * ⚠ `$http` 故意**不给默认值**，强制调用点表态：失败要么 4xx 要么 5xx，别一律 200 ——
+     * 否则前端 `if (! res.ok)` 那条路（designer.js 一直依赖它）会失效。
+     *
+     * 实现同样收口到 `Support\JsonEnvelope`（机器码 / 文案 / 状态码的语义说明见那里）。
+     */
+    protected function error(string $code, string $msg, int $http, array $detail = []): JsonResponse
+    {
+        return JsonEnvelope::error($code, $msg, $http, $detail);
     }
 
     /**

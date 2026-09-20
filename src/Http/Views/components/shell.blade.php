@@ -81,6 +81,8 @@ $containerClasses = trim('container' . ($hasAside ? '' : ' pl0') . ($hasTopBar ?
     <x-scaffold::confirm-container />
 
     <script src="/vendor/scaffold/javascript/jquery-3.7.1.min.js"></script>
+    {{-- api.js 必须排在 main.js 与各页面脚本之前：它是全站统一的响应解包层（ScaffoldApi） --}}
+    <script src="/vendor/scaffold/javascript/api.js?v={{ @filemtime(public_path('vendor/scaffold/javascript/api.js')) ?: time() }}"></script>
     <script src="/vendor/scaffold/javascript/main.js?v={{ @filemtime(public_path('vendor/scaffold/javascript/main.js')) ?: time() }}"></script>
     {{ $scripts ?? '' }}
 </body>

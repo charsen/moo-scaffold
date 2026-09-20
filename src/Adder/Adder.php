@@ -17,6 +17,7 @@ use Illuminate\Support\Str;
 use Mooeen\Scaffold\Support\Concerns\InteractsWithConsoleUi;
 use Mooeen\Scaffold\Support\Concerns\ResolvesOriginContext;
 use Mooeen\Scaffold\Support\Concerns\SharedCodegenHelpers;
+use Mooeen\Scaffold\Support\Paths;
 use Mooeen\Scaffold\Utility;
 
 class Adder
@@ -197,9 +198,9 @@ class Adder
 
         $file_path = Str::replaceEnd('.php', '', $exist->getPathname());
         $class     = str_replace([$path, '/'], ['', '\\'], $file_path);
-        // resource.path 带尾 `/` → formatNameSpace 产出尾部带 `\` 的 namespace,再拼 `\\{class}` 得到
+        // resource.path 带尾 `/` → Paths::namespaceOf() 产出尾部带 `\` 的 namespace,再拼 `\\{class}` 得到
         // 双反斜杠 `Resources\\Foo`(空命名空间段)→ 生成的 controller use 语句 PHP 语法错(2026-06-09 修)。
-        $namespace = rtrim($this->utility->formatNameSpace('./' . config('scaffold.resource.path')), '\\');
+        $namespace = rtrim(Paths::namespaceOf('./' . config('scaffold.resource.path')), '\\');
 
         return "use {$namespace}\\{$class};";
     }

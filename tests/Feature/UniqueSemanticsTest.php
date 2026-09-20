@@ -138,7 +138,7 @@ function callRebuildFieldsRules(array $fields, array $enums = []): array
     $method = $ref->getMethod('rebuildFieldsRules');
     $method->setAccessible(true);
     $gen = $ref->newInstanceWithoutConstructor();     // ctor 需 Command 依赖,绕过
-    // rebuildFieldsRules 内部调 $this->utility->getModelIds() / $this->escapePhpString,需要注入
+    // rebuildFieldsRules 内部调 StorageRegistry::modelIds() / $this->escapePhpString,需要注入
     $utility    = app(Utility::class);
     $refUtility = $ref->getProperty('utility');
     $refUtility->setAccessible(true);

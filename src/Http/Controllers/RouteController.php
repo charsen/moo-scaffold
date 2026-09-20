@@ -10,6 +10,9 @@ use Illuminate\Routing\Router;
 use Mooeen\Scaffold\Http\Requests\Route\IndexRequest;
 use Mooeen\Scaffold\Support\AclActionResolver;
 use Mooeen\Scaffold\Support\AclDocumentLoader;
+use Mooeen\Scaffold\Support\ActionMeta;
+use Mooeen\Scaffold\Support\ControllerName;
+use Mooeen\Scaffold\Support\Paths;
 use Mooeen\Scaffold\Utility;
 use ReflectionClass;
 
@@ -190,7 +193,7 @@ class RouteController extends Controller
                 continue;
             }
 
-            $controllerShort = Utility::stripControllerSuffix($controllerClass);
+            $controllerShort = ControllerName::strip($controllerClass);
 
             $methods = array_filter($route->methods(), fn ($m) => $m !== 'HEAD');
             $apiInfo = $this->resolveApiInfo($app, $moduleName, $controllerShort, $method);
@@ -384,11 +387,11 @@ class RouteController extends Controller
     private function resolveModuleName(string $app, string $moduleKey): string
     {
         if (! array_key_exists($app, $this->menusTransformCache)) {
-            $apiPath  = $this->utility->getApiPath('schema') . $app . '/';
+            $apiPath  = Paths::api('schema') . $app . '/';
             $yamlFile = $apiPath . '_menus_transform.yaml';
 
             $this->menusTransformCache[$app] = $this->filesystem->isFile($yamlFile)
-                ? $this->utility->normalizeMenusTransform($this->utility->parseYamlFile($yamlFile))
+                ? ActionMeta::normalizeMenus($this->utility->parseYamlFile($yamlFile))
                 : [];
         }
 
@@ -438,7 +441,7 @@ class RouteController extends Controller
         }
 
         foreach ($yamlData['actions'] as $key => $actionData) {
-            $realAction = $this->utility->removeActionNameMethod((string) $key);
+            $realAction = ActionMeta::removeMethodSuffix((string) $key);
             if ($realAction === $action) {
                 return [
                     'name'      => is_array($actionData) ? (string) ($actionData['name'] ?? '') : '',

@@ -12,7 +12,8 @@ namespace Mooeen\Scaffold\Generator;
 
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Support\Str;
-use Mooeen\Scaffold\Utility;
+use Mooeen\Scaffold\Support\ControllerName;
+use Mooeen\Scaffold\Support\StorageRegistry;
 
 class CreateViewGenerator extends Generator
 {
@@ -28,11 +29,11 @@ class CreateViewGenerator extends Generator
         $this->view_path          = $this->utility->getConfig('frontend.views');
         $this->view_relative_path = str_replace([base_path('../'), '../'], ['', '/'], $this->view_path);
 
-        $all  = $this->utility->getControllers(false);
+        $all  = StorageRegistry::controllers(false);
         $attr = $all[$schema_name][$controller];
 
         // 删除字符串尾部的 Controller 字符
-        $attr['class'] = Utility::stripControllerSuffix($controller);
+        $attr['class'] = ControllerName::strip($controller);
 
         $module             = Str::snake($attr['module']['folder'], '-');
         $entity             = Str::snake($attr['class'], '-');

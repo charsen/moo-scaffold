@@ -45,13 +45,18 @@
             data: { src: section.getAttribute('data-reorder-src'), slugs: slugs },
             success: function (res) {
                 renumber(section);
-                var n = res && typeof res.changed === 'number' ? res.changed : null;
+                // 经解包层取载荷（信封 `{ok:true, data:{changed}}`）；取不到就当 null ——
+                // 只是不显示「改写 N 篇」那段括注，不影响"排序已保存"这个事实。
+                var payload = window.ScaffoldApi.data(res) || {};
+                var n = typeof payload.changed === 'number' ? payload.changed : null;
                 toast('排序已保存' + (n !== null ? '（改写 ' + n + ' 篇）' : ''), 'success');
                 // 侧栏导航就地刷新(重取本页抽出 .p-docs-nav 换入;失败也无妨,下次导航自然新)
                 $('#aside_container').load(window.location.pathname + ' .p-docs-nav');
             },
             error: function (xhr) {
-                var msg = (xhr.responseJSON && xhr.responseJSON.error) || '排序保存失败';
+                // 新信封的 error 是**对象**（{code,msg,detail}），旧写法直接当字符串 toast 会出
+                // [object Object]；errorText 两种都吃。
+                var msg = window.ScaffoldApi.errorText(xhr, '排序保存失败');
                 toast(msg, 'error');
                 setTimeout(function () { window.location.reload(); }, 1500);   // 回真实状态
             },
@@ -217,9 +222,10 @@
                 return;
             }
             var mySeq = ++seq;
-            $.getJSON(CFG.routes.search, { q: q }, function (data) {
+            $.getJSON(CFG.routes.search, { q: q }, function (res) {
                 if (mySeq !== seq) return;            // 慢响应乱序:丢过期结果(对齐编辑器预览守护)
-                render(data, q);
+                // render() 要的是**载荷本身**（results / truncated），而信封是 `{ok:true, data:{…}}`
+                render(window.ScaffoldApi.data(res), q);
             });
         }
 

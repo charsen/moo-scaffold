@@ -73,7 +73,11 @@
             url: CFG.routes.preview, type: 'POST', data: { content: $content.val() },
             success: function (res) {
                 if (seq !== previewSeq) return;
-                $preview.html((res && res.html) || '');
+                // 必须经解包层取载荷：信封是 `{ok:true, data:{html}}`，照旧直读顶层 html 会拿到
+                // undefined —— 预览整块空白且**不报错**，最难查的那种坏法。`|| {}` 保留旧代码
+                // 对空响应（204 / 空 body）的容忍，别让解包层的新写法把 null 变成异常。
+                var payload = window.ScaffoldApi.data(res) || {};
+                $preview.html(payload.html || '');
                 if (typeof window.scaffoldDocsRenderMermaid === 'function') {
                     window.scaffoldDocsRenderMermaid($preview[0]);
                 }
@@ -160,7 +164,9 @@
             },
             error: function (xhr) {
                 setStatus('error');
-                if (!silent) toast((xhr.responseJSON && xhr.responseJSON.error) || '保存失败', 'danger');
+                // errorText 同时吃新信封 `{error:{code,msg,detail}}` 与旧形态 `{error:"…"}`，
+                // 所以迁移期间两种响应都对；旧写法直接把 error 当字符串 toast，新信封会变 [object Object]。
+                if (!silent) toast(window.ScaffoldApi.errorText(xhr, '保存失败'), 'danger');
             },
             complete: function () {
                 saving = false;
@@ -251,8 +257,8 @@
                 if (!ok) return;
                 $.ajax({
                     url: CFG.routes.remove, type: 'POST', data: { slug: CFG.slug, src: CFG.src || '' },
-                    success: function (res) { window.location.href = res.redirect; },
-                    error: function (xhr) { toast((xhr.responseJSON && xhr.responseJSON.error) || '删除失败', 'danger'); }
+                    success: function (res) { window.location.href = window.ScaffoldApi.data(res).redirect; },
+                    error: function (xhr) { toast(window.ScaffoldApi.errorText(xhr, '删除失败'), 'danger'); }
                 });
             });
     });
@@ -272,7 +278,7 @@
         if (catalog) { cb(); return; }
         $.ajax({
             url: CFG.routes.picker, type: 'GET',
-            success: function (res) { catalog = res || { endpoints: [], tables: [] }; cb(); },
+            success: function (res) { catalog = window.ScaffoldApi.data(res) || { endpoints: [], tables: [] }; cb(); },
             error: function () { toast('加载引用列表失败', 'danger'); }
         });
     }

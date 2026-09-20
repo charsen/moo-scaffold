@@ -6,7 +6,10 @@ use Illuminate\Support\Facades\DB;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Support\ColumnTypeGroups;
 use Mooeen\Scaffold\Support\Concerns\AtomicFileWrite;
+use Mooeen\Scaffold\Support\ControllerName;
 use Mooeen\Scaffold\Support\PackageRegistry;
+use Mooeen\Scaffold\Support\Paths;
+use Mooeen\Scaffold\Support\StorageRegistry;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Yaml\Yaml;
@@ -255,7 +258,7 @@ class SchemaLoader
         // 2026-05-30:模型数 — models.php 按模块分组,汇总各模块模型数(缓存缺失则 0,不炸首屏)
         $models = 0;
         try {
-            foreach ($this->utility->getModels() as $moduleModels) {
+            foreach (StorageRegistry::models() as $moduleModels) {
                 $models += is_array($moduleModels) ? count($moduleModels) : 0;
             }
         } catch (\Throwable) {
@@ -693,9 +696,9 @@ class SchemaLoader
             unset($existing['class']);
         } else {
             // 2026-05-21 归一化:controller class 必带 Controller 后缀,跟 generator 端一致 ——
-            // 收口到 Utility::ensureControllerSuffix 单一真源。
+            // 收口到 ControllerName::ensure 单一真源。
             // designer GUI 用户漏写后缀(只填 "Memo")会让 routes 引用 MemoController 但文件名 Memo.php → 类找不到 → 接口调试 sidebar 缺该模块。
-            $existing['class'] = Utility::ensureControllerSuffix($class);
+            $existing['class'] = ControllerName::ensure($class);
         }
         if (array_key_exists('app', $cCtrl) && is_array($cCtrl['app'])) {
             $appList = array_values(array_filter(
@@ -1242,7 +1245,7 @@ class SchemaLoader
     {
         $origin = $this->originOf($schema);
         $dir    = $origin === null
-            ? rtrim($this->utility->getDatabasePath('schema'), '/')
+            ? rtrim(Paths::database('schema'), '/')
             : rtrim($this->utility->targetContext($origin)->pathFor('database'), '/');
 
         return $dir . '/' . $schema . '.yaml';
@@ -1444,7 +1447,7 @@ class SchemaLoader
             }
         };
 
-        $scan($this->utility->getDatabasePath('schema'), null);
+        $scan(Paths::database('schema'), null);
         foreach (app(PackageRegistry::class)->all() as $key => $pkg) {
             $scan($pkg['base_path'] . 'scaffold/database', $key);
         }

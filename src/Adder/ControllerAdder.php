@@ -11,7 +11,8 @@
 namespace Mooeen\Scaffold\Adder;
 
 use Illuminate\Support\Str;
-use Mooeen\Scaffold\Utility;
+use Mooeen\Scaffold\Support\ControllerName;
+use Mooeen\Scaffold\Support\Paths;
 
 class ControllerAdder extends Adder
 {
@@ -45,7 +46,7 @@ class ControllerAdder extends Adder
         }
 
         if ($new_controller) {
-            $controller = Utility::ensureControllerSuffix($controller);
+            $controller = ControllerName::ensure($controller);
             $controller = ucfirst($controller);
             $file_path  = $this->buildNewController($folder, $controller);
 
@@ -108,7 +109,7 @@ class ControllerAdder extends Adder
         return [
             'class' => $this->originCtx !== null
                 ? $this->originCtx->namespaceFor('controller') . '\\' . basename($controller)
-                : $this->utility->formatNameSpace($this->config['path'] . $controller),
+                : Paths::namespaceOf($this->config['path'] . $controller),
             'action' => $action,
         ];
     }
@@ -136,7 +137,7 @@ class ControllerAdder extends Adder
         $controller_relative_file = $this->relDisplay($controller_file, $this->originCtx);
         $namespace_pre            = $this->originCtx !== null
             ? $this->originCtx->namespaceFor('controller')
-            : $this->utility->formatNameSpace(rtrim($this->config['path'] . $folder, '/'));
+            : Paths::namespaceOf(rtrim($this->config['path'] . $folder, '/'));
 
         if ($this->filesystem->exists($controller_file)) {
             $this->console()->exists($controller_relative_file, 'Controller 已存在');
@@ -144,7 +145,7 @@ class ControllerAdder extends Adder
             return $controller_file;
         }
 
-        $controller = Utility::stripControllerSuffix($controller);
+        $controller = ControllerName::strip($controller);
         $meta       = [
             'author'               => $this->utility->getConfig('author'),
             'date'                 => date('Y-m-d H:i'),
@@ -413,7 +414,7 @@ class ControllerAdder extends Adder
         return [
             'full'      => $full_path,
             'relative'  => './' . $path,
-            'namespace' => trim($this->utility->formatNameSpace($path), '\\'),
+            'namespace' => trim(Paths::namespaceOf($path), '\\'),
         ];
     }
 
@@ -440,7 +441,7 @@ class ControllerAdder extends Adder
         return [
             'full'      => $full_path,
             'relative'  => './' . $path,
-            'namespace' => trim($this->utility->formatNameSpace($path), '\\'),
+            'namespace' => trim(Paths::namespaceOf($path), '\\'),
         ];
     }
 }

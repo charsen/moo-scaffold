@@ -3,6 +3,414 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-19，**`Utility` 拆分 · 阶段 3b-3：REGISTRY 外迁 `Support\StorageRegistry` —— 而「REGISTRY 有 14 个读方法」这个前提本身是错的**：
+  **计划被推翻**：3a 量得的 `REGISTRY = 14` 把**三件事**拼成了一组 —— `9 个读 `storage/scaffold/*.php` 聚合缓存`
+  + `getLangFields`（读的是 `scaffold/database/schema/_fields.yaml`，schema YAML，走 `parseYamlFile()`）
+  + `getApps/getAppTargets/getExtraModules/getControllerNamespaces`（app-target 组，且**本就已委托 `AppTargetRegistry`**）。
+  **「按持有面/调用点数分组」量得出重叠，量不出职责** —— 决定切法的必须是「这个方法**读什么**」，不是它当初被归到哪一组。
+  真正可切的 9 个（实际外迁）：`getOneTable`→`table()`、`getTables`→`tables()`、`getModels`→`models()`、
+  `getModelIds`→`modelIds()`、`getControllers`→`controllers()`、`getFields`→`fields()`、`getEnums`→`enums()`、
+  `getEnumWords`→`enumWords()`（去掉与类名重复的 `get*` 前缀，与 3b-2 同批规则）、`dictionaryStats()` 名字本就够、未改。
+  `getEnums`/`getEnumWords`/`dictionaryStats` 内部互调 ⇒ 必须一起搬。
+  **推迟它的那条理由错在「凭什么算 DI 成本」**：3b-2 推迟 REGISTRY 写的是「要 14~22 个文件改构造函数 + 重写测试桩」，
+  实测**只在「实例注入」这种形态下成立** —— 而本类唯一依赖是 `Filesystem`（无状态、不读 `config()`），
+  做成 `final` + 全静态（与 `Paths` 同形，`Filesystem` 各方法就地 `new`，与 `Utility::__construct()` 的既有形态一致）
+  ⇒ **构造函数 0 改动、基类 accessor 0 个、纯文本替换**。反过来若走实例注入：4 个基类 + 全仓 `new XGenerator()`
+  共 **~76 处**要改，收益为零（本仓对这些方法的既有测试本来就是**真写缓存文件**再读，没有替换需求）。
+  ⇒ **可复用判据：以「要改构造函数」为由推迟外迁之前，先问一句「被迁出去的那部分能不能是静态的」**
+  （无状态 + 不读 `config()` ⇒ 能；读 `config()` 的 `AppTargetRegistry`/`PackageRegistry` 才必须走容器）。
+  **删转发还是留转发**：沿用 3b-2 的规则（零 DI 成本 + 调用点可穷举 + 漏了**响亮**），三条全中 ⇒ **删、不留转发**。
+  调用点是 `$this->utility->` / `app(Utility::class)->` 共 **32 处 / 16 文件**，漏改一律 `Call to undefined method`。
+  **顺带收口 5 处「绕开 `Utility` 直读 `models.php`」**（`Command::assertTableInSchema`/`schemaOfTable`、
+  `CreateModelGenerator` / `CreateTSModelGenerator` / `CreateResourceGenerator`）⇒ 现在「读缓存」只有一个出口。
+  其中 `Command::schemaOfTable()` 原来是 `isFile()` 再 `getRequire`，改成 `try { StorageRegistry::models() } catch (FileNotFoundException) { return null; }`
+  （等价：文件不在 ⇒ 原路返回 null）。
+  **账**：`Utility` 483 → **332 行**、公开面 22 → **13**（11 个真邻居 + 2 个 3a 转发）；47 个工作区条目（45 改 + 2 新）。
+  **锚点几乎零新增机制，正好二次验证 3b-2 的「按事实分组」判据**：8 个**改了名**的塞进
+  `UTILITY_RENAMED_METHODS`、`dictionaryStats` 塞进 `UTILITY_RELOCATED_METHODS`（名字没变 ⇒ 注释里写它**仍然是对的**），
+  再加 `StorageRegistry` 进宿主白名单、预算 22 → 13。**若把 `dictionaryStats` 放进改名那组，注释面锚点就会去追本来正确的散文**。
+  **本轮补的一条新判据（因为锚点先误伤了一次）**：接收者是**裸 `$this` / `self` / `static`**（即「本文件的类自己」）时，
+  若**同一段源码里定义**了同名方法 ⇒ 放行 —— `AdderCommand::getControllers($path, $folder)` 与
+  `Utility::getControllers(bool $merge_all)` 只是**重名**。**这层判据不削弱覆盖面**：漏改的真实形态
+  （`$this->utility->xxx()` / `$u->xxx()` / `Utility::xxx()`）接收者不是裸 `$this`，照旧判红（守卫里给了**相反结论**的两条 fixture 钉住这点）。
+  **注释面锚点逮到 8 处，分两类、都没进白名单**：7 处是**真漂移**（`ScaffoldController` / `ScaffoldDashboardTest` /
+  `CreateViewGeneratorTest` / `UpdateMultilingualGeneratorTest` / `GeneratorFixesTest` / `CreateResourceGeneratorTest` /
+  `UniqueSemanticsTest`）已换成新宿主 —— 最典型的是 `UniqueSemanticsTest` 那句「内部调 `$this->utility->getModelIds()`」，
+  方法一走这句话**就是错的**；1 处是**撞车**（`AdderTest` 那行注释指的是 `AdderCommand::getControllers()`），
+  处理是**改注释措辞**（并补一句「不是 StorageRegistry 那个」），**不豁免** —— 白名单只收「刻意讲迁移映射」的，
+  被这类误报稀释就失去意义了。另：`src/Support/StorageRegistry.php` 进白名单，理由同 `Paths.php`（它是旧名→新名的映射表）。
+  **守卫的鉴别力（9 处打哑，红集互不相交 —— 除 M-E 是「覆盖面最广」那条）**：
+  M-A `enums(true)` 的合并键改成表名 ⇒ 只有「enums 按字段名合并」；M-B `enumWords()` 不再跳 `__pending_` ⇒ 只有「跳占位」；
+  M-C `table()` 缺表静默回落空数组 ⇒ 只有「响亮失败」；M-D `controllers()` 默认臂失效 ⇒ 只有「按短类名扁平合并」；
+  M-E `models()` 读错文件名 ⇒ **12 红**（1 条锚点 + 11 条生成器链路：`CodegenOriginTest` / `CreateResourceGeneratorTest`）
+  —— 它是**唯一一条「在真实链路上也响亮」**的错法；M-F `dictionaryStats()` 的 fields 计数 ⇒ 只有「三个计数」；
+  M-G 给 `Utility` 加回一个 `getModels()` 转发 ⇒ {已不存在, 公开面预算}，**扫描锚点与注释面全绿**；
+  M-H 把一个调用点回退成 `$this->utility->getTables()` ⇒ **只有扫描锚点**；M-I 在非白名单文件的注释里留旧名 ⇒ **只有注释面锚点**。
+  ⇒ M-G 与 M-H 红集不相交（「加回定义」与「回退调用」互相看不见），M-I 再证明注释面有**独立于**代码面的鉴别力。9 处变异后
+  `StorageRegistry.php` / `Utility.php` / `ScaffoldController.php` / `ApiSchemaService.php` 均以 sha256 校验**逐字节还原**。
+  **新增 `tests/Feature/Support/StorageRegistryTest.php`（7 例 / 33 断言）** —— 这 9 个方法外迁前**只有生成器链路间接覆盖**
+  （断言的是**产物**，缓存读错成什么样只要产物"看起来对"就发现不了），而外迁前 `Utility` 的 docblock 却写着 `@throws`：
+  **文档承诺了没人钉过的东西**，与 3b-2 给 `Paths` 补 `PathsTest` 同一处境。全部带对照（不是把返回值抄一遍）。
+  **全量 1 failed / 3 skipped / 1141 passed（4567 断言）**（3b-2 基线 `1134 / 4508`，+7 例 / +59 断言 —— +7 例来自新测试文件）；
+  红仍是 `ConfigControllerTest:305` 那条 env 耦合基线（`SCAFFOLD_AUTHOR=charsen` 即转绿）；
+  `pint --dirty --test` 46 files PASS（写入式只修 1 处 `binary_operator_spaces`，前后 `git diff --stat` **逐字节一致**，无夹带重排）；
+  `npm run test:js` 3 个守卫文件 62 断言全绿；**e2e 按六·五 判据整段跳过**（`git status` 里 `public/` 与 `*.blade.php` 均 0 命中）。
+  **顺带查出的三条（本次只登记、不动）**：① `controllers(bool $merge_all = true)` 的 `true` 臂**零调用点**
+  （全仓 10 个调用点一律显式传 `false`，唯一提 `true` 的是 `ScaffoldController` / `ScaffoldDashboardTest` 两处
+  「为什么不再用它」的注释）⇒ **原样搬**，删它是 API 变更、要连注释与注释面锚点一起动；
+  ② 上述 5 处重复读取已在本轮收口；③ **3b-2 记的那条「3b-3 顺带把两个 `extends Utility` 测试桩改成绑容器假件」不成立、已作废** ——
+  `CommandExitCodeTest` 那两个桩覆写的是 `getControllerNamespaces()` / `getAppTargets()`（app-target 组，不在这 9 个里），
+  与本次无关；（另注：其中 244 那个桩的 `__construct` **不调 `parent::__construct()`** ⇒ `$this->filesystem` 未初始化，
+  当前只用它覆写的方法所以没炸 —— 这是它自己的隐患，另立候选。）
+
+- 2026-09-19，**`Utility` 拆分 · 阶段 3b-2：PATHS 外迁 `Support\Paths`，并修掉结构锚点的「接收者盲区」**：
+  **顺序被推翻了 —— 先 PATHS 再 REGISTRY，不是原计划的反过来**：决定顺序的是「组间文件重叠 + 谁依赖谁」。
+  PATHS∩REGISTRY = 14 文件（3a 量得），且 REGISTRY 的方法**依赖 PATHS**（`getStoragePath` ×7）又依赖 IO
+  （`parseYamlFile`）。先动 REGISTRY ⇒ 那 14~22 个文件要改构造函数 + 重写 2 个 `extends Utility` 测试桩
+  （真 DI 成本）；先动 PATHS ⇒ **纯文本替换**（方法体逐字未动，只换接收者与名字）。先做便宜且纯机械的那个，
+  它还会缩小 REGISTRY 那批要引用的面。**3a / 3b 两条末尾的「剩余阶段」已按此订正。**
+  **迁了什么（11 个 + 1 个 private）**：`getModelPath`→`model()`、`getResourcePath`→`resource()`、
+  `getAppResourcePath`→`appResource()`、`getControllerPath`→`controller()`、`getMigrationPath`→`migration()`、
+  `getStoragePath`→`storage()`、`getApiPath`→`api()`、`getAclPath`→`acl()`、`getDatabasePath`→`database()`、
+  `getSchemaPath`→`schema()`、`formatNameSpace`→`namespaceOf()`（去掉与类名重复的 `get*Path` 前缀）。
+  `getResourcePath` 是 3a 收成的 private、也是 `Utility` 当时**仅剩**的那个 private —— 它一并走了，
+  `Utility` 自此**再无私有方法**。**为什么进 `Paths` 而不是开新类**：`Support\Paths` 本就是「路径」这件事的家
+  （归一：`isAbsolute` / `join` / `absolute` / `fromBasePath`），把路径**位置**放进去是同一职责。
+  **`Utility::isApiFileExist()` 没跟着走**：它做「解析 + 断言文件存在」，存在性检查是 IO、不是纯解析；
+  它现在调 `Paths::api()` 再自己 `$this->filesystem->isFile()`。
+  **账**：`Utility` 603 → 483 行、公开面 32 → 22（20 个真邻居 + 2 个 3a 转发）、私有 1 → 0；
+  33 个文件变更（23 src + 9 tests + `NOTES.md`），+852 / −266 —— 其中收尾订正只动注释，
+  但把 6 个此前没碰过的文件拉进了 `pint --dirty` 的检查范围。
+  **补上了三处「有意保留的不对称」的语义锁 —— 这才是本阶段最该记的**：外迁时方法体逐字未动，
+  但当时只在 `UtilitySurfaceTest` 钉了结构面（旧名不再存在）。语义面靠 `TargetContextTest` **间接对照**，
+  而那是拿 `Paths` 当**基准**去比 `targetContext` —— `Paths` 自身改坏它照样绿（基准跟着一起动）。
+  偏偏 `Paths.php` 的类注释写着这三处不对称「都有用例钉着」：**在补齐 `PathsTest` 之前那句话是假承诺**
+  （文档承诺了不存在的守卫，比不写更危险）。补的三条都带**对照**，不是把当前值抄一遍
+  （抄一遍的用例会跟实现一起变，等于没钉）：① `storage(true)` 去的是 `storage_path()`、
+  `migration(true)` 去的**仍是** `base_path()`（两条互为对照）；② `database()` 走 `fromBasePath()`（认绝对），
+  `model()` / `api()` 走裸 `base_path($config)`（不认）—— 两条断言必须**不同**，否则用例失去鉴别力；
+  ③ `acl()` 硬编码：故意补一个 `scaffold.acl.path` 配置再断言它不生效。
+  **顺带发现一个签名陷阱（既有形态，未改，已钉住）**：这 10 个方法里 5 个是 `($relative)`、
+  5 个是 `(键名, $relative)`，且**第一参的类型化状态不一致** —— `api()` / `appResource()` 已类型化
+  ⇒ 误用 `api(true)` 直接 TypeError（**响亮**，好）；`controller()` / `database()` / `schema()` 未类型化
+  ⇒ `controller(true)` **静默**返回 `base_path()` 本身、`schema(true)` **静默**返回
+  `".../scaffold/database/1"`（`true` 被拼成 `"1"`）—— 路径**错但像对的**，最难查。
+  **我自己写这组用例时先踩了一次**（这正是把它写成锚点的原因）。收紧签名（`?string` / `string`）是候选后续项：
+  零调用点会破、且能把静默变响亮，但属 API 决定 —— 按本项目「既有形态不顺手改」的惯例没在 3b-2 里做。
+  **踩坑（本阶段最可复用的教训）：结构锚点的「接收者白名单」就是它的盲区** ——
+  ① 迁移调用点的正则只锚 `$this->utility->` / `Utility::` / `app(Utility::class)->`，漏掉了
+  `tests/.../TargetContextTest.php` 里的 `$u->getModelPath()`（**变量接收者**），于是**漏检与漏改同时发生**：
+  锚点全绿、直到运行期 `Call to undefined method Utility::getModelPath()` 才炸。
+  ⇒ 锚点的价值全在「它能不能看见真实世界的写法」，看不见的写法就是它的盲区。
+  ② 矫枉过正成「接收者无关」（`/(?:->|::)\s*(name)\s*\(/`）又**误伤正确代码**：新宿主**继承了同名方法**
+  （`ActionDoc::parsePMCNames()` 就是原 `Utility::parsePMCNames()`），按名字扫必然自伤，6 个文件被判红。
+  ⇒ 正解是「按**宿主身份**放行，而不是按方法名放行」：把**接收者**也捕出来，
+  `ActionDoc` / `ActionMeta` / `Paths`（带命名空间前缀的归一成短名）放行，`self` / `static` 只在三个新宿主
+  **自己的文件**里放行。`app\(Utility::class\)` 这个备选必须写在类名备选**之前**，否则会被类名分支先吃掉。
+  ③ 改完后锚点**判红了自己**：新加的回归守卫里写着 fixture 字符串 `'$u->getModelPath();'` ——
+  **字符串字面量里的方法名不是调用**。于是扫描文本再丢掉 `T_CONSTANT_ENCAPSED_STRING` /
+  `T_ENCAPSED_AND_WHITESPACE`（helper 由 `utility_usage_without_comments` 更名 `utility_scannable_code`）。
+  **守卫的鉴别力（7 处打哑，红集互不相交）**：M-A `storage()` 的去前缀改成 `base_path()` ⇒ 只有「不对称之一」；
+  M-B `acl()` 改成读配置 ⇒ 只有「不对称之三」；M-C `database()` 改成裸 `base_path()` ⇒ 只有「不对称之二」；
+  M-D `namespaceOf()` 去掉 `ucfirst` ⇒ 只有 namespaceOf 用例；M-E `controller()` 两参换位 ⇒
+  {参数形状, model/… 语义} 两条；M-F 给 `Utility` 加回一条 `@deprecated` 转发 ⇒ {已不存在, 公开面预算}，
+  **扫描锚点不红**；M-G 外部文件里加 `$u->getModelPath()` ⇒ **只有扫描锚点**。
+  ⇒ M-F 与 M-G 红集**不相交**，正好证明「定义面」与「调用面」两条锚点互相独立。
+  变异后 `Paths.php` / `Utility.php` 均以 sha256 校验**字节还原**。
+  **全量 1 failed / 3 skipped / 1134 passed（4508 断言）**（3b 基线实测 `1125 / 4375`；
+  本阶段 +9 例 / +133 断言 —— +8 例 / +115 断言来自 `PathsTest` 6 → 14，+1 例 / +5 断言来自注释面锚点，
+  +13 断言来自「参数形状」锚点从「钉疣」改写成「钉不变量 + 正面断言响亮」）；
+  红仍是 `ConfigControllerTest:305` 那条 env 耦合基线
+  （`SCAFFOLD_AUTHOR=charsen` 即转绿）；`pint --dirty` 32 files **零改动**
+  （写入前后 `git diff --stat` 逐字节一致，无夹带重排）。
+  **收尾订正：「代码面」锚点看不见注释，于是注释里的旧名活了下来**：结构锚点故意剥掉注释与字符串
+  （理由见下），所以**注释里的旧名它永远看不见**。收尾时全仓扫了一遍注释，逮到 **6 处**把已不存在的名字
+  当**现役方法**在解释行为的注释：`tests/TestCase.php`（`Utility::getDatabasePath`）、
+  `src/Adder/Adder.php` + `tests/.../AdderTest.php`（`formatNameSpace`）、两个 HTTP 测试（`getApiPath`）、
+  `AclDocumentLoaderTest`（`getAclPath`）。**注释是给人读的**，人照着它去找方法会找不到（比没有注释更坏）
+  ⇒ 全部订正为新宿主，并补一条**注释面锚点**（`utility_old_names_in_comments()` + 5 文件白名单）
+  与代码面锚点互补，防这类漂移重演。
+  **补这条时判据先错了一次，而且错得有价值**：第一版把 `UTILITY_MOVED_METHODS` **整张清单**拿去扫注释，
+  立刻把 4 个文件判红 —— 其中 `src/Support/ActionDoc.php` 的映射表、以及三个测试里对
+  **现役** `ActionDoc::parseActionDesc()` 的正常描述，全成了"违规"。根因是**两件事被当成了一件**：
+  这 22 个名字里，12 个是「**改了名**」（PATHS 11 + `formatDisplayDate` + 4 个 ActionMeta 归一方法），
+  10 个只是「**换了宿主、名字没变**」（`parsePMCNames` / `parseActionInfo` / `parseActionName` /
+  `parseActionDesc` / `getActionRequestClass` / `parseByLanguages`）—— 后者名字在全仓**仍然存在**，
+  读者照着它能找到方法，压根不是漂移。⇒ 清单拆成 `UTILITY_RENAMED_METHODS`（注释面判据用它）
+  + `UTILITY_RELOCATED_METHODS`（注释面放行），并集留作「`Utility` 上不得再有」与代码面扫描的口径。
+  **这就是「锚点的判据要按事实分家，而不是按清单一把扫」**：一把扫的锚点会不断用假阳性逼你加白名单，
+  而白名单一多，锚点就退化成噪音。
+  打哑实测：注释里写 `getApiPath` / `formatNameSpace`（改名名）⇒ **红**；写 `parseActionDesc`
+  （仅换宿主的名）⇒ **不红** —— 分家是真的。文件 sha256 字节还原。
+  **收尾第二件事：把「静默错值」收紧成「响亮 TypeError」（用户拍板做）**：外迁时方法体逐字未动，
+  于是把 `Utility` 原来的参数类型也原样搬来了 —— 而那批签名里 `$relative` 与键名参数大多**无类型**，
+  误用会**静默**产出错路径：`controller(true)` 把 `true` 当键名 ⇒ `config('scaffold.1')` 取到 null ⇒
+  返回 `base_path()` **本身**；`schema(true)` 更隐蔽 —— `true` 被拼成 `"1"` ⇒ `".../scaffold/database/1"`。
+  ⇒ 10 个方法的 `$relative` 一律 `bool`、键名参数一律 `string`（`schema()` 的 `$file_name` 用 `?string`，
+  `null` = 只要目录），**方法体仍未动一个字**。
+  **前提必须实测、不能想当然**：`declare(strict_types=1)` 是**逐文件**的 —— 调用方文件没声明时
+  `true` 会被强制转成 `'1'`，静默问题照旧。实测本仓 **202 个非 blade src 文件 + 136 个 tests 文件全部声明**、
+  **Blade 视图零处调 `Paths::`**（视图不继承 strict_types，是唯一潜在漏洞口）⇒ 全仓每个调用点都在严格模式下。
+  `PathsTest` 的「参数形状」锚点随之从「钉住那个疣」改成「钉住不变量 + 正面断言响亮」：
+  末参恒 `bool $relative`、键名参恒 `string`（`schema()` 是 `?string`），且 `controller/database/schema/api/appResource(true)`
+  必须抛 TypeError（断言里连**方法名**一起钉：TypeError 的消息本身就含 `Paths::controller(`）。
+  **只有「有键名位」的 5 个**能这么断言 —— `model(true)` / `storage(true)` 本来就是合法调用
+  （`$relative` 就是首参），第一版把它们也算进去，立刻红。
+  **踩坑（可复用）**：`toThrow(TypeError::class, $msg)` 的第二参是**异常消息的子串**，不是自定义说明 ——
+  第一版拿它当「哪条断言失败」的说明写，报 `Expected: <异常消息> To contain: Paths::controller(true) 应当 TypeError`。
+  要附说明得换形态，或者让异常消息自己承担（本次正是后者：`Paths::{$method}(` 既是断言也是说明）。
+  **剩余阶段**：3b-3 = REGISTRY 14 个读方法 → `Support\StorageRegistry`（现在更便宜：PATHS 已就位）；
+  3c = PATHS/CORE 收尾，**必须与 `TUNING-PLAN.md` §三 P2（给 `targetContext` 补 host 臂 controller/request
+  的 path+namespace）合并考虑**，否则同一个 `targetContext` 要改两次。
+
+- 2026-09-19，**`Utility` 拆分 · 阶段 3b：DOCMETA 外迁 `Support\ActionMeta` + `Support\ActionDoc`，按「读/写两侧」切，且这批不留转发**：
+  **为什么切两刀而不是一个类**：DOCMETA 那 12 个成员其实是两种职责混在一起 ——
+  「从反射与 DocBlock **读出**字段」（`parsePMCNames`/`parseActionInfo`/`parseActionName`/`parseActionDesc`/
+  `getActionRequestClass` + 私有 `parseByLanguages`/`normalizeDocComment`）与「把读出的字段**归一**成稳定形状」
+  （`normalizeApiActionMeta`/`isApiActionDeprecated`/`normalizeMenusTransform`/`removeActionNameMethod` + 私有
+  `formatDisplayDate`）。两者唯一的外界依赖也不同：前者只读 `scaffold.languages`，后者纯计算。合成一个类会让
+  「改解析正则」要给另一侧的归一用例找理由 —— 侧不同，测试的鉴别力就互相污染。
+  **`Utility::parseYamlFile()` 没跟着走**：它依赖 `$this->filesystem` 且要吞掉损坏 YAML 的异常，是 `Utility` 里
+  唯一还合理的「有状态」残留（`getResourcePath` / `getControllerNamespaces` 等同理，留待 3b-2 / 3c）。
+  **这批不留 `@deprecated` 转发 —— 与 3a 的 NAME 组相反，理由要写清**：3a 留转发是因为那两个是**静态**方法，
+  `Utility::stripControllerSuffix()` 可能被含动态拼接的调用点命中，而转发成本只有一行；本批是**实例**方法，
+  一条委托就是一整个方法体，留着等于把 god-class 撑回去 —— 而「宿主引用 `Utility` **零处**」3a 已核。
+  **判据**：外迁目标满足「零 DI 成本 + 全仓调用点可穷举 + 漏改会以 `Call to undefined method` **响亮**失败」
+  三条就不留转发；留转发只在「漏改会**静默**（语义等价的分叉实现）或调用点**不可穷举**（动态调用 / 跨仓）」时才值得。
+  **外部消费者复核（AGENTS.md 要求）**：`wisdomcity/engine` / `moo-system` / `moo-radar` 引用 `Utility` **零处**；
+  **`haikoupifang` 是个反例、要记清楚** —— 它 `engine/composer.json` 写 `mooeen/scaffold: *` 且
+  `repositories.packages = {type: path, url: ../packages/*}`，指向的是它**自己** 2024-01-08 的
+  `packages/moo-scaffold` 快照（那份 `Utility` 的 API 都不一样：`parseActionNames()` / 双参 `parseActionName()`），
+  **不是本仓** ⇒ 它既不是消费者也不构成改动约束。上一阶段把 `haikoupifang` 写成「四个消费方之一」有歧义，此处订正。
+  **账**：`Utility` 854 → 603 行、公开面 41 → 32（现 33 个公开成员含构造器 + 1 个私有 `getResourcePath`）；
+  迁移 33 个 src 调用点（`CreateApiGenerator` 19 / `ApiController` 8 / `UpdateAuthorizationGenerator` 4 /
+  `RouteController` 2），`ParseActionDescTest` 从 `app(Utility::class)` 改为静调。
+  **守卫的鉴别力（10 处打哑，红集互不相同 —— 这正是不给它们合并的理由）**：
+  M1 给 `Utility` 加回一条 `parseActionName` 转发 ⇒ **{已不存在锚点, 公开面预算}**；
+  M2 加一个**不在外迁清单里**的新公开方法 ⇒ **只有公开面预算**（证明预算锚点有独立于「已不存在」的鉴别力）；
+  M3b 既加回转发、又把一个内部调用点改回 `$this->utility->` ⇒ {已不存在, 预算, 结构锚点}，**M3b 减 M1 = 恰好结构锚点**；
+  M4 `ActionMeta::formatDate` 放宽成 public ⇒ 只有 private 锚点；M5 去掉 `final` ⇒ 只有形状锚点；
+  M6 `removeMethodSuffix` 正则去掉尾部 `$` ⇒ 只有「不吃近似词」；M7 `isDeprecated` 的 `=== 1` 放宽成 `> 0` ⇒
+  只有「只有 1 算」；M8 `normalizeMenus` 不再丢标量项 ⇒ 只有「标量→丢掉」；M9 `parseActionInfo` 的 whitelist 恒 false
+  ⇒ 只有「无 `@acl` ⇒ 白名单」；M10 `getActionRequestClass` 不再校验参数名 ⇒ 只有「名字不对 ⇒ null」。
+  ⇒ **结构锚点抓不到「有人把方法加回来」，「已不存在」抓不到「加了别的新公开方法」，形状锚点抓不到「私有助手被放宽」**
+  —— 六类锚点各有盲区，缺一不可。
+  **它推翻了 3a 条里那条持久结论**：3a 写「只被类内调用的 3 个方法收成 `private`」，其中 `formatDisplayDate` /
+  `parseByLanguages` 已随本阶段离开 `Utility`（成为 `ActionMeta::formatDate` / `ActionDoc::parseByLanguages` 的 private），
+  `Utility` 现在只剩 `getResourcePath` 一个 private。`UtilitySurfaceTest` 的对应断言从「3 个保持 private」升级为
+  「9 个已不存在 + 真源确实在对面 + 留在这儿的老邻居还在」。
+  **踩坑（可复用）**：`parsePMCNames` 的测试替身第一版把 `@package_name` 挂在 `__construct` 的 docblock 上 ⇒
+  `ReflectionClass::getDocComment()` 读到 `false`、三处名全空。匿名类的**类级** docblock 要写成
+  `return new /** … */ class { … };`（docblock 插在 `new` 与 `class` 之间），已探针实测可被反射读到。
+  **全量 1 failed / 3 skipped / 1125 passed（4375 断言）**（3a 基线 1110 passed / 4274）；红仍是
+  `ConfigControllerTest:305` 那条 env 耦合基线（**已实测**：`git stash` 回 3a 同样红、加 `SCAFFOLD_AUTHOR=charsen`
+  即转绿 ⇒ 非本次回归）；`pint` 对这 10 个文件**零改动**（写入前后 `diff -r src tests` 为空，无夹带重排）。
+  **剩余阶段**（⚠ **本条的顺序已被推翻** —— 见本文件上方 2026-09-19 的 **3b-2 条**）：
+  原计划「3b-2 = REGISTRY 14 个读方法 → `Support\StorageRegistry`（顺带把两个 `extends Utility` 测试桩
+  改成绑容器假件，那本来就是更好的测试缝）；3c = PATHS，必须与 `TUNING-PLAN.md` §三 P2 合并考虑」。
+  实际执行时**先做了 PATHS、把 REGISTRY 推后**（理由：先动 REGISTRY 要那 14 个重叠文件改构造函数，
+  先动 PATHS 是纯文本替换）。⇒ 修正后的剩余：**3b-3 = REGISTRY → `Support\StorageRegistry`**
+  （顺带把两个 `extends Utility` 测试桩改成绑容器假件）；**3c = PATHS/CORE 收尾**，
+  必须与 `TUNING-PLAN.md` §三 P2 合并考虑。
+  **（注 2026-09-19 订正：本条两处已作废 —— ① 上面「先动 REGISTRY 要改构造函数」这个理由**不成立**，
+  它只在「实例注入」形态下成立、而本类可做成全静态（详见本文件上方 3b-3 条）；
+  ② 括号里「顺带把两个 `extends Utility` 测试桩改成绑容器假件」与 3b-3 的实际切法**无关**，
+  那两个桩覆写的是 app-target 组的方法、不在这 9 个里 ⇒ **已从 3b-3 摘掉、另立候选**。
+  ③ 「3b-3 = REGISTRY」本身也需修正：**不是 14 个读方法、是 9 个**，见上方 3b-3 条。）**
+
+- 2026-09-19，**`Utility` 拆分 · 阶段 3a：先量持有面与组间重叠，再决定「一次切四类」不值得**：
+  **先量**：852 行 / 45 个公开成员（1 构造器 + 42 实例 + 2 静态）= 5 组职责 —— CORE 配置与身份(3)、PATHS 路径(13)、
+  REGISTRY 聚合缓存读取(14)、DOCMETA docblock 与动作元信息(12)、NAME 控制器名归一(2)；src 调用点
+  52 / 70 / 54 / 45 / 8。**决定拆分顺序的不是方法数，是「组间文件重叠」**：PATHS∩REGISTRY=14 文件、
+  PATHS∩CORE=13、REGISTRY∩CORE=9、PATHS∩DOCMETA=8 —— 按职责切多类会把 14+ 个文件的构造函数
+  从 1 个参数变成 2~3 个，而**功能行为零变化**，且会与后续 `ApiController` / `SchemaLoader` 拆分改同一批文件。
+  **持有面**：22 个 src 类构造注入 `Utility`，其中 4 个是基类（`Command\Command` / `Generator\Generator` /
+  `Adder\Adder` / `Http\Controllers\Controller`）；5 个测试内匿名命令壳、2 个测试内 `extends Utility` 匿名子类
+  （覆写 `getControllerNamespaces()` / `getAppTargets()`，正是 REGISTRY 组）；`ResolvesOriginContext` trait
+  硬调 `$this->utility->targetContext($origin)` ⇒ 拆 PATHS 必须连 trait 一起改。
+  **外部消费者核查**（AGENTS.md 要求）：已知四个**候选**消费方引用 `Mooeen\Scaffold\Utility` **零处**、`$this->utility->`
+  **零处**，宿主只消费 `Concerns\*` / `Foundation\*` / `Rules\*` / `Exceptions\BaseException` / `Contracts\*` /
+  `Translation\MergingLoader`；宿主**无一处** `extends Scaffold\Http\Controllers\Controller`（宿主继承的
+  `Foundation\Controller` 直接 `extends Illuminate\Routing\Controller`，**不含 `$utility`**）⇒ `Utility` 是包内
+  实现细节，不是下游编译接口。**（注：这四个的名单有歧义 —— `haikoupifang` 其实是自带 2024 旧快照、不是消费者，
+  见本文件上方 3b 条的订正）**
+  **本次做的（零/低风险三件）**：① 只被类内调用的 3 个方法收成 `private`（`formatDisplayDate` ←
+  `normalizeApiActionMeta`；`getResourcePath` ← `targetContext`；`parseByLanguages` ← `parsePMCNames`/`parseActionInfo`；
+  全仓 + Blade + 动态调用 `->{`/`->$` 均已核零外部调用点）⇒ 公开面 44 → 41；**（注：`formatDisplayDate` 与
+  `parseByLanguages` 已于 3b 离开 `Utility`，现在只剩 `getResourcePath` 一个 private —— 见本文件上方 3b 条）**；
+  ② NAME 组外迁 `Support\ControllerName`（`final` + 全静态 `strip()`/`ensure()`，与 `Paths`/`FieldName` 同形），
+  7 个 src 文件迁移，`Utility` 上只留两行 `@deprecated` 转发 —— **转发不用删**：删了只省 6 行，留转发让未迁移的
+  宿主不炸，成本是一行委托（它的等价性由测试钉住，见下）；③ 收口**上一条登记的遗留**：`addGitIgnore(ConsoleUi
+  $console)`（见本文件下方 2026-09-18「ConsoleUi 唯一出口」条目里那条「遗留一处」）。
+  **这批守卫的鉴别力（5 处打哑，红集互不相同 —— 这正是不给它们合并的理由）**：M1 `formatDisplayDate` 回 public
+  ⇒ **2 红**（private 锚点 + 公开面预算，两条各守一面）；M2 `ControllerName::strip` 改成旧「删全部」语义 ⇒
+  **3 红**（语义三条：只剥末尾 / 不动中间开头 / 互逆），而**等价性那条是绿的**；M3 让 `Utility::stripControllerSuffix`
+  自带一份分叉实现 ⇒ **恰好 1 红 = 等价性那条**，语义三条全绿；M4 把某个 src 内部调用点改回废弃转发 ⇒
+  **恰好 1 红 = 结构锚点**，行为测试全绿；M5 `addGitIgnore` 首参退回无类型 ⇒ **恰好 1 红 = 首参类型锚点**。
+  ⇒ **「等价性」抓不到语义对错，「语义」抓不到分叉实现，「行为」抓不到「内部又调回废弃转发」**，三者缺一不可。
+  **全量 1 failed / 3 skipped / 1110 passed（4274 断言）**（基线 1105 passed / 4240 断言，+5 例 / +34 断言），
+  红仍是 `ConfigControllerTest:305` 那条 env 耦合基线（见本文件另条）；`pint --dirty --test` 15 files PASS，
+  写入式 pint 只删掉 4 个因本次改动而失效的 `use Mooeen\Scaffold\Utility;`（已逐文件核 diff，无夹带重排）。
+  **剩余阶段**（不建议一次做完）：3b **已拆成两批，3b-1（DOCMETA）已完成** —— 见本文件上方
+  2026-09-19 阶段 3b 条（实际外迁了 9 个公开方法到 `Support\ActionMeta` + `Support\ActionDoc` 两个类，
+  比原计划只列 5 个纯函数多；`parseYamlFile` 留在 `Utility`）；**3b-2 = REGISTRY 14 个读方法 →
+  `Support\StorageRegistry`**（顺带把两个 `extends Utility` 测试桩改成绑容器假件，那本来就是更好的测试缝）；
+  3c = PATHS，**必须与 `TUNING-PLAN.md` §三 P2（给 `targetContext` 补 host 臂 controller/request 的
+  path+namespace）合并考虑**，否则同一个 `targetContext` 要改两次。
+  **（注 2026-09-19 订正：上面这条「3b-2 = REGISTRY、3c = PATHS」的顺序已作废 ——
+  实际先做了 PATHS（3b-2）、REGISTRY 推后到 3b-3。理由与后果见本文件上方 3b-2 条；
+  3b-3 已于同日完成，切的是 **9 个**读缓存方法（不是这条写的 14 个）、且**没有**出现 DI 成本，
+  见本文件上方 3b-3 条。⇒ **剩余只剩 3c = PATHS/CORE 收尾（与 `TUNING-PLAN.md` §三 P2 合并考虑）**。）**
+
+- 2026-09-19，**阶段 3 收口：删掉前端仅剩的两处「旧形态」容忍（顶层字符串 `error` + 无状态码兜底）**：
+  **删了什么**：`ScaffoldApi.errorText()` 里 `typeof j.error === 'string' → return j.error`；
+  `ScaffoldApi.isOk()` 里 `if (status === 0 && j.error) return false;`。
+  **为什么能删**：顶层字符串 `error` 的最后两个产出方（`DocsController`、三个 Enforce* 中间件）2026-09-19
+  都迁进了信封，而框架层走 `{message}`、代理走 `_proxy_status`，都不产这个形态；
+  `isOk()` 全仓**唯一**调用点是 `designer.js._unwrap()`，经 `fromFetch(res, json)` 进来**必然**带数字状态码
+  ⇒ `status === 0` 不可达，且这条启发式**判据不稳**（同一个 `{html, error:'frontmatter 警告'}`：
+  带 200 时算成功 —— 2xx 上的 `error` 是领域字段；不带状态码时算失败）。
+  **行为变化（有意的）**：`errorText(jq(422, {error:'炸了'}))` 从 `'炸了'` 变 `'HTTP 422'`；
+  `isOk({error:'炸了'})`（无状态码）从 `false` 变 `true`。**方向**：容忍会把「还有人产旧形态」**静默**
+  变成一句看起来正常的 toast，删掉后同场景落到 `fallback` / `HTTP <码>` —— **回退可见**才是想要的信号。
+  **它推翻了下方一条旧结论**：2026-09-18 那条把「字符串 `error` 能拿到真文案（旧实现得到 `new Error(undefined)`）」
+  写成**有意的改善**，该改善只在那天的迁移期成立，随容忍一并删除。
+  **守卫同步**（3 个 JS 守卫文件共 109 断言全绿）：`scaffold-api.test.js` 把两条断言改成钉「删后行为」、
+  `toError` 的 `detail` 断言改用框架层形态喂入、`errorText 取值优先级` 那条改用新信封喂入
+  （否则它自己会变成**假绿**——旧喂入形状下它仍写着「body 优先于 fallback」）；`docs-unwrap.test.js` /
+  `designer-unwrap.test.js` 各一条改成钉「落到 fallback / `请求失败`」。
+  **刻意没动**：框架层 `{message}` 读法（永久契约，见上一条）、代理 `_proxy_status`、`data()` 的真值分支。
+
+- 2026-09-19，**`{message}` 不是「旧形态」而是「框架层」的形态 —— 前端 `j.message` 读法是永久契约**：
+  **误判**：信封迁移收尾时我把 `{message:"…"}` 记成「第 6 种旧形态、迁完就删」，`api.js` 里
+  `errorText()` 那句 `if (j.message)` 也被标成「旧：BaseException（已迁完）/ API 代理」。
+  **实测推翻**（探针打真 HTTP 栈）：合成 `abort(404, '文案')` + `getJson` ⇒ body **恰好** `{"message":"文案"}`；
+  `postJson` 缺参 ⇒ `{"message":"…","errors":{…}}`；连打 31 次 `plans.save`（`throttle:30,1`）⇒ 第 31 次
+  `{"message":"Too Many Attempts."}`。而 `abort*()` 在 `src/` 里有 **20+ 处**（`Support\LocalMarkdownEditor` 的
+  403/409/422、`PlansController:25`、`ApiController:421-442`、`Requests\LocalMarkdown\PreviewRequest:14,16`）。
+  **判据**：`abort()` 是 Laravel 的惯用法，给它们套信封 = 接管 exception handler（`Exceptions::renderable`），
+  收益为零、风险全在框架升级上 ⇒ **框架层永久在信封之外**，前端 `j.message` 读法是**契约**而非兼容分支。
+  真正「已无产出方」的只有 `{error:"字符串"}`（Docs + 三个 Enforce* 中间件迁完后就没了）——
+  两者曾被写在同一句「这两支只剩容忍，阶段 3 一起删」里，**别照那句删**。
+  **两侧守卫配对（这条链才算闭合）**：PHP 侧新增 `tests/Feature/Http/FrameworkErrorShapeTest.php` 4 条 ——
+  合成 `abort(404)` 的 body 恰好 `['message']` 且**反证**没有 `ok`/`error` 键、真产线 409（version 不符）的文案
+  **逐字**等于「文件已被修改，请重新打开后再编辑。」+ 磁盘未被改动、校验袋顶层**恰好** `['message','errors']`、
+  限流边界**恰好**第 31 次 429；JS 侧 `api.js`/`scaffold-api.test.js` 补框架层 5 条（404 / 429 / 校验袋文案，
+  以及校验袋过 `data()` 后 `errors` 原样保留 —— `local-markdown-editor.js` 直读 `errors.content[0]`）。
+  **突变（红集不相交 1/3）**：① 把 `LocalMarkdownEditor:72` 的 409 文案改一个字 ⇒ **恰好 1 红** ——
+  既有的 3 条 409 用例只断状态码、全绿 ⇒ 新用例是**唯一**钉住这句用户可见文案的地方；
+  ② 用 `Exceptions::renderable` 模拟「顺手把框架层也套上信封」⇒ **3 红**（404/409/429），
+  校验袋那条**保持绿**（`ValidationException` 不是 `HttpException`）。
+  **方法论**：清理「旧形态」前先问一句「**这个形态的产出方是谁**」—— 别把框架层当成自家旧代码。
+
+- 2026-09-19，**`designer.js` 的 `_post`/`_get` 去重（接上一条，统一信封阶段 2 的第一个消费者）**：
+  **改了什么**：两个方法原先各抄了一份**逐字相同**的解包尾巴（失败即 `new Error` + 挂 `code`/`detail`/`status`，
+  成功取 `data`），现抽成 `async _unwrap(res)`，两者只剩 `return this._unwrap(res);`。
+  实现走全局 `ScaffoldApi`（`public/javascript/api.js` 在 shell 里排在 `main.js` 与 `{{ $scripts ?? '' }}` 之前 ⇒
+  两个加载点 `db/designer/show.blade.php:1426`、`db/designer/index.blade.php:191` 都在 `<x-slot:scripts>` 里，顺序成立）。
+  **动手前 grep 出一个会静默坏掉的点**：这个 `Error` 上有三个字段在**别的函数**里被读，光看 helper 本身看不出来 ——
+  `e.code`（6 处分支：`AI_NOT_CONFIGURED`×4 / `COMPACT_BLOCKED` / `SUSPECTED_RENAMES` / `EMPTY_DIFF`）、
+  `e.detail`（`compactBlockedReason` 读 `e.detail?.reason`，`:1802`）、`e.status`（`_shouldRetrySave`，`:718`）。
+  ⇒ 顺手回答了旧笔记那条**「`e.code` 是只用于显示还是也参与分支」的待核：参与分支**，不能当展示字段。
+  ⇒ `ScaffoldApi.toError()` 因此**必须**加 `detail`（原来只返 `{code,msg,http}`，直接换上去 `compactBlockedReason`
+  会静默退化成 `'blocked'`）。缺省保持旧语义 `undefined`，**没**擅自改成 `[]`（旧代码是 `e.detail = err.detail`）。
+  **新发现的坑：`fetch` 的 `res.json()` 会消费 body** ⇒ 之后 `pick(res)` 只能拿到 `Response` 自己（它没有
+  `error`/`message` 字段），服务端文案会**丢**、只剩状态码。故给 `api.js` 加了 `fromFetch(res, json)`：
+  把「HTTP 状态 + 已解析体」打包成本层认得的**唯一规范形态**（jQuery 侧仍是自动读 `responseJSON` 的 `jqXHR`），
+  别让各处自己拼 `{status, responseJSON}`。测试里留了一条**对照**断言专门钉住「直接传 `res` 只剩状态码」。
+  **行为等价性**：`{ok:true, redirect}`（无 `data` 键，`DocsController::delete` 的形态）新旧都**原样透出整包**，
+  不是只给 `redirect` —— 我第一版测试写成只给 `redirect` 反而是**我的期望错了**，实现是对的。
+  另一处**有意的改善**：字符串 `error`（`{error:"炸了"}`）旧实现会得到 `new Error(undefined)`（message 是字面量 `"undefined"`、
+  `code` 也是 undefined），新实现拿到真文案 + `code='HTTP_422'`。designer 各端点从不返回字符串 error，故不影响。
+  **守卫 `tests/javascript/designer-unwrap.test.js`（22 断言）分两层，实测确实正交**：
+  ① 行为 —— 4 种响应形态下 `_unwrap` 抛出的 Error 必须带齐 `code`/`message`/`detail`/`status`；
+  ② 形态不变式 —— `return this._unwrap(res);` 恰好 2 处、`json.error ? json.error` 与 `if (!res.ok)` 各 0 处。
+  **打哑 2 处**：删 `e.detail = err.detail;` → 恰好 2 红（且只红在本文件）；把 `_get` 改回内联解包 →
+  **21 条行为断言全绿**、只有形态不变式红 ⇒ 「去重」这件事**只有源码扫描守得住**，别指望行为用例。
+  **`designer.js` 能在 node 里加载**（不需要 jsdom）⇒ 页面脚本与解包层的**接线**也能无宿主观测：
+  只要两个 shim（`document.addEventListener` 收 `alpine:init`、`Alpine.data` 收组件工厂），
+  手动触发 `alpine:init` 后 `comps['dbDesigner']()` 拿到组件对象，`_unwrap` 不依赖 `this`、可直接调；
+  假 `Response` 只需 `{ status, json: async () => body }`。
+  **`npm run test:js` 入口改为自动发现的 `tests/javascript/run-all.js`**：在 `package.json` 里手写文件列表会
+  **悄悄腐烂**（新增守卫忘了加进脚本 ⇒ 永远不跑、CI 照样全绿），「守卫没在跑」比「守卫失败」危险。
+  每文件开子进程跑（守卫自带 `process.exit`，隔离后互不影响）。**`node --test tests/javascript/` 不适用** ——
+  它把目录整体当一个用例，且会被守卫脚本的 `process.exit` 判成 failure（已实测）。
+  同时 `.auth/admin.json` 的**登录态 7 天过期**会让整轮 e2e 假红（47 failed / 401 / 失败快照是登录页；
+  `theme-logo.spec` 那唯一一条用空登录态的用例**反而变绿**）—— 续期命令与 10 秒预检探针写在 `tests/Browser/README.md`。
+
+- 2026-09-19，**收敛 `data()` 时「旧形态必须逐形状等价」—— 5 处真差异，其中 1 处是陷阱（接上一条）**：
+  旧写法是 `return (json && json.data) ? json.data : json;`，是**真值判断**；我第一版 `ScaffoldApi.data()`
+  写成 `typeof j.ok === 'boolean' && j.data !== undefined ? j.data : j`，实测出 5 处差异：
+  **`{data:{…}}` 无 `ok` 键**（旧取 `data`、新漏整包 —— 唯一会真出错的）、
+  `{data:null}` / `{data:0}` / `{data:""}` / `{data:false}`（旧整包、新返回假值）。
+  修法：**旧形态分支刻意保留真值判断** `return j.data ? j.data : j;`，**不要**"顺手统一"成 `!== undefined`；
+  唯一**有意**的差异只留在**新信封**上（旧代码从没见过 `ok` 键）：信封里出现 `data` 键就是载荷，
+  哪怕是 falsy 也取出来 —— 否则 `{ok:true, data:null}` 会把整个信封漏给调用方。
+  **代理形态 `{data:<上游 body>, _proxy_status:N}` 属旧形态一侧**，必须走真值分支（今天 `designer.js` 不调代理，
+  但契约得留对）。**守卫补到 54 断言**（新增 13 条逐形状钉子）；**打哑 1 处**：把真值判断换成 `!== undefined`
+  → **恰好 4 红**（`{data:null/0/""/false}`），证明这组钉子真的抓得住。
+  **教训：收敛一个"取值"函数时，别只测"新形态对不对"，要把旧写法在**所有**形状上的输出列出来逐个对齐** ——
+  我第一版只测了 `{ok:true,data:{…}}` 和裸数据这两种"一致"的形状，5 处差异一条都没覆盖。
+
+- 2026-09-19，**e2e A/B 对照实测：`designer.js` 去重**零回归，但那 4 条红是**宿主绑定**不是回归**：
+  同一宿主、同一 env、同一条命令跑三轮，比**失败集合**（不是比 passed 数）：
+  | 版本 | passed | failed 集合 |
+  |---|---|---|
+  | 改前（HEAD 的 `designer.js`）| 44 | `:111` `:132` `:143` `:159` |
+  | 改后 第 1 轮 | 43 | 同上 **+ `:624`** |
+  | 改后 第 2 轮 | 44 | 同改前，**恰好 4 条** |
+  ⇒ **`:624`（"加临时字段 → 删除"）是偶发**（它自己的 `waitForResponse` 只给 5s），**不是回归**；
+  ⇒ 另 4 条两边**逐条相同** ⇒ 属 README 早写明的「不覆盖 env 的典型症状」：
+  `:111` 断 `Infrastructure`（spec 默认 `SCHEMAS_LIST` 是 LLE 的 6 个显示名，本宿主没有）、
+  `:132` 找 `platform_pages` 侧栏项、`:143` 期望 `float:1000000`（`E2E_FIELD_FORMAT` 默认值）、
+  `:159` 期望 `region_name` 索引（`E2E_INDEX_FIELDS_CSV` 默认值）—— 都靠 `E2E_SCHEMAS_CSV` /
+  `E2E_TABLE_IN_LIST` / `E2E_FIELD_FORMAT` / `E2E_INDEX_FIELDS_CSV` 覆盖，**与本轮改动无关**。
+  **顺带修正一条旧结论**：换宿主跑时**不止** `E2E_API_SCHEMAS_CSV` 要覆盖，上面这 4 个也得覆盖，
+  否则必然 4 红而看着像回归。
+
+
+- 2026-09-18，**前端统一响应解包层 `public/javascript/api.js`（`window.ScaffoldApi`）落地 + 它的 3 个坑**：
+  **动机**：同一个后端契约前端有**两套互不兼容的读法** —— `designer.js:389,406` 把 `json.error` 当**对象**
+  （取 `.msg` / `.code` / `.detail`），`docs-home.js:54`、`docs-editor.js:163,255` 当**字符串**（直接 `toast`）。
+  同一个 `error` 键两种解析法 ⇒ 每次后端改动要在两边各改一遍还容易漏。本层把「判成败 / 取业务数据 / 取错误文案」
+  收敛成 `isOk()` / `data()` / `errorText()` / `errorCode()` / `toError()` 五个纯函数，全站复用。
+  **迁移期双形态兼容是设计目标，不是妥协**：后端正逐控制器迁信封，新旧响应会并存一段时间，
+  故本层两种都吃（新 `{ok,data}` / `{ok:false,error:{code,msg,detail}}`；旧 裸数据 / `{error:"字符串"}` /
+  `{message}` / `{_proxy_status:N}`）⇒ **迁移可按控制器灰度**，不必一次性改完前端。
+  **坑 1（已在层内修）：`errorText` 的 `fallback` 必须压过 HTTP 状态码。** 空 body + 502 时状态码说不出
+  「用户当时在做什么」，而调用方知道（`'保存失败'` > `'HTTP 502'`）。优先级定为
+  服务端文案 > `fallback` > `HTTP <码>` > `'请求失败'`；想两者都要就调用方自己传 `'保存失败（HTTP 502）'`。
+  **坑 2（已在层内修，且是本轮新发现的真雷）：`isOk()` 里 2xx 上的 `error` 键是领域字段，不是失败。**
+  本地 Markdown 预览（`PlansController::preview:77` / `ReleaseRecordsController::preview:78`）返回
+  `{html:'<已渲染正文>', error:<frontmatter 警告|null>}` **+ HTTP 200** —— 预览成功了、正文也渲染了，
+  只是 frontmatter 有问题要在编辑器就地提示。原先 `if (j.error) return false` 会把它判成**请求失败**。
+  今天不发病（该页走 `$.ajax().done/.fail`，jQuery 不会为 HTTP 200 触发 `.fail`），但本层的**存在意义**
+  就是当唯一判据 ⇒ 一到迁移就炸。修法：`error` 键**只在 `httpStatus === 0`**（拿不到状态码）时才当失败信号。
+  安全性依据：旧形态里真正带 `error` 的失败（`EnforceAdminOnly:61` 等三个中间件、`DocsController::delete:234`）
+  **一律配 4xx**，状态码那句已经拦住，不依赖这条启发式。**注意这与 `{html,error:null}` 是同一族**
+  （`error` 为 null 也走这条路径），故两者用同一套守卫覆盖。
+  **坑 3（刻意不对称，别"顺手改齐"）：`errorText` 里 `fallback` 压过状态码，`errorCode` 里状态码压过 `fallback`。**
+  因为 `fallback` 是调用方自己传的入参，`errorCode` 返回它等于把入参原样还回去 —— 零信息量；
+  而 `HTTP_502` 至少能区分「网关挂了」和「业务报错」。要文案兜底的场景用 `errorText`。
+  **守卫是 node 脚本，不进 Playwright**：本层是纯函数、无 DOM/网络依赖，用 e2e 验它是杀鸡用牛刀
+  （还要起宿主 + 录登录态），而它又是迁移期**唯一**的兼容保障 ⇒ `tests/javascript/scaffold-api.test.js`
+  （32 断言覆盖**全部** 10 种响应形态）+ `npm run test:js`，秒级、无宿主、退出码即结果。
+  `playwright.config.ts` 的 `testDir` 是 `./tests/Browser` + `testMatch **/*.spec.ts`，`phpunit.xml`
+  只扫 `tests/Feature` 的 `*Test.php` ⇒ 新目录**不会**被两边误收。
+  **变异验证 3 处（失败集合互不相交 ⇒ 每条分支都被独立守住）**：把 `fallback` 挪到状态码之后 → 2 红
+  （`body 空+502+fallback`、`null+fallback`）；删 `j.message` 分支 → 1 红（`errorText 取 message`）；
+  把 `status === 0 && j.error` 改回无条件的 `j.error` → 1 红（`{html,error:"警告"} + 200`）。
+  **接线**：`shell.blade.php:85` 插在 jquery 之后、`main.js` 与 `{{ $scripts ?? '' }}` 之前（页面脚本要用它）。
+  `@filemtime(...) ?: time()` 是照抄同文件 `alpine-init.js:33` 的既有写法（testbench 下文件不存在也不报错）。
+  **发布无需改 provider**：`ScaffoldProvider:48` 是**目录级**映射 `public/ → public/vendor/scaffold`，
+  新增 JS 自动随之发布。但宿主里拿到的仍是**拷贝**（见 `tests/Browser/README.md`「public/ 资源是拷贝不是软链」），
+  改 `public/` 后必须 `php artisan vendor:publish --tag=public --force` 宿主才生效。
+  **仍未处理**：`designer.js:375-411` 的 `_post`/`_get` 是**两份逐字重复**的解包逻辑
+  （`json.error?…:{code:'HTTP_'+status,…}` + `json.data?json.data:json`），正是本层要收掉的第一号消费者；
+  `local-markdown-editor.js` 同文件内 `result.error` 有**两种语义**（`:39` 成功路径上是 frontmatter 领域字段，
+  `:81` 失败路径上是错误文案）—— 迁它时必须分开处理，不能整文件套 `isOk()`。
+  `pages/api-request.js:1301` 读的 `json.errors` 是**上游被代理**的 Laravel 校验体，与 Scaffold 自己的信封无关，**不要包**。
+
 - 2026-09-18，**`Support/` 层 4 处静默写入收口：Web/Support 层没有 console，写失败一律抛异常**（接上一条的第 4 点）：
   **为什么是「抛」而不是「打 failed」**：这 4 处（`AccountStore::writeYaml`、`AiSettingStore::writeYaml`、
   `DocsRepository::save` / `reorder`）都在 Web 链路里，**没有 `console()` 可打**。本仓同层早有正统范式：
@@ -535,8 +943,10 @@
   服务契约（`DesignerController` 三处直接展示，测试 `toStartWith('⚠ ')` 锁着），改消息会破坏 web 端。
   **验证**：打哑两处（去掉 `warn()` 去重 + 还原一个调用点）⇒ **恰好 3 条失败**（2 条去重 dataset + 1 条锚点），
   恢复后 12/12 绿；全量 **980 passed / 1 failed / 3 skipped**（基线 968 + 新增 12 条）= **净增失败 0**。
-  **遗留一处**：`Utility::addGitIgnore($command)` 仍写 `new ConsoleUi($command)` —— 它是 `Utility` 的公开方法
-  且参数无类型，收成 `ConsoleUi` 属公开签名变更，留待 Utility 拆分时一并处理（已在锚点测试里登记为有意例外）。
+  **该处遗留已于 2026-09-19 消除**：原先 `Utility::addGitIgnore($command)` 仍写 `new ConsoleUi($command)`，因它是
+  `Utility` 的公开方法且参数无类型、收成 `ConsoleUi` 属公开签名变更，当时留待 Utility 拆分时一并处理，并在锚点
+  测试里登记为有意例外。现已收成 `addGitIgnore(ConsoleUi $console)`，锚点测试里那第 3 条例外**已删**（原条目的
+  「已登记为有意例外」结论作废）；细节见本文件顶部 2026-09-19 的「`Utility` 拆分 · 阶段 3a」条目。
 
 - 2026-09-18，**批量变量改名的「纯重命名」证法 —— 不要靠人眼读 diff**：
   变量名可读性整治（`$temp` / `$tmp_field` / `$fc` / `$ic` / `$ch` / `$b` / `$a` 这类缩写与一名多义）属机械改写，
@@ -581,9 +991,8 @@
   ⇒ **裸检出上恒红**。所以它红**不代表掩码逻辑坏了**，别去查 `maskValue`；要转绿应显式注入 `putenv`/`$_ENV`（思路同本文件里
   「测『配置文件』不要靠运行时 `config()` 注值」那条），或把断言收窄为「默认值列不出现明文」。
   **基线口径**（本文件其余结论若提到「全绿」，指的是这个基线下无净增失败）：
-  `SESSION_DRIVER=array CACHE_STORE=array QUEUE_CONNECTION=sync composer test` = **984 passed / 1 failed / 3 skipped**，
-  那 1 failed 就是本条。（该数会随新增用例上移：965 → 968（类型归一 +3）→ 980（输出出口 +12）→ 984（只读口径 +4）→ 997（路径归一 +13）→ 1000（同名类锚点 +3）。
-  判断回归看的是**净增失败数**，不是绝对数。）
+  `SESSION_DRIVER=array CACHE_STORE=array QUEUE_CONNECTION=sync composer test` = **1 failed / 3 skipped，其余全绿**，
+  那 1 failed 就是本条。（通过的绝对数会随新增用例上移，**判断回归看的是净增失败数，不是绝对数**。）
 - 2026-09-18，**escape 三件套（含 `quoteYamlString`）已全收口，全仓无内联副本**：`FreshStorageGenerator::buildFields()`
   的 `en` / `zh-CN` 槽位原先手写 `str_replace("'", "''", ...)`，是**全仓唯一残留的内联 escape**（trait `SharedCodegenHelpers`
   从 plan-40 起就有 `quoteYamlString()`，`CreateApiGenerator` 那时也删掉了自己的私有副本，只有这里漏收）。
@@ -608,10 +1017,14 @@
   `stat_file_type_meta`）—— **枚举字典本身不走 Resource**（走 `FormRequest::options()` → `FormWidgetCollection`，
   本来就是 `[{label,value}]`），所以"枚举数据到处都是"不等于"到处都是这个坑"，不要据此做全生态大改。
 
-- 2026-09-11，**裸检出跑 Pest 必须显式指定非 DB 驱动**：本仓无 `.env`，Testbench 起的 Laravel 11+ 默认 `SESSION_DRIVER` / `CACHE_STORE` / `QUEUE_CONNECTION` 全是 `database`，而测试库没有 `sessions` / `cache` 表 ⇒ 所有走 session / cache 的 HTTP 用例 500。
-  **症状有迷惑性**：失败数会随你修的维度**递减**（只设 `SESSION_DRIVER=array` 时 167 failed → 72 failed，报错从 `no such table: sessions` 变成 `no such table: cache`），看起来像"快修好了"，其实只是还差下一项。正确跑法：
-  `SESSION_DRIVER=array CACHE_STORE=array QUEUE_CONNECTION=sync composer test`
-  **判据**：报错出现 `no such table: <非业务表>`（sessions / cache / jobs 等框架表）时先怀疑驱动，不要去补 migration —— 本仓是包，自身没有业务表，Testbench 也不跑宿主 migration。
+- 2026-09-11（2026-09-19 更正机制），**裸跑 Pest 必须显式指定非 DB 驱动**：Testbench 骨架 `vendor/orchestra/testbench-core/laravel/config/{session,cache,queue}.php` 的**真实默认值本来是 `array` / `array` / `sync`，裸跑本该全绿**；
+  真正把它盖掉的是**同目录下被遗留的 `.env`**。该文件由 testbench 控制台命令自动从同目录 `.env.example` 拷来（`testbench-core/src/Foundation/Console/Concerns/CopyTestbenchFiles.php:106`），
+  而那份 `.env.example` 里写死 `SESSION_DRIVER=cookie` / `CACHE_STORE=database` / `QUEUE_CONNECTION=database`；命令正常退出会删掉它，**被中断就留在 vendor 里静默污染之后每一次裸跑**（本仓根目录无 `.env`，所以此前误判成"框架默认就是 database"）。
+  **症状随遗留内容变形，都不像驱动问题**：`no such table: sessions` / `no such table: cache`；也见过 `Attempt to read property "cookies" on null` at `CookieSessionHandler::read`（driver 被改成 `cookie`，栈里只有 session 处理器，看不出是配置问题）。
+  失败数还会随你修的维度**递减**（只设 `SESSION_DRIVER=array` 时 167 failed → 72 failed，报错从 `no such table: sessions` 变成 `no such table: cache`），看起来像"快修好了"，其实只是还差下一项。
+  **稳的跑法**（有无遗留都成立）：`SESSION_DRIVER=array CACHE_STORE=array QUEUE_CONNECTION=sync composer test`（`composer test` 就等于 `./vendor/bin/pest`，`composer` 不在 PATH 时直接跑后者）。
+  **定位**：探针打印 `config('session.driver')`；或把 `vendor/orchestra/testbench-core/laravel/.env` 挪开再裸跑对照（挪开后裸跑转绿即坐实是它）。
+  **判据**：见到 `<非业务表> no such table` 或 `CookieSessionHandler` 先怀疑驱动/遗留 `.env`，不要去补 migration —— 本仓是包，自身没有业务表，Testbench 也不跑宿主 migration。
 - 2026-09-11，**历史脱敏的边界 + 一处判断更正**：本轮那 15 个未推送 commit 里的宿主名 / 域名 / 绝对路径已用 `git filter-branch`（限定 `origin/master..master`）就地脱敏 —— 改写后**最终文件内容一字未变**（`git diff <旧 sha> master` 为空）、commit 数不变（15）、工作区干净，且**正常 `git push` 即可**（`origin/master` 是新 master 的祖先，远程是快进，**不需要强推**）。动手前已整仓备份 `.git`（48M → `/tmp`）。
   **更正**：起初只按「文件内容」搜（`git log -S<串>`）得出"含内部名的只有 3 个 commit、且全未推送"。这个结论**不完整** —— `-S` **只搜内容 diff，不搜 commit message**。补搜 message 后发现另有 **6 个 commit 的 message 里也含该宿主名**，而且它们**早已随 `2.1.10` / `2.1.11` / `2.1.12` 三个 tag 发布到两个远程**（`master` 与 `dev` 都在）。
   清那 6 条要 rewrite **已发布**历史 + 强推 2 个远程 + **重打 tag**（tag 不可变、下游可能按 tag 取包），代价与风险远超收益 —— **决定不清**，仅记录在此。

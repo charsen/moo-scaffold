@@ -15,6 +15,7 @@ use Illuminate\Routing\Router;
 use Mooeen\Scaffold\Generator\CreateApiGenerator;
 use Mooeen\Scaffold\Generator\FreshStorageGenerator;
 use Mooeen\Scaffold\RouterTool;
+use Mooeen\Scaffold\Support\Paths;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
@@ -223,7 +224,7 @@ class CreateApiCommand extends Command
     private function hasNamespaceApiFiles(string $app, string $namespace): bool
     {
         $namespace = ($namespace === '<ROOT_PATH>' || $namespace === '/') ? '' : trim($namespace, '/');
-        $path      = $this->utility->getApiPath('schema') . $app . '/' . ($namespace === '' ? '' : $namespace . '/');
+        $path      = Paths::api('schema') . $app . '/' . ($namespace === '' ? '' : $namespace . '/');
 
         return $this->filesystem->isDirectory($path) && $this->filesystem->files($path) !== [];
     }

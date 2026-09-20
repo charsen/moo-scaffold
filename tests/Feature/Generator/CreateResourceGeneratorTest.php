@@ -12,7 +12,7 @@ use Symfony\Component\Console\Output\NullOutput;
  *   1. 整链路:在 storage_path('scaffold/') 写最小化缓存(models.php + {table}.php),
  *      调 start() 跑通 → 断言产出的 Resource 文件内容。
  *      generator 不直接读 yaml,而是经 Utility 从 storage 缓存读
- *      (start() 读 models.php;buildResource 经 getOneTable 读 {table}.php)。
+ *      (start() 读 models.php;buildResource 经 StorageRegistry::table() 读 {table}.php)。
  *   2. 纯方法:反射调 private getFieldCode,逐分支锁字段规则派生
  *      (whenTrashed / whenDate / password 跳过 / whenHas vs 索引字段 / enum _txt append / options)。
  *

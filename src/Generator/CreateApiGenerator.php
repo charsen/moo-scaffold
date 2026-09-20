@@ -10,7 +10,10 @@
 
 namespace Mooeen\Scaffold\Generator;
 
-use Mooeen\Scaffold\Utility;
+use Mooeen\Scaffold\Support\ActionDoc;
+use Mooeen\Scaffold\Support\ActionMeta;
+use Mooeen\Scaffold\Support\ControllerName;
+use Mooeen\Scaffold\Support\Paths;
 use Symfony\Component\Yaml\Yaml;
 
 class CreateApiGenerator extends Generator
@@ -71,8 +74,8 @@ class CreateApiGenerator extends Generator
         $this->staleMode        = in_array($staleMode, [self::STALE_MODE_KEEP, self::STALE_MODE_DEPRECATE, self::STALE_MODE_DELETE], true)
             ? $staleMode
             : self::STALE_MODE_DEPRECATE;
-        $this->apiPath         = $this->utility->getApiPath('schema') . $app . '/';
-        $this->apiRelativePath = $this->utility->getApiPath('schema', true) . $app . '/';
+        $this->apiPath         = Paths::api('schema') . $app . '/';
+        $this->apiRelativePath = Paths::api('schema', true) . $app . '/';
 
         // 处理 <ROOT_PATH> 为空字符串
         $namespace       = ($namespace === '<ROOT_PATH>' || $namespace === '/') ? '' : $namespace;
@@ -100,7 +103,7 @@ class CreateApiGenerator extends Generator
             $relativeYaml    = $this->buildRelativeYamlPath($controllerName);
             $reflectionClass = $this->getController($data['controller_class']);
 
-            $pmcNames   = $this->utility->parsePMCNames($reflectionClass);
+            $pmcNames   = ActionDoc::parsePMCNames($reflectionClass);
             $moduleName = $pmcNames['module']['name']['zh-CN'] ?? '';
             if ($moduleName !== '' && ! isset($menuTransform[$this->namespace])) {
                 $menuTransform[$this->namespace] = $moduleName;
@@ -170,7 +173,7 @@ class CreateApiGenerator extends Generator
 
         foreach ($routes as $route) {
             [$controllerClass, $actionName] = explode('@', $route['action']);
-            $shortName                      = Utility::stripControllerSuffix(class_basename($controllerClass));
+            $shortName                      = ControllerName::strip(class_basename($controllerClass));
             $method                         = $this->normalizeMethod($route['method']);
 
             if (! isset($grouped[$shortName])) {
@@ -202,7 +205,7 @@ class CreateApiGenerator extends Generator
         $existingActions                      = is_array($existingData['actions'] ?? null) ? $existingData['actions'] : [];
         $newActionNames                       = array_values(array_diff(
             array_keys($actions),
-            $this->utility->removeActionNameMethod(array_keys($existingActions))
+            ActionMeta::removeMethodSuffix(array_keys($existingActions))
         ));
         $staleActionKeys = $this->getStaleActionKeys($existingActions, array_keys($actions));
         $routeChanged    = $this->hasRouteSignatureChanges($existingActions, $actions);
@@ -365,7 +368,7 @@ class CreateApiGenerator extends Generator
         $staleActionKeys           = $this->getStaleActionKeys($existingActions, array_keys($actions));
         $forceControllerDeprecated = $actions === [] && $this->staleMode === self::STALE_MODE_DEPRECATE && $staleActionKeys !== [];
 
-        $names                 = $reflectionClass !== null ? $this->utility->parsePMCNames($reflectionClass) : [];
+        $names                 = $reflectionClass !== null ? ActionDoc::parsePMCNames($reflectionClass) : [];
         $controllerDisplayName = $this->resolveControllerDisplayName($controllerName, $controllerData, $names);
         $controllerCode        = $controllerData['code'] ?? '';
         $controllerDesc        = $controllerData['desc'] ?? [];
@@ -428,7 +431,7 @@ class CreateApiGenerator extends Generator
             }
 
             if ($this->staleMode === self::STALE_MODE_DEPRECATE) {
-                $alreadyDeprecated = $this->utility->isApiActionDeprecated($storedAction);
+                $alreadyDeprecated = ActionMeta::isDeprecated($storedAction);
                 $record            = $this->buildStoredAction($code, $actionKey, $storedAction, true);
                 if (! $alreadyDeprecated) {
                     $deprecatedRecords[] = $record;
@@ -471,7 +474,7 @@ class CreateApiGenerator extends Generator
         $ordered = [];
 
         foreach (array_keys($existingActions) as $existingKey) {
-            $actionName = (string) $this->utility->removeActionNameMethod((string) $existingKey);
+            $actionName = (string) ActionMeta::removeMethodSuffix((string) $existingKey);
             if (isset($actions[$actionName]) && ! in_array($actionName, $ordered, true)) {
                 $ordered[] = $actionName;
             }
@@ -497,7 +500,7 @@ class CreateApiGenerator extends Generator
         $stale = [];
 
         foreach (array_keys($existingActions) as $actionKey) {
-            $actionName = (string) $this->utility->removeActionNameMethod((string) $actionKey);
+            $actionName = (string) ActionMeta::removeMethodSuffix((string) $actionKey);
             if (! in_array($actionName, $currentActionNames, true)) {
                 $stale[] = (string) $actionKey;
             }
@@ -622,13 +625,13 @@ class CreateApiGenerator extends Generator
         array $actionData,
         bool $forceDeprecated,
     ): array {
-        $actionName     = (string) $this->utility->removeActionNameMethod($actionKey);
+        $actionName     = (string) ActionMeta::removeMethodSuffix($actionKey);
         [$method, $uri] = $this->getStoredRequest($actionData);
         $name           = trim((string) ($actionData['name'] ?? $actionName));
         $meta           = $forceDeprecated
             ? $this->buildDeprecatedActionMeta($actionData)
-            : $this->utility->normalizeApiActionMeta($actionData);
-        $deprecated = $forceDeprecated || $this->utility->isApiActionDeprecated($actionData);
+            : ActionMeta::normalize($actionData);
+        $deprecated = $forceDeprecated || ActionMeta::isDeprecated($actionData);
 
         $code[] = $this->getTabs(1) . "{$actionKey}:";
         // 2026-06-11 修:name 是唯一漏走 quoteYamlString 的字符串槽。来自方法 docblock(自由文本),
@@ -686,7 +689,7 @@ class CreateApiGenerator extends Generator
 
     private function buildActionMeta(array $existingAction, bool $touchUpdatedMeta): array
     {
-        $existingMeta = $this->utility->normalizeApiActionMeta($existingAction);
+        $existingMeta = ActionMeta::normalize($existingAction);
 
         return [
             'creator'           => $existingMeta['creator']    !== '' ? $existingMeta['creator'] : $this->currentLoginUser,
@@ -701,8 +704,8 @@ class CreateApiGenerator extends Generator
 
     private function buildDeprecatedActionMeta(array $existingAction): array
     {
-        $existingMeta      = $this->utility->normalizeApiActionMeta($existingAction);
-        $alreadyDeprecated = $this->utility->isApiActionDeprecated($existingAction);
+        $existingMeta      = ActionMeta::normalize($existingAction);
+        $alreadyDeprecated = ActionMeta::isDeprecated($existingAction);
 
         return [
             'creator'    => $existingMeta['creator']    !== '' ? $existingMeta['creator'] : $this->currentLoginUser,
@@ -736,7 +739,7 @@ class CreateApiGenerator extends Generator
                 continue;
             }
 
-            if ($this->utility->removeActionNameMethod((string) $existingKey) === $actionName) {
+            if (ActionMeta::removeMethodSuffix((string) $existingKey) === $actionName) {
                 return (string) $existingKey;
             }
         }
@@ -760,7 +763,7 @@ class CreateApiGenerator extends Generator
         return $existingActionKey !== $targetActionKey
             || $existingMethod    !== strtoupper($method)
             || $existingUri       !== $uri
-            || $this->utility->isApiActionDeprecated($existingAction);
+            || ActionMeta::isDeprecated($existingAction);
     }
 
     private function hasRouteSignatureChanges(array $existingActions, array $actions): bool
@@ -802,7 +805,7 @@ class CreateApiGenerator extends Generator
             }
 
             $existingAction = $existingActions[$existingActionKey] ?? null;
-            if (is_array($existingAction) && $this->utility->isApiActionDeprecated($existingAction)) {
+            if (is_array($existingAction) && ActionMeta::isDeprecated($existingAction)) {
                 $count++;
             }
         }
@@ -832,7 +835,7 @@ class CreateApiGenerator extends Generator
     private function buildRecordFromStoredAction(string $actionKey, array $actionData): array
     {
         [$method, $uri] = $this->getStoredRequest($actionData);
-        $actionName     = (string) $this->utility->removeActionNameMethod($actionKey);
+        $actionName     = (string) ActionMeta::removeMethodSuffix($actionKey);
 
         return [
             'action'     => $actionName,
@@ -969,7 +972,7 @@ class CreateApiGenerator extends Generator
             return '';
         }
 
-        return $this->utility->parseActionName($reflectionClass->getMethod($actionName));
+        return ActionDoc::parseActionName($reflectionClass->getMethod($actionName));
     }
 
     /**
@@ -993,7 +996,7 @@ class CreateApiGenerator extends Generator
             return [];
         }
 
-        return $this->utility->parseActionDesc($reflectionClass->getMethod($actionName));
+        return ActionDoc::parseActionDesc($reflectionClass->getMethod($actionName));
     }
 
     private function normalizeMethod(string $method): string
@@ -1050,7 +1053,7 @@ class CreateApiGenerator extends Generator
         $existing      = [];
 
         if ($this->filesystem->isFile($transformFile)) {
-            $existing = $this->utility->normalizeMenusTransform($this->utility->parseYamlFile($transformFile));
+            $existing = ActionMeta::normalizeMenus($this->utility->parseYamlFile($transformFile));
         }
 
         $changed = false;
@@ -1130,8 +1133,8 @@ class CreateApiGenerator extends Generator
             return;
         }
 
-        $historyPath  = $this->utility->getApiPath('history');
-        $relativePath = $this->utility->getApiPath('history', true);
+        $historyPath  = Paths::api('history');
+        $relativePath = Paths::api('history', true);
         $this->checkDirectory($historyPath);
 
         $publishedAt     = date('Y-m-d H:i:s');
