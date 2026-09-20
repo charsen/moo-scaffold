@@ -3,6 +3,53 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-20，**第 6 项：`SchemaLoader` 的 `loadTableFull` 族 4 方法外迁 `Designer\FieldShaper` —— 唯一「整族零状态」的切片，也是判据第一次量到第三层**：
+  **净变化**：`SchemaLoader` **1504 → 1357 行**、方法 **44 → 40**；新类 **181 行**（含类注释）。
+  搬走 4 个 = `shapeField`（99 行块，入口）+ `computeSizeClass` / `computeDefaultClass` / `computeDefaultTitle`。
+  **机械替换只有两类**：接收者 `$this->computeX(` → `self::computeX(`（5 处）、签名加 `static`（4 处，入口同时 `private` → `public`）。
+  正文与「搬前切片 + 两类替换」做了**字节级比对 ⇒ 零差异**（pint 唯一改动 = 文件末尾补一个空行，`class_attributes_separation`；**谁改的、改了哪一行必须定位到，不接受不明改动**）。
+  **方法集合差集自证**：`旧-新` 恰为那 4 个、`新-旧` 为空、4 个恰落在新家 —— 做法是从 `git show HEAD:<旧文件>` 与两个新文件抽
+  `^ {4}((public|private|protected) )?(static )?function (\w+)\(` 求集合差，**比人工核对可靠**（`diff` 只证「搬了什么」，集合差才证「没多没少」）。
+- 2026-09-20，**判据有三层，前两轮只量到第二层；且「零状态子集占比过高」要反向解读**（第 6 项副产品，可复用）：
+  ① 行数多不多 —— **不是判据**；② 有没有「**单入口可达的族**」；③ **族内有没有零状态子集**。
+  第 6 项是本批**唯一**三层全满足的：族只被 `loadTableFull` 一个 public 入口可达、族外接触面 0、**整族 0 处实例状态**（只用入参 + `ColumnTypeGroups::` 静态常量）。
+  **反向判据（比正向更容易踩）**：零状态子集**占比过高**时，摘出去等于**把整个类搬家** —— `SchemaDiffService::diff` 16/17 = **97%**，
+  摘完只剩 `diff()` 一个壳持 2 个状态，那不是切片、是**加间接层**，明确否决。**闸门**：外迁后「新家」与「旧家剩余」都得各自成为
+  说得清的职责——本项两边分别是**纯函数 shaper** 与 **yaml I/O**，成立。
+  **族级读数是聚合读数、会掩盖子集**：`CreateApiGenerator` 族级打「持 14 处状态（12 属性 + filesystem/utility）」⇒ 看着不可动，
+  逐方法量才发现族内 **17 个方法 / 286 行块零状态**（占族 25%）。**所以判「族能不能搬」之前必须先逐方法分类。**
+  ⚠ 分类时**必须先查 `$this->X(` 的 X 是不是「本类自己的方法」**，不查会把本类兄弟方法调用（`$this->normalizeMethod()`）误归到
+  trait / 父类 ⇒ 纯性被系统性低估（同一个类：不查 = 10 个纯方法 / 131 行块；查了 = **17 个 / 286 行块**）。
+- 2026-09-20，**「先补测试」怎么落地到「结构锚点也没法改前先绿」的场景**（第 6 项方法论，值得复用）：
+  这一族外迁前在 `tests/` **零直接覆盖**（只有两条 `loadTableFull` 用例断了 `fields[*]` 里「**有** `size_class` / `default_class` 这些键」，
+  键的**取值**一个都没钉）⇒ 按红线 9 先补 `tests/Feature/Designer/FieldShaperTest.php`（**22 例 / 330 断言**，其中 7 例是结构锚点）。
+  仍用「同一批断言跨两个宿主」：`fshSubject()` 外迁前 `SchemaLoader::class`、外迁后 `FieldShaper::class`；
+  `fshCall()` 按 `isStatic()` 自动在 `invoke($实例, …)` / `invoke(null, …)` 间切（外迁前是**私有实例**方法，需要一个实例接）。
+  **结构锚点断言的是还不存在的类，没法「改前先绿」** ⇒ 解法是 **`->skip(! class_exists(新宿主), …)`**：外迁前 7 例整体跳过
+  （全量 pest 的 skipped 由 3 变 10），外迁后自动转成必须全绿。
+  **关键性质：skip 条件是「新宿主这个类存不存在」，不是「我改完了没有」** ⇒ **半迁移（类建了但没接上）会报红而不是被跳过**。
+  实测正是如此：搬完不翻 `fshSubject()` 时 §6 7 例全红，报错直接指出「还指着旧宿主」——**这种「故意留下的红」是设计，不是缺陷**。
+  **分工契约也能行为化**：§5 走真 fixture 调 `loadTableFull`，断言「字段形状的**键集** = 本族产出 + **恰好一个** `index_disabled`」，
+  把「本族只产字段形状、`index` 反向映射与 `index_disabled` 留在 `loadTableFull`（那两步要读**整表**，不属于单字段形状）」钉成机器可判的等式。
+  **验证链**：`pint --test` **PASS 349 files**；全量 pest **1 failed / 3 skipped / 1288 passed / 5277 assertions**，对比基线
+  （1 failed / 10 skipped / 1281 / 5251）⇒ **+7 passed / −7 skipped / +26 assertions，passed 增量恰等于 §6 那 7 例**；
+  唯一那条红仍是**已知 env 耦合基线红**（`ConfigControllerTest:305`）。
+  **mutation 18 处全部被咬住、漏网 0**（11 行为型 + 7 结构型：`final` 去掉 / 加一条 static 缓存属性 / 可见面缩回 private / 漏搬一个方法 /
+  互调改重复实现 / 拿掉一个 `static` / 多带一条 `use`）。**预检变异先在外迁前跑了一轮**（10 处、打在旧宿主上）才敢搬 ——
+  否则可能带着一个**空转的测试**搬家。**其中 M5 漏网是真缺口**：`$rowReadonly = $isSystem || ($name === 'id')` 的
+  `$name === 'id'` 兜底没有反例（我所有 `id` 用例都带了 `_system` 标记）⇒ 补「**没有** `_system` 标记的 `id` 行」反例后才咬住。
+  **影响面**：宿主 + 四个下游仓 grep `shapeField|FieldShaper` **零命中**；且它原本是 `private`，**类外调用在 PHP 层面本就不可能**
+  ⇒ 影响面**由构造保证为 0**，不只靠扫。**e2e 可跳过**（六·五·零，有据）：改动只在 `src/`，`git status` 里无 `public/` 与 `*.blade.php`。
+- 2026-09-20，**第 6 项顺手量出的两个既有问题（**刻意不动**，各属独立过堂；记下来免得下次再量一遍）**：
+  ① 〔**真缺陷，值得单独开项**〕`computeDefaultClass` 的 `$type === 'bool'` 支**只认字面 `bool`**，而 `SchemaLoader` 归一后写回的是
+  **canonical** 的 `'boolean'`（`ColumnTypeGroups::canonicalize` 把 `bool` / `boolean` 一律归一成 `boolean`）
+  ⇒ **真实链路上 bool 字段的 default 校验从未生效**（GUI 上 bool 字段 default 填任意垃圾不会红框）。与 `ColumnTypeGroups` 注释里
+  记过的「有人写了更窄的 inline 列表 ⇒ 整类列静默丢掉校验」**同型**，也再次印证该注释那句「成员只有一处定义，才谈得上改一处不漏四处」。
+  已用测试把现状**钉死**（字面 `bool` 命中 / canonical `boolean` 不命中，两条互为对照）⇒ 将来修它时那条断言会立刻照出来，
+  正是「先钉现状、再谈修复」的用例。② `shapeField` 的 `$tableLocked` 参数**整个函数体零使用**（只在紧邻注释里被提到）；
+  已用「同一 `$attr` 分别传 `true` / `false`、结果必须**全等**」把它钉住 —— 等价于把代码注释里那句「表锁只锁表级操作、
+  字段编辑一律允许」的**意图**也钉成了断言。
+
 - 2026-09-20，**e2e 收尾脚本 `safe-run.sh` 的清理段已收口「静默失败」；并新增第 4 个「它的日志不可信」的实例**：
   **原缺陷**：清理段第一行 `git -C "$HOST_DB_PATH" checkout . >/dev/null 2>&1` 失败时**完全无声**，脚本照常打印
   「已清理本次新增的未跟踪产物 N 项」⇒ 宿主 `scaffold/database/Platform.yaml` 留在 ` M`（**已跟踪**文件残留）却报「干净」。
