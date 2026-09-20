@@ -307,7 +307,8 @@ it('parseAction:空/null 输入 action 为空且不崩,多空格容错', functio
     expect($m->invoke($cmd, 'index IndexRequest IndexResource'))->toBe(['index', 'IndexRequest', 'IndexResource']);
 });
 
-// ─── AdderCommand::getControllers —— 列表项带 folder/ 分隔(2026-06-21:原 folder+name 糊一起)──
+// ─── AdderCommand 自己的「控制器列表扫描」（列表项带 folder/ 分隔，2026-06-21:原 folder+name 糊一起）──
+// 注意它**不是** Scaffold\Utility 上那个同名读缓存方法（那个已外迁 Support\StorageRegistry）。
 it('getControllers:列表项 = folder/name(Market/BaseServiceController),不再糊成 MarketBaseServiceController', function () {
     $dir = base_path('app/Admin/Controllers/Market');
     @mkdir($dir, 0777, true);

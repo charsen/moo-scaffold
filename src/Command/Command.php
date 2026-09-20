@@ -12,10 +12,11 @@ namespace Mooeen\Scaffold\Command;
 
 use Illuminate\Console\Command as BaseCommand;
 use Illuminate\Console\View\Components\Factory;
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Filesystem\Filesystem;
 use Mooeen\Scaffold\Designer\SchemaLoader;
 use Mooeen\Scaffold\Support\Concerns\InteractsWithConsoleUi;
-use Mooeen\Scaffold\Support\Paths;
+use Mooeen\Scaffold\Support\StorageRegistry;
 use Mooeen\Scaffold\Utility;
 
 class Command extends BaseCommand
@@ -316,7 +317,7 @@ class Command extends BaseCommand
      */
     protected function assertTableInSchema(string $schema_name, string $table): bool
     {
-        $models = $this->filesystem->getRequire(Paths::storage() . 'models.php');
+        $models = StorageRegistry::models();
         $valid  = array_values(array_column($models[$schema_name] ?? [], 'table_name'));
 
         if (in_array($table, $valid, true)) {
@@ -337,12 +338,13 @@ class Command extends BaseCommand
      */
     protected function schemaOfTable(string $table): ?string
     {
-        $file = Paths::storage() . 'models.php';
-        if (! $this->filesystem->isFile($file)) {
+        try {
+            $all = StorageRegistry::models();
+        } catch (FileNotFoundException) {
             return null;
         }
 
-        foreach ($this->filesystem->getRequire($file) as $schema => $rows) {
+        foreach ($all as $schema => $rows) {
             if (in_array($table, array_column($rows, 'table_name'), true)) {
                 return (string) $schema;
             }

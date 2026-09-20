@@ -15,12 +15,13 @@ namespace Mooeen\Scaffold\Generator;
 
 use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Support\Paths;
+use Mooeen\Scaffold\Support\StorageRegistry;
 
 class CreateTestGenerator extends Generator
 {
     public function start(string $schema_name, string $controller, bool $force = false, ?string $target_app = null): bool
     {
-        $all    = $this->utility->getControllers(false);
+        $all    = StorageRegistry::controllers(false);
         $attr   = $all[$schema_name][$controller];
         $module = $attr['module']['folder'];
         app(AppTargetRegistry::class)->assertConfigured((array) $attr['app'], "{$schema_name}.{$controller}.controller.app");
@@ -78,7 +79,7 @@ class CreateTestGenerator extends Generator
      */
     public function testDirs(string $schema_name, ?string $target_app = null): array
     {
-        $all  = $this->utility->getControllers(false)[$schema_name] ?? [];
+        $all  = StorageRegistry::controllers(false)[$schema_name] ?? [];
         $dirs = [];
 
         foreach ($all as $attr) {

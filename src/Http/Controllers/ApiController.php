@@ -25,6 +25,7 @@ use Mooeen\Scaffold\Support\ActionDoc;
 use Mooeen\Scaffold\Support\ActionMeta;
 use Mooeen\Scaffold\Support\ApiSchemaService;
 use Mooeen\Scaffold\Support\Paths;
+use Mooeen\Scaffold\Support\StorageRegistry;
 use Mooeen\Scaffold\Utility;
 
 class ApiController extends Controller
@@ -891,13 +892,13 @@ class ApiController extends Controller
         }
 
         try {
-            $enums = $this->utility->getEnums();
+            $enums = StorageRegistry::enums();
         } catch (\Throwable) {
             $enums = [];
         }
 
         try {
-            $fields = $this->utility->getFields();
+            $fields = StorageRegistry::fields();
         } catch (\Throwable) {
             $fields = [];
         }

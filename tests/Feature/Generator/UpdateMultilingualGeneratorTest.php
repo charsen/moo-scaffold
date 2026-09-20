@@ -60,7 +60,7 @@ function mlGen_seedFieldsYaml(array $tableFields, array $appendFields = []): voi
     config()->set('scaffold.database.schema', $schemaDir);
 }
 
-// 在 storage 缓存写 enums.php(getEnumWords 读;shape: [table => [field => [alias => [val, EnName, CnName]]]])。
+// 在 storage 缓存写 enums.php(StorageRegistry::enumWords() 读;shape: [table => [field => [alias => [val, EnName, CnName]]]])。
 function mlGen_seedEnums(array $enums): void
 {
     $fs  = app(Filesystem::class);

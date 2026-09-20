@@ -8,7 +8,7 @@ use Mooeen\Scaffold\Http\Middleware\ScaffoldAuthenticate;
 
 /**
  * 首页(dashboard)三个问题的回归锁(2026-06-10 修):
- *   1. 「控制器」统计按模块求和 —— 不再走 getControllers(true) 的短类名扁平合并
+ *   1. 「控制器」统计按模块求和 —— 不再走 StorageRegistry::controllers(true) 的短类名扁平合并
  *      (跨模块同名互相覆盖 → 少计)。
  *   2. 云端面板 recent 行对外部数据形状免疫 —— 缺 key / 坏时间串不再 500
  *      (坏 payload 会被缓存 60s → 一次形状漂移首页连环炸)。

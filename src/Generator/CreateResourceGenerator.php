@@ -15,6 +15,7 @@ use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Support\ColumnTypeGroups;
 use Mooeen\Scaffold\Support\FieldName;
 use Mooeen\Scaffold\Support\Paths;
+use Mooeen\Scaffold\Support\StorageRegistry;
 
 class CreateResourceGenerator extends Generator
 {
@@ -25,7 +26,7 @@ class CreateResourceGenerator extends Generator
      */
     public function start(string $schema_name, bool $force = false, ?string $only_table = null, ?string $target_app = null): bool
     {
-        $all = $this->filesystem->getRequire(Paths::storage() . 'models.php');
+        $all = StorageRegistry::models();
 
         if (! isset($all[$schema_name])) {
             $this->console()->error("未找到 schema 文件 \"{$schema_name}\"。");
@@ -49,7 +50,7 @@ class CreateResourceGenerator extends Generator
                 continue;
             }
 
-            $table_attr = $this->utility->getOneTable($attr['table_name']);
+            $table_attr = StorageRegistry::table($attr['table_name']);
 
             foreach ($this->getResourceTargets($attr, $target_app) as $target) {
                 // 包平铺(无 module folder 段);host 按 folder 分层

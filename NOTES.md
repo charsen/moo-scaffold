@@ -3,6 +3,66 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-19，**`Utility` 拆分 · 阶段 3b-3：REGISTRY 外迁 `Support\StorageRegistry` —— 而「REGISTRY 有 14 个读方法」这个前提本身是错的**：
+  **计划被推翻**：3a 量得的 `REGISTRY = 14` 把**三件事**拼成了一组 —— `9 个读 `storage/scaffold/*.php` 聚合缓存`
+  + `getLangFields`（读的是 `scaffold/database/schema/_fields.yaml`，schema YAML，走 `parseYamlFile()`）
+  + `getApps/getAppTargets/getExtraModules/getControllerNamespaces`（app-target 组，且**本就已委托 `AppTargetRegistry`**）。
+  **「按持有面/调用点数分组」量得出重叠，量不出职责** —— 决定切法的必须是「这个方法**读什么**」，不是它当初被归到哪一组。
+  真正可切的 9 个（实际外迁）：`getOneTable`→`table()`、`getTables`→`tables()`、`getModels`→`models()`、
+  `getModelIds`→`modelIds()`、`getControllers`→`controllers()`、`getFields`→`fields()`、`getEnums`→`enums()`、
+  `getEnumWords`→`enumWords()`（去掉与类名重复的 `get*` 前缀，与 3b-2 同批规则）、`dictionaryStats()` 名字本就够、未改。
+  `getEnums`/`getEnumWords`/`dictionaryStats` 内部互调 ⇒ 必须一起搬。
+  **推迟它的那条理由错在「凭什么算 DI 成本」**：3b-2 推迟 REGISTRY 写的是「要 14~22 个文件改构造函数 + 重写测试桩」，
+  实测**只在「实例注入」这种形态下成立** —— 而本类唯一依赖是 `Filesystem`（无状态、不读 `config()`），
+  做成 `final` + 全静态（与 `Paths` 同形，`Filesystem` 各方法就地 `new`，与 `Utility::__construct()` 的既有形态一致）
+  ⇒ **构造函数 0 改动、基类 accessor 0 个、纯文本替换**。反过来若走实例注入：4 个基类 + 全仓 `new XGenerator()`
+  共 **~76 处**要改，收益为零（本仓对这些方法的既有测试本来就是**真写缓存文件**再读，没有替换需求）。
+  ⇒ **可复用判据：以「要改构造函数」为由推迟外迁之前，先问一句「被迁出去的那部分能不能是静态的」**
+  （无状态 + 不读 `config()` ⇒ 能；读 `config()` 的 `AppTargetRegistry`/`PackageRegistry` 才必须走容器）。
+  **删转发还是留转发**：沿用 3b-2 的规则（零 DI 成本 + 调用点可穷举 + 漏了**响亮**），三条全中 ⇒ **删、不留转发**。
+  调用点是 `$this->utility->` / `app(Utility::class)->` 共 **32 处 / 16 文件**，漏改一律 `Call to undefined method`。
+  **顺带收口 5 处「绕开 `Utility` 直读 `models.php`」**（`Command::assertTableInSchema`/`schemaOfTable`、
+  `CreateModelGenerator` / `CreateTSModelGenerator` / `CreateResourceGenerator`）⇒ 现在「读缓存」只有一个出口。
+  其中 `Command::schemaOfTable()` 原来是 `isFile()` 再 `getRequire`，改成 `try { StorageRegistry::models() } catch (FileNotFoundException) { return null; }`
+  （等价：文件不在 ⇒ 原路返回 null）。
+  **账**：`Utility` 483 → **332 行**、公开面 22 → **13**（11 个真邻居 + 2 个 3a 转发）；47 个工作区条目（45 改 + 2 新）。
+  **锚点几乎零新增机制，正好二次验证 3b-2 的「按事实分组」判据**：8 个**改了名**的塞进
+  `UTILITY_RENAMED_METHODS`、`dictionaryStats` 塞进 `UTILITY_RELOCATED_METHODS`（名字没变 ⇒ 注释里写它**仍然是对的**），
+  再加 `StorageRegistry` 进宿主白名单、预算 22 → 13。**若把 `dictionaryStats` 放进改名那组，注释面锚点就会去追本来正确的散文**。
+  **本轮补的一条新判据（因为锚点先误伤了一次）**：接收者是**裸 `$this` / `self` / `static`**（即「本文件的类自己」）时，
+  若**同一段源码里定义**了同名方法 ⇒ 放行 —— `AdderCommand::getControllers($path, $folder)` 与
+  `Utility::getControllers(bool $merge_all)` 只是**重名**。**这层判据不削弱覆盖面**：漏改的真实形态
+  （`$this->utility->xxx()` / `$u->xxx()` / `Utility::xxx()`）接收者不是裸 `$this`，照旧判红（守卫里给了**相反结论**的两条 fixture 钉住这点）。
+  **注释面锚点逮到 8 处，分两类、都没进白名单**：7 处是**真漂移**（`ScaffoldController` / `ScaffoldDashboardTest` /
+  `CreateViewGeneratorTest` / `UpdateMultilingualGeneratorTest` / `GeneratorFixesTest` / `CreateResourceGeneratorTest` /
+  `UniqueSemanticsTest`）已换成新宿主 —— 最典型的是 `UniqueSemanticsTest` 那句「内部调 `$this->utility->getModelIds()`」，
+  方法一走这句话**就是错的**；1 处是**撞车**（`AdderTest` 那行注释指的是 `AdderCommand::getControllers()`），
+  处理是**改注释措辞**（并补一句「不是 StorageRegistry 那个」），**不豁免** —— 白名单只收「刻意讲迁移映射」的，
+  被这类误报稀释就失去意义了。另：`src/Support/StorageRegistry.php` 进白名单，理由同 `Paths.php`（它是旧名→新名的映射表）。
+  **守卫的鉴别力（9 处打哑，红集互不相交 —— 除 M-E 是「覆盖面最广」那条）**：
+  M-A `enums(true)` 的合并键改成表名 ⇒ 只有「enums 按字段名合并」；M-B `enumWords()` 不再跳 `__pending_` ⇒ 只有「跳占位」；
+  M-C `table()` 缺表静默回落空数组 ⇒ 只有「响亮失败」；M-D `controllers()` 默认臂失效 ⇒ 只有「按短类名扁平合并」；
+  M-E `models()` 读错文件名 ⇒ **12 红**（1 条锚点 + 11 条生成器链路：`CodegenOriginTest` / `CreateResourceGeneratorTest`）
+  —— 它是**唯一一条「在真实链路上也响亮」**的错法；M-F `dictionaryStats()` 的 fields 计数 ⇒ 只有「三个计数」；
+  M-G 给 `Utility` 加回一个 `getModels()` 转发 ⇒ {已不存在, 公开面预算}，**扫描锚点与注释面全绿**；
+  M-H 把一个调用点回退成 `$this->utility->getTables()` ⇒ **只有扫描锚点**；M-I 在非白名单文件的注释里留旧名 ⇒ **只有注释面锚点**。
+  ⇒ M-G 与 M-H 红集不相交（「加回定义」与「回退调用」互相看不见），M-I 再证明注释面有**独立于**代码面的鉴别力。9 处变异后
+  `StorageRegistry.php` / `Utility.php` / `ScaffoldController.php` / `ApiSchemaService.php` 均以 sha256 校验**逐字节还原**。
+  **新增 `tests/Feature/Support/StorageRegistryTest.php`（7 例 / 33 断言）** —— 这 9 个方法外迁前**只有生成器链路间接覆盖**
+  （断言的是**产物**，缓存读错成什么样只要产物"看起来对"就发现不了），而外迁前 `Utility` 的 docblock 却写着 `@throws`：
+  **文档承诺了没人钉过的东西**，与 3b-2 给 `Paths` 补 `PathsTest` 同一处境。全部带对照（不是把返回值抄一遍）。
+  **全量 1 failed / 3 skipped / 1141 passed（4567 断言）**（3b-2 基线 `1134 / 4508`，+7 例 / +59 断言 —— +7 例来自新测试文件）；
+  红仍是 `ConfigControllerTest:305` 那条 env 耦合基线（`SCAFFOLD_AUTHOR=charsen` 即转绿）；
+  `pint --dirty --test` 46 files PASS（写入式只修 1 处 `binary_operator_spaces`，前后 `git diff --stat` **逐字节一致**，无夹带重排）；
+  `npm run test:js` 3 个守卫文件 62 断言全绿；**e2e 按六·五 判据整段跳过**（`git status` 里 `public/` 与 `*.blade.php` 均 0 命中）。
+  **顺带查出的三条（本次只登记、不动）**：① `controllers(bool $merge_all = true)` 的 `true` 臂**零调用点**
+  （全仓 10 个调用点一律显式传 `false`，唯一提 `true` 的是 `ScaffoldController` / `ScaffoldDashboardTest` 两处
+  「为什么不再用它」的注释）⇒ **原样搬**，删它是 API 变更、要连注释与注释面锚点一起动；
+  ② 上述 5 处重复读取已在本轮收口；③ **3b-2 记的那条「3b-3 顺带把两个 `extends Utility` 测试桩改成绑容器假件」不成立、已作废** ——
+  `CommandExitCodeTest` 那两个桩覆写的是 `getControllerNamespaces()` / `getAppTargets()`（app-target 组，不在这 9 个里），
+  与本次无关；（另注：其中 244 那个桩的 `__construct` **不调 `parent::__construct()`** ⇒ `$this->filesystem` 未初始化，
+  当前只用它覆写的方法所以没炸 —— 这是它自己的隐患，另立候选。）
+
 - 2026-09-19，**`Utility` 拆分 · 阶段 3b-2：PATHS 外迁 `Support\Paths`，并修掉结构锚点的「接收者盲区」**：
   **顺序被推翻了 —— 先 PATHS 再 REGISTRY，不是原计划的反过来**：决定顺序的是「组间文件重叠 + 谁依赖谁」。
   PATHS∩REGISTRY = 14 文件（3a 量得），且 REGISTRY 的方法**依赖 PATHS**（`getStoragePath` ×7）又依赖 IO
@@ -152,6 +212,11 @@
   先动 PATHS 是纯文本替换）。⇒ 修正后的剩余：**3b-3 = REGISTRY → `Support\StorageRegistry`**
   （顺带把两个 `extends Utility` 测试桩改成绑容器假件）；**3c = PATHS/CORE 收尾**，
   必须与 `TUNING-PLAN.md` §三 P2 合并考虑。
+  **（注 2026-09-19 订正：本条两处已作废 —— ① 上面「先动 REGISTRY 要改构造函数」这个理由**不成立**，
+  它只在「实例注入」形态下成立、而本类可做成全静态（详见本文件上方 3b-3 条）；
+  ② 括号里「顺带把两个 `extends Utility` 测试桩改成绑容器假件」与 3b-3 的实际切法**无关**，
+  那两个桩覆写的是 app-target 组的方法、不在这 9 个里 ⇒ **已从 3b-3 摘掉、另立候选**。
+  ③ 「3b-3 = REGISTRY」本身也需修正：**不是 14 个读方法、是 9 个**，见上方 3b-3 条。）**
 
 - 2026-09-19，**`Utility` 拆分 · 阶段 3a：先量持有面与组间重叠，再决定「一次切四类」不值得**：
   **先量**：852 行 / 45 个公开成员（1 构造器 + 42 实例 + 2 静态）= 5 组职责 —— CORE 配置与身份(3)、PATHS 路径(13)、
@@ -192,6 +257,10 @@
   `Support\StorageRegistry`**（顺带把两个 `extends Utility` 测试桩改成绑容器假件，那本来就是更好的测试缝）；
   3c = PATHS，**必须与 `TUNING-PLAN.md` §三 P2（给 `targetContext` 补 host 臂 controller/request 的
   path+namespace）合并考虑**，否则同一个 `targetContext` 要改两次。
+  **（注 2026-09-19 订正：上面这条「3b-2 = REGISTRY、3c = PATHS」的顺序已作废 ——
+  实际先做了 PATHS（3b-2）、REGISTRY 推后到 3b-3。理由与后果见本文件上方 3b-2 条；
+  3b-3 已于同日完成，切的是 **9 个**读缓存方法（不是这条写的 14 个）、且**没有**出现 DI 成本，
+  见本文件上方 3b-3 条。⇒ **剩余只剩 3c = PATHS/CORE 收尾（与 `TUNING-PLAN.md` §三 P2 合并考虑）**。）**
 
 - 2026-09-19，**阶段 3 收口：删掉前端仅剩的两处「旧形态」容忍（顶层字符串 `error` + 无状态码兜底）**：
   **删了什么**：`ScaffoldApi.errorText()` 里 `typeof j.error === 'string' → return j.error`；

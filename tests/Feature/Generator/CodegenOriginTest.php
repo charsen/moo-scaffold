@@ -10,6 +10,7 @@ use Mooeen\Scaffold\Generator\FreshStorageGenerator;
 use Mooeen\Scaffold\Generator\UpdateMultilingualGenerator;
 use Mooeen\Scaffold\Support\PackageRegistry;
 use Mooeen\Scaffold\Support\Paths;
+use Mooeen\Scaffold\Support\StorageRegistry;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Console\Output\NullOutput;
 
@@ -82,9 +83,9 @@ afterEach(function () {
 });
 
 it('fresh 缓存:包 schema 条目挂 origin', function () {
-    $menus = app(Utility::class)->getTables();
+    $menus = StorageRegistry::tables();
     expect($menus['PkgGen']['origin'] ?? null)->toBe('moo-pkgen');
-    $tables = app(Utility::class)->getOneTable('pkgx_items');
+    $tables = StorageRegistry::table('pkgx_items');
     expect($tables['origin'] ?? null)->toBe('moo-pkgen');
 });
 

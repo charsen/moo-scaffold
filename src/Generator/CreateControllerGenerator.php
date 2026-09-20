@@ -20,6 +20,7 @@ use Mooeen\Scaffold\Support\ColumnTypeGroups;
 use Mooeen\Scaffold\Support\ControllerName;
 use Mooeen\Scaffold\Support\FieldName;
 use Mooeen\Scaffold\Support\Paths;
+use Mooeen\Scaffold\Support\StorageRegistry;
 
 use function in_array;
 
@@ -34,7 +35,7 @@ class CreateControllerGenerator extends Generator
     public function start(string $schema_name, bool $force = false, ?string $only_table = null, ?string $target_app = null)
     {
         $this->base_path = app_path('/');
-        $all             = $this->utility->getControllers(false);
+        $all             = StorageRegistry::controllers(false);
 
         if (! isset($all[$schema_name])) {
             $this->console()->error("未找到 schema 文件 \"{$schema_name}\"。");
@@ -121,7 +122,7 @@ class CreateControllerGenerator extends Generator
                 }
 
                 // 表格数据
-                $table_attrs     = $this->utility->getOneTable($attr['table_name']);
+                $table_attrs     = StorageRegistry::table($attr['table_name']);
                 $fields          = $table_attrs['fields'];
                 $enums           = $table_attrs['enums'];
                 $controller_name = ControllerName::strip($class);
@@ -601,7 +602,7 @@ class CreateControllerGenerator extends Generator
         $rules = ['enum_class' => []];
 
         // 获取所有模型，生成外键模型 ID 与 模型类名的对应数组
-        $models_keys = $this->utility->getModelIds();
+        $models_keys = StorageRegistry::modelIds();
         $id_keys     = array_keys($models_keys);
 
         foreach ($fields as $field_name => $attr) {

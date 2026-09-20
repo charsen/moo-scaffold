@@ -15,6 +15,7 @@ use Illuminate\Support\Arr;
 use Mooeen\Scaffold\Support\ColumnTypeGroups;
 use Mooeen\Scaffold\Support\FieldName;
 use Mooeen\Scaffold\Support\Paths;
+use Mooeen\Scaffold\Support\StorageRegistry;
 
 use function in_array;
 
@@ -38,7 +39,7 @@ class CreateModelGenerator extends Generator
         $this->base_namespace      = Paths::namespaceOf($this->model_relative_path);
         $this->factory_path        = database_path('factories/');
 
-        $all = $this->filesystem->getRequire(Paths::storage() . 'models.php');
+        $all = StorageRegistry::models();
 
         if (! isset($all[$schema_name])) {
             $this->console()->error("未找到 schema 文件 \"{$schema_name}\"。");
@@ -75,7 +76,7 @@ class CreateModelGenerator extends Generator
             // Model 目录检查，不存在则创建
             $this->checkDirectory($model_path);
 
-            $table_attr = $this->utility->getOneTable($attr['table_name']);
+            $table_attr = StorageRegistry::table($attr['table_name']);
 
             // Model 目录及 namespace 处理
             $trait_class     = "{$class}Trait";

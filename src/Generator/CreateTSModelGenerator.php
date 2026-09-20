@@ -12,6 +12,7 @@ namespace Mooeen\Scaffold\Generator;
 
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Mooeen\Scaffold\Support\ColumnTypeGroups;
+use Mooeen\Scaffold\Support\StorageRegistry;
 
 use function in_array;
 
@@ -31,7 +32,7 @@ class CreateTSModelGenerator extends Generator
         $this->model_path          = $this->utility->getConfig('frontend.models');
         $this->model_relative_path = str_replace([base_path('../'), '../'], ['', '/'], $this->model_path);
 
-        $all = $this->filesystem->getRequire(Paths::storage() . 'models.php');
+        $all = StorageRegistry::models();
 
         if (! isset($all[$schema_name])) {
             $this->console()->error("未找到 schema 文件 \"{$schema_name}\"。");
@@ -61,7 +62,7 @@ class CreateTSModelGenerator extends Generator
                 continue;
             }
 
-            $table_attr = $this->utility->getOneTable($attr['table_name']);
+            $table_attr = StorageRegistry::table($attr['table_name']);
 
             // 生成 model
             $this->buildModel($model_path, $class, $attr, $table_attr);
