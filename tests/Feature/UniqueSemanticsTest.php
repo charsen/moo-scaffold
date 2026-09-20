@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Unique;
 use Mooeen\Scaffold\Designer\MigrationWriter;
 use Mooeen\Scaffold\Designer\SchemaLoader;
+use Mooeen\Scaffold\Designer\SchemaPayloadMerger;
 use Mooeen\Scaffold\Foundation\FormRequest;
 use Mooeen\Scaffold\Generator\CreateControllerGenerator;
 use Mooeen\Scaffold\Generator\FreshStorageGenerator;
@@ -264,8 +265,7 @@ test('M-load-legacy · attr.unique + index 块 type:unique 同存 → "unique-db
 // ─── §三 D3 #6 · rebuildTableIndex translate client 值到 canonical ──────
 test('M-save-app · client.field.index="unique-app" → 不进 index 块', function () {
     // 反射调 private rebuildTableIndex
-    $loader = app(SchemaLoader::class);
-    $ref    = new ReflectionClass($loader);
+    $ref    = new ReflectionClass(SchemaPayloadMerger::class);
     $method = $ref->getMethod('rebuildTableIndex');
     $method->setAccessible(true);
 
@@ -274,14 +274,13 @@ test('M-save-app · client.field.index="unique-app" → 不进 index 块', funct
         ['name' => 'id', 'index' => 'primary'],
         ['name' => 'org_name', 'index' => 'unique-app'],
     ];
-    $result = $method->invoke($loader, $yamlIndex, $clientFields, []);
+    $result = $method->invoke(null, $yamlIndex, $clientFields, []);
     expect($result)->toHaveKey('id');
     expect(isset($result['org_name']))->toBeFalse();   // app-level 不进 index 块
 });
 
 test('M-save-db · client.field.index="unique-db" → 进 index 块 type:unique(canonical)', function () {
-    $loader = app(SchemaLoader::class);
-    $ref    = new ReflectionClass($loader);
+    $ref    = new ReflectionClass(SchemaPayloadMerger::class);
     $method = $ref->getMethod('rebuildTableIndex');
     $method->setAccessible(true);
 
@@ -290,18 +289,17 @@ test('M-save-db · client.field.index="unique-db" → 进 index 块 type:unique(
         ['name' => 'id', 'index' => 'primary'],
         ['name' => 'mobile', 'index' => 'unique-db'],
     ];
-    $result = $method->invoke($loader, $yamlIndex, $clientFields, []);
+    $result = $method->invoke(null, $yamlIndex, $clientFields, []);
     expect($result['mobile']['type'] ?? null)->toBe('unique');
 });
 
 test('M-save-legacy · client.field.index="unique"(legacy)→ 进 index 块 canonical 不变', function () {
-    $loader = app(SchemaLoader::class);
-    $ref    = new ReflectionClass($loader);
+    $ref    = new ReflectionClass(SchemaPayloadMerger::class);
     $method = $ref->getMethod('rebuildTableIndex');
     $method->setAccessible(true);
 
     $clientFields = [['name' => 'old_field', 'index' => 'unique']];
-    $result       = $method->invoke($loader, [], $clientFields, []);
+    $result       = $method->invoke(null, [], $clientFields, []);
     expect($result['old_field']['type'] ?? null)->toBe('unique');
 });
 

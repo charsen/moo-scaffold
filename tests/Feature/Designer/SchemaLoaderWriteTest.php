@@ -3,6 +3,7 @@
 use Mooeen\Scaffold\Designer\MigrationWriter;
 use Mooeen\Scaffold\Designer\SchemaLoader;
 use Mooeen\Scaffold\Designer\SchemaLoadException;
+use Mooeen\Scaffold\Designer\SchemaPayloadMerger;
 use Mooeen\Scaffold\Designer\SnapshotStore;
 use Symfony\Component\Yaml\Yaml;
 
@@ -1030,13 +1031,13 @@ it('saveModule 跨字段不串扰:改 A 字段不影响 B 字段已有 attrs', f
 // 新名(一个已存在的别的字段)→ 索引落在错字段上。
 
 it('applyRenameHints:目标名已存在(撞名)→ 整条跳过,索引不被改到错字段', function () {
-    $ref = new ReflectionMethod(SchemaLoader::class, 'applyRenameHints');
+    $ref = new ReflectionMethod(SchemaPayloadMerger::class, 'applyRenameHints');
     $ref->setAccessible(true);
 
     $yamlFields = ['status' => ['type' => 'tinyint'], 'state' => ['type' => 'tinyint']];
     $yamlTable  = ['index' => ['idx_status' => ['type' => 'index', 'fields' => 'status']]];
 
-    $ref->invokeArgs($this->loader, [&$yamlFields, &$yamlTable, ['status' => 'state']]);
+    $ref->invokeArgs(null, [&$yamlFields, &$yamlTable, ['status' => 'state']]);
 
     // state 已存在 → status 没被改名,索引仍指 status(bug 版本会被改成 'state')
     expect($yamlFields)->toHaveKey('status');
@@ -1044,13 +1045,13 @@ it('applyRenameHints:目标名已存在(撞名)→ 整条跳过,索引不被改�
 });
 
 it('applyRenameHints:正常改名(目标名不存在)→ 字段 + 索引一起改', function () {
-    $ref = new ReflectionMethod(SchemaLoader::class, 'applyRenameHints');
+    $ref = new ReflectionMethod(SchemaPayloadMerger::class, 'applyRenameHints');
     $ref->setAccessible(true);
 
     $yamlFields = ['status' => ['type' => 'tinyint']];
     $yamlTable  = ['index' => ['idx_status' => ['type' => 'index', 'fields' => 'status']]];
 
-    $ref->invokeArgs($this->loader, [&$yamlFields, &$yamlTable, ['status' => 'state']]);
+    $ref->invokeArgs(null, [&$yamlFields, &$yamlTable, ['status' => 'state']]);
 
     expect($yamlFields)->toHaveKey('state')->not->toHaveKey('status');
     expect($yamlTable['index']['idx_status']['fields'])->toBe('state');

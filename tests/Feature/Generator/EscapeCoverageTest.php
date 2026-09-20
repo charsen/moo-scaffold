@@ -179,12 +179,14 @@ test('F9c · CreateModelGenerator buildEnum string item[0] 应走 escapePhpStrin
  * SchemaLoader 入口 sanitize · enum value / default / format — P1
  * ------------------------------------------------------------------------ */
 
-test('SchemaLoader::applyEnums 应对 string value 走 sanitizeEnumLabel', function () {
-    $abs = __DIR__ . '/../../../src/Designer/SchemaLoader.php';
+test('SchemaPayloadMerger::applyEnums 应对 string value 走 sanitizeEnumLabel', function () {
+    // 2026-09-20(第 5 项):applyEnums 连同 sanitizeEnumLabel 一起从 SchemaLoader 外迁,
+    //   锚点随之指到新宿主 —— 只断言「SchemaLoader 里还有这句」会在搬走后假绿。
+    $abs = __DIR__ . '/../../../src/Designer/SchemaPayloadMerger.php';
     $src = file_get_contents($abs);
     // applyEnums 写 entries 前应 sanitize value(标志:value sanitize 注释 + sanitizeEnumLabel($rawVal) 调用)
     expect($src)->toContain('plan-40 §二 P1 防御纵深:enum value sanitize');
-    expect($src)->toContain('$this->sanitizeEnumLabel($rawVal)');
+    expect($src)->toContain('self::sanitizeEnumLabel($rawVal)');
 });
 
 test('SchemaLoader::sanitizeFieldAttrs 应对 default + format 内容 sanitize', function () {
@@ -194,6 +196,9 @@ test('SchemaLoader::sanitizeFieldAttrs 应对 default + format 内容 sanitize',
     expect($src)->toContain("\$key === 'format' && is_string(\$value)");
     // format strict regex
     expect($src)->toContain('/^[a-z]+(?::[0-9,]+)?$/');
+    // 2026-09-20(第 5 项):default 的 sanitize 能力搬去了 SchemaPayloadMerger,
+    //   这里补一条「调用点在」的锚 —— 否则删掉这行调用,default 就静默不再 sanitize。
+    expect($src)->toContain('SchemaPayloadMerger::sanitizeEnumLabel($value)');
 });
 
 /* ---------------------------------------------------------------------------
