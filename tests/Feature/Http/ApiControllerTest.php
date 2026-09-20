@@ -202,29 +202,41 @@ it('POST /scaffold/api/proxy 多值响应头(多条 Set-Cookie)全部展示,不�
 
 // ─── cache:存上次参数 ───────────────────────────────────────────────────
 
-it('POST /scaffold/api/cache 存参数 → status ok', function () {
-    $this->postJson('/scaffold/api/cache', [
-        'key'    => 'apictrl_test_' . uniqid(),
+it('POST /scaffold/api/cache 存参数 → 统一成功信封(顶层恰好 ok/data,旧的顶层 status 已收掉)', function () {
+    $key = 'apictrl_test_' . uniqid();
+
+    $r = $this->postJson('/scaffold/api/cache', [
+        'key'    => $key,
         'params' => ['name' => ['value' => 'x', 'checked' => true]],
-    ])->assertOk()->assertJson(['status' => 'ok']);
+    ]);
+    $r->assertOk();
+
+    $body = $r->json();
+    expect(array_keys($body))->toBe(['ok', 'data'])   // 旧形态 `{status:'ok'}` 无 ok 布尔、且 status 在顶层
+        ->and($body['ok'])->toBeTrue()
+        ->and($body['data'])->toBe([])
+        ->and(array_key_exists('status', $body))->toBeFalse();
 });
 
-it('POST /scaffold/api/cache 缺 key/params 也安全返回 ok(no-op)', function () {
-    $this->postJson('/scaffold/api/cache', [])
-        ->assertOk()
-        ->assertJson(['status' => 'ok']);
+it('POST /scaffold/api/cache 缺 key/params 也安全返回成功信封(no-op)', function () {
+    $r = $this->postJson('/scaffold/api/cache', []);
+    $r->assertOk();
+
+    expect($r->json())->toBe(['ok' => true, 'data' => []]);
 });
 
 it('POST /scaffold/api/cache key 超长 / params 非数组 → 422(2026-06-10 加校验)', function () {
+    // 422 走 Laravel 框架校验袋(`{message,errors}`),**刻意不套信封** ——
+    // 与 LocalMarkdown / Docs 的既有口径一致:框架生成的 validation bag 原样保留。
     $this->postJson('/scaffold/api/cache', [
         'key'    => str_repeat('k', 201),
         'params' => ['a' => ['value' => 1]],
-    ])->assertStatus(422);
+    ])->assertStatus(422)->assertJsonValidationErrors('key');
 
     $this->postJson('/scaffold/api/cache', [
         'key'    => 'ok_key',
         'params' => 'not-an-array',
-    ])->assertStatus(422);
+    ])->assertStatus(422)->assertJsonValidationErrors('params');
 });
 
 // ─── 接口文档:yaml 形状守护 + deprecated 口径(2026-06-10 修)──────────────
@@ -236,7 +248,7 @@ function apiDoc_sandbox(string $actionsYaml): string
     app(\Illuminate\Filesystem\Filesystem::class)->ensureDirectoryExists($dir);
     file_put_contents($dir . '/Memo.yaml', "controller:\n  class: MemoController\n  name: 备忘管理\nactions:\n{$actionsYaml}");
     config([
-        'scaffold.api.schema' => $rel . '/',   // getApiPath 直接拼 app 名,尾斜杠必须有(包默认值同形)
+        'scaffold.api.schema' => $rel . '/',   // Paths::api() 直接拼 app 名,尾斜杠必须有(包默认值同形)
         'scaffold.controller' => ['admin' => ['name' => ['zh-CN' => '后台', 'en' => 'Admin']]],
     ]);
 

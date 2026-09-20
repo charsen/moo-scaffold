@@ -36,6 +36,7 @@ use Mooeen\Scaffold\Http\Requests\Designer\ShowRequest;
 use Mooeen\Scaffold\Http\Requests\Designer\TranslateRequest;
 use Mooeen\Scaffold\Support\AccountStore;
 use Mooeen\Scaffold\Support\ReadonlyMode;
+use Mooeen\Scaffold\Support\StorageRegistry;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Console\Output\NullOutput;
 use Throwable;
@@ -104,7 +105,7 @@ class DesignerController extends Controller
             'designer_module_groups' => $groups,
             'designer_stats'         => $this->loader->loadStats(),
             // 2026-05-30:字典卡片底部 stat 行(装饰 + 引导),口径同字典页
-            'designer_dict_stats' => $this->utility->dictionaryStats(),
+            'designer_dict_stats' => StorageRegistry::dictionaryStats(),
             // plan 19 v9 F2:首屏需要的 dbDesigner state(只 newSchema modal 用得到)
             'designer_initial' => [
                 'csrfToken'            => csrf_token(),
@@ -775,18 +776,11 @@ class DesignerController extends Controller
     }
 
     // ─── helpers ──────────────────────────────────────────────────────
-    private function ok(array $data): JsonResponse
-    {
-        return response()->json(['ok' => true, 'data' => $data]);
-    }
-
-    private function error(string $code, string $msg, int $http, array $detail = []): JsonResponse
-    {
-        return response()->json([
-            'ok'    => false,
-            'error' => ['code' => $code, 'msg' => $msg, 'detail' => $detail],
-        ], $http);
-    }
+    // ok() / error() 已上提到基类 `Mooeen\Scaffold\Http\Controllers\Controller`
+    // （统一 JSON 信封，签名逐字相同 ⇒ 本文件所有调用点无需改动）。
+    // 真正的**单一实现**是 `Mooeen\Scaffold\Support\JsonEnvelope`，基类那两个只是薄壳 ——
+    // 中间件也要产出信封、又不继承控制器基类，所以实现落在 Support 层（别在这里再拼一份）。
+    // 这个控制器原本就是全站事实标准的来源，行为未变。
 
     private function summarizeTable(array $tableDiff): string
     {

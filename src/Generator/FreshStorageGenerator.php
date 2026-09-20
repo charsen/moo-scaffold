@@ -14,8 +14,9 @@ use Brick\VarExporter\VarExporter;
 use Illuminate\Support\Str;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Support\ColumnTypeGroups;
+use Mooeen\Scaffold\Support\ControllerName;
 use Mooeen\Scaffold\Support\PackageRegistry;
-use Mooeen\Scaffold\Utility;
+use Mooeen\Scaffold\Support\Paths;
 use Symfony\Component\Yaml\Yaml;
 
 class FreshStorageGenerator extends Generator
@@ -52,11 +53,11 @@ class FreshStorageGenerator extends Generator
     {
         $this->silence                 = $silence;
         $this->field_table_names       = [];
-        $this->db_schema_path          = $this->utility->getDatabasePath('schema');
-        $this->db_relative_schema_path = $this->utility->getDatabasePath('schema', true);
+        $this->db_schema_path          = Paths::database('schema');
+        $this->db_relative_schema_path = Paths::database('schema', true);
 
-        $this->storage_path          = $this->utility->getStoragePath();
-        $this->storage_path_relative = $this->utility->getStoragePath(true);
+        $this->storage_path          = Paths::storage();
+        $this->storage_path_relative = Paths::storage(true);
 
         if ($clean) {
             $this->cleanAll();
@@ -124,9 +125,9 @@ class FreshStorageGenerator extends Generator
                     // 缓存 控制器 与 模型等的关系
                     if (isset($config['controller'])) {
                         // 2026-05-21 归一化:手编 yaml 漏 Controller 后缀(如 class: Memo)时兜底补,
-                        // 收口到 Utility::ensureControllerSuffix 单一真源。
+                        // 收口到 ControllerName::ensure 单一真源。
                         // designer GUI 路径在 SchemaLoader::applyTableController 已归一化,这里是手编 yaml 兜底。
-                        $controllerClass                           = Utility::ensureControllerSuffix((string) ($config['controller']['class'] ?? ''));
+                        $controllerClass                           = ControllerName::ensure((string) ($config['controller']['class'] ?? ''));
                         $controllers[$file_name][$controllerClass] = [
                             'module'      => $data['module'],
                             'entity_name' => $config['attrs']['name'] ?? $table_name,     // 同 line 101/109,attrs.name 可缺省
@@ -610,12 +611,12 @@ class FreshStorageGenerator extends Generator
     private function buildModelIdList(array $data): void
     {
         $model_ids  = [];
-        $model_path = $this->utility->getModelPath(true);
+        $model_path = Paths::model(true);
 
         foreach ($data as $folder => $models) {
             foreach ($models as $model => $config) {
                 $model_id             = Str::snake($model, '_') . '_id';
-                $namespace            = $this->utility->formatNameSpace($model_path) . $config['module']['folder'];
+                $namespace            = Paths::namespaceOf($model_path) . $config['module']['folder'];
                 $model_ids[$model_id] = [
                     'namespace'  => $namespace,
                     'model'      => $namespace . '\\' . $model,
@@ -649,7 +650,7 @@ class FreshStorageGenerator extends Generator
             $this->console()->failed($this->storage_path_relative, 'Clean failed');
         }
 
-        $this->utility->addGitIgnore($this->command);
+        $this->utility->addGitIgnore($this->console());
 
         $this->console()->newLine();
     }

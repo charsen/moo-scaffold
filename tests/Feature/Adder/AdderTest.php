@@ -7,6 +7,7 @@ use Illuminate\Console\View\Components\Factory;
 use Illuminate\Filesystem\Filesystem;
 use Mooeen\Scaffold\Adder\ControllerAdder;
 use Mooeen\Scaffold\Adder\RouterAdder;
+use Mooeen\Scaffold\Support\ControllerName;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
@@ -86,24 +87,24 @@ function adder_makeRouterAdder(): RouterAdder
     return new RouterAdder(test()->adderConsole, test()->adderFs, test()->adderUtility);
 }
 
-// ─── Utility 后缀归一化(单一真源,ControllerAdder::start 直接调,无 getTabs,可真断言) ──
+// ─── ControllerName 后缀归一化(单一真源,ControllerAdder::start 直接调,无 getTabs,可真断言) ──
 
 it('ensureControllerSuffix 补尾缀、已有不重复、空串原样', function () {
-    expect(Utility::ensureControllerSuffix('User'))->toBe('UserController');
-    expect(Utility::ensureControllerSuffix('UserController'))->toBe('UserController');
-    expect(Utility::ensureControllerSuffix(''))->toBe('');
+    expect(ControllerName::ensure('User'))->toBe('UserController');
+    expect(ControllerName::ensure('UserController'))->toBe('UserController');
+    expect(ControllerName::ensure(''))->toBe('');
 });
 
 it('stripControllerSuffix 只剥尾缀、中间含 Controller 不动', function () {
-    expect(Utility::stripControllerSuffix('UserController'))->toBe('User');
-    expect(Utility::stripControllerSuffix('User'))->toBe('User');
-    expect(Utility::stripControllerSuffix('ControllerManager'))->toBe('ControllerManager');
+    expect(ControllerName::strip('UserController'))->toBe('User');
+    expect(ControllerName::strip('User'))->toBe('User');
+    expect(ControllerName::strip('ControllerManager'))->toBe('ControllerManager');
 });
 
 it('ensure/strip 互为逆操作(短名与 FQCN 都成立)', function () {
-    expect(Utility::stripControllerSuffix(Utility::ensureControllerSuffix('Memo')))->toBe('Memo');
-    expect(Utility::ensureControllerSuffix(Utility::stripControllerSuffix('MemoController')))->toBe('MemoController');
-    expect(Utility::stripControllerSuffix('App\\Admin\\Controllers\\Light\\MemoController'))
+    expect(ControllerName::strip(ControllerName::ensure('Memo')))->toBe('Memo');
+    expect(ControllerName::ensure(ControllerName::strip('MemoController')))->toBe('MemoController');
+    expect(ControllerName::strip('App\\Admin\\Controllers\\Light\\MemoController'))
         ->toBe('App\\Admin\\Controllers\\Light\\Memo');
 });
 
@@ -270,7 +271,7 @@ it('非新建模式追加 action:在类闭合前插入 action 并注入 use', fu
 });
 
 // ─── checkGlobalResource:复用已存在 resource 时拼 use 语句 ─────────────────────────
-// resource.path 带尾 `/`(config 默认 'app/Http/Resources/')→ formatNameSpace 产出尾部带 `\` 的
+// resource.path 带尾 `/`(config 默认 'app/Http/Resources/')→ Paths::namespaceOf() 产出尾部带 `\` 的
 // namespace,再拼 `\\{class}` 得到双反斜杠 `Resources\\Foo`(空命名空间段)→ 生成的 controller use
 // 语句 PHP 语法错。rtrim namespace 尾部反斜杠修(2026-06-09)。
 it('checkGlobalResource · resource.path 带尾 / 时复用 resource 的 use 语句无双反斜杠', function () {
@@ -306,7 +307,8 @@ it('parseAction:空/null 输入 action 为空且不崩,多空格容错', functio
     expect($m->invoke($cmd, 'index IndexRequest IndexResource'))->toBe(['index', 'IndexRequest', 'IndexResource']);
 });
 
-// ─── AdderCommand::getControllers —— 列表项带 folder/ 分隔(2026-06-21:原 folder+name 糊一起)──
+// ─── AdderCommand 自己的「控制器列表扫描」（列表项带 folder/ 分隔，2026-06-21:原 folder+name 糊一起）──
+// 注意它**不是** Scaffold\Utility 上那个同名读缓存方法（那个已外迁 Support\StorageRegistry）。
 it('getControllers:列表项 = folder/name(Market/BaseServiceController),不再糊成 MarketBaseServiceController', function () {
     $dir = base_path('app/Admin/Controllers/Market');
     @mkdir($dir, 0777, true);

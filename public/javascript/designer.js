@@ -384,16 +384,7 @@ document.addEventListener('alpine:init', () => {
                 credentials: 'same-origin',
                 body: JSON.stringify(body),
             });
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                const err = json && json.error ? json.error : { code: 'HTTP_' + res.status, msg: '请求失败' };
-                const e = new Error(err.msg || err.code);
-                e.code = err.code;
-                e.detail = err.detail;
-                e.status = res.status;
-                throw e;
-            }
-            return (json && json.data) ? json.data : json;
+            return this._unwrap(res);
         },
         async _get(url) {
             const res = await fetch(url, {
@@ -401,16 +392,29 @@ document.addEventListener('alpine:init', () => {
                 headers: { 'Accept': 'application/json' },
                 credentials: 'same-origin',
             });
+            return this._unwrap(res);
+        },
+        // 统一解包。原先 _post / _get 各抄了一份**逐字相同**的解包尾巴，改一处必忘另一处；
+        // 现收敛到全局 ScaffoldApi（public/javascript/api.js，在 shell 里排在 main.js 之前）。
+        //
+        // 抛出的 Error 必须保住三样，调用方真的在用：
+        //   e.code   —— 6 处分支（AI_NOT_CONFIGURED / COMPACT_BLOCKED / SUSPECTED_RENAMES / EMPTY_DIFF）
+        //   e.detail —— compactBlockedReason 读 e.detail?.reason
+        //   e.status —— _shouldRetrySave 判「网络断 / 5xx 才重试」
+        // ⚠ fetch 的 res.json() 会**消费** body，所以要把「状态 + 已解析体」一起打包给
+        //   ScaffoldApi.fromFetch；直接把 res 传下去只会拿到状态码、丢掉服务端文案。
+        async _unwrap(res) {
             const json = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                const err = json && json.error ? json.error : { code: 'HTTP_' + res.status, msg: '请求失败' };
-                const e = new Error(err.msg || err.code);
+            const box = window.ScaffoldApi.fromFetch(res, json);
+            if (! window.ScaffoldApi.isOk(box)) {
+                const err = window.ScaffoldApi.toError(box, '请求失败');
+                const e = new Error(err.msg);
                 e.code = err.code;
                 e.detail = err.detail;
-                e.status = res.status;
+                e.status = err.http;
                 throw e;
             }
-            return (json && json.data) ? json.data : json;
+            return window.ScaffoldApi.data(box);
         },
         // v6.3 C-4:跟 SchemaLoader::rebuildFieldRows 的 $writable 对齐到 single source of truth(JS 侧)
         //   PHP $writable = ['type', 'size', 'required', 'default', 'comment', 'unsigned']

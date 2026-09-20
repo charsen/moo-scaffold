@@ -21,7 +21,11 @@ use Mooeen\Scaffold\Http\Requests\Api\CacheRequest;
 use Mooeen\Scaffold\Http\Requests\Api\EndpointRequest;
 use Mooeen\Scaffold\Http\Requests\Api\IndexRequest;
 use Mooeen\Scaffold\Support\AclActionResolver;
+use Mooeen\Scaffold\Support\ActionDoc;
+use Mooeen\Scaffold\Support\ActionMeta;
 use Mooeen\Scaffold\Support\ApiSchemaService;
+use Mooeen\Scaffold\Support\Paths;
+use Mooeen\Scaffold\Support\StorageRegistry;
 use Mooeen\Scaffold\Utility;
 
 class ApiController extends Controller
@@ -214,6 +218,11 @@ class ApiController extends Controller
     /**
      * 缓存"上次填了啥"的请求参数(用户切换接口后恢复表单状态)。
      * 不缓存响应——调试器永远走真实请求,不让用户看到旧数据。
+     *
+     * 回执走统一成功信封(旧形态是无 ok 布尔的裸 `{status:'ok'}`)。**调用方不读这个 body**:
+     * 唯一的消费者 `public/javascript/pages/api-request.js` 里那句 `$.ajax` 是 fire-and-forget,
+     * 既没有 success 也没有 error 回调 ⇒ 形状变化对它零影响。这里**不编造载荷**:
+     * 端点没有可返回的数据,`status:'ok'` 与信封的 `ok:true` 语义重复,故给空 data。
      */
     public function cache(CacheRequest $req)
     {
@@ -231,7 +240,7 @@ class ApiController extends Controller
             }
         }
 
-        return response()->json(['status' => 'ok']);
+        return $this->ok();
     }
 
     // ---- Private Methods ----
@@ -250,7 +259,7 @@ class ApiController extends Controller
      */
     private function getApiList(string $app = 'admin'): array
     {
-        $apiPath = $this->utility->getApiPath('schema') . $app . '/';
+        $apiPath = Paths::api('schema') . $app . '/';
 
         if (! $this->filesystem->isDirectory($apiPath)) {
             return ['menus' => [], 'apis' => [], 'menus_transform' => []];
@@ -287,8 +296,8 @@ class ApiController extends Controller
                     continue;
                 }
 
-                $actionMeta = $this->utility->normalizeApiActionMeta($attr, true);
-                $deprecated = $this->utility->isApiActionDeprecated($attr);
+                $actionMeta = ActionMeta::normalize($attr, true);
+                $deprecated = ActionMeta::isDeprecated($attr);
 
                 $temp[$actionName] = [
                     // 手写 yaml 可缺 name 字段,裸取 → ErrorException 炸文档/调试页;
@@ -396,7 +405,7 @@ class ApiController extends Controller
             return [];
         }
 
-        return $this->utility->normalizeMenusTransform($this->utility->parseYamlFile($yamlFile));
+        return ActionMeta::normalizeMenus($this->utility->parseYamlFile($yamlFile));
     }
 
     /**
@@ -437,12 +446,12 @@ class ApiController extends Controller
             abort(404, 'API Action Invalid');
         }
         $method     = strtoupper((string) $actionData['request'][0]);
-        $actionMeta = $this->utility->normalizeApiActionMeta($actionData, true);
-        $deprecated = $this->utility->isApiActionDeprecated($actionData);
+        $actionMeta = ActionMeta::normalize($actionData, true);
+        $deprecated = ActionMeta::isDeprecated($actionData);
         $uri        = $actionData['request'][1];
 
         // 2. 去掉方法后缀，获取真实 action 名（用于 Reflection）
-        $realActionName = $this->utility->removeActionNameMethod($actionName);
+        $realActionName = ActionMeta::removeMethodSuffix($actionName);
 
         // 3. 构建完整控制器类名
         $controllerFullClass = $this->resolveControllerClass($app, $folderPath, $controllerClass);
@@ -470,7 +479,7 @@ class ApiController extends Controller
             $tempName = ($realActionName === 'store') ? 'create' : 'edit';
             if (empty($data['prototype'])) {
                 foreach ($yamlData['actions'] as $key => $val) {
-                    if ($this->utility->removeActionNameMethod($key) === $tempName && ! empty($val['prototype'] ?? '')) {
+                    if (ActionMeta::removeMethodSuffix($key) === $tempName && ! empty($val['prototype'] ?? '')) {
                         $data['prototype'] = $val['prototype'];
                         break;
                     }
@@ -541,7 +550,7 @@ class ApiController extends Controller
             return [];
         }
 
-        $request = $this->utility->getActionRequestClass($reflectionClass->getMethod($ruleAction));
+        $request = ActionDoc::getActionRequestClass($reflectionClass->getMethod($ruleAction));
         if ($request === null || ! method_exists($request, 'rules')) {
             return [];
         }
@@ -883,13 +892,13 @@ class ApiController extends Controller
         }
 
         try {
-            $enums = $this->utility->getEnums();
+            $enums = StorageRegistry::enums();
         } catch (\Throwable) {
             $enums = [];
         }
 
         try {
-            $fields = $this->utility->getFields();
+            $fields = StorageRegistry::fields();
         } catch (\Throwable) {
             $fields = [];
         }

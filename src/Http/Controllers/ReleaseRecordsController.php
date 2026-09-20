@@ -65,7 +65,7 @@ class ReleaseRecordsController extends Controller
         $data    = $request->validated();
         $version = $editor->save('release_records', $data['slug'], $data['content'], $data['version']);
 
-        return response()->json(['ok' => true, 'version' => $version]);
+        return $this->ok(['version' => $version]);
     }
 
     public function preview(PreviewRequest $request, LocalMarkdownEditor $editor, DocMarkdownRenderer $renderer, RecordMarkdownDocument $markdown): JsonResponse
@@ -75,6 +75,10 @@ class ReleaseRecordsController extends Controller
         $document = $markdown->parse($data['content'], $data['slug'], '');
         $body     = $document['body'];
 
-        return response()->json(['html' => $renderer->render($body), 'error' => $document['error']]);
+        // ⚠ 同 PlansController::preview：`error` 是**领域字段**（frontmatter 警告），不是失败信号。
+        return $this->ok([
+            'html'  => $renderer->render($body),
+            'error' => $document['error'],
+        ]);
     }
 }

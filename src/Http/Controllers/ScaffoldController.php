@@ -13,6 +13,8 @@ use Mooeen\Scaffold\Http\Requests\Scaffold\CspReportRequest;
 use Mooeen\Scaffold\Http\Requests\Scaffold\DashboardRequest;
 use Mooeen\Scaffold\Http\Requests\Scaffold\DbDocsRequest;
 use Mooeen\Scaffold\Support\ApiSchemaService;
+use Mooeen\Scaffold\Support\Paths;
+use Mooeen\Scaffold\Support\StorageRegistry;
 use Mooeen\Scaffold\Utility;
 
 /**
@@ -134,8 +136,8 @@ class ScaffoldController extends Controller
      */
     public function dictionaries(ContextRequest $req)
     {
-        $menus    = $this->utility->getTables();
-        $allEnums = $this->utility->getEnums(false);
+        $menus    = StorageRegistry::tables();
+        $allEnums = StorageRegistry::enums(false);
 
         $data            = [];   // [moduleKey => [tableName => dictionaries]]
         $moduleSummaries = [];   // [moduleKey => {name, table_count, field_count, value_count}]
@@ -244,7 +246,7 @@ class ScaffoldController extends Controller
             'stats' => [
                 ['label' => '应用',    'value' => count($apps)],
                 ['label' => '模块',    'value' => count($tables)],
-                // 按模块求和:getControllers(true) 的扁平合并按短类名作 key,跨模块同名
+                // 按模块求和:StorageRegistry::controllers(true) 的扁平合并按短类名作 key,跨模块同名
                 // (如 Solution/WorkTask 各有 CategoryController)互相覆盖 → 少计(2026-06-10 修)
                 ['label' => '控制器',  'value' => array_sum(array_map('count', $controllers))],
                 ['label' => '接口',    'value' => $apiStats['api_count']],
@@ -268,7 +270,7 @@ class ScaffoldController extends Controller
      */
     private function summarizeAppsCached(array $apps): array
     {
-        $basePath = rtrim($this->utility->getApiPath('schema'), '/') . '/';
+        $basePath = rtrim(Paths::api('schema'), '/') . '/';
         $sig      = [];
         foreach (array_keys($apps) as $app) {
             $appPath = $basePath . $app;
@@ -467,7 +469,7 @@ class ScaffoldController extends Controller
      */
     private function getApiPublishHistory(array $apps, ?int $limit = null): array
     {
-        $historyPath = rtrim($this->utility->getApiPath('history'), '/') . '/';
+        $historyPath = rtrim(Paths::api('history'), '/') . '/';
         if (! $this->filesystem->isDirectory($historyPath)) {
             return [];
         }
@@ -754,7 +756,7 @@ class ScaffoldController extends Controller
     private function getTablesSafely(): array
     {
         try {
-            return $this->utility->getTables();
+            return StorageRegistry::tables();
         } catch (\Throwable) {
             return [];
         }
@@ -766,7 +768,7 @@ class ScaffoldController extends Controller
     private function getControllersSafely(): array
     {
         try {
-            return $this->utility->getControllers(false);
+            return StorageRegistry::controllers(false);
         } catch (\Throwable) {
             return [];
         }

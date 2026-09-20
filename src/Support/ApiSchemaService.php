@@ -28,7 +28,7 @@ class ApiSchemaService
     public function getAppStats(array $apps): array
     {
         $data     = [];
-        $basePath = rtrim($this->utility->getApiPath('schema'), '/') . '/';
+        $basePath = rtrim(Paths::api('schema'), '/') . '/';
 
         foreach ($apps as $app => $name) {
             $stats = [

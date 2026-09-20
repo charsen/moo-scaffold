@@ -12,6 +12,7 @@ namespace Mooeen\Scaffold\Command;
 
 use Mooeen\Scaffold\Generator\CreateViewGenerator;
 use Mooeen\Scaffold\Generator\FreshStorageGenerator;
+use Mooeen\Scaffold\Support\StorageRegistry;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
@@ -60,7 +61,7 @@ class CreateViewCommand extends Command
 
         (new FreshStorageGenerator($this, $this->filesystem, $this->utility))->start(false, true);
 
-        $all = $this->utility->getControllers(false);
+        $all = StorageRegistry::controllers(false);
         if (! isset($all[$schema_name])) {
             return $this->reportSchemaNotFound($schema_name);
         }

@@ -11,6 +11,7 @@
 namespace Mooeen\Scaffold\Generator;
 
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
+use Mooeen\Scaffold\Support\StorageRegistry;
 
 class UpdateMultilingualGenerator extends Generator
 {
@@ -23,7 +24,7 @@ class UpdateMultilingualGenerator extends Generator
         // MergingLoader 随包分发到任何 host);host / 未指定 schema → 全量写 host(原行为零变化)。
         // 词条 key 全局共享(同名列跨表一致),host 全量文件含包字段词条无害 — 运行时 host 优先。
         if ($schema !== null) {
-            $menus  = $this->utility->getTables();
+            $menus  = StorageRegistry::tables();
             $origin = $menus[$schema]['origin'] ?? null;
             if ($origin !== null) {
                 return $this->startForPackage($schema, $origin);
@@ -36,7 +37,7 @@ class UpdateMultilingualGenerator extends Generator
         $all_fields     = $this->utility->getLangFields();
         $all_field_keys = array_keys($all_fields);
 
-        $all_enums     = $this->utility->getEnumWords();
+        $all_enums     = StorageRegistry::enumWords();
         $all_enum_keys = array_keys($all_enums);
 
         foreach ($files as $file_name) {
@@ -66,15 +67,15 @@ class UpdateMultilingualGenerator extends Generator
         $this->assertOriginWritable($origin);
         $this->originCtx = $this->originContext($origin);
 
-        $menus  = $this->utility->getTables();
+        $menus  = StorageRegistry::tables();
         $tables = array_keys($menus[$schema]['tables'] ?? []);
 
         // 该包各表的字段名集合 + 枚举 label 键集合({field}_{alias})
         $fieldKeys = [];
         $enumKeys  = [];
-        $allEnums  = $this->utility->getEnums(false);
+        $allEnums  = StorageRegistry::enums(false);
         foreach ($tables as $t) {
-            $tableAttr = $this->utility->getOneTable((string) $t);
+            $tableAttr = StorageRegistry::table((string) $t);
             foreach (array_keys((array) ($tableAttr['fields'] ?? [])) as $f) {
                 $fieldKeys[$f] = true;
             }
@@ -90,7 +91,7 @@ class UpdateMultilingualGenerator extends Generator
 
         $all_fields     = array_intersect_key($this->utility->getLangFields(), $fieldKeys);
         $all_field_keys = array_keys($all_fields);
-        $all_enums      = array_intersect_key($this->utility->getEnumWords(), $enumKeys);
+        $all_enums      = array_intersect_key(StorageRegistry::enumWords(), $enumKeys);
         $all_enum_keys  = array_keys($all_enums);
 
         $languages = $this->utility->getConfig('languages');

@@ -11,6 +11,7 @@
 namespace Mooeen\Scaffold\Generator;
 
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
+use Mooeen\Scaffold\Support\Paths;
 
 class CreateSchemaGenerator extends Generator
 {
@@ -19,8 +20,8 @@ class CreateSchemaGenerator extends Generator
      */
     public function start(string $schema_name, bool $force = false): bool
     {
-        $schema_relative_file = $this->utility->getSchemaPath("{$schema_name}.yaml", true);
-        $schema_file          = $this->utility->getSchemaPath("{$schema_name}.yaml");
+        $schema_relative_file = Paths::schema("{$schema_name}.yaml", true);
+        $schema_file          = Paths::schema("{$schema_name}.yaml");
         $schema_exists        = $this->filesystem->exists($schema_file);
 
         if (! $schema_exists || $force) {

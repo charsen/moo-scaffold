@@ -64,7 +64,7 @@ class PlansController extends Controller
         $data    = $request->validated();
         $version = $editor->save('plans', $data['slug'], $data['content'], $data['version']);
 
-        return response()->json(['ok' => true, 'version' => $version]);
+        return $this->ok(['version' => $version]);
     }
 
     public function preview(PreviewRequest $request, LocalMarkdownEditor $editor, PlansMarkdownRenderer $renderer, PlansRepository $repository, RecordMarkdownDocument $markdown): JsonResponse
@@ -74,6 +74,13 @@ class PlansController extends Controller
         $document = $markdown->parse($data['content'], $data['slug'], '');
         $body     = $document['body'];
 
-        return response()->json(['html' => $renderer->render($body, $data['slug'], array_column($repository->all(), 'slug')), 'error' => $document['error']]);
+        // ⚠ 这里的 `error` 是**领域字段**（frontmatter 解析警告），不是失败信号 ——
+        // 预览是**成功的**、正文也渲染了，只是 frontmatter 有问题要在编辑器里就地提示。
+        // 所以它放在 data 下（`{ok:true, data:{html, error}}`），前端必须经解包层取，
+        // 别让"有 error 键就算失败"的判断逻辑碰到它（见 public/javascript/api.js 的 isOk 注释）。
+        return $this->ok([
+            'html'  => $renderer->render($body, $data['slug'], array_column($repository->all(), 'slug')),
+            'error' => $document['error'],
+        ]);
     }
 }
