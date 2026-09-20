@@ -3,6 +3,35 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-20，**订正三条历史结论：`Utility` 拆分「剩余 3c」已不存在，且它绑定的 `TUNING-PLAN.md` §三 P2 早在 2026-07-09 就止损关闭**：
+  **为什么现在才发现**：3a / 3b / 3b-2 三节的「剩余阶段」都写着「**3c = PATHS/CORE 收尾，必须与
+  `TUNING-PLAN.md` §三 P2 合并考虑**，否则同一个 `targetContext` 要改两次」——这句话**默认 P2 还开着**，
+  而 `TUNING-PLAN.md:24` 的批准状态区写的是「⛔ **P2 已放弃（止损条款生效）**…**2026-07-09 止损，维持现状**
+  （详见 `NOTES.md`）。**无新证据不重开**」，本文件下方的原始记录（plan-53 双路径不再强收敛）是同一个决定。
+  ⇒ **计划文档的「剩余阶段」是在拿一份已被关闭的上游计划当理由**；引用旧计划前先读它的**批准状态区**。
+  **另一半更直接：3c 的内容已经在 3b-2 做完了。** 3c 原文是「PATHS，最贵、放最后」，实测它**最便宜**
+  （纯文本替换、方法体逐字未动），于是执行顺序被推翻、PATHS 先做、REGISTRY 推后到 3b-3 ——
+  **四批做完（3a / 3b / 3b-2 / 3b-3），`Utility` 852 → 331 行、公开面 45 → 13、私有 0，第 3 项收口。**
+  **剩下的 CORE 组不该再切（这就是「3c」不该重开的技术理由）**：`getConfig`(**46 个调用点** / 15 文件)、
+  `resolveCurrentLoginUser`、`getApps` / `getAppTargets` / `getExtraModules` / `getControllerNamespaces`
+  （**本就已委托 `AppTargetRegistry`，只是 1 行转发**）、`parseYamlFile`、`getLangFields`、`isApiFileExist`、
+  `addGitIgnore`、`targetContext` + 2 个 3a 静态转发 = **13 个公开成员**。
+  它们**就是「门面」本身**（类注释原话：「生成器的**门面**」），切走等于把 22 个类的构造注入换成 2~3 个参数，
+  而**功能行为零变化** —— 与 3a 调研时否掉「一次切四类」是同一条判据。
+  **P2 的前提数字仍然成立，但补不到「新证据」**：`originCtx !== null` / `=== null` 现 **24 处**
+  （`CreateControllerGenerator` 11 / `ControllerAdder` 7 / `CreateModelGenerator` 3 /
+  `CreateResourceGenerator` 1 / `UpdateMultilingualGenerator` 1 / `RouterAdder` 1；TUNING-PLAN 记的是 23），
+  `originCtx` 总提及 **78 处**。缺的仍是 **host 臂的 controller/request**：`TargetContext::pathFor()` /
+  `namespaceFor()` 是**包臂**访问器，host 的 controller 路径随 app 变、namespace 要插 `module.folder`
+  —— 正是止损那条理由。**3b-2 把路径解析收进 `Support\Paths` 补不到这个洞**：`Paths` 是 app 无关的
+  （签名里没有 app 维度），所以它不构成「新证据」。
+  **顺带把队列真实位置也钉一下**（改完这轮，下一项照这张表走）：第 1 项 镜像守卫 `c61d332` ✅、
+  第 2 项 JSON 信封 ✅、第 3 项本项 ✅；**第 4 项 = `ApiController` 拆分（现 1238 行 / 38 方法）**、
+  **第 5 项 = `SchemaLoader` 拆分（现 2133 行 / 56 方法，全仓最大）**。
+  另记一个**从未进过队列**的候选：`Generator\CreateApiGenerator` **1294 行 / 41 方法**，比 `ApiController` 还大。
+  **可复用判据**：**「剩余阶段」这类话要像代码一样被验证** —— 它至少包含「引用了一份还活着的计划」
+  与「内容还没做」两条断言，任一条失效它就成了**误导下一个人的错误路标**（本次两条同时失效）。
+
 - 2026-09-19，**`Utility` 拆分 · 阶段 3b-3：REGISTRY 外迁 `Support\StorageRegistry` —— 而「REGISTRY 有 14 个读方法」这个前提本身是错的**：
   **计划被推翻**：3a 量得的 `REGISTRY = 14` 把**三件事**拼成了一组 —— `9 个读 `storage/scaffold/*.php` 聚合缓存`
   + `getLangFields`（读的是 `scaffold/database/schema/_fields.yaml`，schema YAML，走 `parseYamlFile()`）
@@ -162,6 +191,8 @@
   **剩余阶段**：3b-3 = REGISTRY 14 个读方法 → `Support\StorageRegistry`（现在更便宜：PATHS 已就位）；
   3c = PATHS/CORE 收尾，**必须与 `TUNING-PLAN.md` §三 P2（给 `targetContext` 补 host 臂 controller/request
   的 path+namespace）合并考虑**，否则同一个 `targetContext` 要改两次。
+  **（2026-09-20 订正：本条「3c」已作废 —— PATHS 已由 3b-2 完成、`Utility` 拆分四批收口；
+  且 §三 P2 早在 2026-07-09 就止损关闭。见本文件顶部 2026-09-20 条。）**
 
 - 2026-09-19，**`Utility` 拆分 · 阶段 3b：DOCMETA 外迁 `Support\ActionMeta` + `Support\ActionDoc`，按「读/写两侧」切，且这批不留转发**：
   **为什么切两刀而不是一个类**：DOCMETA 那 12 个成员其实是两种职责混在一起 ——
@@ -212,6 +243,7 @@
   先动 PATHS 是纯文本替换）。⇒ 修正后的剩余：**3b-3 = REGISTRY → `Support\StorageRegistry`**
   （顺带把两个 `extends Utility` 测试桩改成绑容器假件）；**3c = PATHS/CORE 收尾**，
   必须与 `TUNING-PLAN.md` §三 P2 合并考虑。
+  **（2026-09-20 订正：上面这条「3c = PATHS/CORE 收尾」同样作废，理由同上 —— 见本文件顶部 2026-09-20 条。）**
   **（注 2026-09-19 订正：本条两处已作废 —— ① 上面「先动 REGISTRY 要改构造函数」这个理由**不成立**，
   它只在「实例注入」形态下成立、而本类可做成全静态（详见本文件上方 3b-3 条）；
   ② 括号里「顺带把两个 `extends Utility` 测试桩改成绑容器假件」与 3b-3 的实际切法**无关**，
@@ -261,6 +293,7 @@
   实际先做了 PATHS（3b-2）、REGISTRY 推后到 3b-3。理由与后果见本文件上方 3b-2 条；
   3b-3 已于同日完成，切的是 **9 个**读缓存方法（不是这条写的 14 个）、且**没有**出现 DI 成本，
   见本文件上方 3b-3 条。⇒ **剩余只剩 3c = PATHS/CORE 收尾（与 `TUNING-PLAN.md` §三 P2 合并考虑）**。）**
+  **（2026-09-20 订正：这条「剩余只剩 3c」已作废 —— 3c 无内容、P2 已止损。见本文件顶部 2026-09-20 条。）**
 
 - 2026-09-19，**阶段 3 收口：删掉前端仅剩的两处「旧形态」容忍（顶层字符串 `error` + 无状态码兜底）**：
   **删了什么**：`ScaffoldApi.errorText()` 里 `typeof j.error === 'string' → return j.error`；
