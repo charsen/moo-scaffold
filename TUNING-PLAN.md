@@ -197,7 +197,7 @@ tests/Feature/Generator/CodegenOriginTest.php:200-204(直接测 Utility 这俩�
 
 | 旧决定 | 本次独立复审结论 |
 |---|---|
-| 拆大类（SchemaLoader/CreateApiGenerator/ApiController） | **大体维持不拆，但破一个边缘个案**。SchemaLoader(2128) 和 CreateApiGenerator(1254) 复读后判定高内聚、方法小、流程顺——拆 = 加间接层，恰违品味基准，真心不拆。唯 ApiController 的 proxy 段是"两个东西住一个类"，见 §3.1（2026-07-09 用户已批准析出）。 |
+| 拆大类（SchemaLoader/CreateApiGenerator/ApiController） | **大体维持不拆，但破一个边缘个案**。SchemaLoader(2128) 和 CreateApiGenerator(1254) 复读后判定高内聚、方法小、流程顺——拆 = 加间接层，恰违品味基准，真心不拆。唯 ApiController 的 proxy 段是"两个东西住一个类"，见 §3.1（2026-07-09 用户已批准析出）。**2026-09-20 追加**：ApiController 的**参数形状归一族**（Group C：`formatRules`/`formatYamlParams`/`formatToFaker`/`mergeDebugParams` + 11 个私有助手 = 15 方法 / 476 行）带**新证据**重开本行，用户已批准外迁 `Support\ApiParameterFormatter`——它是同一判据的**第二个实例**（垂直切片、零新增状态），**非**本行否掉的"按类拆"，四条反证见 `NOTES.md` 同日条。 |
 | `putAndReport` 相关 | **必须重开**：新证据 = 基类助手 0 调用方 vs 11 处手搓——"保留助手"与"手搓遍地"逻辑上不能同时成立，要么收编（P1.1，推荐）要么删助手。二选一，不能再拖。 |
 | Foundation 未引用方法 / `getOnlyActionKeys` | **维持不删**（host 面 API，仓内 grep 不可证死——该教训依然成立）。新增建议：这批方法 docblock 加 `@api`（host 消费面）标记，一次成本杜绝未来每轮审查反复误判。 |
 | `ConfigSourceScanner::rebuild()` | 重问后用户拍板**"删"**（2026-07-09），已升格为 §二 1.4 执行项（附三重验证）。旧"选择不动"作废。 |
