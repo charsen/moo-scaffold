@@ -52,7 +52,8 @@
 
 namespace Mooeen\Scaffold\Command;
 
-use Composer\Autoload\ClassLoader;
+use Mooeen\Scaffold\Support\ControllerScanTarget;
+use Mooeen\Scaffold\Support\FormContractMarkers;
 use Mooeen\Scaffold\Support\FormWidgetVisibility;
 use Mooeen\Scaffold\Support\Paths;
 use ReflectionClass;
@@ -81,14 +82,6 @@ class AuditFormContractCommand extends Command
         {--all : Loosen every counting scope (--include-hidden --include-disabled --include-non-contract + ignoring formLayout)}';
 
     /**
-     * 「刻意不实现」的机器可读标记：`// @moo-waived <字段名>: <原因>`。
-     *
-     * 字段名写在标记里（自包含），注释重构/换行不影响；工具按 Request 文件文本扫描，
-     * 不靠"规则被整行注释"的形态特征自动判定 —— 否则会把真漏写一起吞掉。
-     */
-    private const WAIVED_MARKER_PATTERN = '/@moo-waived\s+([A-Za-z0-9_.\*]+)\s*:\s*(.+)$/m';
-
-    /**
      * CSV 行缓冲（writeCsv() 消费）。
      *
      * **寿命 = 一个进程**：本命令**不是**每请求新建 —— 同一进程内多次 `Artisan::call` 复用同一实例，
@@ -110,7 +103,7 @@ class AuditFormContractCommand extends Command
         // ⚠ --out 默认落 storage/app/audit/，**不指向 plans/.audit-* baseline** ——
         // 裸跑覆写基线是本项目踩过的坑（见 H1 宿主项目 NOTES.md「smoke:* 的 --out 默认值」条）。
         $outPath = Paths::fromBasePath((string) $this->option('out'));
-        $root    = $this->resolveRoot(trim((string) $this->option('scope')));
+        $root    = ControllerScanTarget::resolveRoot(trim((string) $this->option('scope')));
 
         // 两个「已就地报错」的解析：null 表示提示已打出来，handle() 只负责翻译成退出码
         $namespace = $this->resolveNamespace($root);
@@ -140,26 +133,10 @@ class AuditFormContractCommand extends Command
         return $totals['violations'] === 0 ? self::SUCCESS : self::FAILURE;
     }
 
-    // ─── 解析：扫描根 / 命名空间 / 文件清单 ────────────────────────────────
-
-    private function resolveRoot(string $scope): string
-    {
-        if ($scope === '') {
-            $scope = 'app/Admin/Controllers';
-        }
-
-        // 绝对判定共用 Support\Paths（盘符路径在这儿也算绝对，与全仓一致）；本处额外做 realpath + 去尾斜杠。
-        if (! Paths::isAbsolute($scope)) {
-            return rtrim(base_path($scope), '/');
-        }
-
-        $real = realpath($scope);
-
-        return rtrim($real === false ? $scope : $real, '/');
-    }
+    // ─── 解析：命名空间 / 文件清单（扫描根推导见 Support\ControllerScanTarget）─────────────
 
     /**
-     * 控制器根目录 → 命名空间：优先 `--namespace`，缺省从扫描根反推（见 controllerNamespace()）。
+     * 控制器根目录 → 命名空间：优先 `--namespace`，缺省从扫描根反推（见 ControllerScanTarget::controllerNamespace()）。
      *
      * 推导失败时把提示就地打出来并返回 null，由 handle() 翻成 `self::FAILURE` ——
      * 这样「已经是终态的错误」不必一路往上传值。
@@ -169,7 +146,7 @@ class AuditFormContractCommand extends Command
         $namespace = trim((string) $this->option('namespace'));
 
         if ($namespace === '') {
-            $namespace = $this->controllerNamespace($root) ?? '';
+            $namespace = ControllerScanTarget::controllerNamespace($root) ?? '';
         }
 
         if ($namespace === '') {
@@ -206,73 +183,6 @@ class AuditFormContractCommand extends Command
         }
 
         return $files;
-    }
-
-    /**
-     * 控制器根目录 → 命名空间：优先用宿主 composer 的 PSR-4 前缀反推（app/Admin/Controllers
-     * → App\Admin\Controllers），回退到 base_path 相对路径。推导失败返回 null。
-     */
-    private function controllerNamespace(string $root): ?string
-    {
-        $root = rtrim(str_replace('\\', '/', $root), '/');
-
-        foreach (spl_autoload_functions() as $fn) {
-            if (! is_array($fn) || ! is_object($fn[0]) || ! $fn[0] instanceof ClassLoader) {
-                continue;
-            }
-
-            $best = null;
-            foreach ($fn[0]->getPrefixesPsr4() as $prefix => $dirs) {
-                foreach ($dirs as $dir) {
-                    $dir = (string) $dir;
-                    // composer 前缀里的目录常带 `vendor/composer/../../`，先归一化再比边界
-                    $dir = realpath($dir) ?: $dir;
-                    $dir = rtrim(str_replace('\\', '/', $dir), '/');
-                    if ($dir === '' || $root !== $dir && ! str_starts_with($root, $dir . '/')) {
-                        continue;
-                    }
-
-                    if ($best === null || strlen($dir) > strlen($best[0])) {
-                        $best = [$dir, rtrim($prefix, '\\')];
-                    }
-                }
-            }
-
-            if ($best !== null) {
-                $relative  = trim(substr($root, strlen($best[0])), '/');
-                $namespace = $best[1];
-                if ($relative !== '') {
-                    $namespace .= '\\' . str_replace('/', '\\', $relative);
-                }
-
-                return $namespace;
-            }
-        }
-
-        // 回退：base_path 下的相对路径（app/ → App\）
-        $base = rtrim(str_replace('\\', '/', base_path()), '/');
-        if (str_starts_with($root, $base . '/')) {
-            $relative  = substr($root, strlen($base) + 1);
-            $namespace = '';
-            if (str_starts_with($relative, 'app/')) {
-                $namespace = 'App\\';
-                $relative  = substr($relative, 4);
-            }
-
-            return $namespace . str_replace('/', '\\', $relative);
-        }
-
-        return null;
-    }
-
-    /**
-     * 控制器命名空间 → 对应 Request 命名空间（App\Admin\Controllers → App\Admin\Requests）。
-     */
-    private function requestNamespace(string $namespace): string
-    {
-        return str_contains($namespace, '\\Controllers')
-            ? str_replace('\\Controllers', '\\Requests', $namespace)
-            : $namespace . '\\Requests';
     }
 
     // ─── 口径：可见性开关 + 累加器 ────────────────────────────────────────
@@ -378,7 +288,7 @@ class AuditFormContractCommand extends Command
                 continue;
             }
 
-            $request = $this->requestNamespace($namespace) . '\\' . $moduleName . '\\' . $stem . '\\' . $requestClass;
+            $request = ControllerScanTarget::requestNamespace($namespace) . '\\' . $moduleName . '\\' . $stem . '\\' . $requestClass;
             if (! class_exists($request)) {
                 continue;
             }
@@ -433,11 +343,11 @@ class AuditFormContractCommand extends Command
 
             // 「刻意不实现」的显式声明：扫描 Request 文件里的 `// @moo-waived <field>: <原因>`。
             // 字段名自包含在标记里，注释重构不会失联；不靠"规则被注释"的形态自动判定。
-            $waived = $this->waivedMarkers($request);
+            $waived = FormContractMarkers::waivedMarkers($request);
 
-            $extra = $this->dropForgotten($extra, $src);
+            $extra = FormContractMarkers::dropForgotten($extra, $src);
 
-            foreach ($this->staleWaivedMarkers($waived, $extra, $where) as $stale) {
+            foreach (FormContractMarkers::staleWaivedMarkers($waived, $extra, $where) as $stale) {
                 $totals['staleMarkers'][] = $stale;
             }
 
@@ -492,81 +402,6 @@ class AuditFormContractCommand extends Command
         }
 
         return $out;
-    }
-
-    /**
-     * 扫描 Request 类文件里的「刻意不实现」标记，返回 字段名 => 原因。
-     *
-     * 标记语法（固定在命令文档与测试里）：
-     *   // @moo-waived system_logo: 早期精简：nullable 字段暂不实现
-     *   // 'system_logo' => ['nullable', 'string', 'max:192'],
-     *
-     * 字段名必须写在标记里（自包含），不靠与被注释规则相邻或形态推断 —— 注释重排不会失效，
-     * 也不会把"真漏写"自动吞掉。
-     *
-     * @return array<string, string>
-     */
-    private function waivedMarkers(string $requestClass): array
-    {
-        $file = (new ReflectionClass($requestClass))->getFileName();
-        if ($file === false || ! is_file($file)) {
-            return [];
-        }
-
-        $src = (string) file_get_contents($file);
-        if (preg_match_all(self::WAIVED_MARKER_PATTERN, $src, $matches, PREG_SET_ORDER) === 0) {
-            return [];
-        }
-
-        $markers = [];
-        foreach ($matches as $match) {
-            $markers[$match[1]] = trim($match[2]);
-        }
-
-        return $markers;
-    }
-
-    /**
-     * 剔除 controller 层 `->forget('<field>')` 掉的字段。
-     *
-     * 已知盲区：本命令反射进 `getFormWidgets`，**看不见 controller 层的后处理**。典型是
-     * `InOutBudgetController::create()` 紧跟一句 `->forget('budget_personnel_ids')` 把控件摘掉
-     * —— 真实响应里没有它，报出来就是假阳性。这里按源码里的 forget 调用剔除。
-     *
-     * 精度边界：按 `forget('field')` 字面匹配整份控制器源码，所以**同名字段**在别的 action 里
-     * 被 forget 也会连带剔除。宁可漏报也不误报（假阳性的代价更高 —— 会让人不再信任这个审计）。
-     *
-     * @param list<string> $extra
-     *
-     * @return list<string>
-     */
-    private function dropForgotten(array $extra, string $src): array
-    {
-        return array_values(array_filter(
-            $extra,
-            static fn (string $field): bool => ! str_contains($src, "forget('" . $field . "')")
-        ));
-    }
-
-    /**
-     * 陈旧标记：标记了某字段，但该字段当期并不构成检出项（规则已补回 / 控件已移除）——
-     * 不能静默忽略，作为 warning 报出来（属维护提醒，不影响退出码）。
-     *
-     * @param array<string, string>                                                      $waived
-     * @param list<string>                                                               $extra
-     * @param array{module: string, controller: string, method: string, request: string} $where
-     *
-     * @return list<array<string, string>>
-     */
-    private function staleWaivedMarkers(array $waived, array $extra, array $where): array
-    {
-        $stale = [];
-
-        foreach (array_diff(array_keys($waived), $extra) as $field) {
-            $stale[] = $where + ['field' => (string) $field, 'reason' => $waived[$field]];
-        }
-
-        return $stale;
     }
 
     // ─── 落账：分桶 / 计数 / CSV 行 ───────────────────────────────────────
