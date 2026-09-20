@@ -9,6 +9,7 @@ use Mooeen\Scaffold\Support\Concerns\AtomicFileWrite;
 use Mooeen\Scaffold\Support\ControllerName;
 use Mooeen\Scaffold\Support\PackageRegistry;
 use Mooeen\Scaffold\Support\Paths;
+use Mooeen\Scaffold\Support\StorageRegistry;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Yaml\Yaml;
@@ -257,7 +258,7 @@ class SchemaLoader
         // 2026-05-30:模型数 — models.php 按模块分组,汇总各模块模型数(缓存缺失则 0,不炸首屏)
         $models = 0;
         try {
-            foreach ($this->utility->getModels() as $moduleModels) {
+            foreach (StorageRegistry::models() as $moduleModels) {
                 $models += is_array($moduleModels) ? count($moduleModels) : 0;
             }
         } catch (\Throwable) {

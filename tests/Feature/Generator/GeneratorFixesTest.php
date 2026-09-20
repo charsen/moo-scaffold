@@ -26,7 +26,7 @@ function genfix_src(string $relPath): string
 
 // ─── ① 数值校验覆盖全类型 ─────────────────────────────────────────────────
 it('① rebuildFieldsRules:decimal/float/double → numeric,smallint/mediumint → integer,unsigned → min:0', function () {
-    // rebuildFieldsRules 顶部调 getModelIds()(getRequire model_ids.php)。该缓存是跨测试共享的
+    // rebuildFieldsRules 顶部调 StorageRegistry::modelIds()(getRequire model_ids.php)。该缓存是跨测试共享的
     // (UniqueSemanticsTest::callRebuildFieldsRules 也依赖它存在),只在缺失时补一份空的、**不删**
     // (删了会破坏依赖它存在的其它测试);本测试字段非外键,空 model_ids 足够。
     $fs      = app(Filesystem::class);

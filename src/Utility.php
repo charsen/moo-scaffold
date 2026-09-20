@@ -12,7 +12,6 @@ declare(strict_types=1);
 
 namespace Mooeen\Scaffold;
 
-use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Filesystem\Filesystem;
 use InvalidArgumentException;
 use Mooeen\Scaffold\Support\AppTargetRegistry;
@@ -24,6 +23,16 @@ use Mooeen\Scaffold\Support\TargetContext;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
 
+/**
+ * 生成器的**门面**：配置与身份、schema/API YAML 解析、多目标上下文、控制器目录扫描、连字符。
+ *
+ * 2026-09-19 起原来的 5 组职责已按「组间文件重叠」逐批外迁，留在这里的是**还没轮到的**：
+ *   - PATHS  → {@see Paths}（阶段 3b-2，纯路径口径）
+ *   - DOCMETA → `Support\ActionMeta` / `Support\ActionDoc`（阶段 3b-1，docblock 与动作元信息）
+ *   - NAME   → {@see ControllerName}（阶段 3a，两个静态转发留在本类给未迁移的宿主）
+ *   - REGISTRY → {@see StorageRegistry}（阶段 3b-3，`storage/scaffold/*.php` 聚合缓存的读取）
+ * 本类**再无私有方法**（3b-2 之后即如此）。
+ */
 class Utility
 {
     protected Filesystem $filesystem;
@@ -284,73 +293,11 @@ class Utility
     }
 
     /**
-     * 获取一表数据表的数据
-     *
-     * @throws FileNotFoundException
-     */
-    public function getOneTable(string $table_name): array
-    {
-        $file = Paths::storage() . "{$table_name}.php";
-
-        if (! $this->filesystem->isFile($file)) {
-            throw new InvalidArgumentException('Invalid Argument (Not Found).');
-        }
-
-        return $this->filesystem->getRequire($file);
-    }
-
-    /**
-     * 获取 数据表 数据
-     *
-     * @throws FileNotFoundException
-     */
-    public function getTables(): array
-    {
-        return $this->filesystem->getRequire(Paths::storage() . 'tables.php');
-    }
-
-    /**
-     * 获取 模型 数据
-     *
-     * @throws FileNotFoundException
-     */
-    public function getModels(): array
-    {
-        return $this->filesystem->getRequire(Paths::storage() . 'models.php');
-    }
-
-    /**
-     * 获取 模型ID 数据
-     *
-     * @throws FileNotFoundException
-     */
-    public function getModelIds(): array
-    {
-        return $this->filesystem->getRequire(Paths::storage() . 'model_ids.php');
-    }
-
-    /**
-     * 获取控制器数据
-     */
-    public function getControllers(bool $merge_all = true): array
-    {
-        $data = $this->filesystem->getRequire(Paths::storage() . 'controllers.php');
-        if (! $merge_all) {
-            return $data;
-        }
-
-        $result = [];
-        foreach ($data as $schema_file => $controllers) {
-            foreach ($controllers as $class => $attr) {
-                $result[$class] = $attr;
-            }
-        }
-
-        return $result;
-    }
-
-    /**
      * 获取多语言字段数据
+     *
+     * ⚠ **没跟着 REGISTRY 组外迁**（2026-09-19，阶段 3b-3）：它读的是
+     * `scaffold/database/schema/_fields.yaml`（schema YAML，走本类 `parseYamlFile()`），
+     * 不是 `storage/scaffold/` 的聚合缓存 —— 见 {@see \Mooeen\Scaffold\Support\StorageRegistry} 的类注释。
      */
     public function getLangFields(): array
     {
@@ -362,105 +309,6 @@ class Utility
         $fields = array_merge($tableFields, $appendFields);
 
         return empty($fields) ? [] : $fields;
-    }
-
-    /**
-     * 获取字段数据
-     *
-     *
-     * @throws FileNotFoundException
-     */
-    public function getFields(): array
-    {
-        return $this->filesystem->getRequire(Paths::storage() . 'fields.php');
-    }
-
-    /**
-     * 获取字典数据
-     *
-     *
-     * @throws FileNotFoundException
-     */
-    public function getEnums(bool $merge_all = true): array
-    {
-        $enums = $this->filesystem->getRequire(Paths::storage() . 'enums.php');
-        if (! $merge_all) {
-            return $enums;
-        }
-
-        $result = [];
-        foreach ($enums as $table_name => $fields) {
-            foreach ($fields as $field_name => $attr) {
-                $result[$field_name] = $attr;
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * 获取字典里的所有词
-     */
-    public function getEnumWords(): array
-    {
-        $enums = $this->getEnums(false);
-
-        $result = [];
-        foreach ($enums as $table_name => $fields) {
-            foreach ($fields as $field_name => $words) {
-                foreach ($words as $alias => $attr) {
-                    // 2026-05-21:跳 designer pending sentinel(yaml 占位 __pending_n),
-                    // 避免 lang file 出现 memo_status___pending_0 这种 garbage key。
-                    // user AI 翻译填好真实 key 后重跑 moo:i18n 才生成 lang 条目。
-                    if (str_starts_with((string) $alias, '__pending_')) {
-                        continue;
-                    }
-                    $result[$field_name . '_' . $alias] = ['zh-CN' => $attr[2], 'en' => $attr[1]];
-                }
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * 数据字典统计总数(有字典的模块数 / 枚举字段数 / 字典值数)。
-     *
-     * 口径跟 ScaffoldController::dictionaries 一致:按模块表分组、只数有枚举的表、
-     * value 取原始 case 数 — 供 designer index 字典卡片 + 字典页共用,保证两处数字一致。
-     */
-    public function dictionaryStats(): array
-    {
-        try {
-            $tables   = $this->getTables();
-            $allEnums = $this->getEnums(false);
-        } catch (FileNotFoundException) {
-            return ['modules' => 0, 'fields' => 0, 'values' => 0];
-        }
-
-        $modules = 0;
-        $fields  = 0;
-        $values  = 0;
-
-        foreach ($tables as $folder) {
-            $moduleHasDict = false;
-            foreach (array_keys($folder['tables'] ?? []) as $tableName) {
-                $dictionaries = $allEnums[$tableName] ?? [];
-                if (empty($dictionaries)) {
-                    continue;
-                }
-                $moduleHasDict = true;
-                $fields += count($dictionaries);
-                foreach ($dictionaries as $rows) {
-                    $values += count($rows);
-                }
-            }
-            if ($moduleHasDict) {
-                $modules++;
-            }
-        }
-
-        return ['modules' => $modules, 'fields' => $fields, 'values' => $values];
     }
 
     /**

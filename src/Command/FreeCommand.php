@@ -26,6 +26,7 @@ use Mooeen\Scaffold\Generator\FreshStorageGenerator;
 use Mooeen\Scaffold\Generator\UpdateAuthorizationGenerator;
 use Mooeen\Scaffold\Generator\UpdateMultilingualGenerator;
 use Mooeen\Scaffold\RouterTool;
+use Mooeen\Scaffold\Support\StorageRegistry;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
@@ -121,7 +122,7 @@ class FreeCommand extends Command
         // 在任何业务代码落盘前确认目标端确实由当前生成范围声明，避免 `--app`
         // 拼对了注册表、却选中了不含该端的 schema/table 后只生成半套文件。
         $targetControllers = array_filter(
-            $this->utility->getControllers(false)[$schema_name] ?? [],
+            StorageRegistry::controllers(false)[$schema_name] ?? [],
             static fn (array $attr): bool => ($only_table === null || ($attr['table_name'] ?? null) === $only_table)
                 && in_array($app, (array) ($attr['app'] ?? []), true)
         );
@@ -151,7 +152,7 @@ class FreeCommand extends Command
         } else {
             $this->tipCallCommand('moo:test');
             $test_gen = new CreateTestGenerator($this, $this->filesystem, $this->utility);
-            foreach (array_keys($this->utility->getControllers(false)[$schema_name] ?? []) as $controller) {
+            foreach (array_keys(StorageRegistry::controllers(false)[$schema_name] ?? []) as $controller) {
                 $test_gen->start($schema_name, $controller, $force, $app);
             }
         }
@@ -275,8 +276,8 @@ class FreeCommand extends Command
         if ($onlyTable !== null) {
             $this->console()->line('    单表 ' . $hi($onlyTable) . ' · model / resource / controller <fg=gray>（存在则跳过）</>');
         } else {
-            $t = count($this->utility->getModels()[$schema] ?? []);
-            $c = count($this->utility->getControllers(false)[$schema] ?? []);
+            $t = count(StorageRegistry::models()[$schema] ?? []);
+            $c = count(StorageRegistry::controllers(false)[$schema] ?? []);
             $this->console()->line('    ' . $hi($t) . ' model · ' . $hi($t) . ' resource · ' . $hi($c) . ' controller <fg=gray>（存在则跳过）</>');
         }
 

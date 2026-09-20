@@ -36,6 +36,7 @@ use Mooeen\Scaffold\Http\Requests\Designer\ShowRequest;
 use Mooeen\Scaffold\Http\Requests\Designer\TranslateRequest;
 use Mooeen\Scaffold\Support\AccountStore;
 use Mooeen\Scaffold\Support\ReadonlyMode;
+use Mooeen\Scaffold\Support\StorageRegistry;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Console\Output\NullOutput;
 use Throwable;
@@ -104,7 +105,7 @@ class DesignerController extends Controller
             'designer_module_groups' => $groups,
             'designer_stats'         => $this->loader->loadStats(),
             // 2026-05-30:字典卡片底部 stat 行(装饰 + 引导),口径同字典页
-            'designer_dict_stats' => $this->utility->dictionaryStats(),
+            'designer_dict_stats' => StorageRegistry::dictionaryStats(),
             // plan 19 v9 F2:首屏需要的 dbDesigner state(只 newSchema modal 用得到)
             'designer_initial' => [
                 'csrfToken'            => csrf_token(),

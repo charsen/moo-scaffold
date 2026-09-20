@@ -30,7 +30,7 @@ it('moo:view:生成 index/trashed/show 三个 .vue,meta 占位符全部替换', 
     config()->set('scaffold.frontend.views', $viewsRoot);
     config()->set('scaffold.author', 'tester');
 
-    // controllers 缓存(getControllers(false) 直读):schema → controller → attr。
+    // controllers 缓存(StorageRegistry::controllers(false) 直读):schema → controller → attr。
     // start() 用 module.folder 拼目录、model_class 进 meta;class 会被 stripControllerSuffix 重写。
     $cache = [
         'TestSchema' => [
