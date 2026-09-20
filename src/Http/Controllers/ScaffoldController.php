@@ -263,7 +263,7 @@ class ScaffoldController extends Controller
 
     /**
      * 「接口」等 app 级统计带签名缓存:summarizeApps 为算首页几个数字,每请求全量
-     * parse 所有 app 的全部 schema yaml(wn 142 个 ≈ 90ms,随接口数线性涨)。
+     * parse 所有 app 的全部 schema yaml(H1 142 个 ≈ 90ms,随接口数线性涨)。
      * 按「文件名+mtime+apps」签名缓存 —— moo:api 发布/手改 schema 即换签名立即
      * 失效;cache 不可用退化为现算(2026-06-10 修,同 PublishHistoryService::getApiPublishHistory 模式)。
      */
