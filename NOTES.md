@@ -3,6 +3,82 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-20，**第 4 项收口：`ApiController` 的「参数形状归一族」外迁 `Support\ApiParameterFormatter`**（重开 §五 旧决定的四条新证据见下一条）：
+  **净变化**：`ApiController` **1237 → 808 行**（净 -429）、方法 **38 → 23**、`use Illuminate\Support\Arr` 随之移除
+  （该文件里 `Arr::` 三处命中全在这族内）；新类 **549 行**（含类注释；**方法体逐字搬**，只有接收者
+  `$this` → `self::` 与两个新入参）。搬走 15 个 = 4 个入口（`formatRules` / `formatYamlParams` /
+  `formatToFaker` / `mergeDebugParams`）+ 11 个私有助手（`inheritMissingDebugParamMeta` /
+  `resolveParameterLabel` / `applyParameterFieldMeta` / `resolveParameterFieldKey` /
+  `formatParameterDisplayKey` / `isRuleParameterRequired` / `isRuleParameterSendable` /
+  `isScalarArrayElement` / `resolveRuleParameterType` / `buildRuleParameterDescription` /
+  `appendParameterHint`）。
+  **精度订正**：同一轮里曾把这族记作「466 行」—— 那是「方法体 + 内嵌 docblock」，漏了 `formatYamlParams`
+  的格式说明 docblock（10 行）与 `formatToFaker` 的（3 行）。**实际移出文件的字节是 476 行**，占原控制器 **38.5%**。
+  **三个刻意留在 `ApiController` 的东西**（都属「跨请求敏感」，见下条）：`getParameterMetadata()`
+  （memo + `Utility::getLangFields()`）、`resolveLatestModelIdFromRules()` / `resolveExistsModelClass()` /
+  `getLatestModelIdByClass()`（Eloquent + `$latestModelIds` memo，且 `resolveRouteParamValue()` 也在用）。
+  外迁方只收**归一好的 `$metadata`** 与一个 **`callable $latestIdResolver`**；调用点只有 `getOneApi()`
+  一处（7 行改成 4 处静态调用 + 1 个箭头闭包）。
+  **验证链**：`pint --dirty --test` **PASS 4 files**；全量 pest **1 failed / 3 skipped / 1165 passed /
+  4736 assertions**，对比开工基线（1141 / 4567）⇒ **+24 passed / +169 assertions，增量恰等于新测试文件**
+  （24 例 / 169 断言），**无一处既有断言被改**；唯一那条红是**已知 env 耦合基线红**
+  （`ConfigControllerTest:305`，`SCAFFOLD_AUTHOR=charsen` 下该文件 21 passed ⇒ 非回归）。
+  **mutation 9 处全部被咬住**（打哑 → 对应守卫必红 → 还原后复跑回全绿）：① 去 `final` → 宿主形状；
+  ② 加 `private static array $memo` → 零状态；③ 注入 `use …\Utility` → 零依赖；④ 多一个方法 → 宿主形状；
+  ⑤ 改坏 `resolveParameterLabel` 兜底 → 该行为用例；⑥ 改坏 `isRuleParameterSendable` 判定 → 该行为用例；
+  ⑦ 给 `ApiController` 恢复本地 `formatRules` 壳 → 「已不存在」；⑧ `$parameterMetadata` 改 `static` →
+  「刻意留下」（连带 5 条行为用例）；⑨ 调用点退回 `$this->formatToFaker(` → 接线锚点。
+  **e2e（宿主 = H1，`E2E_BASE_URL=http://<H1>`）**：`api-request.spec.ts` 单跑 **2 passed**，
+  改前/改后**都 2 passed**（两侧同绿）。整套 `npm run test:e2e:safe` 的 **A/B 失败集合对照**：
+  A（改前）`45 passed / 5 failed / 7 skipped`，失败 = `111 132 143 159` + **`:561`**；
+  B（改后）同样 `45 / 5 / 7`，失败 = 上述 4 条 + **`:674`** ⇒ **两侧计数完全相同、集合只差那条漂移**
+  ⇒ **零回归**（`:561` / `:674` 都是 real-write 用例，与「稳定 4 红 + 1 条漂移」的已知形态一致）。
+  **⚠ 两个坑（都踩了，记下来）**：
+  ① **`E2E_BASE_URL` 不能省** —— 默认 `http://localhost` 是**另一个 vhost**，`/scaffold/api/request` 直接
+  **nginx 404** ⇒ 整轮 spec 全红、而且 **A/B 两侧同红**，**看着像「环境阻塞」实则是 URL 用错**
+  （差一点就把它当成「e2e 跑不了」写进结论）。跑之前先自证：
+  `curl -s -o /dev/null -w '%{http_code}' --noproxy '*' <base>/scaffold/login` 应为 **200**。
+  ② **`safe-run.sh` 打印的「无新增未跟踪产物」不可信**：本次全量跑完，宿主实际留下 **4 个**
+  `engine/database/migrations/2026_09_20_110024_{drop,update}_*.php`（时间戳 `11:00:24` 正是那一轮），
+  而脚本报的却是「无新增未跟踪产物」。**跑完必须自己 `git -C <宿主> status --porcelain` 核对**
+  （这种残留尤其危险：`drop_*` migration 留在宿主里会被真的执行）。本次已把它移出宿主复原。
+  **一条可复用的教训（本次踩到）**：**按行号批量删方法时，夹在这族中间、但「不打算搬」的方法会被连带删掉**
+  —— `getParameterMetadata()` 正好夹在 `inheritMissingDebugParamMeta` 与 `resolveParameterLabel` 之间，
+  我按「737→1134」删整块时把它一起删了。**防御动作：删完立刻做「方法集合差集」**
+  （前后各导一份方法名列表 → `comm -23`），差集必须**恰好等于打算搬的那 15 个**；本次靠它当场抓出多删的 1 个。
+  **另一条**：**大块私有方法外迁的正确顺序 = 先写「同一批断言跨两个宿主」的测试**（把宿主耦合点收敛到
+  `apfSubject()` / `apfCallEntry()` 两个助手），再搬 —— 搬完只改 1 行返回值，17 条断言原样跑绿，
+  「行为不变」就成了**机器证明**而不是口头保证。
+
+- 2026-09-20，**`ApiController` 参数形状归一族（Group C）外迁 `Support\ApiParameterFormatter` —— 带「新证据」重开 `TUNING-PLAN.md` §五 的「拆大类」旧决定**：
+  **旧决定怎么说的**：`TUNING-PLAN.md`（§五，旧决定重新过堂）的复审结论是「**大体维持不拆**，但破一个边缘个案……
+  唯 `ApiController` 的 proxy 段是『两个东西住一个类』」。**这句只覆盖了 proxy 段**（那次复读的对象），
+  **不是**「`ApiController` 从此不许再动」的禁令 ⇒ 要让本项成立，得证明它**也是**「两个东西住一个类」，
+  且**不重蹈 P2 被否的覆辙**。§五 自己的话是「**有新证据的重开，没有的维持关闭**」。
+  **新证据 4 条（都可复核）**：
+  ① **垂直切片，不是「按类拆」**：15 个方法 = 4 个入口（`formatRules` / `formatYamlParams` / `formatToFaker` /
+  `mergeDebugParams`）+ 11 个私有助手；**只被这 4 个入口调用、彼此只互相调用**，全仓 grep 方法名除本族外
+  零命中。§五 否掉的是「把 `SchemaLoader` / `CreateApiGenerator` 切成若干层」——**拆 = 加间接层**；
+  本项是**把一个已有内聚块按职责搬出去**，间接层数量不变。
+  ② **476 行 / 控制器 1237 行的 38.5%**，仓库里最大的单块同族聚集，且**有明确入出口**（4 个入口方法）。
+  ③ **外部依赖 = 3 个调用点 + 1 个需反转的回调**：`StorageRegistry::enums()` / `StorageRegistry::fields()` /
+  `$this->utility->getLangFields()`（三处**全在 `getParameterMetadata()` 内、都已有 `try/catch`**），
+  加 `formatRules` 里的「默认最新 ID」`resolveLatestModelIdFromRules()`。
+  ⇒ 与 P2 被否的理由（**引入新状态**：host 臂随 app 变、逼 context 存 app-keyed 嵌套 map）**恰好相反**：
+  本项**零新增状态**，`$metadata` 与解算器**由调用方传入**。
+  ④ **覆盖缺口**：这 466 行此前**只被 1 条**用例覆盖（`ApiControllerTest` 里的
+  `isRuleParameterSendable` / `isScalarArrayElement`）⇒ 与红线 9「钉现状先行」配套：先补 17 例再动手。
+  **两处刻意留下、别顺手搬/删的东西**：
+  - `getParameterMetadata()` **留在 `ApiController`** —— 它持有 memo（`private ?array $parameterMetadata`）
+    与 `Utility` 依赖（`getLangFields()`）。memo 做成新类的 **static 会跨请求残留**（`StorageRegistryTest`
+    正有一条守卫挡这个：重写缓存文件后下一次必须读到新值）；把 `Utility` 注进新类则让它从「纯计算」变成
+    「有依赖」，与 `Paths` / `ActionMeta` 同形的理由就没了 ⇒ 新类只收**归一好的** `$metadata`。
+  - `resolveLatestModelIdFromRules()` / `resolveExistsModelClass()` / `getLatestModelIdByClass()` **不搬**：
+    要 Eloquent 查询 + `$latestModelIds` memo（同样是跨请求敏感状态），且**另有调用方**
+    `resolveRouteParamValue()` 在用（`ApiController.php` 内）—— 外迁方只收一个 `callable` 解算器。
+  **可复用判据**：§五 的「新证据」= **能证明旧结论的适用条件已经变了**。本次的变化 = §五 只复读了 proxy 段；
+  Group C 是同一判据（「两个东西住一个类」）的**第二个实例**，且满足**与被否方案相反**的约束（零新增状态）。
+
 - 2026-09-20，**订正三条历史结论：`Utility` 拆分「剩余 3c」已不存在，且它绑定的 `TUNING-PLAN.md` §三 P2 早在 2026-07-09 就止损关闭**：
   **为什么现在才发现**：3a / 3b / 3b-2 三节的「剩余阶段」都写着「**3c = PATHS/CORE 收尾，必须与
   `TUNING-PLAN.md` §三 P2 合并考虑**，否则同一个 `targetContext` 要改两次」——这句话**默认 P2 还开着**，

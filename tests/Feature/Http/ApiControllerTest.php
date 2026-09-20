@@ -6,7 +6,7 @@ use Mooeen\Scaffold\Http\Middleware\EnforceScaffoldWritable;
 use Mooeen\Scaffold\Http\Middleware\ScaffoldAuthenticate;
 
 /**
- * ApiController HTTP Feature 测试（**重点/冒烟**,1578 行不追求全覆盖）。
+ * ApiController HTTP Feature 测试（**重点/冒烟**，不追求全覆盖）。
  *
  * GET /api、/api?app=admin、/api/request 渲染冒烟已被 ScaffoldRoutesTest 覆盖。
  * 这里补不重复的重点 endpoint:
@@ -38,22 +38,24 @@ it('GET /scaffold/api?app=__nope__ 未知 app → 跳默认应用(不再是选�
 // ─── 数组参数解析:数组-标量(field + field.*)折成一个可发参数;数组-对象(field.*.sub)父不可发 ──
 // 2026-06-21:修「调试页把 field + field.* 数组错解析成两行」。区分 field.* 是标量元素 vs 对象元素。
 it('isRuleParameterSendable/isScalarArrayElement:数组-标量父可发(.* 标量元素被吸收),数组-对象父不可发', function () {
-    $c        = app(\Mooeen\Scaffold\Http\Controllers\ApiController::class);
-    $sendable = new ReflectionMethod($c, 'isRuleParameterSendable');
+    // 2026-09-20：这两个方法随「参数形状归一族」外迁到 `Support\ApiParameterFormatter`（`final` + 全静态）。
+    // 本用例保留原断言，只把宿主换掉（`invoke(null, ...)`）；该族的完整钉尸测试见
+    // `tests/Feature/Support/ApiParameterFormatterTest.php`。
+    $sendable = new ReflectionMethod(\Mooeen\Scaffold\Support\ApiParameterFormatter::class, 'isRuleParameterSendable');
     $sendable->setAccessible(true);
-    $scalar = new ReflectionMethod($c, 'isScalarArrayElement');
+    $scalar = new ReflectionMethod(\Mooeen\Scaffold\Support\ApiParameterFormatter::class, 'isScalarArrayElement');
     $scalar->setAccessible(true);
 
     // 数组-标量:market_cart_ids + market_cart_ids.*(numeric)→ 父可单发、.* 是标量元素(formatRules 吸收掉)
     $idsKeys = ['market_cart_ids', 'market_cart_ids.*'];
-    expect($sendable->invoke($c, 'market_cart_ids', ['required', 'array', 'min:1'], $idsKeys))->toBeTrue();
-    expect($scalar->invoke($c, 'market_cart_ids.*', $idsKeys))->toBeTrue();
+    expect($sendable->invoke(null, 'market_cart_ids', ['required', 'array', 'min:1'], $idsKeys))->toBeTrue();
+    expect($scalar->invoke(null, 'market_cart_ids.*', $idsKeys))->toBeTrue();
 
     // 数组-对象:medias + medias.* + medias.*.media_file → 父不可发(填子)、medias.* 非标量(有更深 .media_file)、叶子可发
     $objKeys = ['medias', 'medias.*', 'medias.*.media_file'];
-    expect($sendable->invoke($c, 'medias', ['required', 'array'], $objKeys))->toBeFalse();
-    expect($scalar->invoke($c, 'medias.*', $objKeys))->toBeFalse();
-    expect($sendable->invoke($c, 'medias.*.media_file', ['string'], $objKeys))->toBeTrue();
+    expect($sendable->invoke(null, 'medias', ['required', 'array'], $objKeys))->toBeFalse();
+    expect($scalar->invoke(null, 'medias.*', $objKeys))->toBeFalse();
+    expect($sendable->invoke(null, 'medias.*.media_file', ['string'], $objKeys))->toBeTrue();
 });
 
 // ─── proxy:SSRF 白名单 + 校验 ───────────────────────────────────────────

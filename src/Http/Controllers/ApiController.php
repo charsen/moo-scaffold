@@ -15,7 +15,6 @@ namespace Mooeen\Scaffold\Http\Controllers;
 use Faker\Factory as Faker;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Mooeen\Scaffold\Http\Requests\Api\CacheRequest;
 use Mooeen\Scaffold\Http\Requests\Api\EndpointRequest;
@@ -23,6 +22,7 @@ use Mooeen\Scaffold\Http\Requests\Api\IndexRequest;
 use Mooeen\Scaffold\Support\AclActionResolver;
 use Mooeen\Scaffold\Support\ActionDoc;
 use Mooeen\Scaffold\Support\ActionMeta;
+use Mooeen\Scaffold\Support\ApiParameterFormatter;
 use Mooeen\Scaffold\Support\ApiSchemaService;
 use Mooeen\Scaffold\Support\Paths;
 use Mooeen\Scaffold\Support\StorageRegistry;
@@ -496,19 +496,27 @@ class ApiController extends Controller
         }
 
         // 7. 从 FormRequest 获取验证规则作为参数
+        //    （参数形状归一已外迁 `Support\ApiParameterFormatter`；这里只交出**归一好的元数据**与一个
+        //      「最新 ID」解算器 —— metadata memo 与 `$latestModelIds` memo 都留在本类，避免跨请求残留）
         $ruleAction = $actionData['rule_action'] ?? $realActionName;
         $rules      = $this->getRequestRulesForAction($controllerFullClass, (string) $ruleAction);
-        $ruleParams = $this->formatRules($realActionName, $rules);
+        $metadata   = $this->getParameterMetadata();
+        $ruleParams = ApiParameterFormatter::formatRules(
+            $realActionName,
+            $rules,
+            $metadata,
+            fn (array $existsRules): int|string|null => $this->resolveLatestModelIdFromRules($existsRules),
+        );
 
         $data['request'][1] = $this->resolveRequestUri($uri, $controllerFullClass, $rules);
 
         // 8. 解析 YAML 中用户手动定义的参数
-        $yamlUrlParams  = $this->formatYamlParams($actionData['url_params'] ?? []);
-        $yamlBodyParams = $this->formatYamlParams($actionData['body_params'] ?? []);
+        $yamlUrlParams  = ApiParameterFormatter::formatYamlParams($actionData['url_params'] ?? [], $metadata);
+        $yamlBodyParams = ApiParameterFormatter::formatYamlParams($actionData['body_params'] ?? [], $metadata);
 
         // 9. 合并参数
         if ($method === 'GET') {
-            $data['url_params']  = $this->mergeDebugParams($ruleParams, $yamlUrlParams);
+            $data['url_params']  = ApiParameterFormatter::mergeDebugParams($ruleParams, $yamlUrlParams);
             $data['body_params'] = [];
         } else {
             $methodRest = [
@@ -528,13 +536,13 @@ class ApiController extends Controller
                 : [];
 
             $data['url_params']  = [];
-            $data['body_params'] = $this->mergeDebugParams(array_merge($methodParam, $ruleParams), $yamlBodyParams);
+            $data['body_params'] = ApiParameterFormatter::mergeDebugParams(array_merge($methodParam, $ruleParams), $yamlBodyParams);
         }
 
         // 10. Faker 伪造数据
         $faker               = Faker::create('zh_CN');
-        $data['url_params']  = $this->formatToFaker($faker, $data['url_params']);
-        $data['body_params'] = $this->formatToFaker($faker, $data['body_params']);
+        $data['url_params']  = ApiParameterFormatter::formatToFaker($faker, $data['url_params']);
+        $data['body_params'] = ApiParameterFormatter::formatToFaker($faker, $data['body_params']);
 
         return $data;
     }
@@ -726,165 +734,14 @@ class ApiController extends Controller
     }
 
     /**
-     * 解析 YAML 中手动定义的参数格式
+     * 参数归一用的元数据（枚举 / 字段 / 多语言字段）。
      *
-     * 格式：
-     * field: [false]                         - 非必填
-     * field: []                              - 必填
-     * field: [Name, value]                   - 必填，名称，默认值
-     * field: [false, Name, value]            - 非必填，名称，默认值
-     * field: [false, Name, value, desc]      - 非必填，名称，默认值，描述
+     * **刻意留在本类、没跟 `Support\ApiParameterFormatter` 一起走** —— 它持有两样「跨请求敏感」的东西：
+     * ① memo（`$this->parameterMetadata`）；② `Utility` 依赖（`getLangFields()`）。
+     * 迁到那个全静态类里，memo 只能变 `static` ⇒ **跨请求残留**（`StorageRegistryTest` 正有一条守卫挡这个：
+     * 重写缓存文件后下一次必须读到新值）；把 `Utility` 注进去又会让那个类从「纯计算」变成「有依赖」。
+     * 故本方法留在原地，**只把归一好的数组**交给外迁方。
      */
-    private function formatYamlParams(array $params): array
-    {
-        if (empty($params)) {
-            return [];
-        }
-
-        $metadata = $this->getParameterMetadata();
-        $enums    = $metadata['enums'];
-        $fields   = $metadata['fields'];
-        $data     = [];
-
-        foreach ($params as $key => $attr) {
-            if ($key === '_method') {
-                $data[$key] = [
-                    'require' => true, 'name' => '',
-                    'value'   => strtoupper($attr[0]), 'desc' => '兼容处理',
-                ];
-
-                continue;
-            }
-
-            if (! is_array($attr)) {
-                continue;
-            }
-
-            $attr[0] = $attr[0] ?? true;
-
-            if ($attr[0] === false) {
-                $name       = $attr[1] ?? $this->resolveParameterLabel($key, $metadata);
-                $data[$key] = [
-                    'require'     => false, 'name' => $name,
-                    'value'       => $attr[2] ?? '', 'desc' => $attr[3] ?? '',
-                    'display_key' => $key, 'send_key' => $key, 'sendable' => true,
-                ];
-            } else {
-                $name       = is_string($attr[0]) ? $attr[0] : $this->resolveParameterLabel($key, $metadata);
-                $data[$key] = [
-                    'require'     => true, 'name' => $name,
-                    'value'       => $attr[1] ?? '', 'desc' => $attr[2] ?? '',
-                    'display_key' => $key, 'send_key' => $key, 'sendable' => true,
-                ];
-            }
-
-            $this->applyParameterFieldMeta($data[$key], $key, $metadata);
-        }
-
-        return $data;
-    }
-
-    /**
-     * 格式化验证规则为 API 参数
-     */
-    private function formatRules(string $actionName, array $rules): array
-    {
-        $metadata = $this->getParameterMetadata();
-        $ruleKeys = array_keys($rules);
-
-        $data = [];
-        foreach ($rules as $key => $attr) {
-            // 数组-标量元素(field.*: numeric/string 等,无 field.*.xxx 深层)→ 被父数组吸收,不单列成参数。
-            // (原先 field + field.* 各出一个参数 → 调试页一个数组被错解析成两行)
-            if ($this->isScalarArrayElement($key, $ruleKeys) && in_array(substr($key, 0, -2), $ruleKeys, true)) {
-                continue;
-            }
-            $sendable   = $this->isRuleParameterSendable($key, $attr, $ruleKeys);
-            $displayKey = $this->formatParameterDisplayKey($key);
-            $data[$key] = [
-                'require' => $this->isRuleParameterRequired($attr),
-                'name'    => $this->resolveParameterLabel($key, $metadata),
-                'value'   => $sendable ? '' : (str_ends_with($key, '.*') ? '{}' : '[]'),
-                // 2026-06-20:desc 与 rules 拆开 —— desc=填写/语义提示(下方 ids/force/最新ID 赋值);
-                //   rules=验证约束(长度/必填条件等)。调试表说明列只显 desc,约束移到 VALUE hover;
-                //   文档页仍合并 rules+desc 显示(外观不变)。
-                'desc'        => '',
-                'rules'       => $this->buildRuleParameterDescription($key, $attr, $ruleKeys, $sendable),
-                'type'        => $this->resolveRuleParameterType($key, $attr, $metadata),
-                'display_key' => $displayKey,
-                'send_key'    => $sendable ? $displayKey : '',
-                'sendable'    => $sendable,
-            ];
-
-            if ($key === 'page') {
-                $data[$key]['value'] = 1;
-            } elseif ($key === 'page_limit') {
-                $data[$key]['value'] = 10;
-            } elseif ($key === 'ids') {
-                $data[$key]['value'] = '2,3';
-                $data[$key]['desc']  = '使用半角逗号（,）分隔为数组';
-            } elseif ($key === 'force') {
-                $data[$key]['require'] = false;
-                $data[$key]['name']    = in_array($actionName, ['destroy', 'destroyBatch']) ? '强制删除' : '强制';
-                $data[$key]['value']   = 1;
-                $data[$key]['desc']    = '{0: false, 1: true}';
-            }
-
-            // 数组-标量(父,有 field.* 标量子键)→ 可单发,提示按数组填(逗号分隔或 [..] JSON)
-            if ($sendable && in_array('array', $attr, true) && in_array($key . '.*', $ruleKeys, true)) {
-                $data[$key]['desc'] = $this->appendParameterHint($data[$key]['desc'], '数组，逗号分隔或 JSON');
-            }
-
-            $latestModelId = $this->resolveLatestModelIdFromRules($attr);
-            if ($latestModelId !== null && $latestModelId !== '') {
-                $data[$key]['value'] = (string) $latestModelId;
-                $data[$key]['desc']  = $this->appendParameterHint($data[$key]['desc'], '默认最新 ID');
-            }
-
-            $this->applyParameterFieldMeta($data[$key], $key, $metadata);
-        }
-
-        return $data;
-    }
-
-    private function mergeDebugParams(array $baseParams, array $overrideParams): array
-    {
-        if (empty($overrideParams)) {
-            return $baseParams;
-        }
-
-        $merged = array_merge($baseParams, $overrideParams);
-
-        foreach ($overrideParams as $key => $overrideParam) {
-            if (
-                ! isset($baseParams[$key], $merged[$key])
-                || ! is_array($baseParams[$key])
-                || ! is_array($merged[$key])
-            ) {
-                continue;
-            }
-
-            $this->inheritMissingDebugParamMeta($merged[$key], $baseParams[$key]);
-        }
-
-        return $merged;
-    }
-
-    private function inheritMissingDebugParamMeta(array &$target, array $source): void
-    {
-        foreach (['value', 'desc', 'name'] as $field) {
-            if (($target[$field] ?? '') === '' && ($source[$field] ?? '') !== '') {
-                $target[$field] = $source[$field];
-            }
-        }
-
-        foreach (['type', 'options', 'require', 'display_key', 'send_key', 'sendable'] as $field) {
-            if (! isset($target[$field]) && isset($source[$field])) {
-                $target[$field] = $source[$field];
-            }
-        }
-    }
-
     private function getParameterMetadata(): array
     {
         if ($this->parameterMetadata !== null) {
@@ -910,228 +767,11 @@ class ApiController extends Controller
         ];
     }
 
-    private function resolveParameterLabel(string $key, array $metadata): string
-    {
-        $fieldKey = $this->resolveParameterFieldKey($key, $metadata);
-
-        return $metadata['lang_fields'][$key]['zh-CN']
-            ?? ($metadata['fields'][$key]['zh-CN'] ?? null)
-            ?? ($metadata['lang_fields'][$fieldKey]['zh-CN'] ?? null)
-            ?? ($metadata['fields'][$fieldKey]['zh-CN'] ?? null)
-            ?? $this->formatParameterDisplayKey($key);
-    }
-
-    private function applyParameterFieldMeta(array &$parameter, string $key, array $metadata): void
-    {
-        $fieldKey = $this->resolveParameterFieldKey($key, $metadata);
-
-        if (isset($metadata['enums'][$key]) || isset($metadata['enums'][$fieldKey])) {
-            $enumKey = isset($metadata['enums'][$key]) ? $key : $fieldKey;
-
-            $parameter['value']   = Arr::random(Arr::pluck($metadata['enums'][$enumKey], 0));
-            $parameter['options'] = Arr::pluck($metadata['enums'][$enumKey], 2, 0);
-            $parameter['type']    = 'radio';
-
-            return;
-        }
-
-        $parameter['type'] = $parameter['type']
-            ?? $metadata['fields'][$key]['type']
-            ?? $metadata['fields'][$fieldKey]['type']
-            ?? null;
-    }
-
-    private function resolveParameterFieldKey(string $key, array $metadata): string
-    {
-        if (
-            isset($metadata['fields'][$key])
-            || isset($metadata['enums'][$key])
-            || isset($metadata['lang_fields'][$key])
-        ) {
-            return $key;
-        }
-
-        $segments = preg_split('/[.\[\]]+/', $key, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        $segments = array_values(array_filter($segments, static function (string $segment): bool {
-            return $segment !== '*' && ! ctype_digit($segment);
-        }));
-
-        return $segments === [] ? $key : (string) end($segments);
-    }
-
-    private function formatParameterDisplayKey(string $key): string
-    {
-        $segments = explode('.', $key);
-        if ($segments === []) {
-            return $key;
-        }
-
-        $displayKey = array_shift($segments) ?: $key;
-        foreach ($segments as $segment) {
-            $displayKey .= '[' . ($segment === '*' ? '0' : $segment) . ']';
-        }
-
-        return $displayKey;
-    }
-
-    private function isRuleParameterRequired(array $rules): bool
-    {
-        if (in_array('required', $rules, true)) {
-            return true;
-        }
-
-        if (in_array('sometimes', $rules, true) || in_array('nullable', $rules, true)) {
-            return false;
-        }
-
-        foreach ($rules as $rule) {
-            if (! is_string($rule)) {
-                continue;
-            }
-
-            if (str_starts_with($rule, 'required_')) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function isRuleParameterSendable(string $key, array $rules, array $allRuleKeys): bool
-    {
-        if (str_ends_with($key, '.*')) {
-            return false;
-        }
-
-        if (! in_array('array', $rules, true)) {
-            return true;
-        }
-
-        // array 类型:有「对象元素」子键(field.*.xxx)或关联子键(field.xxx)→ 父不可单发(改填子字段);
-        // 只有「标量元素」子键(field.* 且无更深)→ 数组-标量(如 ids 数组),父可单发(逗号/JSON 一次填),
-        // 该 field.* 在 formatRules 里被父吸收、不单列。
-        $prefix  = $key . '.';
-        $starKey = $key . '.*';
-        foreach ($allRuleKeys as $ruleKey) {
-            if ($ruleKey === $key || ! str_starts_with($ruleKey, $prefix)) {
-                continue;
-            }
-            if ($ruleKey === $starKey && $this->isScalarArrayElement($starKey, $allRuleKeys)) {
-                continue;
-            }
-
-            return false;
-        }
-
-        return true;
-    }
-
     /**
-     * field.*(数组元素规则)是否「标量元素」—— 数组里装 id/数字/字符串等标量,
-     * 而非嵌套对象(没有更深的 field.*.xxx 子键)。
+     * 同上，也留在本类：`formatRules` 里「`exists:Model,id` ⇒ 默认填最新 ID」这一步要 Eloquent 查询 +
+     * `$latestModelIds` memo（同样跨请求敏感），且**另有调用方** `resolveRouteParamValue()` 在用 ——
+     * 外迁方只收一个解算器回调。
      */
-    private function isScalarArrayElement(string $key, array $allRuleKeys): bool
-    {
-        if (! str_ends_with($key, '.*')) {
-            return false;
-        }
-        $deeper = $key . '.';   // field.*.
-        foreach ($allRuleKeys as $ruleKey) {
-            if ($ruleKey !== $key && str_starts_with($ruleKey, $deeper)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function resolveRuleParameterType(string $key, array $rules, array $metadata): ?string
-    {
-        if (in_array('array', $rules, true)) {
-            return 'array';
-        }
-
-        if (in_array('integer', $rules, true) || in_array('numeric', $rules, true)) {
-            return 'int';
-        }
-
-        if (in_array('boolean', $rules, true)) {
-            return 'boolean';
-        }
-
-        if (in_array('date', $rules, true)) {
-            return 'date';
-        }
-
-        $fieldKey = $this->resolveParameterFieldKey($key, $metadata);
-
-        return $metadata['fields'][$key]['type']
-            ?? $metadata['fields'][$fieldKey]['type']
-            ?? null;
-    }
-
-    private function buildRuleParameterDescription(string $key, array $rules, array $allRuleKeys, bool $sendable): string
-    {
-        $parts = [];
-        $type  = null;
-
-        if (in_array('array', $rules, true)) {
-            $type    = 'array';
-            $parts[] = str_ends_with($key, '.*') ? '数组元素对象' : '数组';
-        }
-
-        foreach ($rules as $rule) {
-            if (! is_string($rule)) {
-                continue;
-            }
-
-            if (str_starts_with($rule, 'required_with:')) {
-                $fields  = array_filter(explode(',', substr($rule, strlen('required_with:'))));
-                $parts[] = '传 ' . implode('、', $fields) . ' 时必填';
-
-                continue;
-            }
-
-            if (str_starts_with($rule, 'required_without:')) {
-                $fields  = array_filter(explode(',', substr($rule, strlen('required_without:'))));
-                $parts[] = '缺少 ' . implode('、', $fields) . ' 时必填';
-
-                continue;
-            }
-
-            if (str_starts_with($rule, 'max:')) {
-                $max     = substr($rule, strlen('max:'));
-                $parts[] = in_array($type, ['array'], true) ? '最多 ' . $max . ' 项' : '最大长度 ' . $max;
-
-                continue;
-            }
-
-            if (str_starts_with($rule, 'min:')) {
-                $min     = substr($rule, strlen('min:'));
-                $parts[] = in_array($type, ['array'], true) ? '至少 ' . $min . ' 项' : '最小长度 ' . $min;
-
-                continue;
-            }
-
-            if (str_starts_with($rule, 'exists:')) {
-                $parts[] = '需为有效 ID';
-
-                continue;
-            }
-        }
-
-        if (! $sendable) {
-            $children = array_values(array_filter($allRuleKeys, static fn (string $ruleKey): bool => str_starts_with($ruleKey, $key . '.')));
-            if ($children !== []) {
-                $parts[] = '结构说明，调试时请填写子字段';
-            }
-        }
-
-        $parts = array_values(array_unique(array_filter(array_map('trim', $parts))));
-
-        return implode('；', $parts);
-    }
-
     private function resolveLatestModelIdFromRules(array $rules): int|string|null
     {
         foreach ($rules as $rule) {
@@ -1164,74 +804,5 @@ class ApiController extends Controller
         return is_subclass_of($modelClass, Model::class)
             ? $modelClass
             : null;
-    }
-
-    private function appendParameterHint(string $description, string $hint): string
-    {
-        $description = trim($description);
-        if ($description === '') {
-            return $hint;
-        }
-
-        if (str_contains($description, $hint)) {
-            return $description;
-        }
-
-        return $description . '；' . $hint;
-    }
-
-    /**
-     * 用 Faker 伪造参数示例值
-     */
-    private function formatToFaker($faker, array $params): array
-    {
-        if (empty($params)) {
-            return [];
-        }
-
-        foreach ($params as $fieldName => &$attr) {
-            if (($attr['sendable'] ?? true) === false || $attr['value'] !== '' || $fieldName === '_method') {
-                continue;
-            }
-
-            $type = $attr['type'] ?? null;
-
-            if (str_contains($fieldName, '_ids')) {
-                $attr['value'] = $faker->numberBetween(1, 3) . ',' . $faker->numberBetween(4, 7);
-            } elseif (str_contains($fieldName, 'media_file')) {
-                $attr['value'] = 'temp/demo/example.jpg';
-            } elseif ($fieldName === 'password' || str_contains($fieldName, '_password')) {
-                $attr['value'] = $faker->password;
-            } elseif ($fieldName === 'address' || str_contains($fieldName, '_address')) {
-                $attr['value'] = $faker->address;
-            } elseif ($fieldName === 'mobile' || str_contains($fieldName, '_mobile')) {
-                $attr['value'] = $faker->phoneNumber;
-            } elseif ($fieldName === 'email' || str_contains($fieldName, '_email')) {
-                $attr['value'] = $faker->safeEmail;
-            } elseif ($fieldName === 'user_name' || $fieldName === 'nick_name') {
-                $attr['value'] = $faker->userName;
-            } elseif ($fieldName === 'id_card_number') {
-                $attr['value'] = '';
-            } elseif ($fieldName === 'real_name') {
-                $attr['value'] = $faker->name(Arr::random(['male', 'female']));
-            } elseif (str_contains($fieldName, '_code')) {
-                $attr['value'] = $faker->numerify('C####');
-            } elseif (in_array($type, ['int', 'tinyint', 'bigint'], true)) {
-                $attr['value'] = 1;
-            } elseif ($type === 'varchar' || $type === 'char') {
-                $attr['value'] = implode(' ', $faker->words(2));
-            } elseif ($type === 'text') {
-                $attr['value'] = $faker->text(100);
-            } elseif ($type === 'date') {
-                $attr['value'] = $faker->date();
-            } elseif ($type === 'datetime' || $type === 'timestamp') {
-                $attr['value'] = $faker->date() . ' ' . $faker->time();
-            } elseif ($type === 'boolean') {
-                $attr['value'] = rand(0, 1);
-                $attr['desc']  = '{1: true, 0: false}';
-            }
-        }
-
-        return $params;
     }
 }
