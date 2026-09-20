@@ -152,7 +152,7 @@ function routeCtrl_memoSandbox(): array
         base_path($rel . '/admin/_menus_transform.yaml'),
         "System:\n  name: 系统设置\nOrder:\n  name: 订单中心\n"
     );
-    config(['scaffold.api.schema' => $rel . '/']);   // getApiPath 直接拼 app 名,尾斜杠必须有
+    config(['scaffold.api.schema' => $rel . '/']);   // Paths::api() 直接拼 app 名,尾斜杠必须有
 
     $fs   = new RouteCtrlCountingFilesystem;
     $ctrl = new RouteController(

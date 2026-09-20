@@ -16,6 +16,7 @@ use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Support\ColumnTypeGroups;
 use Mooeen\Scaffold\Support\ControllerName;
 use Mooeen\Scaffold\Support\PackageRegistry;
+use Mooeen\Scaffold\Support\Paths;
 use Symfony\Component\Yaml\Yaml;
 
 class FreshStorageGenerator extends Generator
@@ -52,11 +53,11 @@ class FreshStorageGenerator extends Generator
     {
         $this->silence                 = $silence;
         $this->field_table_names       = [];
-        $this->db_schema_path          = $this->utility->getDatabasePath('schema');
-        $this->db_relative_schema_path = $this->utility->getDatabasePath('schema', true);
+        $this->db_schema_path          = Paths::database('schema');
+        $this->db_relative_schema_path = Paths::database('schema', true);
 
-        $this->storage_path          = $this->utility->getStoragePath();
-        $this->storage_path_relative = $this->utility->getStoragePath(true);
+        $this->storage_path          = Paths::storage();
+        $this->storage_path_relative = Paths::storage(true);
 
         if ($clean) {
             $this->cleanAll();
@@ -610,12 +611,12 @@ class FreshStorageGenerator extends Generator
     private function buildModelIdList(array $data): void
     {
         $model_ids  = [];
-        $model_path = $this->utility->getModelPath(true);
+        $model_path = Paths::model(true);
 
         foreach ($data as $folder => $models) {
             foreach ($models as $model => $config) {
                 $model_id             = Str::snake($model, '_') . '_id';
-                $namespace            = $this->utility->formatNameSpace($model_path) . $config['module']['folder'];
+                $namespace            = Paths::namespaceOf($model_path) . $config['module']['folder'];
                 $model_ids[$model_id] = [
                     'namespace'  => $namespace,
                     'model'      => $namespace . '\\' . $model,

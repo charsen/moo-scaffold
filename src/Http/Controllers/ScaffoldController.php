@@ -13,6 +13,7 @@ use Mooeen\Scaffold\Http\Requests\Scaffold\CspReportRequest;
 use Mooeen\Scaffold\Http\Requests\Scaffold\DashboardRequest;
 use Mooeen\Scaffold\Http\Requests\Scaffold\DbDocsRequest;
 use Mooeen\Scaffold\Support\ApiSchemaService;
+use Mooeen\Scaffold\Support\Paths;
 use Mooeen\Scaffold\Utility;
 
 /**
@@ -268,7 +269,7 @@ class ScaffoldController extends Controller
      */
     private function summarizeAppsCached(array $apps): array
     {
-        $basePath = rtrim($this->utility->getApiPath('schema'), '/') . '/';
+        $basePath = rtrim(Paths::api('schema'), '/') . '/';
         $sig      = [];
         foreach (array_keys($apps) as $app) {
             $appPath = $basePath . $app;
@@ -467,7 +468,7 @@ class ScaffoldController extends Controller
      */
     private function getApiPublishHistory(array $apps, ?int $limit = null): array
     {
-        $historyPath = rtrim($this->utility->getApiPath('history'), '/') . '/';
+        $historyPath = rtrim(Paths::api('history'), '/') . '/';
         if (! $this->filesystem->isDirectory($historyPath)) {
             return [];
         }

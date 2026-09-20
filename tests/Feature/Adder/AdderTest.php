@@ -271,7 +271,7 @@ it('非新建模式追加 action:在类闭合前插入 action 并注入 use', fu
 });
 
 // ─── checkGlobalResource:复用已存在 resource 时拼 use 语句 ─────────────────────────
-// resource.path 带尾 `/`(config 默认 'app/Http/Resources/')→ formatNameSpace 产出尾部带 `\` 的
+// resource.path 带尾 `/`(config 默认 'app/Http/Resources/')→ Paths::namespaceOf() 产出尾部带 `\` 的
 // namespace,再拼 `\\{class}` 得到双反斜杠 `Resources\\Foo`(空命名空间段)→ 生成的 controller use
 // 语句 PHP 语法错。rtrim namespace 尾部反斜杠修(2026-06-09)。
 it('checkGlobalResource · resource.path 带尾 / 时复用 resource 的 use 语句无双反斜杠', function () {

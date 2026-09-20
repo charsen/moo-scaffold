@@ -15,6 +15,7 @@ use Illuminate\Support\Str;
 use Mooeen\Scaffold\Foundation\Controller;
 use Mooeen\Scaffold\Support\AclActionResolver;
 use Mooeen\Scaffold\Support\ActionDoc;
+use Mooeen\Scaffold\Support\Paths;
 use Symfony\Component\Yaml\Yaml;
 
 class UpdateAuthorizationGenerator extends Generator
@@ -379,11 +380,11 @@ class UpdateAuthorizationGenerator extends Generator
             'modules' => array_values($modules),
         ];
 
-        $dir = $this->utility->getAclPath();
+        $dir = Paths::acl();
         $this->checkDirectory($dir);
 
         $file         = $dir . $app . '.yaml';
-        $relativeFile = $this->utility->getAclPath(true) . $app . '.yaml';
+        $relativeFile = Paths::acl(true) . $app . '.yaml';
 
         if ($this->isAclDocumentUnchanged($file, $document)) {
             $this->console()->unchanged($relativeFile);

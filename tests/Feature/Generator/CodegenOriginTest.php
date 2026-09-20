@@ -9,6 +9,7 @@ use Mooeen\Scaffold\Generator\CreateResourceGenerator;
 use Mooeen\Scaffold\Generator\FreshStorageGenerator;
 use Mooeen\Scaffold\Generator\UpdateMultilingualGenerator;
 use Mooeen\Scaffold\Support\PackageRegistry;
+use Mooeen\Scaffold\Support\Paths;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Console\Output\NullOutput;
 
@@ -108,7 +109,7 @@ it('moo:model:Model/Filter/Trait/Enum 全落包 src/Models(平铺),命名空间�
     expect($model)->toContain('use Mooeen\\Scaffold\\Concerns\\UsingSnowFlakePrimaryKey;');
     expect($model)->not->toContain('use Acme\\PkgGen\\Models\\Traits\\UsingSnowFlakePrimaryKey;');
     // host 目录零污染(host app/Models 不出现包的类)
-    expect(is_file(app(Utility::class)->getModelPath() . 'PkgGen/PkgxItem.php'))->toBeFalse();
+    expect(is_file(Paths::model() . 'PkgGen/PkgxItem.php'))->toBeFalse();
 });
 
 it('moo:resource:Resource 落包 src/Http/Resources(平铺),命名空间用包根', function () {

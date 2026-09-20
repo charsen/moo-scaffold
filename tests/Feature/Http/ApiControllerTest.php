@@ -248,7 +248,7 @@ function apiDoc_sandbox(string $actionsYaml): string
     app(\Illuminate\Filesystem\Filesystem::class)->ensureDirectoryExists($dir);
     file_put_contents($dir . '/Memo.yaml', "controller:\n  class: MemoController\n  name: 备忘管理\nactions:\n{$actionsYaml}");
     config([
-        'scaffold.api.schema' => $rel . '/',   // getApiPath 直接拼 app 名,尾斜杠必须有(包默认值同形)
+        'scaffold.api.schema' => $rel . '/',   // Paths::api() 直接拼 app 名,尾斜杠必须有(包默认值同形)
         'scaffold.controller' => ['admin' => ['name' => ['zh-CN' => '后台', 'en' => 'Admin']]],
     ]);
 

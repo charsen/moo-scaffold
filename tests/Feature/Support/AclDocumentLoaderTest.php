@@ -9,7 +9,7 @@ use Mooeen\Scaffold\Support\AclDocumentLoader;
  * 压平 + 同 action 取第一条、name 的 zh-CN/字符串两种形态、normalizeKey 去 app 前缀、
  * 跨 app 反向索引、exists()。
  *
- * sandbox:getAclPath() 硬编码 base_path('scaffold/acl/')，setBasePath 把它落 temp dir。
+ * sandbox:Paths::acl() 硬编码 base_path('scaffold/acl/')，setBasePath 把它落 temp dir。
  */
 function aclLoader_writeYaml(string $app, string $body): void
 {

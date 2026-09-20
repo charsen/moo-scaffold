@@ -19,7 +19,7 @@ use Mooeen\Scaffold\Support\AppTargetRegistry;
 use Mooeen\Scaffold\Support\ColumnTypeGroups;
 use Mooeen\Scaffold\Support\ControllerName;
 use Mooeen\Scaffold\Support\FieldName;
-use Mooeen\Scaffold\Utility;
+use Mooeen\Scaffold\Support\Paths;
 
 use function in_array;
 
@@ -103,12 +103,12 @@ class CreateControllerGenerator extends Generator
                 $config_key    = 'controller.' . $app_folder . '.path';
                 $namespace_pre = $this->originCtx !== null
                     ? $this->originCtx->namespaceFor('controller') . '\\'
-                    : $this->utility->formatNameSpace($this->utility->getControllerPath($config_key, true));
+                    : Paths::namespaceOf(Paths::controller($config_key, true));
 
                 // model 处理（要求 moo:model 已先执行，否则 getKeyName() 会失败）
                 $model_class = $this->originCtx !== null
                     ? $this->originCtx->namespaceFor('model') . '\\' . $attr['model_class']
-                    : $this->utility->formatNameSpace($this->utility->getModelPath(relative: true) . $attr['module']['folder'] . '/' . $attr['model_class']);
+                    : Paths::namespaceOf(Paths::model(relative: true) . $attr['module']['folder'] . '/' . $attr['model_class']);
 
                 // resource(包:落包 Resources 命名空间;未配 resource 时同 host 走基类)
                 $resourceBasePath = $this->getModelResourcePath($app_folder, $attr);
@@ -117,7 +117,7 @@ class CreateControllerGenerator extends Generator
                 } elseif ($this->originCtx !== null) {
                     $model_resource = $this->originCtx->namespaceFor('resource') . '\\' . $attr['model_class'] . 'Resource';
                 } else {
-                    $model_resource = $this->utility->formatNameSpace($resourceBasePath . $attr['module']['folder'] . '/' . $attr['model_class'] . 'Resource');
+                    $model_resource = Paths::namespaceOf($resourceBasePath . $attr['module']['folder'] . '/' . $attr['model_class'] . 'Resource');
                 }
 
                 // 表格数据
@@ -162,7 +162,7 @@ class CreateControllerGenerator extends Generator
                     'use_base_resources'            => $this->utility->getConfig('class.resources.base'),
                     'use_base_resources_collection' => $this->utility->getConfig('class.resources.collection'),
                     'use_model_resource'            => $model_resource,
-                    'use_model_collection'          => $this->utility->getConfig('class.resources.collection'), // $this->utility->formatNameSpace($model_collection),
+                    'use_model_collection'          => $this->utility->getConfig('class.resources.collection'), // Paths::namespaceOf($model_collection),
                     'use_form_widgets'              => $this->utility->getConfig('class.resources.form'),
                     'use_columns'                   => $this->utility->getConfig('class.resources.columns'),
                     'use_table_columns'             => $this->utility->getConfig('class.resources.table_columns'),
@@ -239,7 +239,7 @@ class CreateControllerGenerator extends Generator
         $resourceApps = $controller['resource'] ?? [];
 
         if (in_array($app_folder, $resourceApps, true)) {
-            return $this->utility->getAppResourcePath($app_folder, true);
+            return Paths::appResource($app_folder, true);
         }
 
         return null;
@@ -254,8 +254,8 @@ class CreateControllerGenerator extends Generator
         if ($this->originCtx !== null) {
             $enum_namespace = $this->originCtx->namespaceFor('model') . '\\Enums\\';
         } else {
-            $enum_namespace = $this->utility->getModelPath(relative: true) . $controller['module_en_name'] . '/Enums/';
-            $enum_namespace = $this->utility->formatNameSpace($enum_namespace);
+            $enum_namespace = Paths::model(relative: true) . $controller['module_en_name'] . '/Enums/';
+            $enum_namespace = Paths::namespaceOf($enum_namespace);
         }
 
         $use_codes = [];
@@ -569,8 +569,8 @@ class CreateControllerGenerator extends Generator
                 continue;
             }
             $config_key    = 'controller.' . strtolower($app) . '.path';
-            $path          = $this->utility->getControllerPath($config_key) . 'Traits';
-            $relative_path = $this->utility->getControllerPath($config_key, true) . 'Traits';
+            $path          = Paths::controller($config_key) . 'Traits';
+            $relative_path = Paths::controller($config_key, true) . 'Traits';
             $base_file     = $path . '/BaseActionTrait.php';
 
             // 检查目录是否存在，不存在则创建
@@ -579,7 +579,7 @@ class CreateControllerGenerator extends Generator
             // 检查文件是否存在，不存在则创建
             if (! $this->filesystem->isFile($base_file)) {
                 $data = [
-                    'namespace'      => $this->utility->formatNameSpace($relative_path),
+                    'namespace'      => Paths::namespaceOf($relative_path),
                     'base_resources' => $this->utility->getConfig('class.resources.base'),
                 ];
 

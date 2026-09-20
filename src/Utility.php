@@ -110,129 +110,18 @@ class Utility
     }
 
     /**
-     * Get Model Path
-     */
-    public function getModelPath($relative = false): string
-    {
-        $path = base_path($this->getConfig('model.path'));
-
-        return $relative ? str_replace(base_path(), '.', $path) : $path;
-    }
-
-    /**
-     * Get Resource Path
-     *
-     * 内部专用：唯一调用点是 {@see targetContext()} 的 host 臂。
-     */
-    private function getResourcePath($relative = false): string
-    {
-        $path = base_path($this->getConfig('resource.path'));
-
-        return $relative ? str_replace(base_path(), '.', $path) : $path;
-    }
-
-    /**
-     * Get App Resource Path
-     */
-    public function getAppResourcePath(string $app, bool $relative = false): string
-    {
-        $target = app(AppTargetRegistry::class)->get($app);
-        $path   = trim((string) ($target['resource_path'] ?? ''));
-        if ($path === '') {
-            throw new InvalidArgumentException("应用端 [{$app}] 未配置 resource_path。");
-        }
-        $path = base_path($path);
-
-        return $relative ? str_replace(base_path(), '.', $path) : $path;
-    }
-
-    /**
-     * Get Controller Path
-     */
-    public function getControllerPath($key = 'controller.admin.path', $relative = false): string
-    {
-        $path = base_path($this->getConfig($key));
-
-        return $relative ? str_replace(base_path(), '.', $path) : $path;
-    }
-
-    /**
-     * Get Migration Path
-     */
-    public function getMigrationPath($relative = false): string
-    {
-        $path = database_path('migrations/');
-
-        return $relative ? str_replace(base_path(), '.', $path) : $path;
-    }
-
-    /**
-     * Get Storage Path
-     */
-    public function getStoragePath($relative = false): string
-    {
-        $path = storage_path('scaffold/');
-
-        return $relative ? str_replace(storage_path(), '.', $path) : $path;
-    }
-
-    /**
-     * Get API Schema Path
-     */
-    public function getApiPath(string $folder = 'schema', bool $relative = false): string
-    {
-        $path = base_path($this->getConfig('api.' . $folder));
-
-        return $relative ? str_replace(base_path(), '.', $path) : $path;
-    }
-
-    /**
-     * Get ACL Schema Path
-     */
-    public function getAclPath(bool $relative = false): string
-    {
-        $path = base_path('scaffold/acl/');
-
-        return $relative ? str_replace(base_path(), '.', $path) : $path;
-    }
-
-    /**
      * 检查 API YAML 文件是否存在
      */
     public function isApiFileExist(string $folderPath, string $fileName, string $folder = 'schema'): string
     {
         $folderPath = trim($folderPath, '/');
-        $file       = $this->getApiPath($folder) . (empty($folderPath) ? '' : $folderPath . '/') . $fileName . '.yaml';
+        $file       = Paths::api($folder) . (empty($folderPath) ? '' : $folderPath . '/') . $fileName . '.yaml';
 
         if (! $this->filesystem->isFile($file)) {
             throw new InvalidArgumentException("Invalid File Argument (Not Found): {$file}");
         }
 
         return $file;
-    }
-
-    /**
-     * Get Scaffold Database Path
-     *
-     * Configured value 可以是 relative path(走 base_path() prefix,常规生产用法)
-     * 或 absolute path(scaffold 包测试 / 多项目共享场景,plan-33 加)。
-     */
-    public function getDatabasePath($folder = 'schema', $relative = false): string
-    {
-        $configured = (string) $this->getConfig('database.' . $folder);
-        $path       = Paths::fromBasePath($configured);
-
-        return $relative ? str_replace(base_path(), '.', $path) : $path;
-    }
-
-    /**
-     * 获取 schema 文件路径
-     */
-    public function getSchemaPath($file_name = null, bool $relative = false): string
-    {
-        $path = $this->getDatabasePath('schema', $relative);
-
-        return $file_name === null ? $path : ($path . $file_name);
     }
 
     /**
@@ -249,17 +138,17 @@ class Utility
                 target: null,
                 basePath: rtrim(base_path(), '/') . '/',
                 paths: [
-                    'model'     => $this->getModelPath(),
-                    'resource'  => $this->getResourcePath(),
-                    'migration' => $this->getMigrationPath(),
-                    'storage'   => $this->getStoragePath(),
-                    'database'  => $this->getDatabasePath('schema'),
-                    'api'       => $this->getApiPath('schema'),
-                    'acl'       => $this->getAclPath(),
+                    'model'     => Paths::model(),
+                    'resource'  => Paths::resource(),
+                    'migration' => Paths::migration(),
+                    'storage'   => Paths::storage(),
+                    'database'  => Paths::database('schema'),
+                    'api'       => Paths::api('schema'),
+                    'acl'       => Paths::acl(),
                     'docs'      => base_path((string) $this->getConfig('docs.path', 'scaffold/docs')) . '/',
                 ],
                 namespaces: [
-                    'model' => $this->formatNameSpace($this->getModelPath(true)),
+                    'model' => Paths::namespaceOf(Paths::model(true)),
                 ],
                 app: null,
                 classes: [],
@@ -289,7 +178,7 @@ class Utility
                 'lang'       => $base . 'lang/',
                 'route'      => $base . 'routes/admin.php',
                 // 缓存是 host 侧聚合物(条目挂 origin 键区分出身),不按包分桶
-                'storage' => $this->getStoragePath(),
+                'storage' => Paths::storage(),
             ],
             namespaces: [
                 'model'      => $ns . '\\Models',
@@ -401,7 +290,7 @@ class Utility
      */
     public function getOneTable(string $table_name): array
     {
-        $file = $this->getStoragePath() . "{$table_name}.php";
+        $file = Paths::storage() . "{$table_name}.php";
 
         if (! $this->filesystem->isFile($file)) {
             throw new InvalidArgumentException('Invalid Argument (Not Found).');
@@ -417,7 +306,7 @@ class Utility
      */
     public function getTables(): array
     {
-        return $this->filesystem->getRequire($this->getStoragePath() . 'tables.php');
+        return $this->filesystem->getRequire(Paths::storage() . 'tables.php');
     }
 
     /**
@@ -427,7 +316,7 @@ class Utility
      */
     public function getModels(): array
     {
-        return $this->filesystem->getRequire($this->getStoragePath() . 'models.php');
+        return $this->filesystem->getRequire(Paths::storage() . 'models.php');
     }
 
     /**
@@ -437,7 +326,7 @@ class Utility
      */
     public function getModelIds(): array
     {
-        return $this->filesystem->getRequire($this->getStoragePath() . 'model_ids.php');
+        return $this->filesystem->getRequire(Paths::storage() . 'model_ids.php');
     }
 
     /**
@@ -445,7 +334,7 @@ class Utility
      */
     public function getControllers(bool $merge_all = true): array
     {
-        $data = $this->filesystem->getRequire($this->getStoragePath() . 'controllers.php');
+        $data = $this->filesystem->getRequire(Paths::storage() . 'controllers.php');
         if (! $merge_all) {
             return $data;
         }
@@ -465,7 +354,7 @@ class Utility
      */
     public function getLangFields(): array
     {
-        $file         = $this->getDatabasePath('schema') . '_fields.yaml';
+        $file         = Paths::database('schema') . '_fields.yaml';
         $yaml_data    = $this->parseYamlFile($file);
         $tableFields  = is_array($yaml_data['table_fields'] ?? null) ? $yaml_data['table_fields'] : [];
         $appendFields = is_array($yaml_data['append_fields'] ?? null) ? $yaml_data['append_fields'] : [];
@@ -483,7 +372,7 @@ class Utility
      */
     public function getFields(): array
     {
-        return $this->filesystem->getRequire($this->getStoragePath() . 'fields.php');
+        return $this->filesystem->getRequire(Paths::storage() . 'fields.php');
     }
 
     /**
@@ -494,7 +383,7 @@ class Utility
      */
     public function getEnums(bool $merge_all = true): array
     {
-        $enums = $this->filesystem->getRequire($this->getStoragePath() . 'enums.php');
+        $enums = $this->filesystem->getRequire(Paths::storage() . 'enums.php');
         if (! $merge_all) {
             return $enums;
         }
@@ -572,14 +461,6 @@ class Utility
         }
 
         return ['modules' => $modules, 'fields' => $fields, 'values' => $values];
-    }
-
-    /**
-     * 格式化命名空间
-     */
-    public function formatNameSpace(string $path): string
-    {
-        return ucfirst(str_replace(['./', '/'], ['', '\\'], $path));
     }
 
     /**

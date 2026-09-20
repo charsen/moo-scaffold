@@ -24,6 +24,7 @@ use Mooeen\Scaffold\Support\AclActionResolver;
 use Mooeen\Scaffold\Support\ActionDoc;
 use Mooeen\Scaffold\Support\ActionMeta;
 use Mooeen\Scaffold\Support\ApiSchemaService;
+use Mooeen\Scaffold\Support\Paths;
 use Mooeen\Scaffold\Utility;
 
 class ApiController extends Controller
@@ -257,7 +258,7 @@ class ApiController extends Controller
      */
     private function getApiList(string $app = 'admin'): array
     {
-        $apiPath = $this->utility->getApiPath('schema') . $app . '/';
+        $apiPath = Paths::api('schema') . $app . '/';
 
         if (! $this->filesystem->isDirectory($apiPath)) {
             return ['menus' => [], 'apis' => [], 'menus_transform' => []];

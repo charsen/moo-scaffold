@@ -15,6 +15,7 @@ use Illuminate\Console\View\Components\Factory;
 use Illuminate\Filesystem\Filesystem;
 use Mooeen\Scaffold\Designer\SchemaLoader;
 use Mooeen\Scaffold\Support\Concerns\InteractsWithConsoleUi;
+use Mooeen\Scaffold\Support\Paths;
 use Mooeen\Scaffold\Utility;
 
 class Command extends BaseCommand
@@ -315,7 +316,7 @@ class Command extends BaseCommand
      */
     protected function assertTableInSchema(string $schema_name, string $table): bool
     {
-        $models = $this->filesystem->getRequire($this->utility->getStoragePath() . 'models.php');
+        $models = $this->filesystem->getRequire(Paths::storage() . 'models.php');
         $valid  = array_values(array_column($models[$schema_name] ?? [], 'table_name'));
 
         if (in_array($table, $valid, true)) {
@@ -336,7 +337,7 @@ class Command extends BaseCommand
      */
     protected function schemaOfTable(string $table): ?string
     {
-        $file = $this->utility->getStoragePath() . 'models.php';
+        $file = Paths::storage() . 'models.php';
         if (! $this->filesystem->isFile($file)) {
             return null;
         }

@@ -8,6 +8,7 @@ use Mooeen\Scaffold\Support\ColumnTypeGroups;
 use Mooeen\Scaffold\Support\Concerns\AtomicFileWrite;
 use Mooeen\Scaffold\Support\ControllerName;
 use Mooeen\Scaffold\Support\PackageRegistry;
+use Mooeen\Scaffold\Support\Paths;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Yaml\Yaml;
@@ -1243,7 +1244,7 @@ class SchemaLoader
     {
         $origin = $this->originOf($schema);
         $dir    = $origin === null
-            ? rtrim($this->utility->getDatabasePath('schema'), '/')
+            ? rtrim(Paths::database('schema'), '/')
             : rtrim($this->utility->targetContext($origin)->pathFor('database'), '/');
 
         return $dir . '/' . $schema . '.yaml';
@@ -1445,7 +1446,7 @@ class SchemaLoader
             }
         };
 
-        $scan($this->utility->getDatabasePath('schema'), null);
+        $scan(Paths::database('schema'), null);
         foreach (app(PackageRegistry::class)->all() as $key => $pkg) {
             $scan($pkg['base_path'] . 'scaffold/database', $key);
         }
