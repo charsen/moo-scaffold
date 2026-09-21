@@ -31,6 +31,18 @@ class UpdateAuthorizationGenerator extends Generator
     private ?AclActionResolver $aclActionResolver = null;
 
     /**
+     * `controller::action`（FQCN 形态）→ `[moduleKey, controllerKey]` 归属索引。
+     *
+     * 主循环每处理一条路由就登记一次 —— 它算出的 module/controller key 才是权威口径。
+     * 跨控制器 transform_methods 的复用 key 必须写回"它自己所属的 controller"，而这个归属
+     * 只有主循环知道：自行按 FQCN 重算会因段口径不同而算出不存在的伪控制器
+     * （2026-09-21 修「授权页看不到『查看应用』」时，用短类名与明文 key 反推两种写法都错位）。
+     *
+     * @var array<string, array{0: string, 1: string}>
+     */
+    private array $aclTargetOwner = [];
+
+    /**
      * 依据路由全量重算 config/actions.php、lang/{lang}/actions.php 和 scaffold/acl/{app}.yaml；
      * 内容完全由路由决定，不支持手动润色，但三类产物都在内容无变化时跳过写入(不刷生成戳)
      */
@@ -60,6 +72,13 @@ class UpdateAuthorizationGenerator extends Generator
             $controller_key               = str_replace(['\\', $base_namespace, '-controller'], ['', $app, ''], Str::snake($controller, '-'));
             $controller_key               = $this->getMd5($controller_key);
             $controllers[$controller_key] = $PMC_names['controller']['name'];
+
+            // 登记归属：跨控制器 transform_methods 的成员 key 要写回它自己的 controller，
+            // 而主循环算出的 module/controller key 是唯一权威口径（详见 $aclTargetOwner 说明）。
+            // 路由里可能是短类名、acl_targets 里是 FQCN，两种形态都登记，回查时才不会落空。
+            $owner                                                           = ['module-' . $module_key, 'controller-' . $controller_key];
+            $this->aclTargetOwner[$controller . '::' . $action]              = $owner;
+            $this->aclTargetOwner[ltrim($controller, '\\') . '::' . $action] = $owner;
 
             $action_info      = ActionDoc::parseActionInfo($this->getMethod($controller, $action));
             $action_name      = ActionDoc::parseActionName($this->getMethod($controller, $action));
@@ -112,6 +131,46 @@ class UpdateAuthorizationGenerator extends Generator
                 // 权限树渲染时会用全局 key=>label 字典的 label（target controller 的 @acl 文案），
                 // 导致与当前 controller 名错位（如"通知机器人管理 > 个人中心"）。
                 // 同 controller 内部 transform（如 create→store / logins→index）不属于此类，正常展示。
+                //
+                // 2026-09-21 修「整组 key 丢失」：原先这里走的是空分支，于是这些复用 key **一条都不写**，
+                // 授权页（读 config('actions.admin.actions')）里既没有 key 也没有可勾选项 ——
+                // 现网表现为「moo:auth 刷新后，MiniAppController::show 的『查看应用』在授权管理里看不到」。
+                // 正解是**按 key 的真实归属登记**：targets 是 `FQCN::method`，每个 target 自己的 controller
+                // 才是该 key 的名实所在；写回那里既能让权限点可见可勾，又天然避开上面说的名实错位。
+                //
+                // 注意：运行时校验是 `in_array(成员key, role_actions)`（Foundation\Controller::checkAuthorization），
+                // 组自身不参与校验，故此处不额外合成"组节点"。
+                if (isset($meta['acl_target_keys']) && is_array($meta['acl_target_keys'])) {
+                    foreach ($meta['acl_target_keys'] as $target => $targetKey) {
+                        $targetController = str_contains((string) $target, '::')
+                            ? explode('::', (string) $target, 2)[0]
+                            : '';
+                        if ($targetController === '') {
+                            continue;
+                        }
+
+                        $targetKey = (string) $targetKey;
+                        if ($targetKey === '') {
+                            continue;
+                        }
+
+                        // 归属**只能回查主循环登记的索引**：`$aclTargetOwner[$target]` 给出它自己的
+                        // module/controller key。不要自行重算 —— `aclPlainKey` 的段口径与主循环的
+                        // controller key 并不相同（主循环对 `Mooeen\...\RecordController` 得
+                        // `controller-7b67f06a66cded71`，而按明文 key 反推得到另一个 hash），
+                        // 自行算会写出没有语言条目的伪控制器、渲染时被 `Actions::recursion` 丢弃。
+                        $target = (string) $target;
+                        $owner  = $this->aclTargetOwner[$target] ?? null;
+                        if ($owner === null) {
+                            // 该 target 本轮没有自己的路由（理论上不应发生）：跳过而不是猜归属，
+                            // 宁可少登记也不写出结构错误的条目。
+                            continue;
+                        }
+
+                        [$targetModuleKey, $targetControllerKey]                  = $owner;
+                        $config_actions[$targetModuleKey][$targetControllerKey][] = $targetKey;
+                    }
+                }
             } else {
                 foreach ($meta['action_keys'] as $actionKey) {
                     $config_actions[$meta['module_key']][$meta['controller_key']][] = $actionKey;
