@@ -105,7 +105,7 @@ order: 190
 
 1. **重新发布前端资源** —— `php artisan vendor:publish --provider="Mooeen\Scaffold\ScaffoldProvider" --tag=public --force`。否则宿主 `public/vendor/scaffold/` 里还是旧的页面脚本，拿不到 `api.js`。详见 [01-install.md](01-install.md)。
 2. **改你自己消费 `/scaffold` JSON 的代码** —— 按 §1 的信封取载荷，错误分支改用 `error.code`。
-3. **改已外迁成员的调用点** —— 如 `Utility::getStoragePath()` → `Support\Paths::storage()`、`Utility::getModels()` → `Support\StorageRegistry::models()`。完整清单见 [CHANGELOG](../../CHANGELOG.md) 的 `2.2.0` 与「未发布」两节。
+3. **改已外迁成员的调用点** —— 如 `Utility::getStoragePath()` → `Support\Paths::storage()`、`Utility::getModels()` → `Support\StorageRegistry::models()`。完整清单见 [CHANGELOG](../../CHANGELOG.md) 的 `2.2.0` 与 `2.2.1` 两节。
 
 ## 6. 守卫在哪(契约不靠人记)
 
