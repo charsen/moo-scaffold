@@ -209,6 +209,38 @@ class UpdateAuthorizationGenerator extends Generator
             }
         }
 
+        // 不变式：**任何被非白名单动作校验的 key，永不允许出现在白名单**。
+        //
+        // 2026-09-21 修「白名单污染」：动作缺 @acl 时上面把 `$meta['action_keys']` 塞进白名单，
+        // 而那是 transform **目标**的 key（如 AttachmentController 的 $abilities=['WorkController::show',...]），
+        // 于是别的 controller 的**真实权限点**被写进白名单。运行期 Gate 命中白名单即放行
+        // （AuthServiceProvider 的 acl_authentication），后果是这些权限点对任何登录者恒真 ——
+        // 实测 12 个 key / 90 个路由动作受影响，且 `hasAction('ContractController::show')` 恒真会
+        // 短路 ContractAclCheckTrait / ReceivePaymentTrait，**按合同的数据范围 ACL 被整体绕过**。
+        //
+        // 保留的语义：真正「登录即可、不做授权」的动作（@acl 缺失）其 key 不在 actions 里，
+        // 不受本不变式影响（实测 160 个白名单 key 中 148 个属此类）。
+        $actionKeySet = [];
+        foreach ($actions as $controllers) {
+            foreach ($controllers as $actionKeys) {
+                foreach ($actionKeys as $actionKey) {
+                    $actionKeySet[(string) $actionKey] = true;
+                }
+            }
+        }
+        // 注意：$whitelist 此处尚未去重（同一 key 会被每个动作各加一次），故先取唯一再比对与报告，
+        // 否则警告里会出现「68 个 key」这种把它们重复计数的误导性数字（实际只有 12 个唯一 key）。
+        $whitelist = array_values(array_unique($whitelist));
+        $conflicts = array_values(array_intersect($whitelist, array_keys($actionKeySet)));
+        if ($conflicts !== []) {
+            $whitelist = array_values(array_diff($whitelist, array_keys($actionKeySet)));
+            $this->console()->warn(sprintf(
+                '白名单与权限点冲突，已剔除 %d 个唯一 key（这些 key 变更为按权限校验，不再登录即放行）：%s',
+                count($conflicts),
+                implode(', ', $conflicts),
+            ));
+        }
+
         $config[$app] = [
             'whitelist' => array_values(array_unique($whitelist)),
             'actions'   => $actions,
