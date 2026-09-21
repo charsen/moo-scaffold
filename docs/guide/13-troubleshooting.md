@@ -35,13 +35,20 @@ order: 140
 
 ## 写操作被拒(403)
 
-任意 `/scaffold/*` 的 POST 报 403,挨个查:
+任意 `/scaffold/*` 的 POST 报 403,先看**机器码** —— JSON 端点读响应 `error.code`,表单请求看 flash 文案:
 
-- `APP_ENV=production`?生产一律只读。
-- `SCAFFOLD_CONFIG_READONLY=true`?强制只读。
+| `error.code` | 含义 → 解法 |
+|---|---|
+| `WRITE_LOCKED` | 生产 / `SCAFFOLD_CONFIG_READONLY=true` 下改了 `db/designer*` · `accounts*` · `config*` · `cloud/push` · `cloud/discard` · `docs*` → 设计意图,不要绕 |
+| `EDIT_LOCAL_ONLY` | 计划 / 发版日志仅 local 可编辑(staging 也不行) |
+| `ADMIN_ONLY` | 当前账号不是 admin(或改 `/scaffold/config/*` 需要 admin) |
+| `DESIGNER_FORBIDDEN` | 账号没有 `can_design_db` |
+
+其余排查:
+
 - 写操作是不是绕过了 `EnforceScaffoldWritable` 路由组?
 
-详见 [12-security.md](12-security.md)。
+详见 [12-security.md](12-security.md) 与 [19-web-json-contract.md](19-web-json-contract.md)。
 
 ## 表单 / CSRF
 
@@ -60,6 +67,9 @@ order: 140
 | 改了 Blade 没生效 | 罕见 → `php artisan view:clear` |
 | CSS 缓存破坏失效 | DevTools 看 `<link>` 的 `?v=` 变了没,勾 Disable cache |
 | 主题切换不响应 | `<html data-theme>` 切了吗?`main.js` 加载了吗? |
+| **toast 喷 `[object Object]`** | 前端资源没重发 → 新信封的 `error` 是**对象**,旧脚本按字符串用 → `vendor:publish --tag=public --force` |
+| **功能静默失效**(预览空白 / 删除后页面不动 / 搜索永远"无匹配") | 同上前提,或**你自己写的 JS** 还在直读顶层载荷 → 改走 `window.ScaffoldApi.data()`;这是升级到 2.2.0+ 后最典型的症状,详见 [19-web-json-contract.md](19-web-json-contract.md) |
+| 想按错误类型分支 | 读 `error.code`(机器码),**别**匹配 `error.msg` 文案 → 清单见 [19-web-json-contract.md](19-web-json-contract.md) |
 
 详见包内 `public/javascript/alpine-init.js` 顶部的 Alpine CSP build 约束。
 
