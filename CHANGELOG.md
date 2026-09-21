@@ -1,8 +1,27 @@
 # Changelog
 
+## 未发布（2.2.0 tag 之后）
+
+> 2.2.0 打 tag 之后、下一个版本号之前的改动先记在此处；发版时整体下移到一个版本号下。
+
+- **`Utility` god-class 拆分收尾（第 4-9 项，重构 · 行为保真）**：继 2.2.0 已发布的 3a→3b-3（`Support\Paths` / `ActionMeta` + `ActionDoc` / `StorageRegistry` / `ControllerName`）之后，剩余各「一族一职责」的切片全部外迁，同样**不留转发**：
+  - `ApiController` 的参数形状归一族 → `Support\ApiParameterFormatter`（15 方法 / 549 行）；旧家 **1237 → 808 行**。
+  - `ScaffoldController` 的接口发布历史族 → `Support\PublishHistoryService`（7 方法 / 342 行）；旧家 **795 → 508 行**。
+  - `SchemaLoader` 的 `saveModule` 族 → `Designer\SchemaPayloadMerger`（12 方法 / 679 行）、`loadTableFull` 族 → `Designer\FieldShaper`（4 方法 / 181 行）；旧家 **2132 → 1356 行**。
+  - `AuditFormContractCommand` 的扫描目标推导族 → `Support\ControllerScanTarget`（3 方法 / 116 行）、豁免标记族 → `Support\FormContractMarkers`（3 方法 + 1 私有常量 / 113 行）；旧家 **757 → 592 行**。
+  **下游需注意**：以上成员原为各控制器 / 服务 / 命令的 private 面，外迁后成为 `Support\` / `Designer\` 的公开类 —— 直接调用过旧私有实现（或反射 / 结构锚点钉过它们）的地方需要改指向。
+- **`FieldShaper::shapeField` 更名为 `FieldShaper::shape`**（纯命名，零行为）。跨语言引用一并收口 —— PHP 侧与 `public/javascript/designer.js` 注释里指向该方法的字面量都已改名；**下游若在注释 / 文档 / 脚本里引用过 `shapeField`，需同步**。
+- **`src/` 里 3 处内部项目代号脱敏为 H1 代号**（注释文本，零行为变化）—— 本仓开源，不写内部项目名。
+- **示例账号模板 `stubs/accounts.example.yaml` 不再使用真口令形态**，并加内容守卫（非纯数字 + 占位语义 + 注释层），避免样例被误当真账号沿用。
+- **e2e 收尾脚本 `tests/Browser/safe-run.sh` 的清理段不再静默失败**（小项 #38）：清理失败会显式报出，不再伪装成"已经跑干净了"。
+- **`pages/local-markdown-editor.js` 的失败分支不再直读 `xhr.responseJSON`**（改为 `ScaffoldApi.pick(xhr)`）：此前它是全仓最后一个绕开前端解包层的 body 读法。`pick()` 在 `responseJSON` 缺失时会再试 `JSON.parse(responseText)`、失败返回 `null` 不抛，因此「拿不到 body」与「body 里没有 `errors`」不再被混为一件事。**不变量未变** —— 校验袋仍是框架层产物、仍不套信封。配套守卫 `tests/javascript/local-markdown-unwrap.test.js` 的对应断言由「`responseJSON` 恰好 1 处（合法例外）」升级为「必须 0 处」。同批与姊妹文件 `docs-editor.js` 对齐：预览回调补上 `data()` 结果的 `|| {}` 与 `payload.html || ''` 兜底（此前只有 `docs-editor.js` 有），守卫新增 2 条**跨文件**断言钉住两侧一致。**下游需注意**：改的是 `public/` 下的资源，需重新 `vendor:publish --tag=public --force` 才生效。
+- **`tests/javascript/run-all.js` 改为打印断言总数**（开发工具）：此前它只报「N 个守卫文件全绿」，各文件自己的「（M passed）」原样转发 —— 屏幕上最后一行是**最后一个文件**的计数，看起来像总数。已导致同一处误记独立复现两次。现在由 runner 解析各文件计数并求和，解析不出时显式告警。
+- 回归：本批新增 `ApiParameterFormatterTest` / `PublishHistoryServiceTest` / `SchemaPayloadMergerTest` / `FieldShaperTest` / `ControllerScanTargetTest` / `FormContractMarkersTest` / `AccountsExampleTemplateTest` / `SafeRunScriptTest`，并同步订正既有结构锚点（外迁后钉在旧家的清单项必须同批删除，否则立刻红）。
+- **`FormRequest::getExistId()` 补注释 + 加守卫（零行为变化）**：该 helper 把入参原样拼成 `exists:<入参>,id`，而调用面一律传 `Model::class` —— 这是**刻意保留**的：Laravel 的 `exists`/`unique` 规则自己会把模型类解析成 `getTable()`，并额外带上模型自己的 connection，手工归一反而会丢 connection。本轮曾据一次离线静态扫描判定此处「必然 500」并尝试归一，经真实 `Validator` 验证后**已撤回**；现补上 `tests/Feature/Foundation/ExistIdRuleTest.php`（5 例）把该行为钉住，并在方法 docblock 记下误判成因。
+
 ## 2.2.0
 
-- **`/scaffold` 全部 API 端点统一为 `{message}` JSON 信封**（**行为变更**）。此前各控制器各自拼装响应、错误回执形态不一，消费者要逐处容错；现由 `Support\JsonEnvelope` 统一产出，机器码由异常类名派生（`BaseException` 迁移），三个 `Enforce*` 中间件与控制器基类同时收敛，并在框架层与前端层各加一道守卫。前端新增 `public/javascript/api.js` 统一解包层 `ScaffoldApi`，`designer.js` / `docs-editor.js` / `docs-home.js` / `local-markdown-editor.js` 全部改走它，旧的「两形态容忍」代码删除。**下游需注意**：① 直接消费 `/scaffold` JSON 的代码要按新信封解析；② 若曾 `vendor:publish` 前端资源，需重新发布以取得 `api.js` 与更新后的页面脚本。
+- **`/scaffold` 全部 API 端点统一为 JSON 信封**（**行为变更**）：成功 `{"ok":true,"data":{…}}`、失败 `{"ok":false,"error":{"code","msg","detail"}}` + 对应 4xx/5xx（`$http` 故意不给默认值）。此前各控制器各自拼装响应、错误回执形态不一，消费者要逐处容错；现由 `Support\JsonEnvelope` 统一产出，机器码由异常类名派生（`BaseException` 迁移），三个 `Enforce*` 中间件与控制器基类同时收敛，并在框架层与前端层各加一道守卫。**两类永久例外（不套信封，前端解包层同样吃）**：① `ApiProxyController` 的 body 是上游 API 原样透传（HTTP 恒 200 + `_proxy_status` 契约）；② 框架层响应（`abort()` 的 `{message}`、表单校验袋 `{message,errors}`、throttle 429）。前端新增 `public/javascript/api.js` 统一解包层 `ScaffoldApi`，`designer.js` / `docs-editor.js` / `docs-home.js` / `local-markdown-editor.js` 全部改走它，旧的「两形态容忍」代码删除。**下游需注意**：① 直接消费 `/scaffold` JSON 的代码要按新信封解析（形态、两类例外与机器码清单见 [guide/19-web-json-contract](docs/guide/19-web-json-contract.md)）；② 若曾 `vendor:publish` 前端资源，需重新发布以取得 `api.js` 与更新后的页面脚本。
 - **`Utility` god-class 拆分**（重构，行为保真）：`src/Utility.php` 由 845 行降至 331 行，按职责外迁到 `Support\` 下的独立类，**不留转发** —— 3a 名归一 → `Support\ControllerName`（`addGitIgnore` 遗留项一并收口）；3b 文档元信息 → `Support\ActionMeta` + `Support\ActionDoc`（9 方法 / 33 调用点）；3b-2 路径 → `Support\Paths`（10 公开 + 1 private）；3b-3 登记表读取 → `Support\StorageRegistry`（9 方法 / 32 调用点）。两个高频名字归一方法保留一版 `@deprecated` 静态转发。**下游需注意**：直接调用 `Utility::getStoragePath()`（→ `Support\Paths`）/ `Utility::getModels()`（→ `Support\StorageRegistry`）等已外迁成员的地方需要改指向。
 - **跨包姓名契约移出 scaffold**：改由私有 `moo-contract` 定义，scaffold 侧不再持有该契约。
 - **`moo:account:add` 修复**：非交互模式下会静默创建空密码账号。

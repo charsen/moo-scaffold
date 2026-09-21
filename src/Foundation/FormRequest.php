@@ -121,6 +121,24 @@ class FormRequest extends BaseFormRequest
 
     /**
      * 获取 模型主键 是否存在的规则
+     *
+     * 入参是**表名**，但生成器与手写 Request 的调用面一律传 `Model::class`
+     * （`CreateControllerGenerator` 生成 `$this->getExistId(\App\Models\X::class)`）。
+     *
+     * ⚠ **这是刻意保留的形态，不要在这里把入参归一成表名**：Laravel 的 `exists` / `unique`
+     * 规则**自己会解析模型类** —— 字符串规则走 `ValidatesAttributes::parseTable()`，
+     * `Rule::exists()` 对象走 `DatabaseRule::resolveTableName()`，两处在 Laravel 10 / 11 / 12
+     * 都逐字相同。而且框架比"取 `getTable()`"多做一步：它会把模型自己的 connection 带上
+     * （`$connection ??= $model->getConnectionName()`）—— 手工归一反而会**丢掉 connection**，
+     * 让跨库模型查到默认库上去。
+     *
+     * ⚠ 2026-09-21 有过一次「修 bug」的尝试（把入参归一成 `getTable()`），**已撤回**。
+     * 那个结论来自**离线扫规则串的 harness**：那里宿主模型类不可加载 ⇒ `class_exists()` 为 false
+     * ⇒ 框架不解析 ⇒ 复现出 `no such table: App\Models\X` 的 `QueryException`。
+     * 真实运行时模型类就在同一个应用里、是可加载的，框架照常解析成真实表名。
+     * **同一串形态在「类可加载 / 不可加载」两种上下文里结果相反** —— 判断这条链路
+     * 必须在应用内跑一次 `Validator`，别用静态扫规则串的结论。
+     * 守卫：`tests/Feature/Foundation/ExistIdRuleTest.php`。
      */
     protected function getExistId(string $model_table): string
     {

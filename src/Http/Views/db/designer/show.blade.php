@@ -391,7 +391,7 @@
                                 <tbody>
                                     {{-- CSP build:模板里 method call 几乎全拒(:key/:disabled/:readonly/:class/x-show 都不行;
                                          x-on 也不能带 literal+$event 这种 multi-arg)。
-                                         做法:① shapeField 预算 row_readonly/name_readonly/index_disabled/row_class/can_remove
+                                         做法:① FieldShaper::shape 预算 row_readonly/name_readonly/index_disabled/row_class/can_remove
                                               ② 每个 attr 一个专属 single-arg setter(setFieldKey/Name/Type/Size/Default/Index/Nullable/Comment)
                                               ③ <tr> 加 :data-rk="f.__rowId",setter 内从 closest('tr').dataset.rk 反查 fields[] 行
                                               ④ :key 用 __rowId(stable session id,改 key 不会触发 DOM remount) --}}

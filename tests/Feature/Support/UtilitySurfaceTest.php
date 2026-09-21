@@ -505,9 +505,12 @@ it('src/ 内部不再调用 Utility 上已废弃的两个后缀转发，一律�
     expect($offenders)->toBe([], "以下文件仍在调 Utility 上已废弃的转发（应直调 ControllerName::strip()/ensure()）：\n  " . implode("\n  ", $offenders));
 
     // 正向锚点：确认扫描真的扫到了迁移后的真源调用，而不是文件集/正则坏了导致空过。
+    // 2026-09-20（第 5 项）：`ControllerName::ensure` 的唯一调用点随 saveModule 族一起
+    //   从 `src/Designer/SchemaLoader.php` 搬到了 `src/Designer/SchemaPayloadMerger.php`
+    //   ⇒ 锚点跟着搬，不能只删旧的（删了就失去「扫描非空过」的证明力）。
     expect($callers)->toContain(
         'src/Adder/ControllerAdder.php',
-        'src/Designer/SchemaLoader.php',
+        'src/Designer/SchemaPayloadMerger.php',
         'src/Generator/CreateApiGenerator.php',
         'src/Generator/CreateControllerGenerator.php',
         'src/Generator/CreateViewGenerator.php',
