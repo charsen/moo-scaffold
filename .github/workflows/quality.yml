@@ -34,3 +34,42 @@ jobs:
 
       - name: Audit dependencies
         run: composer audit --locked --no-interaction
+
+  javascript:
+    name: Frontend guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # 前端解包层守卫（`public/javascript/api.js` 的行为 + 各页面脚本的接线形态）。
+      #
+      # 为什么**不**跑 `npm ci`：`tests/javascript/run-all.js` 只用 node 内置模块
+      # （path / fs / child_process），零依赖 —— 装了 @playwright/test 会把
+      # 「改一行 api.js 的反馈回路」从秒级拉到分钟级，而这条守卫的全部价值就是快。
+      # 守卫「没在跑」比守卫失败危险得多，所以它必须在这里真的跑起来。
+      - name: Run frontend unwrap guards
+        run: npm run test:js
+
+  ui-checks:
+    name: UI static checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 只跑三个不依赖运行宿主的静态检查（视图规则 / 资源引用 / CSS 体积预算）。
+      #
+      # `smoke-http.sh` **不进 CI**：它要对真实起着的 `/scaffold` 发 HTTP（需要宿主
+      # Laravel + 数据库 + 登录态），属本地手动项 —— 见 tools/ui-checks/README.md。
+      # 所以这里逐脚本调用，而不是跑会连带 smoke-http 的 `run-all.sh`。
+      - name: Static guards（业务视图无内联 style / 无硬编码 hex 等）
+        run: tools/ui-checks/static-guards.sh
+
+      - name: Asset guards（CSS / JS 引用文件存在）
+        run: tools/ui-checks/asset-guards.sh
+
+      - name: CSS budget（index.css gzip ≤ 60 KB）
+        run: tools/ui-checks/css-budget.sh
