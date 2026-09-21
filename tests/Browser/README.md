@@ -24,6 +24,13 @@ php /path/to/host/artisan serve --host=127.0.0.1 --port=8088
   php /path/to/host/artisan vendor:publish --tag=public --force
   ```
 
+- ⚠️ **坑：宿主走 vhost 域名（如 `http://my-host.test`）时，Chromium 会直接拦掉并报 `net::ERR_BLOCKED_BY_CLIENT`**
+  —— 长得像网络故障，其实是「HTTP + 该主机名」这一对不放行（`localhost` / `127.0.0.1` 都能开，同一域名改用
+  `https://` 反而会真去连、报 `CONNECTION_REFUSED`）。**别去调 Chromium 开关，用本机反向代理绕**：
+  `127.0.0.1:<port>` → 该 vhost（补 `Host:` 头，并把响应体与 `Location` 里的原主机名改写成代理地址），
+  然后 `E2E_BASE_URL=http://127.0.0.1:<port>`，**并把 `admin.json` 里 cookie 的 `domain` 改成 `127.0.0.1`**
+  （仍是原域名的 state 在代理下不生效，会整套以「未登录」形态假失败）。
+
 ## 2. 录登录态
 
 **人工（推荐）**：
@@ -117,6 +124,19 @@ npm run test:e2e:ui
 判定「改动是否引入回归」用 **A/B 对照**：改动前后在**同一宿主、同一 env** 下各跑一遍，
 比**失败集合**（不只是 passed 数）。同一份代码两次跑也可能一条红一条绿（本仓见过
 `designer.spec` 的创建表类用例偶发超时），所以「疑似回归」至少要复跑一次再定性。
+
+### ⚠ 限流会伪装成回归
+
+`/plans/save`、`/release-records/save`、`/docs/save`、`/db/designer/{schema}/save` 等写端点都挂了
+`throttle:30,1`（部分更紧，如 `throttle:10,1`）。**短时间内反复跑同一批保存类用例会把配额打爆**：
+症状是页面状态栏显示 **`Too Many Attempts.`**，用例断言「已保存」因而失败 —— 看着像功能回归，
+实际是上一轮跑剩的配额。
+
+- **判据**：报错文案是 `Too Many Attempts.`（而不是断言不匹配、也不是 5xx）。
+- **处置**：等 60 秒窗口重置后**只重跑受影响的那几条**；别急着改代码。
+
+> 反过来说，这个现象是个**正向信号**：429 走的是框架层 `{message}`（**不套信封**），
+> 前端能把它读出来显示，说明解包层的 `j.message` 分支在真实环境是通的。
 
 ## ⚠ 跑完必须核对宿主
 
