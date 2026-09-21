@@ -195,7 +195,8 @@ it('save 的信封：{ok:true,data:{version}}，顶层不再有 version', functi
 
 it('失败路径不套信封：校验失败仍是 Laravel 的 validation bag（前端靠它做就地提示）', function ($route) {
     // `errors.*` 由框架的 ValidationException 生成，**不经控制器** ⇒ 不套信封。
-    // 前端 `local-markdown-editor.js` 的 .fail 分支依赖 `responseJSON.errors.content[0]`，
+    // 前端 `local-markdown-editor.js` 的 .fail 分支要读 `errors.content[0]` 做就地提示
+    // （经 `ScaffoldApi.pick(xhr)` 取 body，2026-09-21 起不再直读 `xhr.responseJSON`），
     // 这条把它钉住，避免有人"顺手"把异常出口也包进 ok:false,error:{…} 而打掉就地提示。
     $this->postJson('/scaffold/' . $route . '/save', ['slug' => $this->slug, 'content' => ['bad'], 'version' => str_repeat('a', 64)])
         ->assertUnprocessable()
