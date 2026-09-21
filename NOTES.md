@@ -3,6 +3,55 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-21，**「屏幕最后一行的数字」不等于「总数」—— 汇总器只报文件数时，最后一个文件的计数会被当成总计**：
+  `npm run test:js` 原先只打印「✅ N 个守卫文件全绿」，各文件自己的「（M passed）」原样转发到 stdout。
+  按文件名排序最后一个恒是 `scaffold-api.test.js`（62）⇒ **两轮笔记都把这个 62 记成了总数**。
+  真总数：22 + 25 + 30 + 62 = **139**。同款误读在 `NOTES.md` 第 512 行与本轮工作日志里各留过一条，
+  两条都写「3 个守卫文件 62 断言」—— **同一处错记被独立复现过两次，说明是输出形态的问题、不是谁的疏忽**。
+  **修法**：`run-all.js` 把子进程输出收回来、逐个解析「（N passed）」求和，打印**唯一的总数**；
+  某文件计数解析不出来时**显式告警**（格式变了 = runner 不再读得到它，属静默失效）。
+  **通则**：**汇总器必须自己算并打印总数，不能指望读的人去累加屏幕上的分项** ——
+  尤其当分项里有一个数「看起来像总数」（最后一个 / 最大的那个）时，误读率接近 100%。
+  判据：见到汇总输出先问一句「这个数字是**它算出来的**，还是我从屏上抄的」。
+- 2026-09-21，**「守卫存在」不等于「守卫在跑」—— 本轮审计最硬的一条**：`tests/javascript/`（前端解包层守卫）与 `tools/ui-checks/` 的三个静态检查**都已存在、且能秒级跑通**，但 `.github/workflows/quality.yml` 里只有 `php` 一个 job —— `git log 2.1.25..HEAD -- .github/` **零命中**，整轮改造期间它们一次都没在 CI 跑过。
+  最讽刺的是这两处自己的注释就写着要防这个：`scaffold-api.test.js` 的 docstring 写「必须有一个能在 **CI** / 无宿主环境跑起来、秒级返回的守卫」，`run-all.js` 的 docstring 写「守卫『没在跑』比『守卫失败』危险得多」—— 而它自己就没在跑。
+  **通则**：新增守卫必须**同批**确认它的执行入口（CI / composer script / hook），否则等于写了一份永不被执行的文档；审计「守卫是否有效」的第一步不是读断言，是查它的调用点。
+  **顺带定清边界**：`smoke-http.sh` 与 `npm run test:e2e:safe` **不进 CI 是对的** —— 前者要对真实起着的 `/scaffold` 发 HTTP，后者要宿主 Laravel + 数据库 + 浏览器登录态。所以 CI 里**逐脚本**调用那三个不依赖宿主的静态检查，而不是跑会连带 smoke-http 的 `run-all.js`。
+- 2026-09-21，**审计类 `grep` 一律走工具，不要走本机 shell**：zsh 下 `grep "a\|b"` 的 BRE 交替**静默失效**（不报错、返回空），本轮因此一度误判「`NOTES.md` 里没有信封条目」「`docs/` 里没有信封提及」—— 实际 NOTES 里第 2 项有 6 条相关记录。
+  **判据**：任何「某关键词全仓无命中」的结论，写进报告前必须换工具（Grep / ripgrep）复核一次；「没搜到」与「不存在」是两件事。
+- 2026-09-21，**`local-markdown-editor.js` 的形态层守卫必须「先剥注释再扫」，不能照抄 `docs-unwrap.test.js`**：那个文件的注释**故意**写出旧读法来警告后人（`取 data.version 而不是 result.version`、`别用 isOk() 判它`），按原始文件内容扫会把自己的警告语扫红。`tests/javascript/local-markdown-unwrap.test.js` 因此先 `stripComments()`，并额外加 4 条「剥注释自身可信」断言（原文长度确实变短 + 精确接线字符串仍在 + 校验袋读法仍在 + 警告语确实被剥掉）—— 否则剥过头会把代码一起吃掉、让形态层**静默放行**。
+  同文件还有一条**反向断言**：本文件里 `isOk(` 必须 0 处 —— `{ok:true,data:{html,error}}` 里的 `error` 是 **frontmatter 领域字段**（预览成功、只是要就地提示），用 `isOk()` 判它会把「成功但有提示」当失败吞掉。这是唯一一个**不能用成功判据判 error 字段**的消费者。
+- 2026-09-21，**`getExistId()` 的「入参是模型类」不是 bug —— 框架自己会解析，原样透传才是对的；撤回一次误判的「修复」**：
+  生成器产出 `$this->getExistId(\App\Models\X::class)`，helper 原样拼成 `exists:App\Models\X,id`。
+  Laravel 的 `exists` / `unique` 规则**自己就把模型类解析成真实表**：字符串规则走
+  `ValidatesAttributes::parseTable()`（`str_contains($table,'\\') && class_exists($table) && is_a($table, Model::class, true)`
+  ⇒ `$table = $model->getTable()`），`Rule::exists()` 对象走 `DatabaseRule::resolveTableName()`；两处在 Laravel 10 / 11 / 12 逐字相同。
+  框架还比「手工取 `getTable()`」多做一步：`$connection ??= $model->getConnectionName()` —— **手工归一反而会丢掉 connection**，
+  让跨库模型查到默认库上去。实测：`parseTable(ConnParent::class)` 得 `['exist_id_conn','exist_id_conn_parents','id']`，
+  换成本地归一后的纯表名则退化成 `[null,'exist_id_conn_parents',null]`。端到端跑真实 `Validator`：存在的行通过、缺失的行报校验错，**没有 500**。
+  ⚠ 写这类探针时 fixture **必须是具名类**：解析的第一道闸就是 `str_contains($table, '\\')`，匿名类的 `::class` 不含反斜杠，会被直接跳过。
+  **⚠ 误判怎么来的（这才是本条真正要记的）**：一次「离线扫规则串」的 harness 把 878 个 FormRequest 的规则串静态分类，
+  判定「首参含 `\` 的 226 条是坏规则、必然 500」—— 那个 harness 里**宿主模型类不在自动加载路径上**，
+  `class_exists()` 返回 false ⇒ 框架跳过解析 ⇒ `parseTable` 把 FQCN 当表名返回 ⇒ 真的复现出
+  `QueryException: no such table: App\Models\X`。**结论对 harness 成立、对真实应用不成立。**
+  **通则（可复用）**：**同一串形态在「类可加载 / 不可加载」两种上下文里结果相反** —— 凡结论依赖「某个类能不能被解析」，
+  就不能用静态扫字符串 / 离线 harness 定案，必须在应用内跑一次真实 `Validator`。那组「76 / 226」「291 / 1」
+  量的是**规则串的形态**、不是 bug 数，**已作废，不要外引**。
+  **同族 helper 对照**：`getUnique()` 的调用点传的是 `$this->getTable()`（纯表名），无此形态 —— 两套语义并存是刻意的，不要「统一」。
+  守卫：`tests/Feature/Foundation/ExistIdRuleTest.php`（5 例，含 connection 保留与「类加载不到才退化」两条反向锚点）。
+- 2026-09-21，**「环境依赖型脆弱测试」的一个实例，且它已经在 NOTES 里被当成常态记录了 3 次**：
+  `ConfigControllerTest` 的「敏感字段不回显明文」原先用 `assertSee('<code>****</code>')` 锚定「默认值列也掩码」，
+  而该列的值来自 `ConfigManager::packageDefault('author')` = `env('SCAFFOLD_AUTHOR','')` —— **shell 里没有这个变量时就是空串**，
+  `maskValue('')` 返回 `''`，默认列渲染成空 `<code>`，断言必红。实测：无该变量 **1 failed**、`SCAFFOLD_AUTHOR=probe` 立刻 **1 passed**。
+  **定性判据**：`resolveField()` 与 `config/index.blade.php` 的默认列 diff 均未触及 ⇒ **是测试脆弱，不是代码回归**；
+  上一轮（第 8/9 项）NOTES 里那句「全量 pest 1 failed / 3 skipped / 1320 passed」记的就是它 —— 一条随运行环境变色的断言被当成了基线。
+  **修法**：锚点字段换成 `auth.cookie_name`（包默认值是 `config/config.php` 里的**字面量** `'scaffold_auth'`，确定性可断言），
+  `sensitive_keys` 同时含 `AUTHOR`（断真值不回显）与 `COOKIE`（断默认列掩码）；同款判据早已在
+  `ConfigManagerSensitiveTest`「敏感字段的『默认值』列也掩码」一条里，**写法可直接对齐，不必新造**。
+  **咬合力验证**：把 `resolveField()` 的 `'default' => $sensitive ? maskValue($packageDefault) : $packageDefault` 打哑 ⇒ 该用例报红，还原后复绿。
+  修后全量 pest **1321 passed / 0 failed / 3 skipped（5530 assertions）** —— 失败归零。
+  **通则**：给「包默认值」列做断言时，**只挑包 config 里字面量非空的字段**；凡 `env('X','')` 形态的字段，
+  其默认值随运行环境浮动，拿它当锚点等于把测试绑到 shell —— 这与「用 H1/H2 代号而不是绝对路径」是同一种纪律。
 - 2026-09-20，**第 9 项：同一命令的「豁免标记」族 3 方法 + 1 个私有常量外迁 `Support\FormContractMarkers` —— 首个「常量跟着方法一起搬」的切片，也是「同一份命令拆两次」的第二次**：
   **净变化**（含第 8 项）：`AuditFormContractCommand` **757 → 592 行**、方法 **18 → 12**（第 8 项后 15、本项后 12）；本项新类 **113 行**。
   搬走 3 个 = `waivedMarkers`（Request 源码里 `// @moo-waived <字段>: <原因>` → `字段名 => 原因`）/
@@ -470,7 +519,10 @@
   **全量 1 failed / 3 skipped / 1141 passed（4567 断言）**（3b-2 基线 `1134 / 4508`，+7 例 / +59 断言 —— +7 例来自新测试文件）；
   红仍是 `ConfigControllerTest:305` 那条 env 耦合基线（`SCAFFOLD_AUTHOR=charsen` 即转绿）；
   `pint --dirty --test` 46 files PASS（写入式只修 1 处 `binary_operator_spaces`，前后 `git diff --stat` **逐字节一致**，无夹带重排）；
-  `npm run test:js` 3 个守卫文件 62 断言全绿；**e2e 按六·五 判据整段跳过**（`git status` 里 `public/` 与 `*.blade.php` 均 0 命中）。
+  `npm run test:js` 3 个守卫文件全绿；**e2e 按六·五 判据整段跳过**（`git status` 里 `public/` 与 `*.blade.php` 均 0 命中）。
+  ⚠ 本条原先写的是「62 断言」—— **那是误读**：runner 只报「N 个守卫文件全绿」，屏幕最后一行的
+  「（N passed）」是**按文件名排序最后一个文件**（`scaffold-api.test.js`）自己的计数，不是总数。
+  2026-09-21 已让 `run-all.js` 直接打印总数，**旧数别再引用**（当时 3 文件的真总数已不可考，故不补写）。
   **顺带查出的三条（本次只登记、不动）**：① `controllers(bool $merge_all = true)` 的 `true` 臂**零调用点**
   （全仓 10 个调用点一律显式传 `false`，唯一提 `true` 的是 `ScaffoldController` / `ScaffoldDashboardTest` 两处
   「为什么不再用它」的注释）⇒ **原样搬**，删它是 API 变更、要连注释与注释面锚点一起动；
