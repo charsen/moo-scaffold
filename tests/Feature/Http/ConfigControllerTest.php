@@ -286,9 +286,15 @@ function sensitiveSandboxOff(array $handle): void
 }
 
 it('敏感字段不回显明文:GET /scaffold/config 里既无真值、也无掩码回填', function () {
-    // 把 author 变成 sensitive(按 path 子串匹配)
+    // author 走敏感(按 path 子串匹配),用于断言真值不进 HTML。
+    // `auth.cookie_name` **一起标敏感**,专门给下面的「默认值列」锚点用 —— 它的包默认值是
+    // config/config.php 里的**字面量** `'scaffold_auth'`,确定性可断言;而 author 的包默认值是
+    // `env('SCAFFOLD_AUTHOR','')`,shell 里没有这个变量时就是空串、默认列渲染成空 `<code>`
+    // ⇒ 拿 author 当锚点会让本用例**依赖运行环境**(2026-09-21 实测:无该变量时这条必红、
+    // 设上就绿;`resolveField()` 与 index.blade.php 的默认列都没改过,属测试脆弱而非代码回归)。
+    // 同款判据在 ConfigManagerSensitiveTest 的「敏感字段的『默认值』列也掩码」一条。
     config([
-        'scaffold.config_ui.sensitive_keys' => ['AUTHOR'],
+        'scaffold.config_ui.sensitive_keys' => ['AUTHOR', 'COOKIE'],
         'scaffold.author'                   => 'top-secret-author',
     ]);
 
