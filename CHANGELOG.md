@@ -1,9 +1,8 @@
 # Changelog
 
-## 未发布（2.2.0 tag 之后）
+## 2.2.1
 
-> 2.2.0 打 tag 之后、下一个版本号之前的改动先记在此处；发版时整体下移到一个版本号下。
-
+- **2.2.0 重构的收尾版**：PHP 侧无公开契约变化 —— 新增的 6 个类（`Support\ApiParameterFormatter` / `Support\PublishHistoryService` / `Support\ControllerScanTarget` / `Support\FormContractMarkers` / `Designer\SchemaPayloadMerger` / `Designer\FieldShaper`）在 2.2.0 时都不存在；被搬走的 44 个方法当时**全是 `private`**（`public` / `protected` 签名 0 处改动），逐个核对后 43 个仍在当前 `src/` 里，唯一消失的名字是已公告改名的 `shapeField` → `shape`。常规升级路径下宿主需要动手的只有一件事：重新 `vendor:publish --tag=public --force`，以取得 `local-markdown-editor.js` 失败分支的修复。
 - **`Utility` god-class 拆分收尾（第 4-9 项，重构 · 行为保真）**：继 2.2.0 已发布的 3a→3b-3（`Support\Paths` / `ActionMeta` + `ActionDoc` / `StorageRegistry` / `ControllerName`）之后，剩余各「一族一职责」的切片全部外迁，同样**不留转发**：
   - `ApiController` 的参数形状归一族 → `Support\ApiParameterFormatter`（15 方法 / 549 行）；旧家 **1237 → 808 行**。
   - `ScaffoldController` 的接口发布历史族 → `Support\PublishHistoryService`（7 方法 / 342 行）；旧家 **795 → 508 行**。
