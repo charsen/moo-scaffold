@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **白名单污染**：`buildActions()` 对「缺 `@acl` 的动作」用 `$meta['action_keys']` 填白名单，而那是 **transform 目标**的 key（不是该动作自己的），于是别的 controller 的**真实权限点**被写进 whitelist；运行期 Gate 命中白名单即放行，实测 **12 个 key / 90 个路由动作**对任何登录者恒真。
+  放大后果：`hasAction('ContractController::show')` 恒真 → 按合同的数据范围 ACL（`acl_business` / `acl_receive_payment`）被整体绕过。
+  现写入前加不变式：**任何被非白名单动作校验的 key 永不允许出现在白名单**（冲突时打印剔除清单）。真正「登录即可」的动作其 key 不在 actions 里，不受影响。
+- **跨控制器复用的 ACL key 未写入授权字典**：`transform_methods` 跨 controller 复用 key 时原走空分支，整组 key 一条都不进 `config/actions.php`，授权管理页既看不到也无从勾选（实测「查看应用」不可见，非 root 无法进小应用内部）。
+  现按 key 的真实归属写回其所属 controller；归属取自主循环登记的 `aclTargetOwner` 索引，不再自行按 FQCN / 明文 key 反推（两者段口径不同，会算出不存在的伪控制器）。
+
 ## 2.2.1
 
 - **2.2.0 重构的收尾版**：PHP 侧无公开契约变化 —— 新增的 6 个类（`Support\ApiParameterFormatter` / `Support\PublishHistoryService` / `Support\ControllerScanTarget` / `Support\FormContractMarkers` / `Designer\SchemaPayloadMerger` / `Designer\FieldShaper`）在 2.2.0 时都不存在；被搬走的 44 个方法当时**全是 `private`**（`public` / `protected` 签名 0 处改动），逐个核对后 43 个仍在当前 `src/` 里，唯一消失的名字是已公告改名的 `shapeField` → `shape`。常规升级路径下宿主需要动手的只有一件事：重新 `vendor:publish --tag=public --force`，以取得 `local-markdown-editor.js` 失败分支的修复。
