@@ -1089,7 +1089,7 @@ document.addEventListener('alpine:init', () => {
             if (idx < 0) return;
             const f = this.fields[idx];
             // row_readonly 语义是"行内 attr 不可改"(system timestamps),不等于"不能整行删";
-            // 删除守护以 can_remove 为单一真源,跟 shapeField + view x-show 判定一致(只拦 id)
+            // 删除守护以 can_remove 为单一真源,跟 FieldShaper::shape + view x-show 判定一致(只拦 id)
             if (!f || !f.can_remove) return;
             const ok = await window.scaffoldConfirm({
                 title: '删除字段',
@@ -1897,7 +1897,7 @@ document.addEventListener('alpine:init', () => {
                 insertAt = this.fields.findIndex(f => f && f.row_readonly && f.key !== 'id');
                 if (insertAt < 0) insertAt = this.fields.length;
             }
-            // plan 19 v8 C4:新字段 shape 必须跟 SchemaLoader::shapeField 对齐,
+            // plan 19 v8 C4:新字段 shape 必须跟 FieldShaper::shape 对齐,
             // 漏掉 derived(unsigned_disabled / can_rename / row_title 等)→ Alpine CSP 模板访问 f.X 找不到 → warn
             const newField = {
                 __rowId: key,                  // session 内 stable id,跟 saveModule 重建后 reload 派生的 __rowId 一致
@@ -1921,7 +1921,7 @@ document.addEventListener('alpine:init', () => {
                 size_title: '',
                 default_class: '',
                 default_title: '',
-                // C4 补全 derived(跟 batch-add 那一处 + PHP shapeField 对齐)
+                // C4 补全 derived(跟 batch-add 那一处 + PHP FieldShaper::shape 对齐)
                 // 2026-05-22:unsigned_disabled / precision_disabled 必须根据 type 派生,
                 // 否则新加 bigint 字段表里 unsigned col 视觉 disabled、decimal 字段 precision 不可编辑
                 unsigned_disabled: ! ['bigint', 'int', 'tinyint', 'smallint', 'mediumint', 'decimal', 'float', 'double'].includes(type),
@@ -2163,7 +2163,7 @@ document.addEventListener('alpine:init', () => {
                 const t = r.type || 'varchar';
                 const sizeIsApplicable = (t === 'varchar' || t === 'char');
                 const sz = sizeIsApplicable && r.size && /^\d+$/.test(r.size) ? parseInt(r.size, 10) : null;
-                // 2026-06-16:unsigned 跟 confirmAddField 派生对齐 —— numeric 类型默认 unsigned(同 PHP shapeField
+                // 2026-06-16:unsigned 跟 confirmAddField 派生对齐 —— numeric 类型默认 unsigned(同 PHP FieldShaper::shape
                 // 默认)且可编辑。原写死 unsigned:false + unsigned_disabled:true → 新加 int/bigint 无符号不可改、
                 // 且 reload 后被 PHP 默认 true 自动勾上(前后不一致)。
                 const isNumeric = ['bigint', 'int', 'tinyint', 'smallint', 'mediumint', 'decimal', 'float', 'double'].includes(t);

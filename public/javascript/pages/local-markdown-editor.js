@@ -40,10 +40,10 @@
                 //   而这里的 `error` 是 **frontmatter 领域字段**（预览成功、正文已渲染，
                 //   只是 frontmatter 有问题要就地提示），**不是**失败信号 —— 别用 isOk() 判它。
                 //   解包层双形态兼容，故旧 `{html, error}` 响应也照样能取到。
-                var payload = window.ScaffoldApi.data(result);
+                var payload = window.ScaffoldApi.data(result) || {};
                 frontmatterError.hidden = !payload.error;
                 frontmatterErrorText.textContent = payload.error || '';
-                preview.innerHTML = payload.html;
+                preview.innerHTML = payload.html || '';
                 if (window.scaffoldDocsRenderMermaid) window.scaffoldDocsRenderMermaid(preview);
                 if (window.scaffoldDocsRenderCode) window.scaffoldDocsRenderCode(preview);
             })
@@ -77,8 +77,12 @@
                 setStatus(content.value === submitted ? '已保存' : '未保存', content.value === submitted ? 'saved' : 'dirty');
             })
             .fail(function (xhr, reason) {
-                var result = xhr.responseJSON || {};
-                // 这两条是**框架生成**的、不走控制器，所以**不套信封**，保持原样读取：
+                // ⚠ body 也必须经解包层取 —— `pick()` 是 XHR 的唯一规范读法。
+                //   它读 `responseJSON`，拿不到时再试 `JSON.parse(responseText)`，解析失败返回
+                //   `null` 而不是抛。直读 `xhr.responseJSON` 在 body 非 JSON / 空 body 时是
+                //   `undefined`，于是「拿不到 body」与「body 里没有 errors」被混成一件事。
+                var result = window.ScaffoldApi.pick(xhr) || {};
+                // 下面这条是**框架生成**的、不走控制器，所以**不套信封**，字段路径保持原样：
                 //   `errors.*` = Laravel 校验失败（SaveRequest）的 validation bag
                 var validation = result.errors && result.errors.content && result.errors.content[0];
                 if (validation) {

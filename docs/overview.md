@@ -87,6 +87,8 @@ moo-scaffold 在同一个 Service Provider 下做两件相对独立的事，构�
 
 **核心契约**：用户只改 YAML；`moo:fresh` 把 YAML 解析成缓存；**所有其它生成器读缓存，不读 YAML**。手改 YAML 后不跑 `moo:fresh` = 生成器看到旧数据（数据库设计器保存时会自动同步跑一次 `moo:fresh` 刷缓存，best-effort，失败仅警告）。
 
+支柱二的 Web 层对外只有**一套 JSON 契约**：统一信封 `{ok:true,data}` / `{ok:false,error:{code,msg,detail}}`，加两类刻意不套信封的永久例外（代理透传 / 框架层 `{message}`）；前端由 `public/javascript/api.js` 的 `ScaffoldApi` 统一解包。形态、机器码清单与升级注意事项见 **[19 · Web JSON 契约](guide/19-web-json-contract.md)**。
+
 生成产物分两类：
 - **每次重写**（不要写业务逻辑）：`*Trait.php`、Enum 文件。
 - **只生成一次，可安全手改**（除非 `--force`）：`Model.php` / `ModelFilter.php` / `ModelFactory.php` / `Model.ts`。
@@ -303,9 +305,11 @@ YAML 驱动的一条生成流水线。**生成类命令 dev-only**（非 local �
 
 | 项 | 说明 |
 |---|---|
-| Pest Feature 测试 | Orchestra Testbench + Pest 3，覆盖生成器 / SchemaLoader / Diff / 配置 / 账号 / 接口调试 / 安全等，530+ 测试用例 |
-| Playwright e2e | 独立 npm，覆盖设计器 / 接口调试器关键 user flow |
+| Pest Feature 测试 | Orchestra Testbench + Pest 3，覆盖生成器 / SchemaLoader / Diff / 配置 / 账号 / 接口调试 / 信封契约 / 安全等，**1300+ 用例 / 120+ 个测试文件** |
+| 前端解包层守卫 | `tests/javascript/`（纯 node、零依赖，入口 `npm run test:js`，自动发现目录下全部 `*.test.js`）：既验 `api.js` 吃下全部响应形态，也**按源码扫描**各页面脚本的接线形态，防「解包被人改回去」 |
+| Playwright e2e | 独立 npm，覆盖设计器 / 接口调试器 / 文档中心 / 计划 / 发版日志等关键 user flow；需真实宿主，一律走 `npm run test:e2e:safe`（跑完还原宿主数据） |
 | 静态门禁 | `tools/ui-checks/`：HTTP smoke + 静态规则（业务视图无内联 style / 无硬编码 hex）+ asset 存在 + CSS gzip 预算 |
+| CI | `.github/workflows/quality.yml` 三个 job：`php`（`composer validate` + Pint + Pest + `composer audit`）· `javascript`（`npm run test:js`）· `ui-checks`（三个**不依赖宿主**的静态检查）。e2e 与 HTTP smoke 需要起真实宿主 + 数据库 + 登录态，**不进 CI**，本地手动跑 |
 | 代码风格 | Laravel Pint（统一格式化） |
 | 回归锁 | 每个修复都补「经 revert 验证」的回归测试，沉淀进套件 |
 
@@ -330,14 +334,16 @@ YAML 驱动的一条生成流水线。**生成类命令 dev-only**（非 local �
 | CLI 命令 | `src/Command/` | 全部 `moo:*` artisan 入口 |
 | 生成器 | `src/Generator/` + `src/Adder/` | 命令背后的代码生成实现 |
 | 设计器 | `src/Designer/` | 可视化 schema 编辑 + diff + migration |
-| 横切服务 | `src/Support/` | 账号 / 配置 / 云端 / 运行时 / ACL 等 |
+| 横切服务 | `src/Support/` | 账号 / 配置 / 云端 / 运行时 / ACL 等；以及从 `Utility` god-class 拆出的单一职责类（`Paths` / `StorageRegistry` / `ActionMeta` + `ActionDoc` / `ControllerName`）与 **Web JSON 契约的唯一出口 `JsonEnvelope`** |
 | 登录认证 | `src/Auth/` | ScaffoldAuth——登录 cookie 加密（AES-256-CBC）+ 签名（HMAC-SHA256）的实际实现，ScaffoldAuthenticate 中间件的底层 |
-| 其它横切 | `src/Concerns/` · `src/Rules/` · `src/Exceptions/` | 共享 trait / 表单校验规则 / 异常类 |
+| 其它横切 | `src/Concerns/` · `src/Rules/` · `src/Exceptions/` | 共享 trait / 表单校验规则 / 异常类（`BaseException` 把子类**类名派生**为信封机器码，见 [19](guide/19-web-json-contract.md)） |
 | Stubs | `stubs/` | 所有代码生成模板（= 编码规范） |
 | Foundation | `src/Foundation/` | 生成代码依赖的基类（Controller / FormRequest / BaseResource / Actions） |
-| Web 控制器 | `src/Http/Controllers/` | Account / Api / Auth / Cloud / CloudRedirect / Config / Designer / Docs / Route / Scaffold |
+| Web 控制器 | `src/Http/Controllers/` | Account / Api / ApiProxy / Auth / Cloud / CloudRedirect / Config / Designer / Docs / Plans / ReleaseRecords / Route / Scaffold |
 | Web 视图 | `src/Http/Views/` | Blade（`<x-scaffold::*>` 匿名组件库） |
-| 中间件 | `src/Http/Middleware/` | ScaffoldAuthenticate / EnforceScaffoldWritable / SecurityHeaders |
+| Web 前端 | `public/javascript/` · `public/sass/` | `api.js`（统一解包层 `ScaffoldApi`，必须排在页面脚本之前）· `main.js` · `designer.js` · `pages/*.js`；SCSS 源在 `public/sass/`，**编译产物 `public/css/index.css` 入仓**（改 SCSS 后跑 `npm run build:css`） |
+| 中间件 | `src/Http/Middleware/` | ScaffoldAuthenticate / EnforceScaffoldWritable / EnforceAdminOnly / EnforceDesignerPermission / SecurityHeaders |
+| 测试 | `tests/` | `Feature/`（Pest，含信封与框架层形态守卫）· `javascript/`（node 守卫，`npm run test:js`）· `Browser/`（Playwright e2e，`npm run test:e2e:safe`） |
 | 默认配置 | `config/config.php` | publish 后成宿主 `config/scaffold.php` |
 
 ---

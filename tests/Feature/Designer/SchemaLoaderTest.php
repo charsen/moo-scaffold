@@ -2,6 +2,7 @@
 
 use Mooeen\Scaffold\Designer\SchemaLoader;
 use Mooeen\Scaffold\Designer\SchemaLoadException;
+use Mooeen\Scaffold\Designer\SchemaPayloadMerger;
 use Mooeen\Scaffold\Support\ColumnTypeGroups;
 use Mooeen\Scaffold\Tests\Feature\Designer\Support\FixtureSchema;
 
@@ -32,7 +33,7 @@ it('listSchemaFiles returns schemas in ksort + _fields.yaml excluded + Laravel a
 // applyRenameHints:改名时同步索引块里的字段名。原来只处理单字段索引(string 形式),
 // 多字段复合索引(fields:[a,b])保留旧列名 → yaml 索引引用不存在的列、破坏下次 diff/migration(2026-06-09 修)。
 it('applyRenameHints · 多字段复合索引随改名同步,单字段索引/字段集一并改', function () {
-    $ref = new ReflectionMethod($this->loader, 'applyRenameHints');
+    $ref = new ReflectionMethod(SchemaPayloadMerger::class, 'applyRenameHints');
     $ref->setAccessible(true);
 
     $yamlFields = ['col_a' => [], 'col_c' => []];
@@ -41,7 +42,7 @@ it('applyRenameHints · 多字段复合索引随改名同步,单字段索引/字
         'uq_c'   => ['type' => 'unique', 'fields' => 'col_c'],            // 单字段(string)
     ]];
 
-    $ref->invokeArgs($this->loader, [&$yamlFields, &$yamlTable, ['col_a' => 'col_x']]);
+    $ref->invokeArgs(null, [&$yamlFields, &$yamlTable, ['col_a' => 'col_x']]);
 
     // 复合索引里 col_a → col_x,col_b 不动(bug 版本整条 fields 保留 ['col_a','col_b'])
     expect($yamlTable['index']['idx_ab']['fields'])->toBe(['col_x', 'col_b']);
@@ -115,7 +116,7 @@ it('loadTableFull returns rich shape with attrs / fields / index', function () {
         ->toHaveKey('enums')
         ->toHaveKey('prefix');
     expect($t['fields'])->toBeArray()->not->toBeEmpty();
-    // fields 是 list of {key, name, type, ...} objects(shapeField 结果),不是 dict
+    // fields 是 list of {key, name, type, ...} objects(FieldShaper::shape 结果),不是 dict
     // 只锁 id / created_at / updated_at(MUST have)— deleted_at 是 yaml 可选字段(软删表才有),
     // 不能强 assertion 否则 yaml drift 时此 test 假阳;真实回归用下面 rebuildFieldRows 专项 test 锁
     $fieldKeys = array_column($t['fields'], 'key');
@@ -186,7 +187,7 @@ it('loadModule throws SchemaLoadException for unknown schema', function () {
 // 写空 entry [],由 normalize 阶段(line 1155)派生 _system + type:timestamp。
 
 it('rebuildFieldRows · client 加 yaml 缺的 system 字段 → 写空 entry', function () {
-    $ref = new ReflectionMethod($this->loader, 'rebuildFieldRows');
+    $ref = new ReflectionMethod(SchemaPayloadMerger::class, 'rebuildFieldRows');
     $ref->setAccessible(true);
 
     $yamlFields = [
@@ -201,7 +202,7 @@ it('rebuildFieldRows · client 加 yaml 缺的 system 字段 → 写空 entry', 
         ['name' => 'created_at', 'display_name' => null, 'index' => null],
         ['name' => 'updated_at', 'display_name' => null, 'index' => null],
     ];
-    $result = $ref->invoke($this->loader, $yamlFields, $clientFields);
+    $result = $ref->invoke(null, $yamlFields, $clientFields);
     expect($result)->toHaveKeys(['id', 'name', 'deleted_at', 'created_at', 'updated_at']);
     expect($result['deleted_at'])->toBe([]);     // 空 entry,normalize 阶段会派生 _system + type:timestamp
     expect($result['created_at'])->toBe([]);
@@ -209,7 +210,7 @@ it('rebuildFieldRows · client 加 yaml 缺的 system 字段 → 写空 entry', 
 });
 
 it('rebuildFieldRows · yaml 原有 system 字段保留(plan-40 P1 Round 2 不回归)', function () {
-    $ref = new ReflectionMethod($this->loader, 'rebuildFieldRows');
+    $ref = new ReflectionMethod(SchemaPayloadMerger::class, 'rebuildFieldRows');
     $ref->setAccessible(true);
     // yaml 原 deleted_at 有 desc 'soft-delete'(模拟 user 之前手编),client 给的是只 name 的 base entry
     // → server 应该保留 yaml 原 entry(line 671-672 array_key_exists 分支),不被 client base 覆盖
@@ -221,7 +222,7 @@ it('rebuildFieldRows · yaml 原有 system 字段保留(plan-40 P1 Round 2 不�
         ['name' => 'id', 'display_name' => null, 'index' => null],
         ['name' => 'deleted_at', 'display_name' => null, 'index' => null],
     ];
-    $result = $ref->invoke($this->loader, $yamlFields, $clientFields);
+    $result = $ref->invoke(null, $yamlFields, $clientFields);
     expect($result['deleted_at'])->toBe(['desc' => 'soft-delete', '_some_legacy' => 'keep']);
 });
 

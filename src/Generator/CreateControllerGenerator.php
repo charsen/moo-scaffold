@@ -700,6 +700,12 @@ class CreateControllerGenerator extends Generator
             }
 
             if (in_array($field_name, $id_keys, true)) {
+                // 传关联**模型类**而不是表名 —— 这是刻意的：Laravel 的 `exists` 规则自己会把
+                // 模型类解析成 `getTable()`（字符串规则走 `ValidatesAttributes::parseTable()`，
+                // Laravel 10/11/12 逐字相同），而且会带上模型自己的 connection。
+                // 生成物因此不必反查被关联表的物理名。
+                // ⚠ 别"顺手"在 `FormRequest::getExistId()` 里再把入参归一成表名：那会丢掉 connection，
+                // 且 2026-09-21 已因此误判过一次（详见该方法的 docblock 与 NOTES.md）。
                 $filed_rules[] = "\$this->getExistId(\\{$models_keys[$field_name]['model']}::class)";
             }
 

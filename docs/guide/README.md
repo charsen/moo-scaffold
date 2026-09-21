@@ -26,6 +26,7 @@ order: 30
 | 16 | 云端汇聚(运行时错误 / 慢 SQL / Todos)+ AI 接入 | `moo:cloud:push` / `moo:cloud:mcp` / `moo:monitor:migrate` | [16-cloud-push.md](16-cloud-push.md) |
 | 17 | 开发文档中心(MD + 深链 shortcode + Mermaid 流程图) | `/scaffold/docs` | [17-docs-center.md](17-docs-center.md) |
 | 18 | 扩展包 schema 管理与代码生成(出身模型) | 设计器分块 + `moo:free admin {包schema}` | [18-package-schema.md](18-package-schema.md) |
+| 19 | Web JSON 契约(统一信封) | 自定义 JS / 脚本消费 `/scaffold` 接口时 | [19-web-json-contract.md](19-web-json-contract.md) |
 
 ## 其它参考
 

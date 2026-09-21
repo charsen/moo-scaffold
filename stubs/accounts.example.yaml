@@ -15,9 +15,11 @@ meta:
 
 accounts:
     # 示例：一个普通 admin（首次启动用，登录后请立即改密）
-    # 此处明文 '123654' 会在 store 首次写入时自动 bcrypt 化
+    # password 一栏是**占位符**，不是可用口令 —— 仅示意「这里是明文，store 首次写入时
+    # 会自动 bcrypt 化」。请勿照抄，也请勿在本文件里写任何真实密码（本文件入 git、
+    # 随包发布；真实账号走 scaffold/accounts.yaml，那份不入本模板）。
     - username: admin
-      password: '123654'
+      password: 'change-me'
       phone: ''
       role: admin                 # admin | member
       enabled: true

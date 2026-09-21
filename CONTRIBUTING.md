@@ -24,7 +24,8 @@
 
 - **改 SCSS** → commit 前必跑 `npm run build:css`(否则下游拉不到新 CSS)。
 - **改 `stubs/*.stub` 或 `src/Foundation/`** → 这是"编码规范本体",按改规范的严肃度对待,别随手改模板解决单点问题。
-- **跑测试** → `composer test`(零 env 即全绿,fixture 自带);涉及前端资源时再跑对应的 `npm` 构建或 e2e 检查。
+- **跑测试** → 后端 `composer test`(零 env 即全绿,fixture 自带);**改了 `public/javascript/` 下的任何脚本**要跑 `npm run test:js`(纯 node、零依赖、秒级返回,验解包层行为 + 各页面脚本的接线形态);`/scaffold` UI 改动再跑 `npm run test:e2e:safe`(需真实宿主,不得用会污染宿主数据的裸 `test:e2e`)。
+- **改 JSON 响应形态** → 先读 `docs/guide/19-web-json-contract.md`:信封是唯一出口,别在控制器里自己拼响应,也别给框架层响应套信封。
 
 ## Commit / PR
 

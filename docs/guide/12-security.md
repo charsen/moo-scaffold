@@ -9,7 +9,9 @@ order: 130
 
 ## 总览
 
-一条请求进 `/scaffold/*` 穿过这串中间件:`SecurityHeaders`(加 CSP / 防御头)→ 路由级 `throttle`(login / intake 限流)→ `ScaffoldAuthenticate`(校验 `scaffold_auth` cookie)→ Session + ShareErrors → `VerifyCsrfToken` → `EnforceScaffoldWritable`(prod / readonly 拒所有写)。并行还有 CLI 防线:`config('scaffold.only_in_local')`。
+一条请求进 `/scaffold/*` 穿过这串中间件:`SecurityHeaders`(加 CSP / 防御头)→ 路由级 `throttle`(login / intake 限流)→ `ScaffoldAuthenticate`(校验 `scaffold_auth` cookie)→ Session + ShareErrors → `VerifyCsrfToken` → 写保护三件套 `EnforceScaffoldWritable`(prod / readonly 拒高风险写)· `EnforceAdminOnly`(账号与配置写需 admin)· `EnforceDesignerPermission`(设计器需 `can_design_db`)。并行还有 CLI 防线:`config('scaffold.only_in_local')`。
+
+三个 `Enforce*` 拒绝时都产**同一个 403 信封**、各带自己的机器码(`WRITE_LOCKED` / `ADMIN_ONLY` / `DESIGNER_FORBIDDEN`,另有 `EDIT_LOCAL_ONLY`)—— 前端据此分支;表单请求则走 `flash_error` + 303 回退。完整形态与码表见 [19-web-json-contract.md](19-web-json-contract.md)。
 
 ## 两条强制写保护
 
@@ -27,10 +29,11 @@ order: 130
 挂在所有 `/scaffold/*` 受保护路由组(`src/Http/Middleware/EnforceScaffoldWritable.php`):
 
 - **GET / HEAD / OPTIONS** → 永远放行。
-- **POST / PUT / PATCH / DELETE**,命中高风险簇(designer / accounts / config / cloud/push)时:
-  - `APP_ENV=production` → 403。
-  - `SCAFFOLD_CONFIG_READONLY=true` → 403。
+- **POST / PUT / PATCH / DELETE**,命中高风险簇(designer / accounts / config / cloud push·discard / docs)时:
+  - `APP_ENV=production` → 403 `WRITE_LOCKED`。
+  - `SCAFFOLD_CONFIG_READONLY=true` → 403 `WRITE_LOCKED`。
   - 其它(api 调试 / csp-report 等)→ 放行。
+- **计划 / 发版日志**(`plans/*` · `release-records/*`)另有一条更严的线:非 local 或强制只读 → 403 `EDIT_LOCAL_ONLY`。
 
 结果:读类页面(查文档 / 看 ACL / 看 runtime)生产也能用;改代码与账号体系的写操作生产一律拒;api 调试这类非高风险写仍放行。**新增写操作必须走这一层**,绕过它(controller 直接写文件不过 middleware)= 违反定位,review 时拦下。
 
@@ -95,18 +98,20 @@ report-uri /scaffold/csp-report;
 ## 检查清单(新增写操作时跑一遍)
 
 - [ ] 路由放在 `EnforceScaffoldWritable` 包裹的 group 里?
+- [ ] 需要 admin / 设计器权限的路由挂了对的 `Enforce*` 中间件?
 - [ ] controller 写动作前再 `assertCanWrite()` 一次(防绕过)?
 - [ ] 表单带 `@csrf` / AJAX 带 `X-CSRF-TOKEN`?
 - [ ] 外部输入做了类型校验 / 长度截断?
 - [ ] 文件路径输入做了正则 / `realpath` 校验防 traversal?
 - [ ] inline `<script>` / `<style>` 都带 `nonce="{{ $cspNonce }}"`?
 - [ ] AJAX 失败调 `handleAuthError`(读 `X-Scaffold-Login`)而非吞错?
+- [ ] JSON 端点用 `$this->ok()` / `$this->error()`(不自己拼响应)?
 
 ## 排错
 
 | 现象 | 检查 |
 |---|---|
-| 点保存 403 | `APP_ENV` / `SCAFFOLD_CONFIG_READONLY`,看页面状态条 |
+| 点保存 403 | 读响应 `error.code`: `WRITE_LOCKED` → `APP_ENV` / `SCAFFOLD_CONFIG_READONLY`;`ADMIN_ONLY` → 账号不是 admin;`DESIGNER_FORBIDDEN` → 无 `can_design_db`;`EDIT_LOCAL_ONLY` → 非 local。表单请求看 flash 文案 |
 | 表单提交 419 | CSRF token 过期 / 缺失,刷新取新 token |
 | Alpine 报"can not eval" | 用了非 CSP-safe 表达式,改方法名引用 |
 | 登录后立刻跳回登录页 | cookie 没存上 → reverse proxy / cookie domain 配错 |

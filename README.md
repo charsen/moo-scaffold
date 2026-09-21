@@ -67,6 +67,7 @@ php artisan moo:account:add admin --password=xxx --role=admin
 | 命令速查(忘了 flag) | [CLI 速查](docs/guide/03-cli-reference.md) |
 | 全部模块手册 | [docs/guide/](docs/guide/README.md) |
 | 安全模型(dev 写 / prod 只读) | [安全模型](docs/guide/12-security.md) |
+| 自己写 JS / 脚本消费 `/scaffold` 接口 | [Web JSON 契约(统一信封)](docs/guide/19-web-json-contract.md) |
 | 设计取舍 / 模块总览 | [项目总览](docs/overview.md) |
 | 给包做贡献 / 跑测试 | [贡献指南](CONTRIBUTING.md) |
 
