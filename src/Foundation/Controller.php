@@ -87,7 +87,7 @@ class Controller extends BaseController
         // ② 它绕开 Gate，与单目标分支口径分歧：不查白名单（`acl_authentication` 里先判 isRoot、
         //    再判 whitelist、最后比角色动作），新增判定也对多目标动作失效。
         // `Gate::any($abilities, $argument)` 的语义就是「任一命中即可」，与上面的循环等价且同源。
-        if (! app(Gate::class)->any($method, 'acl_authentication')) {
+        if (! app(Gate::class)->any($method, ['acl_authentication'])) {
             throw new AuthorizationException;
         }
 
@@ -110,30 +110,38 @@ class Controller extends BaseController
     }
 
     /**
-     * 「任一能力命中即可」的布尔判定（命令式，多个授权点之间是 OR）。
+     * 本动作「自身 key **或** 已声明的 transform 目标」是否命中（命令式，返回 bool 不抛）。
      *
      * 与 `checkAuthorization()` 的分工：后者是**终止型**守卫（不通过就抛 `AuthorizationException`
-     * 结束请求），用于「本动作的授权口径固定」；本方法是**询问型**（返回 bool 不抛），用于
-     * 「授权口径需在运行时才能确定」的场景 —— 例如目标来自配置、或要先读请求数据判断。
+     * 结束请求）；本方法是**询问型**，用于「还要结合别的条件再决定是否放行」的场景 —— 例如
+     * 「有本动作授权 **或** 满足某个运行时数据条件」。
      *
-     * 2026-09-21 新增。此前这类场景只能写成 `try { $this->checkAuthorization(); } catch
-     * (AuthorizationException) { foreach (...) Gate::check(...) }` —— 用异常做布尔判断，且
-     * `checkAuthorization()` 的多目标分支当时还不走 Gate（白名单/isRoot 口径分歧）。现统一：
-     * 调用方先自行 `boot()` 登记 transform，再用本方法问「有没有」。
+     * ⚠️ 两步判定的顺序与语义和原本「手写 Gate 循环」的写法一致：
+     * ① 先查**自身** key（`static::class::method`）—— 自身权限点**不得**写进 `transform_methods`，
+     *    否则 `moo:auth` 会把它从权限树删掉（`getAclMethodName()` 只返回 transform 目标）；
+     * ② 再查已声明的 transform 目标（继承授权点）。
      *
-     * @param list<string> $abilities 目标动作，完整命名空间或同模块简化写法（同 `hasAction`）
+     * ⚠️ 调用前必须已在 `boot()` 中登记好 `transform_methods`。
      */
-    protected function hasAnyAction(array $abilities): bool
+    protected function hasOwnActionOrInherited(): bool
     {
-        $keys = [];
-        foreach ($abilities as $ability) {
-            $key = $this->formatAclName($this->getOtherControllerAction($ability));
-            if ($key !== '') {
-                $keys[] = $key;
+        if (! config('scaffold.authorization.check')) {
+            return true;
+        }
+
+        $own = $this->formatAclName(static::class . '::' . $this->method);
+        if ($own !== '' && app(Gate::class)->check('acl_authentication', $own)) {
+            return true;
+        }
+
+        $method = $this->getAclMethodName();
+        foreach ((array) $method as $key) {
+            if ($key !== '' && app(Gate::class)->check('acl_authentication', $key)) {
+                return true;
             }
         }
 
-        return $keys !== [] && app(Gate::class)->any($keys, 'acl_authentication');
+        return false;
     }
 
     /**
