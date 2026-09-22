@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- **`AclActionResolver` 在生成期无法安全 boot**（两处）：① 未设置 `Foundation\Controller::$method`（它是未初始化 typed property，只在运行期 `callAction()` 赋值），任何在 `boot()` 里读它的控制器都会抛 `must not be accessed before initialization`，被 `catch (Throwable)` 吞成「回退 key」——实测 `PersonnelOptionController` 三个动作全部落成「无标签白名单」，产物对授权事实撒谎；现改为 boot 前反射设成本次解析的动作名。② `bootWithoutAuthorization()` 只关掉 `scaffold.authorization.check`，管不到控制器**直接调 `Gate`** 的领域校验（同上控制器校验 `ProcessDefinitionController` 的 update / publish / simulate）——生成期无登录用户，判定必然失败并中止扫描；现容忍 boot 抛出的 `AuthorizationException`（`transform_methods` 赋值在抛错前已完成），其它异常仍按既有语义回退。
+- **跨控制器 transform 的 ACL key 算错**：`formatAclName()` 原在**起源控制器实例**上调用，目标动作被按起源命名空间解析 —— 实测 `PersonnelOptionController -> ProcessDefinitionController::update` 产出 `admin-process-mooeen-process-http-controllers-admin-process-definition-update`（拼进了起源的命名空间段），与目标自己运行期校验的 `admin-process-process-definition-update` 不一致，**勾了也不生效**。跨控制器是框架既定支持的形态（`transform_methods` 的 `X::y` 写法），错的是 key 的算法；现改用静态 `Controller::aclPlainKey($target)`，与运行期同一算法。**下游需注意**：本修复会改变 host 的 ACL 产物（原先静默回退的动作恢复真实授权关联），发版后各 host 需重跑 `moo:auth` 并核对键级 diff。
+
+
+### Fixed
+
 - **白名单污染**：`buildActions()` 对「缺 `@acl` 的动作」用 `$meta['action_keys']` 填白名单，而那是 **transform 目标**的 key（不是该动作自己的），于是别的 controller 的**真实权限点**被写进 whitelist；运行期 Gate 命中白名单即放行，实测 **12 个 key / 90 个路由动作**对任何登录者恒真。
   放大后果：`hasAction('ContractController::show')` 恒真 → 按合同的数据范围 ACL（`acl_business` / `acl_receive_payment`）被整体绕过。
   现写入前加不变式：**任何被非白名单动作校验的 key 永不允许出现在白名单**（冲突时打印剔除清单）。真正「登录即可」的动作其 key 不在 actions 里，不受影响。
