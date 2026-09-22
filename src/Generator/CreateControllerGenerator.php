@@ -893,7 +893,7 @@ PHP,
     /**
      * 永久删除{{entity_name}}
      *
-     * @acl {zh-CN: 永久删除{{entity_name}}, en: Destroy Forever {{entity_en_name}}, desc: }
+     * @acl {zh-CN: 永久删除{{entity_name}}, en: Destroy Forever {{entity_en_name}}, desc:, danger: 1}
      */
     public function forceDestroy(int|string $id): BaseResource
     {
