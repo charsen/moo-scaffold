@@ -105,6 +105,33 @@ class Controller extends BaseController
     }
 
     /**
+     * 「任一能力命中即可」的布尔判定（命令式，多个授权点之间是 OR）。
+     *
+     * 与 `checkAuthorization()` 的分工：后者是**终止型**守卫（不通过就抛 `AuthorizationException`
+     * 结束请求），用于「本动作的授权口径固定」；本方法是**询问型**（返回 bool 不抛），用于
+     * 「授权口径需在运行时才能确定」的场景 —— 例如目标来自配置、或要先读请求数据判断。
+     *
+     * 2026-09-21 新增。此前这类场景只能写成 `try { $this->checkAuthorization(); } catch
+     * (AuthorizationException) { foreach (...) Gate::check(...) }` —— 用异常做布尔判断，且
+     * `checkAuthorization()` 的多目标分支当时还不走 Gate（白名单/isRoot 口径分歧）。现统一：
+     * 调用方先自行 `boot()` 登记 transform，再用本方法问「有没有」。
+     *
+     * @param list<string> $abilities 目标动作，完整命名空间或同模块简化写法（同 `hasAction`）
+     */
+    protected function hasAnyAction(array $abilities): bool
+    {
+        $keys = [];
+        foreach ($abilities as $ability) {
+            $key = $this->formatAclName($this->getOtherControllerAction($ability));
+            if ($key !== '') {
+                $keys[] = $key;
+            }
+        }
+
+        return $keys !== [] && app(Gate::class)->any($keys, 'acl_authentication');
+    }
+
+    /**
      * 根据配置获取 action 的 acl name
      */
     protected function formatAclName(string $str, bool $plain = false): string
@@ -240,11 +267,16 @@ class Controller extends BaseController
      */
     private function getOtherControllerAction(string $action): string
     {
-        if (Str::startsWith($action, 'App\\')) {
+        // 完整类名直接放行（2026-09-21 修）：原实现只认 `App\` 根，其余一律按「同模块简化写法」
+        // 前缀**当前**命名空间，于是引用其它命名空间的控制器（典型是宿主引用 `Mooeen\*` 包控制器，
+        // 或任何 `Vendor\Pkg\...`）会被拼成
+        // `App\Admin\Controllers\X\Mooeen\...` 这种幻影类名 —— 生成期与运行期都落在一个
+        // 谁都拿不到的 key 上。判据用 `\\` 是否存在：含命名空间分隔符即已完整。
+        if (str_contains($action, '\\')) {
             return $action;
         }
 
-        // 同模块简化写法 转换
+        // 同模块简化写法（仅方法名，如 'save'）→ 补当前控制器命名空间
         $class     = get_called_class();
         $namespace = substr($class, 0, strrpos($class, '\\'));
 
