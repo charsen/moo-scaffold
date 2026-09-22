@@ -62,7 +62,11 @@ final class ActionDoc
         $temp_string       = (empty($acl) ? '' : $acl[1]);
         $data['name']      = self::parseByLanguages($temp_string);
 
-        preg_match('/desc:([^\|]*)[\|}]/i', $temp_string, $temp);
+        // 2026-09-21：`desc` 捕获需在多值字段（如 `danger: 1`）前停下。
+        // 原 `[^\|]*` 会一路吃到注解边界，于是 `desc: , danger: 1}` 把后置元数据当成了描述内容
+        // （实测产物出现 `-desc => ', danger: 1'` 并显示到授权页）。
+        // 现用非贪婪 + 断言「逗号后紧跟已知字段名」为界：既保留描述里的普通逗号，又不吞后续字段。
+        preg_match('/desc:([^\|,}]*?)\s*(?=,\s*(?:danger|whitelist|en|zh-CN)\s*:|[\|}])/i', $temp_string, $temp);
         $data['desc'] = empty($temp) ? '' : trim($temp[1]);
 
         // 危险动作声明（2026-09-21）：`@acl {..., danger: 1}` 表示该动作**高危且不可逆**
