@@ -59,6 +59,7 @@ class UpdateAuthorizationGenerator extends Generator
         $original_actions = [];
         $config_actions   = [];
         $whitelist        = [];
+        $dangerKeys       = [];   // 危险动作 key 集合（供授权页「全选」排除）
         $controllers      = [];
         $modules          = [];
 
@@ -119,7 +120,16 @@ class UpdateAuthorizationGenerator extends Generator
                 'desc'              => $action_info['desc'],
                 'auth_desc'         => $auth_info['desc'],
                 'whitelist'         => $auth_info['whitelist'],
+                'danger'            => (bool) ($action_info['danger'] ?? false),
             ];
+
+            // 危险动作声明（@acl 的 danger: 1）：授权页「全选」据此排除，避免误勾不可逆权限。
+            // 登记在 actions 树的 key 空间（前端叶子 id 即该 key）。
+            if (! $meta['whitelist'] && ($meta['danger'] ?? false)) {
+                foreach (array_merge(array_values((array) ($meta['acl_target_keys'] ?? [])), array_values((array) ($meta['action_keys'] ?? []))) as $dangerKey) {
+                    $dangerKeys[(string) $dangerKey] = true;
+                }
+            }
 
             if ($meta['whitelist']) {
                 foreach ($meta['action_keys'] as $actionKey) {
@@ -180,7 +190,7 @@ class UpdateAuthorizationGenerator extends Generator
             $original_actions[] = $meta;
         }
 
-        $this->buildActions($app, $config_actions, $whitelist, $configuredApps);
+        $this->buildActions($app, $config_actions, $whitelist, $configuredApps, $dangerKeys);
         $this->buildLangFiles($app, $config, $modules, $controllers, $original_actions, $configuredApps);
         $this->buildACLViewer($app, $config, $original_actions);
 
@@ -190,7 +200,7 @@ class UpdateAuthorizationGenerator extends Generator
     /**
      * 配置文件生成
      */
-    private function buildActions(string $app, array $actions, array $whitelist, array $configuredApps): void
+    private function buildActions(string $app, array $actions, array $whitelist, array $configuredApps, array $dangerKeys = []): void
     {
         $config = config('actions', []);
 
@@ -244,6 +254,8 @@ class UpdateAuthorizationGenerator extends Generator
         $config[$app] = [
             'whitelist' => array_values(array_unique($whitelist)),
             'actions'   => $actions,
+            // 危险动作 key（`@acl {..., danger: 1}`）：授权页「全选」排除它们，避免误勾不可逆权限。
+            'danger' => array_values(array_keys($dangerKeys)),
         ];
 
         $file = config_path('actions.php');

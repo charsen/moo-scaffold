@@ -20,12 +20,20 @@ class Actions
 {
     private array $data;
 
+    /** @var array<string, int> 危险动作 key 集合（key => 任意值） */
+    private array $dangerKeys = [];
+
     private string $app;
 
     public function __construct(string $app = 'admin')
     {
         $this->app  = $app;
         $this->data = config('actions.' . $this->app . '.actions', []);
+
+        // 危险动作 key 集合（生成期由 `@acl {..., danger: 1}` 声明）：授权页「全选」据此排除。
+        // 由后端带出语义，前端无需按文案猜测 —— 文案受多语言/改名影响，而 key 经 md5 后前端
+        // 只有 `{id, pid, label}`，无从判断。
+        $this->dangerKeys = array_flip(array_map('strval', (array) config('actions.' . $this->app . '.danger', [])));
     }
 
     /**
@@ -74,6 +82,11 @@ class Actions
         foreach ($data as $key => $v) {
             $key = (string) $key;
             $one = ['id' => $key, 'pid' => $parent_id, 'label' => $v['name']];
+
+            // 危险动作标记透出到前端（叶子）：授权页「全选」据此排除不可逆权限。
+            if (! empty($v['danger'])) {
+                $one['danger'] = true;
+            }
 
             if (! empty($v['children'])) {
                 $one['checked']      = [];
@@ -156,7 +169,11 @@ class Actions
                     $action_lang = __("actions.{$this->app}.{$action}");
                     // 只保留有多语言的功能
                     if ($action_lang !== "actions.{$this->app}.{$action}") {
-                        $temp[$action] = ['name' => $action_lang];
+                        $node = ['name' => $action_lang];
+                        if (isset($this->dangerKeys[(string) $action])) {
+                            $node['danger'] = true;
+                        }
+                        $temp[$action] = $node;
                     }
                 }
 
