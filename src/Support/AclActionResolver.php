@@ -22,7 +22,7 @@ class AclActionResolver
 
         try {
             $controller = $this->makeController($controllerClass);
-            $this->bootWithoutAuthorization($controller);
+            $this->bootWithoutAuthorization($controller, $actionName);
 
             $targets    = $this->resolveTargetActions($controller, $controllerClass, $actionName);
             $keys       = [];
@@ -30,8 +30,8 @@ class AclActionResolver
             $targetKeys = [];
 
             foreach ($targets as $target) {
-                $keys[]      = $targetKeys[$target] = $this->formatAclName($controller, $target, false);
-                $plainKeys[] = $this->formatAclName($controller, $target, true);
+                $keys[]      = $targetKeys[$target] = $this->formatAclName($target, false);
+                $plainKeys[] = $this->formatAclName($target, true);
             }
 
             $keys      = array_values(array_filter(array_unique($keys)));
@@ -48,7 +48,9 @@ class AclActionResolver
                 'target'      => implode(' | ', $targets),
                 'transformed' => $targets !== [$controllerClass . '::' . $actionName],
             ];
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            fwrite(STDERR, 'DIAG resolve failed: ' . $controllerClass . '::' . $actionName . ' → ' . get_class($e) . ': ' . substr($e->getMessage(), 0, 150) . PHP_EOL);
+
             return $this->emptyResult();
         }
     }
@@ -86,10 +88,28 @@ class AclActionResolver
         return (new ReflectionClass($controllerClass))->newInstanceWithoutConstructor();
     }
 
-    private function bootWithoutAuthorization(object $controller): void
+    private function bootWithoutAuthorization(object $controller, string $actionName = ''): void
     {
         if (! method_exists($controller, 'boot')) {
             return;
+        }
+
+        // 先把基类 `$method` 设成本次解析的动作名，再调 boot()。
+        //
+        // 2026-09-21 修「resolver 静默失败 → 产物对授权事实撒谎」：`Foundation\Controller::$method`
+        // 是未初始化 typed property，只在运行期 `callAction()` 里赋值；生成期直接 boot() 会让任何在
+        // boot() 里读 `$this->method` 的控制器抛 `must not be accessed before initialization`，
+        // 而本类的 `catch (Throwable)` 会把整个动作吞成「回退 key」。实测 `PersonnelOptionController`
+        // 因此三个动作全部落成「无标签白名单」，其真实授权（Gate 校验 ProcessDefinitionController 的
+        // update / publish / simulate）完全没有进入产物。
+        if ($actionName !== '') {
+            try {
+                $property = new \ReflectionProperty(\Mooeen\Scaffold\Foundation\Controller::class, 'method');
+                $property->setAccessible(true);
+                $property->setValue($controller, $actionName);
+            } catch (Throwable) {
+                // 非 scaffold 基类控制器（无 $method）无需设置。
+            }
         }
 
         $original = Config::get('scaffold.authorization.check');
@@ -97,6 +117,12 @@ class AclActionResolver
 
         try {
             $controller->boot();
+        } catch (\Illuminate\Auth\Access\AuthorizationException) {
+            // 控制器 boot() 里直接调 Gate 做**领域级**授权（如 PersonnelOptionController 校验
+            // ProcessDefinitionController 的 update / publish / simulate）时，生成期没有登录用户，
+            // 判定必然失败并被抛到这里。这类异常**不代表解析失败** —— transform_methods 的赋值在
+            // boot() 开头就已完成，授权判定只是它后面的守卫，故忽略并继续扫描。
+            // 只吞 AuthorizationException：其它异常仍向上抛给 resolve() 的 catch，保持既有回退语义。
         } finally {
             Config::set('scaffold.authorization.check', $original);
         }
@@ -162,16 +188,31 @@ class AclActionResolver
         return (string) $method->invoke($controller, $mappedAction);
     }
 
-    private function formatAclName(object $controller, string $target, bool $plain): string
+    /**
+     * 由**目标自身**的 FQCN 计算 ACL key。
+     *
+     * 2026-09-21 修「跨控制器 transform 的 key 算错」：原实现在**起源控制器实例**上调用
+     * `formatAclName($target)`，于是目标动作被按起源的命名空间解析 —— 实测
+     * `PersonnelOptionController -> ProcessDefinitionController::update` 产出的明文是
+     * `admin-process-mooeen-process-http-controllers-admin-process-definition-update`
+     * （拼进了起源的命名空间段），与目标自己运行期校验的 `admin-process-process-definition-update`
+     * 不一致，勾了也不生效。
+     *
+     * ACL key 只应由**目标 FQCN** 决定（`Controller::aclPlainKey` 是 gen↔runtime 的单一算法），
+     * 故改为静态解析；跨控制器本就是这个框架支持的形态（`transform_methods` 的 `X::y` 写法）。
+     */
+    private function formatAclName(string $target, bool $plain): string
     {
-        if (! method_exists($controller, 'formatAclName')) {
+        $action = \Mooeen\Scaffold\Foundation\Controller::aclPlainKey($target);
+        if ($action === '') {
             return '';
         }
 
-        $method = new ReflectionMethod($controller, 'formatAclName');
-        $method->setAccessible(true);
+        if ($plain || ! Config::get('scaffold.authorization.md5')) {
+            return $action;
+        }
 
-        return (string) $method->invoke($controller, $target, $plain);
+        return substr(md5($action), 8, 16);
     }
 
     private function splitTarget(string $target): array

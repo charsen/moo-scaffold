@@ -65,6 +65,13 @@ final class ActionDoc
         preg_match('/desc:([^\|]*)[\|}]/i', $temp_string, $temp);
         $data['desc'] = empty($temp) ? '' : trim($temp[1]);
 
+        // 危险动作声明（2026-09-21）：`@acl {..., danger: 1}` 表示该动作**高危且不可逆**
+        // （典型为 destroy-forever 类「永久删除」）。授权页的「全选」据此排除，避免误勾。
+        //
+        // 由注解显式声明而非按文案/明文 key 猜测：文案受多语言与改名影响，而 ACL key 经 md5
+        // 后到不了前端（前端叶子只有 `{id, pid, label}`）。不写即默认非危险，对既有注解零影响。
+        $data['danger'] = (bool) preg_match('/danger:\s*(1|true|yes)\b/i', $temp_string);
+
         return $data;
     }
 
