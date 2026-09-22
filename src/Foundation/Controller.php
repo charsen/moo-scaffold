@@ -79,14 +79,19 @@ class Controller extends BaseController
          *    'destroyBatch' => ['LoginManagementController::index', 'AdminController::index'],
          *  ];
          */
-        $role_actions = getUser()->getActions();
-        foreach ($method as $item) {
-            if (in_array('is_root', $role_actions, true) || in_array($item, $role_actions, true)) {
-                return true;
-            }
+        // 2026-09-21：与单目标分支统一走 Gate。
+        //
+        // 原实现直接比对 `getUser()->getActions()`，有两个问题：
+        // ① `getUser()` 是**宿主全局**，包内并不定义 —— 于是「继承了 ACL 目标」的动作在包级测试
+        //    环境直接 `Call to undefined function`，任何包都无法为继承授权写测试；
+        // ② 它绕开 Gate，与单目标分支口径分歧：不查白名单（`acl_authentication` 里先判 isRoot、
+        //    再判 whitelist、最后比角色动作），新增判定也对多目标动作失效。
+        // `Gate::any($abilities, $argument)` 的语义就是「任一命中即可」，与上面的循环等价且同源。
+        if (! app(Gate::class)->any($method, 'acl_authentication')) {
+            throw new AuthorizationException;
         }
 
-        throw new AuthorizationException;
+        return true;
     }
 
     /**
