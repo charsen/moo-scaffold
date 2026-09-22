@@ -86,12 +86,18 @@ class Controller extends BaseController
         //    环境直接 `Call to undefined function`，任何包都无法为继承授权写测试；
         // ② 它绕开 Gate，与单目标分支口径分歧：不查白名单（`acl_authentication` 里先判 isRoot、
         //    再判 whitelist、最后比角色动作），新增判定也对多目标动作失效。
-        // `Gate::any($abilities, $argument)` 的语义就是「任一命中即可」，与上面的循环等价且同源。
-        if (! app(Gate::class)->any($method, ['acl_authentication'])) {
-            throw new AuthorizationException;
+        // ⚠️ 用 `Gate::check('acl_authentication', $key)` 逐个判定，**不要**用
+        // `Gate::any(..., 'acl_authentication')` —— 那条路参数语义易错（实测写成
+        // `any($method, ['acl_authentication'])` 会把 ACL key 当成 ability 名，Gate 只定义过
+        // `acl_authentication`，于是**恒 false、含 root 全部 403**）。此处与 `hasAction()` /
+        // `hasOwnActionOrInherited()` 同口径，都是「ability 固定为 acl_authentication，key 作实参」。
+        foreach ($method as $key) {
+            if ($key !== '' && app(Gate::class)->check('acl_authentication', $key)) {
+                return true;
+            }
         }
 
-        return true;
+        throw new AuthorizationException;
     }
 
     /**
