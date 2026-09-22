@@ -59,7 +59,7 @@ it('默认 transform map：create→store 视为 transformed', function () {
 
     expect($res['transformed'])->toBeTrue();
     expect($res['targets'])->toBe([AclResolverProbeController::class . '::store']);
-    expect($res['plain_key'])->toBe('aclresolverprobecontroller-store');
+    expect($res['plain_key'])->toBe('acl-resolver-probe-store');
 });
 
 it('action 不在 map 中：原样、transformed=false', function () {
@@ -68,8 +68,9 @@ it('action 不在 map 中：原样、transformed=false', function () {
 
     expect($res['transformed'])->toBeFalse();
     expect($res['targets'])->toBe([AclResolverProbeController::class . '::index']);
-    expect($res['plain_key'])->toBe('aclresolverprobecontroller-index');
-    expect($res['key'])->toBe(AclResolverProbeController::class . '@index');
+    expect($res['plain_key'])->toBe('acl-resolver-probe-index');
+    // md5 开启时 key 为明文 key 的 md5 片段（与 Controller::formatAclName 同口径）。
+    expect($res['key'])->toBe('3ed8eaa117ea7005');
 });
 
 it('自定义 getTransformMethods：数组多目标 → 多 key', function () {
@@ -81,14 +82,14 @@ it('自定义 getTransformMethods：数组多目标 → 多 key', function () {
         AclResolverMapController::class . '::update',
     ]);
     expect($res['plain_keys'])->toBe([
-        'aclresolvermapcontroller-store',
-        'aclresolvermapcontroller-update',
+        'acl-resolver-map-store',
+        'acl-resolver-map-update',
     ]);
     expect($res['target_keys'])->toBe([
-        AclResolverMapController::class . '::store'  => AclResolverMapController::class . '@store',
-        AclResolverMapController::class . '::update' => AclResolverMapController::class . '@update',
+        AclResolverMapController::class . '::store'  => '0d96613445b4791d',
+        AclResolverMapController::class . '::update' => '14504ec4f2eee747',
     ]);
-    expect($res['plain_key'])->toBe('aclresolvermapcontroller-store | aclresolvermapcontroller-update');
+    expect($res['plain_key'])->toBe('acl-resolver-map-store | acl-resolver-map-update');
     expect($res['transformed'])->toBeTrue();
 });
 
