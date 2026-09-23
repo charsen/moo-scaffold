@@ -16,11 +16,11 @@ use Symfony\Component\Yaml\Yaml;
  * + scaffold/acl/{app}.yaml,内容完全由 routes 决定。
  *
  * generator 不读 storage 缓存,而是直接对路由里的 controller 类做反射(parsePMCNames /
- * parseActionInfo 读 docblock,AclActionResolver::resolve 调 controller 的 formatAclName)。
+ * parseActionInfo 读 docblock,AclActionResolver::resolve 与真实 Controller 共享 aclPlainKey)。
  * 所以这里用真·fixture controller 类(带 @module_name/@controller_name + @acl docblock +
- * formatAclName),手工构造 routes 数组(shape 同 RouterTool::storeActions 输出:每项含 action)。
+ * 真实基类),手工构造 routes 数组(shape 同 RouterTool::storeActions 输出:每项含 action)。
  *
- * 同时锁 isCrossControllerTransform / getMd5 / resolveAuthorizationInfo 分支。
+ * 同时锁 getMd5 与逐目标元数据分支。
  *
  * fixture 类名 + 全局函数用唯一前缀 authGen_ 避免 Pest 顶层 redeclare。
  */
@@ -32,7 +32,7 @@ use Symfony\Component\Yaml\Yaml;
  * @module_name en:Content|zh-CN:内容|
  * @controller_name en:Article|zh-CN:文章|
  */
-class authGen_ArticleController
+class authGen_ArticleController extends Controller
 {
     /**
      * 文章列表
@@ -52,21 +52,13 @@ class authGen_ArticleController
      * 健康检查(无授权标注,落入白名单)
      */
     public function ping() {}
-
-    // AclActionResolver 反射调:plain=短名-方法,full=类@方法
-    public function formatAclName(string $target, bool $plain): string
-    {
-        [$cls, $m] = explode('::', $target);
-
-        return $plain ? strtolower(class_basename($cls)) . '-' . strtolower($m) : $cls . '@' . strtolower($m);
-    }
 }
 
 /**
  * @module_name en:Content|zh-CN:内容|
  * @controller_name en:Tag|zh-CN:标签|
  */
-class authGen_TagController
+class authGen_TagController extends Controller
 {
     /**
      * 标签列表
@@ -74,13 +66,6 @@ class authGen_TagController
      * @acl en:List Tags|zh-CN:标签列表|desc:列出标签|
      */
     public function index() {}
-
-    public function formatAclName(string $target, bool $plain): string
-    {
-        [$cls, $m] = explode('::', $target);
-
-        return $plain ? strtolower(class_basename($cls)) . '-' . $m : $cls . '@' . $m;
-    }
 }
 
 /**
@@ -114,7 +99,7 @@ class authGen_PreviewController extends authGen_ArticleController
     {
         return [
             'preview'      => ['store', 'Store', 'update'],
-            'crossPreview' => [authGen_ArticleController::class . '::store', authGen_TagController::class . '::index'],
+            'crossPreview' => ['\\' . authGen_ArticleController::class . '::store', '\\' . authGen_TagController::class . '::index'],
         ];
     }
 }
@@ -208,14 +193,14 @@ it('start() 写 config/actions.php:非白名单 action 按 module>controller 归
 
     // ping 无 @acl → 进 whitelist(key 由 resolver formatAclName 生成:authgen_articlecontroller@ping)
     $whitelist = $config['admin']['whitelist'];
-    expect($whitelist)->toContain('authGen_ArticleController@ping');
+    expect($whitelist)->toContain('auth-gen_-article-ping');
 
     // index/store 进 actions 树(module-key > controller-key > [action keys])
     $flat = json_encode($config['admin']['actions']);
-    expect($flat)->toContain('authGen_ArticleController@index');
-    expect($flat)->toContain('authGen_ArticleController@store');
+    expect($flat)->toContain('auth-gen_-article-index');
+    expect($flat)->toContain('auth-gen_-article-store');
     // whitelist 的 ping 不在 actions 树
-    expect($flat)->not->toContain('authGen_ArticleController@ping');
+    expect($flat)->not->toContain('auth-gen_-article-ping');
 });
 
 it('start() 写 lang/{lang}/actions.php:app/module/controller/action 文案齐全', function () {
@@ -233,7 +218,7 @@ it('start() 写 lang/{lang}/actions.php:app/module/controller/action 文案齐�
     expect($zh['admin']['app-admin'])->toBe('后台管理');
 
     // action 文案来自 @acl(md5 关 → key 即 plain key)
-    $actionKey = 'authGen_ArticleController@index';
+    $actionKey = 'auth-gen_-article-index';
     expect($en['admin'][$actionKey])->toBe('List Articles');
     expect($zh['admin'][$actionKey])->toBe('文章列表');
     expect($en['admin']["{$actionKey}-desc"])->toBe('列出全部文章');
@@ -290,8 +275,8 @@ it('start() 全量重写:第二次跑只保留最新 routes(旧 action 不残留
     $config = require config_path('actions.php');
     $flat   = json_encode($config['admin']['actions']);
 
-    expect($flat)->toContain('authGen_ArticleController@index');
-    expect($flat)->not->toContain('authGen_ArticleController@store'); // 全量重建,store 没了
+    expect($flat)->toContain('auth-gen_-article-index');
+    expect($flat)->not->toContain('auth-gen_-article-store'); // 全量重建,store 没了
 });
 
 it('start() 清理已从 controller 注册表移除的旧 app 聚合键', function () {
@@ -348,10 +333,10 @@ it('多目标转换逐 key 采用目标文案，不被别名路由或路由顺�
     $en = (require lang_path('en/actions.php'))['admin'];
     $zh = (require lang_path('zh-CN/actions.php'))['admin'];
     foreach ([
-        'authGen_PreviewController@store'  => ['Create Article', '创建文章', '新增一篇'],
-        'authGen_PreviewController@update' => ['Update Article', '更新文章', '修改一篇'],
-        'authGen_ArticleController@store'  => ['Create Article', '创建文章', '新增一篇'],
-        'authGen_TagController@index'      => ['List Tags', '标签列表', '列出标签'],
+        'auth-gen_-preview-store'  => ['Create Article', '创建文章', '新增一篇'],
+        'auth-gen_-preview-update' => ['Update Article', '更新文章', '修改一篇'],
+        'auth-gen_-article-store'  => ['Create Article', '创建文章', '新增一篇'],
+        'auth-gen_-tag-index'      => ['List Tags', '标签列表', '列出标签'],
     ] as $key => [$english, $chinese, $description]) {
         expect($en[$key])->toBe($english)
             ->and($zh[$key])->toBe($chinese)
@@ -359,13 +344,15 @@ it('多目标转换逐 key 采用目标文案，不被别名路由或路由顺�
     }
     $config = (require config_path('actions.php'))['admin'];
     expect($config['whitelist'])->toBe([]);
-    expect(json_encode($config['actions']))->not->toContain('@preview')->not->toContain('@crossPreview');
+    $treeKeys = collect($config['actions'])->flatten()->all();
+    expect($treeKeys)->toContain('auth-gen_-article-store', 'auth-gen_-tag-index', 'auth-gen_-preview-store', 'auth-gen_-preview-update');
+    expect(collect($config['actions'])->flatten()->all())->not->toContain('auth-gen_-preview-preview', 'auth-gen_-preview-cross-preview');
     $document = Yaml::parseFile(base_path('scaffold/acl/admin.yaml'));
     $actions  = collect($document['modules'])->flatMap(fn ($module) => $module['controllers'])
         ->flatMap(fn ($controller) => $controller['actions']);
     $preview = $actions->firstWhere('action', 'preview');
     expect($preview['name']['zh-CN'])->toBe('预览文章')
-        ->and($preview['keys'])->toBe(['authGen_PreviewController@store', 'authGen_PreviewController@update'])
+        ->and($preview['keys'])->toBe(['auth-gen_-preview-store', 'auth-gen_-preview-update'])
         ->and($preview['whitelist'])->toBeFalse();
     $before = array_map('file_get_contents', authGen_artifacts());
     authGen_make()->start('admin', $routes);
@@ -449,8 +436,8 @@ it('三类产物 · routes 真变化时全部重写并刷新生成戳', function
     }
 
     // 新 action 确实落进了 config 与 acl(不只是时间戳变了)
-    expect(file_get_contents(config_path('actions.php')))->toContain('authGen_ArticleController@store')
-        ->and(file_get_contents(base_path('scaffold/acl/admin.yaml')))->toContain('authGen_ArticleController@store');
+    expect(file_get_contents(config_path('actions.php')))->toContain('auth-gen_-article-store')
+        ->and(file_get_contents(base_path('scaffold/acl/admin.yaml')))->toContain('auth-gen_-article-store');
 });
 
 it('2.1.16 之前的无头部产物被补写一次头部,补完后保持稳定', function () {
@@ -489,40 +476,6 @@ it('getMd5 · md5 开关 on → 16 位截断,off → 原样返回', function () 
     expect($hashed)->toBe(substr(md5('admin-content-article'), 8, 16));
 });
 
-it('isCrossControllerTransform · 仅当 transformed 且 target 指向别的 controller 时为 true', function () {
-    $gen = authGen_make();
-    $ref = new ReflectionMethod($gen, 'isCrossControllerTransform');
-    $ref->setAccessible(true);
-
-    // 未 transform → false
-    expect($ref->invoke($gen, [
-        'acl_transformed' => false,
-        'acl_targets'     => ['Foo::index'],
-        'controller'      => 'Foo',
-    ]))->toBeFalse();
-
-    // transform 但 target 仍是同 controller → false(同 controller 内部 create→store)
-    expect($ref->invoke($gen, [
-        'acl_transformed' => true,
-        'acl_targets'     => ['Foo::store'],
-        'controller'      => 'Foo',
-    ]))->toBeFalse();
-
-    // transform 且 target 指向别的 controller → true(跨 controller 复用 ACL key)
-    expect($ref->invoke($gen, [
-        'acl_transformed' => true,
-        'acl_targets'     => ['Bar::store'],
-        'controller'      => 'Foo',
-    ]))->toBeTrue();
-
-    // 空 targets / 空 controller → false(防御分支)
-    expect($ref->invoke($gen, [
-        'acl_transformed' => true,
-        'acl_targets'     => [],
-        'controller'      => 'Foo',
-    ]))->toBeFalse();
-});
-
 it('VarExporter 产出可 require 的 PHP 数组(actions.php 与 lang 都依赖)', function () {
     // 锁住 generator 用的导出器行为,actions.php 必须能被 require 回数组
     $code = '<?php return ' . VarExporter::export(['admin' => ['whitelist' => [], 'actions' => []]]) . ';';
@@ -532,4 +485,104 @@ it('VarExporter 产出可 require 的 PHP 数组(actions.php 与 lang 都依赖)
     unlink($tmp);
 
     expect($back)->toBe(['admin' => ['whitelist' => [], 'actions' => []]]);
+});
+
+class authGen_BrokenController extends authGen_ArticleController
+{
+    public function boot(): void
+    {
+        throw new RuntimeException('fixture');
+    }
+}
+
+it('解析失败时中止生成并保留全部现有产物', function () {
+    authGen_make()->start('admin', [authGen_route(authGen_ArticleController::class, 'index')]);
+    $before = array_map('file_get_contents', authGen_artifacts());
+    expect(fn () => authGen_make()->start('admin', [authGen_route(authGen_ArticleController::class, 'store'), authGen_route(authGen_BrokenController::class, 'index')]))
+        ->toThrow(RuntimeException::class, 'ACL 解析失败');
+    expect(array_map('file_get_contents', authGen_artifacts()))->toBe($before);
+});
+
+/**
+ * @module_name en:Content|zh-CN:内容|
+ * @controller_name en:Alias Only|zh-CN:别名入口|
+ */
+class authGen_AliasOnlyController extends Controller
+{
+    public function options() {}
+
+    public function mixed() {}
+
+    public function missing() {}
+
+    /**
+     * 永久删除
+     *
+     * @acl en:Destroy Forever|zh-CN:永久删除|danger:1|
+     */
+    public function forceDestroy() {}
+
+    public function getTransformMethods(): array
+    {
+        return [
+            'options' => ['\\' . authGen_ArticleController::class . '::store', 'forceDestroy'],
+            'mixed'   => ['\\' . authGen_ArticleController::class . '::store', '\\' . authGen_ArticleController::class . '::ping'],
+            'missing' => ['ghost'],
+        ];
+    }
+}
+
+it('无注解的多目标别名只采用目标授权与 danger，即使目标没有独立路由', function () {
+    authGen_make()->start('admin', [authGen_route(authGen_AliasOnlyController::class, 'options')]);
+    $config = (require config_path('actions.php'))['admin'];
+    $danger = Controller::aclPlainKey(authGen_AliasOnlyController::class . '::forceDestroy');
+    expect($config['whitelist'])->toBe([])
+        ->and(collect($config['actions'])->flatten()->all())->toContain('auth-gen_-article-store', $danger)
+        ->and($config['danger'])->toBe([$danger])
+        ->and((require lang_path('zh-CN/actions.php'))['admin'][$danger])->toBe('永久删除');
+});
+
+it('多目标混合白名单时不把受保护目标写入白名单且保留其文案', function () {
+    authGen_make()->start('admin', [authGen_route(authGen_AliasOnlyController::class, 'mixed')]);
+    $config = (require config_path('actions.php'))['admin'];
+    expect($config['whitelist'])->toBe(['auth-gen_-article-ping'])
+        ->and(collect($config['actions'])->flatten()->all())->toBe(['auth-gen_-article-store'])
+        ->and((require lang_path('en/actions.php'))['admin']['auth-gen_-article-store'])->toBe('Create Article');
+});
+
+it('不存在的转换目标中止生成而不是生成虚假权限', function () {
+    authGen_make()->start('admin', [authGen_route(authGen_ArticleController::class, 'index')]);
+    $before = array_map('file_get_contents', authGen_artifacts());
+    expect(fn () => authGen_make()->start('admin', [authGen_route(authGen_AliasOnlyController::class, 'missing')]))
+        ->toThrow(RuntimeException::class, 'ACL 目标不存在');
+    expect(array_map('file_get_contents', authGen_artifacts()))->toBe($before);
+});
+
+class authGen_DefaultRestoreController extends authGen_ArticleController
+{
+    public function restore() {}
+}
+class authGen_ExplicitRestoreController extends authGen_DefaultRestoreController
+{
+    protected array $transform_methods = ['restore' => ['trashed', '\\authGen_ArticleController::index']];
+}
+class authGen_OverrideRestoreController extends authGen_DefaultRestoreController
+{
+    public function getTransformMethods(): array
+    {
+        return ['restore' => 'trashed'];
+    }
+}
+
+it('仅未覆盖的框架默认映射允许目标方法被旧 CRUD 裁掉', function () {
+    authGen_make()->start('admin', [authGen_route(authGen_DefaultRestoreController::class, 'restore')]);
+    expect((require config_path('actions.php'))['admin']['whitelist'])->toBe([
+        Controller::aclPlainKey(authGen_DefaultRestoreController::class . '::trashed'),
+    ]);
+    $before = array_map('file_get_contents', authGen_artifacts());
+    foreach ([authGen_ExplicitRestoreController::class, authGen_OverrideRestoreController::class] as $class) {
+        expect(fn () => authGen_make()->start('admin', [authGen_route($class, 'restore')]))
+            ->toThrow(RuntimeException::class, 'ACL 目标不存在');
+        expect(array_map('file_get_contents', authGen_artifacts()))->toBe($before);
+    }
 });

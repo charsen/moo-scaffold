@@ -42,7 +42,7 @@ class BaseResourceCollection extends ResourceCollection
     {
         return $this->collection->map(function (BaseResource $resource) use ($request) {
             return (! $this->hide)
-                ? $resource->show($this->customFields)->trashed($this->trashed)->toArray($request)
+                ? $resource->show($this->customFields)->hide($this->hiddenFields)->trashed($this->trashed)->toArray($request)
                 : $resource->hide($this->customFields)->trashed($this->trashed)->toArray($request); // except()
         })->all();
     }

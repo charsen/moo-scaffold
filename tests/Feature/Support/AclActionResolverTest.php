@@ -121,3 +121,22 @@ it('targetMethodInfo 解析存在的方法、拒绝无效 target', function () {
     expect($r->targetMethodInfo('no-double-colon'))->toBeNull();                              // 无 ::
     expect($r->targetMethodInfo('App\\Missing::x'))->toBeNull();                              // 类不存在
 });
+
+class AclResolverBrokenController extends \Mooeen\Scaffold\Foundation\Controller
+{
+    public function boot(): void
+    {
+        throw new RuntimeException('fixture');
+    }
+
+    public function index(): void {}
+}
+
+it('解析异常通过跨 SAPI 日志报告并标明失败，不能伪装成有效空权限', function () {
+    config(['scaffold.authorization.check' => true]);
+    \Illuminate\Support\Facades\Log::spy();
+    $result = (new AclActionResolver)->resolve(AclResolverBrokenController::class, 'index');
+    expect($result['keys'])->toBe([])->and($result['error'])->toBe(RuntimeException::class);
+    \Illuminate\Support\Facades\Log::shouldHaveReceived('warning')->once();
+    expect(config('scaffold.authorization.check'))->toBeTrue();
+});

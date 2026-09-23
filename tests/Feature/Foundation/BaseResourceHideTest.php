@@ -16,14 +16,15 @@ use Mooeen\Scaffold\Foundation\BaseResource;
  */
 
 it('hide() 连续调用累加，不覆盖前一次', function () {
-    $model = new class extends Model {
+    $model = new class extends Model
+    {
         protected $guarded = [];
     };
     $model->setRawAttributes([
-        'id'                 => 1,
-        'role_name'          => '测试角色',
-        'role_next_actions'  => 'k1,k2',
-        'role_actions'       => ['k1', 'k2'],
+        'id'                => 1,
+        'role_name'         => '测试角色',
+        'role_next_actions' => 'k1,k2',
+        'role_actions'      => ['k1', 'k2'],
     ], true);
 
     $resource = (new BaseResource($model))->hide('role_next_actions');
@@ -37,7 +38,8 @@ it('hide() 连续调用累加，不覆盖前一次', function () {
 });
 
 it('hide() 单次调用仍生效（不因累加而退化）', function () {
-    $model = new class extends Model {
+    $model = new class extends Model
+    {
         protected $guarded = [];
     };
     $model->setRawAttributes(['id' => 1, 'secret' => 'x', 'keep' => 'y'], true);
@@ -48,7 +50,8 @@ it('hide() 单次调用仍生效（不因累加而退化）', function () {
 });
 
 it('hide() 重复同一字段不产生重复项', function () {
-    $model = new class extends Model {
+    $model = new class extends Model
+    {
         protected $guarded = [];
     };
     $model->setRawAttributes(['id' => 1, 'secret' => 'x'], true);
@@ -61,3 +64,16 @@ it('hide() 重复同一字段不产生重复项', function () {
 
     expect($custom->getValue($resource))->toBe(['secret', 'other']);
 });
+
+it('混用 show 和 hide 时隐藏规则始终优先，集合与单条一致', function (bool $collection, bool $hideFirst) {
+    $data     = ['id' => 1, 'secret' => 'x', 'name' => '测试'];
+    $resource = $collection ? BaseResource::collection([$data]) : new BaseResource($data);
+    if ($hideFirst) {
+        $resource->hide('secret')->show(['id', 'secret']);
+    } else {
+        $resource->show(['id', 'secret'])->hide('secret');
+    }
+    expect($resource->resolve())->toBe($collection ? [['id' => 1]] : ['id' => 1]);
+    // 二次序列化不能因集合把配置再灌入子资源而重现隐藏字段。
+    expect($resource->resolve())->toBe($collection ? [['id' => 1]] : ['id' => 1]);
+})->with([false, true])->with([false, true]);
