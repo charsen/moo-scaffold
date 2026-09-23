@@ -16,4 +16,13 @@ class GuardOperatorResolver implements OperatorResolver
     {
         return auth()->id();
     }
+
+    /**
+     * 框架层不知道谁是平台 root，默认一律 false（最小权限）；
+     * 宿主覆盖绑定后由宿主人员模型判定。
+     */
+    public function isPlatformRoot(int|string|null $operatorId): bool
+    {
+        return false;
+    }
 }
