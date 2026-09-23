@@ -71,7 +71,7 @@ class BaseResource extends JsonResource
     protected function filterFields($resource): array
     {
         return (! $this->hide)
-            ? $resource->only($this->customFields)->toArray()
+            ? $resource->only($this->customFields)->forget($this->hiddenFields)->toArray()
             : $resource->forget($this->customFields)->toArray(); // except()
     }
 

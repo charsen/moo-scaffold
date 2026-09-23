@@ -12,6 +12,8 @@ namespace Mooeen\Scaffold\Foundation;
 
 trait BaseResourceTrait
 {
+    protected array $hiddenFields = [];
+
     /**
      * Set the resource collection to include trashed fields.
      */
@@ -33,12 +35,11 @@ trait BaseResourceTrait
             $fields = array_map('trim', explode(',', $fields));
         }
 
-        // **累加**而非覆盖（2026-09-21 修）：本方法是 `JsonResource::hide()` 的覆写，写的是本类的
-        // `$customFields`（`filterFields()` 真正读取的字段）。原实现直接赋值，于是**连续两次 hide()
-        // 只有最后一次生效** —— 实测 `AuthorizationController::index()` 先
-        // `hide('role_next_actions')`、非 root 再 `hide(['role_actions'])`，结果只隐藏了后者，
-        // 前者（承载**同一份权限清单**的原始落库列）原样透出，非 root 仍能读到他人角色的全量 key。
-        $this->customFields = array_values(array_unique([...$this->customFields, ...$fields]));
+        // 显示白名单和隐藏黑名单分开保存，调用顺序不得重新暴露已隐藏字段。
+        $this->hiddenFields = array_values(array_unique([...$this->hiddenFields, ...$fields]));
+        if ($this->hide) {
+            $this->customFields = $this->hiddenFields;
+        }
 
         return $this;
     }
@@ -48,8 +49,12 @@ trait BaseResourceTrait
      */
     public function show(string|array $fields): self
     {
+        $fields             = is_array($fields) ? $fields : array_map('trim', explode(',', $fields));
+        $this->customFields = $this->hide
+            ? array_values(array_unique($fields))
+            : array_values(array_unique([...$this->customFields, ...$fields]));
         $this->hide = false;
 
-        return $this->hide($fields);
+        return $this;
     }
 }

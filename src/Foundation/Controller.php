@@ -123,8 +123,8 @@ class Controller extends BaseController
      * 「有本动作授权 **或** 满足某个运行时数据条件」。
      *
      * ⚠️ 两步判定的顺序与语义和原本「手写 Gate 循环」的写法一致：
-     * ① 先查**自身** key（`static::class::method`）—— 自身权限点**不得**写进 `transform_methods`，
-     *    否则 `moo:auth` 会把它从权限树删掉（`getAclMethodName()` 只返回 transform 目标）；
+     * ① 先查**自身** key（`static::class::method`）。生成器只消费 transform 声明，
+     *    需要保留独立权限点的动作还须把自身目标显式列入 transform。
      * ② 再查已声明的 transform 目标（继承授权点）。
      *
      * ⚠️ 调用前必须已在 `boot()` 中登记好 `transform_methods`。

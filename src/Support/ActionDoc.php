@@ -57,7 +57,7 @@ final class ActionDoc
         $data        = [];
         $doc_comment = self::normalizeDocComment($reflectionMethod->getDocComment());
 
-        preg_match('/@acl\s(.*)\n/', $doc_comment, $acl);
+        preg_match('/^[ \t]*(?:\/\*\*|\*)[ \t]*@acl\b[ \t]*([^\r\n]*?)(?=\*\/|\r?\n|$)/m', $doc_comment, $acl);
         $data['whitelist'] = empty($acl);
         $temp_string       = (empty($acl) ? '' : $acl[1]);
         $data['name']      = self::parseByLanguages($temp_string);
@@ -66,7 +66,7 @@ final class ActionDoc
         // 原 `[^\|]*` 会一路吃到注解边界，于是 `desc: , danger: 1}` 把后置元数据当成了描述内容
         // （实测产物出现 `-desc => ', danger: 1'` 并显示到授权页）。
         // 现用非贪婪 + 断言「逗号后紧跟已知字段名」为界：既保留描述里的普通逗号，又不吞后续字段。
-        preg_match('/desc:([^\|,}]*?)\s*(?=,\s*(?:danger|whitelist|en|zh-CN)\s*:|[\|}])/i', $temp_string, $temp);
+        preg_match('/desc:([^\|}]*?)\s*(?=,\s*(?:danger|whitelist|en|zh-CN)\s*:|[\|}])/i', $temp_string, $temp);
         $data['desc'] = empty($temp) ? '' : trim($temp[1]);
 
         // 危险动作声明（2026-09-21）：`@acl {..., danger: 1}` 表示该动作**高危且不可逆**

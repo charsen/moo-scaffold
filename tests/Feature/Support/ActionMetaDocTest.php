@@ -247,3 +247,32 @@ function actiondoc_fixture_bare(): object
         public function nothing(): void {}
     };
 }
+
+it('单行 ACL 注解仍受保护，描述保留普通逗号且不吞危险标记', function () {
+    $controller = new class
+    {
+        /** @acl {en:Delete, zh-CN:删除, desc:先检查, 再删除, danger: 1} */
+        public function destroy() {}
+    };
+    $info = ActionDoc::parseActionInfo(new ReflectionMethod($controller, 'destroy'));
+    expect($info['whitelist'])->toBeFalse()->and($info['danger'])->toBeTrue()
+        ->and($info['name']['zh-CN'])->toBe('删除')->and($info['desc'])->toBe('先检查, 再删除');
+});
+
+it('正文提到 ACL 标记不覆盖真正的注解，也不把纯说明变成权限点', function () {
+    $controller = new class
+    {
+        /**
+         * 本动作是 `@acl` 占位，不执行写入。
+         *
+         * @acl {en:People, zh-CN:组织人员, desc: }
+         */
+        public function people() {}
+
+        /** 普通说明中提到 @acl 不代表显式授权。 */
+        public function plain() {}
+    };
+    $info = ActionDoc::parseActionInfo(new ReflectionMethod($controller, 'people'));
+    expect($info['name']['zh-CN'])->toBe('组织人员')->and($info['whitelist'])->toBeFalse();
+    expect(ActionDoc::parseActionInfo(new ReflectionMethod($controller, 'plain'))['whitelist'])->toBeTrue();
+});

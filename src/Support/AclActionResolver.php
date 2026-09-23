@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mooeen\Scaffold\Support;
 
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 use ReflectionClass;
 use ReflectionMethod;
 use Throwable;
@@ -44,14 +45,19 @@ class AclActionResolver
                 'plain_key'  => implode(' | ', $plainKeys),
                 'targets'    => $targets,
                 // keys 会独立去重，调用方不可再用 keys 的下标配对 targets。
-                'target_keys' => $targetKeys,
-                'target'      => implode(' | ', $targets),
-                'transformed' => $targets !== [$controllerClass . '::' . $actionName],
+                'target_keys'            => $targetKeys,
+                'target'                 => implode(' | ', $targets),
+                'transformed'            => $targets !== [$controllerClass . '::' . $actionName],
+                'uses_default_transform' => $this->usesDefaultTransform($controller, $actionName),
             ];
         } catch (Throwable $e) {
-            fwrite(STDERR, 'DIAG resolve failed: ' . $controllerClass . '::' . $actionName . ' → ' . get_class($e) . ': ' . substr($e->getMessage(), 0, 150) . PHP_EOL);
+            Log::warning('ACL action resolution failed', [
+                'controller' => $controllerClass,
+                'action'     => $actionName,
+                'exception'  => $e::class,
+            ]);
 
-            return $this->emptyResult();
+            return [...$this->emptyResult(), 'error' => $e::class];
         }
     }
 
@@ -122,7 +128,7 @@ class AclActionResolver
             // ProcessDefinitionController 的 update / publish / simulate）时，生成期没有登录用户，
             // 判定必然失败并被抛到这里。这类异常**不代表解析失败** —— transform_methods 的赋值在
             // boot() 开头就已完成，授权判定只是它后面的守卫，故忽略并继续扫描。
-            // 只吞 AuthorizationException：其它异常仍向上抛给 resolve() 的 catch，保持既有回退语义。
+            // 只吞 AuthorizationException：其它异常仍向上抛给 resolve() 的 catch，标记解析失败。
         } finally {
             Config::set('scaffold.authorization.check', $original);
         }
@@ -161,6 +167,18 @@ class AclActionResolver
         }
 
         return $controllerClass . '::' . $mappedAction;
+    }
+
+    private function usesDefaultTransform(object $controller, string $action): bool
+    {
+        if (! $controller instanceof \Mooeen\Scaffold\Foundation\Controller) {
+            return false;
+        }
+        $method = new ReflectionMethod($controller, 'getTransformMethods');
+        $custom = new \ReflectionProperty(\Mooeen\Scaffold\Foundation\Controller::class, 'transform_methods');
+
+        return $method->getDeclaringClass()->getName() === \Mooeen\Scaffold\Foundation\Controller::class
+            && ! array_key_exists($action, $custom->getValue($controller));
     }
 
     private function getTransformMethods(object $controller): array
