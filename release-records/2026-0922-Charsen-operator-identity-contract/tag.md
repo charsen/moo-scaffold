@@ -1,10 +1,11 @@
-# 操作者身份契约收敛（moo-scaffold 2.3.0 候选）
+# 操作者身份契约收敛（moo-scaffold 2.2.8 候选）
 
 状态：**准备发版（未打 tag）** —— 已在 `dev` 与 `master`，工作区干净。
 
 ## 发布形态
 
-- 本仓：**minor** tag **`2.3.0`**（契约新增方法属向后不兼容的接口扩展）。
+- 本仓：**patch** tag **`2.2.8`**（作者决定不跳版本号；契约新增属向后不兼容的接口扩展，
+  但按仓库惯例仍走 patch）。
 - 下游：自行实现 `OperatorResolver` 的宿主/包须补 `isPlatformRoot()`；使用 scaffold 默认实现
   （`GuardOperatorResolver`，已实现并返回 false）者不受影响。
 - 已改：`某个内部 Host` 的 `GetUserIdOperatorResolver`（宿主唯一绑定，同时实现 `id()` 与 `isPlatformRoot()`）。
