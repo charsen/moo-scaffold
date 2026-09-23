@@ -34,6 +34,11 @@ beforeEach(function () {
         {
             return 100;
         }
+        public function isPlatformRoot(int|string|null $operatorId): bool
+        {
+            return false;
+        }
+
     });
 });
 
