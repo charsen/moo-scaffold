@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+
+### Added
+
+- **`OperatorResolver` 并入「操作者 root 身份」判定**：新增 `isPlatformRoot(int|string|null $operatorId): bool`。
+  身份只应有**一份**宿主绑定 —— 原先 `moo-<name>` 自持 `Contracts\PlatformAccess` 契约、宿主另写一份适配器，
+  而同包文档本就写明「身份走 scaffold 共享 `OperatorResolver`，本包不做契约、不做绑定」。
+  `GuardOperatorResolver` 补默认实现（返回 `false`，框架层不知道谁是 root）。
+  **下游需注意**：自行实现 `OperatorResolver` 的宿主/包须补该方法（否则接口不满足）；使用 scaffold 默认实现者不受影响。
+
+### Changed
+
+- **`Foundation\Controller::checkAuthorization()` 数组分支改为逐 key `Gate::check`**（原 `Gate::any($method, ['acl_authentication'])` 参数颠倒 → 恒 false、含 root 全 403）。新增真正调用 `checkAuthorization()` 的回归用例（原用例只锁返回值形状，故「形状对、授权恒拒」能全绿逃逸）。
+
+### Fixed
+
+- **`BaseResource` 显示白名单与隐藏黑名单分离**：`hide()` 累加写入 `$hiddenFields`，`show()` 只设白名单；避免「先 hide 后 show」把已隐藏字段重新暴露。`filterFields` / collection 均以黑名单兜底。
 ### Fixed
 
 - **`AclActionResolver` 在生成期无法安全 boot**（两处）：① 未设置 `Foundation\Controller::$method`（它是未初始化 typed property，只在运行期 `callAction()` 赋值），任何在 `boot()` 里读它的控制器都会抛 `must not be accessed before initialization`，被 `catch (Throwable)` 吞成「回退 key」——实测 `PersonnelOptionController` 三个动作全部落成「无标签白名单」，产物对授权事实撒谎；现改为 boot 前反射设成本次解析的动作名。② `bootWithoutAuthorization()` 只关掉 `scaffold.authorization.check`，管不到控制器**直接调 `Gate`** 的领域校验（同上控制器校验 `ProcessDefinitionController` 的 update / publish / simulate）——生成期无登录用户，判定必然失败并中止扫描；现容忍 boot 抛出的 `AuthorizationException`（`transform_methods` 赋值在抛错前已完成），其它异常仍按既有语义回退。
