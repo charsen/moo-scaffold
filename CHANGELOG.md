@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- **骨架规范与判据收口（工具/文档，无运行时改动）**：`tools/audit-package-structure.php` 的 `CONFIG` 级只保留
+  「path 仓库 `versions` 写成约束式」一条（`versions` 必须具体版本，否则无 lock 的干净安装被 Composer 拒绝）；
+  `.gitattributes` 裁剪清单与 GitHub Actions 两项降为 `OPTIONAL`（只报不判）—— 实测 Composer 对 Gitee 无 dist driver、
+  依赖走 `git clone`，`export-ignore` 对私有包不生效，且私有包没有 GitHub 仓；新增 `composer.ci.json` 的必需条目；
+  `docs/package-skeleton.md` 增补「清单双轨」「传递私包闭包」「OPTIONAL 为什么只报不判」三节。
+
 - FormRequest 默认保持字段级 422；无表单动作显式设置 protected bool $fieldValidation = false 后以 BaseException 返回 522。Admin 删除/恢复 Request 与资源动作模板同步生成该约定，已有手写 Request 需显式对齐。
 
 
