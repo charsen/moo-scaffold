@@ -367,3 +367,24 @@
   ⚠ **安全提醒**：`/Volumes/dev/git_tokens` 的内容因我的脱敏正则不匹配其格式（`## name` 头 + 下一行裸值），
   **两个 token 的明文已进入本次会话 transcript/日志** ⇒ **请轮换 Gitee token 与 GitHub PAT**。
   后续引用一律走 shell 变量 + 一次性 askpass（不写进 remote URL、不回显）。
+
+- [x] **他会话在途分支也合入两条线（2026-09-28 用户：「本地的分支都要合并到 dev 和 master/main」）**：
+  - 先按老办法定性再动手，**5 个仓的可修红灯全部是断言落后**（不是产品缺陷）：
+    `moo-<name>` 5 条 / `moo-<name>` 1 条 = 同一笔替换（`DomainException` → `BaseException`）**漏了 import**
+    ⇒ `BaseException::class` 解析成不存在的 `Tests\Feature\BaseException`；顺带挖出 Pest 的陷阱（已写入 `NOTES.md`）。
+    `moo-<name>` 2 条 = `getCode()` 期望 409/422、实得 522 —— 代码是**裸 `BaseException`（默认 522，符合契约）**，
+    且本仓需要非 522 时一律显式传码（`RecordController` 的 403/409）⇒ 断言落后。
+    `moo-<name>` 2 条 = `ArchTest` 硬编码 `^0.2.8`（manifest 已 `^0.2.15`）+ 522 信封改断言 `error.msg`。
+    以上 4 仓已各提交一笔（另修掉 mini-app/certificate 的既有 pint 违规），**套件与 pint 全绿**：
+    category 39 · certificate 33 · mini-app 305 · process-application 46。
+  - `moo-<name>` 的 12 条红是**未完成功能**（终止/撤回/转派/root 强制终止），按用户决定**照原样合入**；
+    ⚠ 该功能红现在在 `dev` 与 `main` 上，**打 tag 前需确认**。
+  - 合并方式同上一批：`merge-tree --write-tree` + `commit-tree` + 推 `refs/heads/<线>`（不切工作区、不碰并行会话 HEAD），
+    回读 `merge-base --is-ancestor` 全部 ✓、远端与我推的 SHA 一致。
+    `moo-<name>` 的两个分支（`fix-shared-sequence` 与 `fix-process-terminate-acl`）都已合入它的两条线。
+  - `moo-<name>` **没有远端**（`remote -v` 为空）⇒ 只能在本地把 `feat-sequence` 快进合入它的 `dev`/`main`（已做，`6636fa4`）；
+    **推送/发版需他们会话先建远端**。
+  - **生态外 10 个分支未动（等用户确认范围）**：`内部官网项目`/`某个内部 Host 项目`/`某个内部业务项目`/`某内部语言项目（后端）`
+    各 1 笔 `fix-business-exceptions`、`某个内部 Host` 的 `fix-category-business-status`(5) 与 `V2-260515`、
+    `某内部语言项目（前端）` 的 `feat-flutter`(77)、`某个内部 Host-next-admin` 的 `antdv-next`/`feat-packages`(59)/`fix-lzw`。
+    这些属其它项目的在途分支（含长期分支），是否有意合入其发布线需用户判断。
