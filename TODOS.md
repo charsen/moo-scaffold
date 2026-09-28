@@ -97,8 +97,14 @@
   **⚠ 第三个独立根因（2026-09-28 实测）**：包测试套件跑在**内存 SQLite** 上时缺 `cache` 表
   （`SQLSTATE[HY000]: no such table: cache`），而缓存驱动走 database ⇒ **即使解决了 path 依赖，
   `composer ci` 的 test 步照样红**。实测 `moo-<name>`（本次完全未改动）同样中招，属既有环境缺口；
-  跑测试时 `CACHE_STORE=array` 可一次性绕过。修法（phpunit.xml 设 `CACHE_STORE=array` 或测试引导建 cache 表）
-  需单独定，**未做**。
+  跑测试时 `CACHE_STORE=array` 可一次性绕过。
+  **⚠ 修法结论（2026-09-28，别再走弯路）**：**`phpunit.xml` 里写 `<env name="CACHE_STORE" value="array"/>` 是无效的** ——
+  PHPUnit 非 `force` 的 `<env>` 只写 `$_ENV/$_SERVER`，这里的 Laravel 不采纳它。实测同一次代码：
+  只靠该 `<env>` = 28 failed（仍在查 `cache` 表），改用 shell `CACHE_STORE=array` = 39 passed。
+  **有效修法是在 `tests/TestCase.php` 的 `defineEnvironment()` 里 `$app['config']->set('cache.default', 'array')`**
+  （cms / product / banner 已按此修，见下方「消费包测试夹具」条）。
+  另：`moo-<name>/phpunit.xml` 里**已经有**那行失效的 `<env name="CACHE_STORE">`，它 11 failed 里有 25 行 `no such table: cache`
+  ⇒ **那是个假先例，别照抄**。
 
 - [ ] **既有 pint 违规（改前就红，非本次引入）**：`moo-<name>` 35 处 / `moo-<name>` 2 处 /
   `moo-<name>` 1 处；**本仓自身 2 处**（`tests/Feature/Concerns/HasOperatorContextTest.php`、
@@ -113,14 +119,27 @@
   `pint --test` 全绿（61 / 55 / 359 files），`php -l` 与定向测试通过；**enterprise-information 仍待你定**。
   另核过 `stubs/controller-admin.stub` 的 use 块**本身无空行** ⇒ 那两个 Controller 是文件落后而非 stub 违规，
   修完不会因重生成而 churn（这是 NOTES 坑②那条纪律的应用）。
+  **追加**：`moo-<name>` 有 **1 处既有违规**（`src/Http/Controllers/Admin/BannerController.php` 的
+  `class_attributes_separation`，最近改动是 2026-09-23，与本次无关）—— 它会让 banner 的 `composer ci` 的
+  `pint:check` 步失败，**未修，待你定**（另 1 处 `AdminPresentationTest.php` 的 import 顺序已在本次顺带归位）。
 
-- [ ] **消费包测试夹具落后于 scaffold 契约（新发现，2026-09-28）**：`moo-<name>` / `moo-<name>` / `moo-<name>` 的
+- [x] **消费包测试夹具落后于契约（2026-09-28 已修 `moo-<name>` / `moo-<name>` / `moo-<name>`）**：
   `tests/Pest.php` 里匿名 `OperatorResolver` 实现**缺 `isPlatformRoot()`**（scaffold 的 operator-identity-contract
-  新增的方法）⇒ 走到用该 helper 的测试就 `Pest\Exceptions\FatalException`；另 cms / banner 的测试上下文里
-  `Mooeen\Contract\PersonnelNameResolver` 无绑定、`not instantiable`。属「改契约必须扫四层引用」的
-  **第四层（测试夹具）漏网**——契约在逐步演进，消费包的 Testbench 夹具没跟上。
-  与上面的 `cache` 缺表共同导致这些包的 `composer ci` 必红。修法：逐包同步 `tests/Pest.php` 的匿名实现与默认绑定；
-  **未做**（本轮只修了 pint，且已用提交态 A/B 证明这些失败与本次改动无关）。
+  新增的方法）⇒ 走到用该 helper 的测试就 `Pest\Exceptions\FatalException`。属「改契约必须扫四层引用」的
+  **第四层（测试夹具）漏网**。已修：cms `c9619ca` / product `3a4c989` / banner `ff57680`
+  （各补 `isPlatformRoot()` ＋ `TestCase::defineEnvironment()` 设 `cache.default=array`），
+  三仓全量套件 **29 / 29 / 39 passed、`cache` 报错 0**，cms/product `pint --test` 亦 PASS。
+  ⚠ **另一处不是「夹具缺绑定」而是「断言落后于已删行为」**：那三个用例原先断言「未绑定宿主时回退裸 ID」，
+  而 2026-09-22 生态已明确**删掉空兜底**（`moo-<name>` `5d6df51`：「空兜底已删，断言须宿主绑定」）
+  ⇒ 产码里的 `app(PersonnelNameResolver::class)` 是**刻意的显式失败**，**不该**给它加 `bound()` 守卫。
+  正解是**改测试**：绑定先行 ＋ 钉住「无内置兜底」（`expect(app()->bound(...))->toBeFalse()` +
+  `toThrow(BindingResolutionException::class)`），照抄 moo-<name> 的写法。**别再试图在产品码里加兜底。**
+
+- [ ] **同类问题在其余包仍存在（未修，需先定范围）**：实测整仓套件红、且与上述根因同族 ——
+  `moo-system` 155 failed / `moo-feedback` 31 / `moo-upload` 26 / `moo-<name>` 11
+  （richtext 还带着那行**失效的** `<env CACHE_STORE>`）。收口三步已明确：① `tests/TestCase.php` 设
+  `cache.default=array`；② 逐包给匿名 `OperatorResolver` 补 `isPlatformRoot()`；③ 按上条口径改掉落后的
+  「回退裸 ID」断言（不加产品码兜底）。跨包且量大，**等确认后再动**。
 
 - [ ] **LAYOUT 待议（改动即破坏 namespace，需同步消费方与 codegen 重生成）**：
   7 包把 model trait 放在 `src/Models/Concerns/`（`moo-<name>` 2 / `moo-<name>` 2 / `moo-<name>` 2 /
