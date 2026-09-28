@@ -28,8 +28,19 @@
   （不静默跳过），**移除条件＝该包首次 commit 落地**；显式 `--package=moo-<name>` 仍可单查它的当前状态。
   剔除后 `--fail-on-drift` **exit=0**，本轮 **29 目标 0 MISS / 0 STYLE-DRIFT**。
 
+**收口状态（2026-09-28）**：原本全部改动都裸躺在 24 个仓的发布基线（`main`/`master`）工作区里 —— 违反
+  「发布基础分支不直接开发」。已逐仓 `fetch` 复核基线最新后，从基线各切出一个 `feat-package-skeleton-alignment`
+  并提交（显式路径暂存，工作区已干净、各领先 `origin/<基线>` 1 个提交）。**未推送、未合入 `dev`/`master`**；
+  将来发布时把**这一个分支分别合入两条线**，两条线互不经过对方。5 个他会话仓见下方待办。
+
 判据已固化为 `tools/audit-package-structure.php`（只读闸门，`--fail-on-drift`），规模口径见
 `docs/package-skeleton.md`。**本轮只做非破坏性补齐**；下列事项需先确认设计意图或同步消费方，未动。
+
+- [ ] **5 个他会话仓的骨架文件待补**：`moo-<name>`、`moo-<name>`（同处 `fix-category-business-status`）、
+  `moo-<name>`（`fix-business-code-prefixes`）、`moo-<name>`、`moo-<name>`（同处 `fix-shared-sequence`）
+  的工作区里躺着本轮那 3 个文件（`AGENTS.md`/`CLAUDE.md` 已改、`.gitattributes` 未跟踪），但它们当前在**他会话的分支**上，
+  不能被本轮 `checkout -b` 带走（会把别人的脏改动一起搬过去）。**等那些会话提交、工作区干净后**，再各仓从最新发布基线
+  起 `feat-package-skeleton-alignment` 补提交。已核：这 5 仓的 hunk 全是本轮那份重写，未与他人内容交织，按路径即可干净分离。
 
 - [x] **已完成**：补齐 `moo-feedback/AGENTS.md`（该包唯一缺失的项目指令文件）；补齐 5 个包的 `CLAUDE.md`
   （contract / feedback / meeting / richtext / upload，另 24 份改为纯入口）；`pint.json` **8 份**偏离
