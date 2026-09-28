@@ -164,10 +164,10 @@ function allowances(): array
     ];
 
     return [
-        'moo-contract'           => $pureContract,
-        'moo-<name>'               => $kernel,
-        'moo-monitor-laravel'    => $infra,
-        'moo-<name>'           => [
+        'moo-contract'        => $pureContract,
+        'moo-<name>'            => $kernel,
+        'moo-monitor-laravel' => $infra,
+        'moo-<name>'        => [
             'routes/admin.php'           => '取号内核：无后台管理面（调用方是各业务包的 Service/Command）',
             'config/moo-<stem>.php'      => '取号内核：无可发布配置（作用域与编号格式由消费者负责）',
             'lang/zh-CN'                 => '取号内核：无词条',

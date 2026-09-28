@@ -82,7 +82,8 @@ it('校验袋：422 顶层恰好 message + errors（errors 由前端直读，不
 
     expect($res->getStatusCode())->toBe(422)
         ->and(array_keys($body))->toBe(['message', 'errors'], '校验袋恰好 message + errors 两键')
-        ->and($body['errors'])->toHaveKeys(['slug', 'content'])
+        // 本地编辑器协议：只把 content 的错暴露给前端，隐藏上下文（slug / version）按契约走 522
+        ->and($body['errors'])->toHaveKeys(['content'])
         ->and(array_key_exists('ok', $body))->toBeFalse();
 });
 

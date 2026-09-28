@@ -26,6 +26,15 @@ class FormRequest extends BaseFormRequest
     /** 有字段控件接收错误时保留 422；无表单动作显式设为 false。 */
     protected bool $fieldValidation = true;
 
+    /**
+     * plan-51:Schema::hasColumn 调用走 information_schema,在 Request rule 派发链路
+     * 每行 unique 字段触发一次。同表多字段 + 同进程内 idempotent,加 static cache 避免
+     * 重复查询(php-fpm worker lifetime 内单次查询/表)。
+     *
+     * @var array<string,bool>
+     */
+    private static array $softDeleteColumnCache = [];
+
     protected function failedValidation(Validator $validator): void
     {
         if (! $this->fieldValidation) {
@@ -35,14 +44,6 @@ class FormRequest extends BaseFormRequest
         parent::failedValidation($validator);
     }
 
-    /**
-     * plan-51:Schema::hasColumn 调用走 information_schema,在 Request rule 派发链路
-     * 每行 unique 字段触发一次。同表多字段 + 同进程内 idempotent,加 static cache 避免
-     * 重复查询(php-fpm worker lifetime 内单次查询/表)。
-     *
-     * @var array<string,bool>
-     */
-    private static array $softDeleteColumnCache = [];
     /**
      * Determine if the user is authorized to make this request.
      */
