@@ -119,5 +119,6 @@ src/Http/{Controllers/Admin,Requests,Resources}/
 - 基准包（`moo-system` / `moo-<name>`）自身形状变化时，脚本的 `CANONICAL_PACKAGES` 与上面的说明要一起复核。
 - **开发中的仓整仓剔除**走脚本的 `DEFERRED_TARGETS`（值里写理由 + **移除条件**）：它只决定「扫哪些仓」，
   不改变任何必需项判据；理由会随报告「跳过」段与 `--json.skipped` 打印，**不允许静默跳过、也不允许借它压掉真实偏离**；
-  显式 `--package=<name>` 仍照常单查该仓。
+  显式 `--package=<name>` 仍照常单查该仓。**当前该清单为空** —— `moo-<name>` 于 2026-09-28 首次 commit 落地后，
+  按它自己那条移除条件纳入审计（它缺的不是「开发中」而是基建包豁免：已补 `allowances()` 与其 `CLAUDE.md`）。
 - 已知的布局 / 命名待议项（`LAYOUT` / `NAME`）登记在 `../TODOS.md`，**不在本文件承诺**。

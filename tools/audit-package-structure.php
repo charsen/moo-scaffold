@@ -56,10 +56,11 @@ const SKIP_DIRS = ['vendor', '.git', 'node_modules'];
  * 只用于「另一个会话正在从零开发、还没有任何基线」的仓；不得用它压掉真实的 MISS / STYLE-DRIFT。
  * 理由与**移除条件**写在值里，报告尾部的「跳过」段与 --json 的 skipped 段原样打印，绝不静默消失。
  * 显式 `--package=<name>` 仍照常审计该仓（用于单独看它的当前状态，不影响默认闸门）。
+ *
+ * **当前为空**：`moo-<name>` 于 2026-09-28 首次 commit 落地（`356898a`）后，按它自己那条移除条件
+ * 纳入审计 —— 它不再是「开发中」，而是一个缺豁免的基建包：已补 `allowances()['moo-<name>']` 与 `CLAUDE.md`。
  */
-const DEFERRED_TARGETS = [
-    'moo-<name>' => '另会话正在从零开发（feat-sequence 尚无任何 commit）；其首次 commit 落地后移除此条',
-];
+const DEFERRED_TARGETS = [];
 
 /** canonical 范本包（pint.json 基准取自第一个存在的） */
 const CANONICAL_PACKAGES = ['moo-system', 'moo-<name>'];
@@ -165,6 +166,17 @@ function allowances(): array
         'moo-contract'           => $pureContract,
         'moo-<name>'               => $kernel,
         'moo-monitor-laravel'    => $infra,
+        'moo-<name>'           => [
+            'routes/admin.php'           => '取号内核：无后台管理面（调用方是各业务包的 Service/Command）',
+            'config/moo-<stem>.php'      => '取号内核：无可发布配置（作用域与编号格式由消费者负责）',
+            'lang/zh-CN'                 => '取号内核：无词条',
+            'lang/en'                    => '取号内核：无词条',
+            'src/Models/Traits'          => '取号内核：无 Eloquent 层',
+            'src/Models/Filters'         => '取号内核：无 Eloquent 层',
+            'src/Http/Controllers/Admin' => '取号内核：无后台控制器',
+            'src/Http/Requests'          => '取号内核：无请求验证层',
+            'src/Http/Resources'         => '取号内核：无资源层',
+        ],
         'moo-scaffold'           => $tooling + ['gitattributes:docs' => 'docs/ 是 host 文档中心的包文档源（src/Support/DocsRepository.php 直接读包 basePath 下的 docs/），有意随包分发'],
         'moo-<name>' => [
             'database/migrations' => '已初始化未落地：空骨架，尚无真实表设计',
@@ -730,7 +742,7 @@ if (isset($options['json'])) {
 
 echo "工作区: {$workspace}\n";
 echo 'canonical 基准: ' . implode(' + ', CANONICAL_PACKAGES) . "\n";
-echo '扫描目标: ' . count($targets) . ' 个（跳过 ' . count($skipped) . " 个：非扩展包 / 开发中）\n\n";
+echo '扫描目标: ' . count($targets) . ' 个（跳过 ' . count($skipped) . " 个：非扩展包 / DEFERRED_TARGETS）\n\n";
 
 foreach ($targets as $target) {
     $total = array_sum(array_map('count', $target['drift']));
