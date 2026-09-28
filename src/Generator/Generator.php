@@ -73,6 +73,11 @@ class Generator
      */
     protected function putAndReport(string $file, string $relativeFile, string $content, string $existVerb = 'overwritten'): void
     {
+        // stub 里有对齐用的固定空格（如 `* @Author:      {{author}}`），占位符为空时就会留下行尾空白，
+        // 而 pint 的 no_trailing_whitespace_in_comment 每次都会报 ⇒ 在唯一写入点统一剥掉行尾空白，
+        // 免得下游每生成一次都要再手动格式化一遍（enterprise-information 的生成迁移就踩过这个）。
+        $content = preg_replace('/[ \t]+$/m', '', $content) ?? $content;
+
         $fileExists = $this->filesystem->isFile($file);
         if ($this->filesystem->put($file, $content) === false) {
             throw new \RuntimeException("文件写入失败：{$file}");

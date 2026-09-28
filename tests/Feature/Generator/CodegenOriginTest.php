@@ -163,11 +163,11 @@ it('moo:i18n 分流:包词条子集进包 lang/,host lang 不动,手写词条不
     $db = $this->pkgRoot . '/lang/zh-CN/db.php';
     expect(is_file($db))->toBeTrue();
     $dbTxt = file_get_contents($db);
-    expect($dbTxt)->toContain("'title' => '标题'");          // 子集 key:值刷新为 schema 派生
-    expect($dbTxt)->toContain("'copy_mode' => '复制模式'");  // 手写 key:保留不删
+    expect($dbTxt)->toMatch("/'title'\s+=> '标题'/");          // 子集 key:值刷新为 schema 派生
+    expect($dbTxt)->toMatch("/'copy_mode'\s+=> '复制模式'/");  // 手写 key:保留不删
     // validation attributes 同语义
     $valTxt = file_get_contents($this->pkgRoot . '/lang/zh-CN/validation.php');
-    expect($valTxt)->toContain("'source_role_id' => '源头角色'");
+    expect($valTxt)->toMatch("/'source_role_id'\s+=> '源头角色'/");
     expect($valTxt)->toContain("'title'");
     // 枚举词条进包 model.php
     $modelTxt = file_get_contents($this->pkgRoot . '/lang/zh-CN/model.php');
