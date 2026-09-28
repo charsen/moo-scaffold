@@ -3,6 +3,42 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-28，**跨 29 个仓做「骨架规范对齐」：判据固化下来了，但四条坑比结论更值钱**：
+  **做了什么**：新增只读闸门 `tools/audit-package-structure.php`（canonical = `moo-system` + `moo-<name>` **现况**，
+  自动区分扩展包 / host / 非包），把「包该有哪些文件、怎么判偏离」从口头约定变成可重跑判据；
+  规模口径写进 `docs/package-skeleton.md`（已挂到 `docs/guide/README.md` 的其它参考）。
+  审计 29 个目标后补齐：`moo-feedback` 缺的 `AGENTS.md`、5 个包缺的 `CLAUDE.md`、28 份 `pint.json` 归一、28 份 `.gitattributes`。
+  **坑 ①：改了共享 lint 配置后，不跟「提交态」做 A/B 就无法归因。** 28 份 `pint.json` 有 4 类偏差
+  （1 份缺 `phpdoc_separation`、3 份多 `ordered_traits`、4 份只有缩进不同）。一次性对齐后跑 `pint --test`，
+  4 个包报红 —— **单看这一刻的红，分不清「我引入的」还是「本来就红的」**。
+  解法：逐个 `git show HEAD:pint.json` 还原成提交态再跑一次，得到 改前/改后 对照表 ⇒ 真相是
+  `moo-upload` **由 PASS 变 FAIL（我引入的）**，另 3 个包 **改前就红、逐项相同（不是我的）**。
+  **通则：动的是「被 N 个包共享的配置」时，必须拿提交态配置做 A/B，否则任何红都会被误记到本次改动头上**
+  （反过来也一样：会漏掉自己真引入的那一个）。**另一个方向性的判据**：**去掉**一条规则只会放宽、
+  不可能让原本绿的变红；**新增**规则才会 —— 所以「多出 ordered_traits」那 3 个包天然无风险。
+  **坑 ②：`pint.json` 的规则与 scaffold 的 stub 是一对隐性契约，改一侧要核另一侧。**
+  上面那个真回归的成因：canonical 的 `phpdoc_separation.groups` 最后一组是
+  `["package_name","module_name","controller_name"]` ⇒ 这三个 tag 之间**不允许**空行；
+  而 `stubs/controller-admin.stub:25-27` 正是**相邻 emit** 的（核过 `moo-<name>` / `moo-<name>` 现码同样无空行），
+  只有 `moo-upload` 的文件是更早生成的旧形态、带空行 ⇒ 归一后必然被 pint 摘掉空行。
+  **所以这不是「代码不合规范」而是「文件落后于 stub」**，格式化是对的、不会每次重生成又churn。
+  **通则：凡是「代码风格配置」约束到 **生成物** 的形态（docblock 分组、空行、缩进），它就是 stub 的隐式依赖 ——
+  改 lint 规则前先 grep stubs，否则会误判成用户在裸写不合规范的代码。**
+  **坑 ③：「CI 骨架存在」不等于「CI 能跑」—— 与本文件 2026-09-21 那条「守卫存在 ≠ 守卫在跑」是同一个误区的第二次。**
+  原本打算给缺 CI 的 20 个包补 `quality.yml`，动手前核了一下 manifest：
+  **13 个包的 `repositories` 声明了 sibling `path`（`../moo-upload` 之类）**，而 GitHub Actions 只 checkout 本仓
+  ⇒ 那些 `../moo-*` 不存在 ⇒ `composer install` 解析不到私包（它们也不在 Packagist）；
+  已有 `quality.yml` 的 6 个包**同样带着 path 依赖**，且 workflow 里**没有 ssh-agent 步骤**，而另一类包改用
+  `git@gitee.com:...` 的 vcs 源 ⇒ **那 6 份多半本来就是红的**。⇒ 补 CI 的前置是「脱离同级目录能 `composer install`」，
+  正是本仓 `TODOS.md` 里早已登记的那条（`moo-<name>` 已改成 vcs 形态并在干净克隆上实测通过）。
+  **通则可复用**：新增 CI 前先问「**这份 workflow 在只有本仓的干净 checkout 里跑得起来吗**」——
+  本地能跑依赖的是**工作区的同级目录**，那是 CI 上不存在的前提。
+  **坑 ④：判「某文件存在吗」不要用大小写不敏感的 glob。** `ls -d moo-*/notes.md` 在这台机器上**会匹配到
+  `NOTES.md` 并按我给的写法回显成小写**，于是同一批 `moo-*` 被读成「每包都有 `notes.md`」；
+  两个独立子代理也给出了互相矛盾的 AGENTS.md 存在性结论。**可靠判据是逐项列举目录内容**
+  （`read_directory` 之类），不是 `[ -f ]` / glob 的命中与否。全仓真相：**只有大写 `NOTES.md`，无 `notes.md`**。
+  **顺带**：`moo-feedback` 是**唯一**缺 `AGENTS.md` 的包 —— 「28 个里 27 个都有」这种统计**不能替代逐包核对**。
+
 - 2026-09-21，**「屏幕最后一行的数字」不等于「总数」—— 汇总器只报文件数时，最后一个文件的计数会被当成总计**：
   `npm run test:js` 原先只打印「✅ N 个守卫文件全绿」，各文件自己的「（M passed）」原样转发到 stdout。
   按文件名排序最后一个恒是 `scaffold-api.test.js`（62）⇒ **两轮笔记都把这个 62 记成了总数**。
