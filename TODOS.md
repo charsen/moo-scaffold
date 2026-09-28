@@ -129,6 +129,28 @@
   **追加**：`moo-<name>` 有 **1 处既有违规**（`src/Http/Controllers/Admin/BannerController.php` 的
   `class_attributes_separation`，最近改动是 2026-09-23，与本次无关）—— 它会让 banner 的 `composer ci` 的
   `pint:check` 步失败，**未修，待你定**（另 1 处 `AdminPresentationTest.php` 的 import 顺序已在本次顺带归位）。
+  **收口（2026-09-28 第三批）**：**全部修完，四仓 `pint --test` 全绿** —— banner `37fb18f`（1 处）、
+  radar `40457d8`（2 处，同上「文件落后于 stub」型）、enterprise-information `f663a5c`＋`3d6d0cd`
+  （**31 处 / 35 文件：src + tests + lang**，pint PASS 165 files、套件 80 passed；6 个 `lang/**` 是生成物，
+  已逐文件核对「`require` 出的数组与格式化前完全相等」）。enterprise 的根因**不在仓库而在生成器**，
+  同批在 scaffold 侧修掉（见下条），所以这次不是「手改生成物」而是「先修生成器再归一产出」。
+
+- [x] **生成器产出即合规（2026-09-28，本仓）**：enterprise-information 那批 pint 违规的**根因在本仓生成器**，
+  按 NOTES 坑②的纪律「lint 规则约束到生成物形态时，它就是 stub 的隐式依赖」，先修生成侧再归一产出：
+  ① `Generator::putAndReport()`（唯一写入点）统一剥掉行尾空白 —— stub 里对齐用的固定空格在占位符为空时
+  会留下 `* @Author:      ` 这种行尾空白，pint 的 `no_trailing_whitespace_in_comment` 每次必报（生成的迁移就踩了）；
+  ② `UpdateMultilingualGenerator` 的 lang 产出补 `<?php declare(strict_types=1);` 并按最长 key 对 `=>` 对齐
+  （canonical pint 的 `declare_strict_types` + `binary_operator_spaces`），8 个 `stubs/lang/*.stub` 头部同步；
+  ③ `CodegenOriginTest` 里两条硬编码「单空格 `=>`」的断言改为容忍空白的正则（语义不变）。
+  验证：**1341 passed / 3 skipped、pint PASS（359 files）**。⇒ 以后「重生成即合规」，不必再手动补格式化。
+
+- [x] **host 骨架的两处失败（2026-09-28，`moo-engine-skeleton`）**：
+  ① **真缺陷**：`engine/config/actions.php` 的 whitelist 在 2026-09-22 那次 `moo:auth` 整文件重写后丢了
+  **8 个个人中心 key**（docs/09 坑 #25 的现场，`FoodAclTest` 正是它的守护）⇒ 按该文档规定的
+  「手动合并（坑 #20/#25）」注释块补齐（依据＝历史原段 `git log -S` ＋ 测试里的 8-key 清单），`699ab9f`。
+  ② **不是仓库缺陷**：`ExampleTest` 的 500 是本机 shell 导出了 `SESSION_DRIVER=database` 导致
+  `no such table: sessions`（同代码清掉该变量即 **103 passed**）⇒ 只在 `engine/phpunit.xml` 写明排查方式（`64704a7`），
+  **不留无效配置**（我先试的 `force="true"` 实测压不住 shell 变量，已撤回）。
 
 - [x] **消费包测试夹具落后于契约（2026-09-28 已修 `moo-<name>` / `moo-<name>` / `moo-<name>`）**：
   `tests/Pest.php` 里匿名 `OperatorResolver` 实现**缺 `isPlatformRoot()`**（scaffold 的 operator-identity-contract
@@ -172,17 +194,30 @@
   Laravel 给 JSON 错误体补 `exception`/`file`/`line`/`trace`）—— 已在 `FrameworkErrorShapeTest` 显式钉住 `app.debug=false`，
   详见 `NOTES.md` 同日条。
 
-- [ ] **仍红的，按理由分三类（未动）**：
-  ① **属他会话分支（不碰，需其会话自己收口）**：`moo-<name>`（`fix-category-business-status`）24 failed、
-  `moo-<name>`（`fix-business-code-prefixes`）8 failed（`is not instantiable`）、
-  `moo-<name>`（`fix-shared-sequence`）11 failed、`moo-<name>`（同分支）25 failed
-  （`no such table: cache_locks`）。**修法与上面三步完全相同**，只是工作区与分支属他会话 —— 等他们落地后照做即可。
-  ② **无依赖未评估**：`moo-<name>` / `moo-<name>` / `moo-engine-skeleton` 等无 `vendor/bin/pest`，本轮未跑。
-  ③ **`moo-<name>` 的 35 处 pint**：含生成物（`database/migrations/2026_09_23_*`），
-  按「不手改生成物」需先定**重新生成还是接受现状**。
+- [x] **第三批（2026-09-28，「仍红的可以修了」）—— 四类全部处理完，两处保留给对应会话**：
+  **① 他会话四仓**：`certificate` 24→**31 passed**（夹具补 `isPlatformRoot` + cache）、
+  `mini-app` 8→**302 passed**（三个服务层测试按包内写法绑 `FakePersonnelNameResolver`）、
+  `process-application` 25→**44 passed / 2 failed**（cache 修好；剩余 2 处是**他们在途业务改动**：
+  `ArchTest` 断言 `require charsen/moo-<name>` 仍写 `^0.2.8` 而 manifest 已 `^0.2.15`；522 响应顶层 `message` 为 null）、
+  `process` 11 failed **未动**（同属 522 信封/业务断言，是他们在途重构）。
+  **② `media` / `meeting` / `engine-skeleton`**：`meeting` 用 phpunit 且**本来就全绿**（17 tests / 165 assertions）；
+  `media` 无依赖 → 装依赖时暴露出**新缺陷**（见下）→ 修后依赖装上、**19 passed** + pint PASS；
+  `engine-skeleton` 的 pest 在 `engine/vendor/bin/pest`（上一轮路径找错）→ 2 failed 中：
+  `FoodAclTest` 是**真缺陷**（`moo:auth` 冲掉了 whitelist 的 8 个 key，见下），`ExampleTest` 是**我 shell 环境串味**（下条）。
+  **③ `enterprise-information` 的 pint（31 处 / 35 文件）**：已修 —— 见下方 pint 条与「生成器产出即合规」条。
+  **④ 新发现的 manifest 缺陷（7 包）**：`composer.json` 的 path 仓库 `versions` 写成了**约束式** `"charsen/moo-scaffold": "^2.2.1"`；
+  无 `composer.lock` 的全新安装（fresh clone / CI）会被 Composer 拒绝（`Invalid version string "^2.2.1"`）——
+  `media` 因此根本装不上依赖。已按既有正确写法（`enterprise-information` / `mini-app` 用的 `2.2.8`）修 7 包：
+  `media` / `certificate` / `cms` / `page` / `process-application` / `product` / `richtext`（各一笔 `chore`，**`require` 约束不动**）。
+  ⇒ 这条直接补强上面的 CI 前置条：**fresh clone 装不上，不只是 path 依赖缺失，还有 versions 语法非法**。
 
-- [ ] **LAYOUT 待议（改动即破坏 namespace，需同步消费方与 codegen 重生成）**：
-  7 包把 model trait 放在 `src/Models/Concerns/`（`moo-<name>` 2 / `moo-<name>` 2 / `moo-<name>` 2 /
+- [ ] **仍红的（只剩他会话的在途业务）**：`moo-<name>`（`fix-shared-sequence`）11 failed、
+  `moo-<name>` 2 failed —— 都是 522 响应的**顶层 `message` 为 null** 与依赖约束断言，
+  属他们那次「共享序列」重构的进行中状态（状态码 522 正确、只有信封字段变了），**需其会话确认契约后自行收口**。
+  另 `moo-engine-skeleton` 的 `ExampleTest` 在本机 shell 导出 `SESSION_DRIVER=database` 时会红
+  （同代码清掉该变量即 103 passed），**不是仓库缺陷**，已在 `engine/phpunit.xml` 写明排查方式。
+
+- [ ] **LAYOUT 待议（改动即破坏 namespace，需同步消费方与 codegen 重生成）**：  7 包把 model trait 放在 `src/Models/Concerns/`（`moo-<name>` 2 / `moo-<name>` 2 / `moo-<name>` 2 /
   `moo-<name>` 2 / `moo-feedback` 1 / `moo-<name>` 2 / `moo-<name>` 2），规范位置是 `src/Models/Traits/`
   （codegen 硬编码 emit `use {ns}Traits\...`）；`moo-<name>/src/Concerns/HasRichTextFields.php` 同族；
   `moo-<name>/src/Models/Concerns/` 是空残留（可直接删）；
