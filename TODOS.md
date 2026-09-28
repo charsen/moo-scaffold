@@ -320,3 +320,26 @@
   `require-dev` 与 `scripts` 存在规范外差异（local 多 pest / sail / dump-server 与 `setup`、`dev`、`lint`，
   test / production 只有 `clear-all`）；仓库根无 `CHANGELOG.md`；`moo-feedback` 已被 require 且有 repository 条目，
   却未进 `extra.moo-private-packages`（`PRIVATE-COMPOSER-PACKAGES.md:63` 有说明，需复核是否仍成立）。
+
+- [ ] **发版：等他会话收绿后，把 `feat-package-skeleton-alignment` 合入 `dev` 与 `main`/`master`（2026-09-28 用户决定）**：
+  **现状（实测）**：
+  - 该分支在 **24 个仓**存在；对 `main`/`master` **24/24 都是快进** ⇒ `git push origin <分支>:<基线>` 即可（连工作区都不用切）；
+    对 `dev` 有 **9 仓不是快进**（`moo-<name>` 4 / `moo-<name>` 4 / `moo-engine-skeleton` 4 / `moo-feedback` 1 /
+    `moo-monitor-laravel` 7 / `moo-<name>` 4 / `moo-<name>` 4 / `moo-scaffold` 7 / `moo-system` 6）⇒ 需一次真合并。
+  - ⚠ **分支 tip 混着另一会话的 20 笔在途提交**（19 个仓）：`fix：统一业务拒绝与表单字段异常出口` ×18 +
+    `moo-scaffold` 的 `e044f16 fix：区分表单字段校验与无表单操作异常`、`c38e210 fix：对齐编辑预览的字段与上下文异常`。
+  - ⚠ **当前 10 个仓是红的**（全量套件实测，已用「清 shell 变量」A/B 排除环境因素）：
+    `moo-scaffold` 4 failed / `moo-<name>` 5 / `moo-<name>` 3 / `moo-<name>` 2 / `moo-feedback` 2 / `moo-upload` 2 /
+    `moo-<name>` 1 / `moo-<name>` 1 / `moo-<name>` 1 / `moo-system` 1；另 12 个绿；
+    `moo-engine-skeleton`（pest 在 `engine/`）与 `moo-<name>`（phpunit）不在 pest 口径内。
+    **这 10 个红灯是他们会话的在途状态**（我这几轮修完时都验证过绿）⇒ 合并会把红灯发布到两条基线，故按用户决定**等其收绿**。
+  - 他会话分支（category / certificate / mini-app / process / process-application）**不推、不碰**（用户决定）。
+  **绿灯后的执行顺序**（逐仓；先 `git fetch origin` 复核基线）：
+  1) 两条线都从**同一个任务分支**来 —— `git push origin <分支>:dev`，再 `git push origin <分支>:<main|master>`；
+     ⛔ **不走 `dev → 发布线`**。9 个非快进仓需在工作区（须干净）`git checkout dev && git merge <分支>` 后再推。
+     公开仓（`moo-feedback` / `moo-scaffold` / `moo-engine-skeleton`）两条线都要推 **origin 与 github 两边**（双源）。
+  2) **tag / CHANGELOG / 版本号未做** —— 各包本轮改动是 docs / 测试 / manifest，是否都发版、发什么版本由用户定。
+  3) 推送后逐仓回读：`git rev-list --count origin/<线>..<线>` 应为 0，并与 github 侧对账（`git ls-remote`）。
+  ⚠ **安全提醒**：`/Volumes/dev/git_tokens` 的内容因我的脱敏正则不匹配其格式（`## name` 头 + 下一行裸值），
+  **两个 token 的明文已进入本次会话 transcript/日志** ⇒ **请轮换 Gitee token 与 GitHub PAT**。
+  后续引用一律走 shell 变量 + 一次性 askpass（不写进 remote URL、不回显）。
