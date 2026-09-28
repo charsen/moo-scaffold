@@ -113,7 +113,7 @@
   **通则**：跑套件做判断前先 `printenv | grep -E 'CACHE_STORE|SESSION_DRIVER|DB_CONNECTION|APP_'`；
   「换台机器/换个 shell 就红」先怀疑环境变量，别急着改断言或改产品码。
 
-- [ ] **既有 pint 违规（改前就红，非本次引入）**：`moo-<name>` 35 处 / `moo-<name>` 2 处 /
+- [x] **既有 pint 违规（改前就红，非本次引入）**：`moo-<name>` 35 处 / `moo-<name>` 2 处 /
   `moo-<name>` 1 处；**本仓自身 2 处**（`tests/Feature/Concerns/HasOperatorContextTest.php`、
   `tests/Feature/Concerns/OperatorResolverTest.php`，`class_attributes_separation`）。
   已用「提交态配置 A/B」与「文件未被本次修改」双重证实与本次 `pint.json` 归一无关，属独立过堂。
