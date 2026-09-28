@@ -30,8 +30,15 @@
 
 **收口状态（2026-09-28）**：原本全部改动都裸躺在 24 个仓的发布基线（`main`/`master`）工作区里 —— 违反
   「发布基础分支不直接开发」。已逐仓 `fetch` 复核基线最新后，从基线各切出一个 `feat-package-skeleton-alignment`
-  并提交（显式路径暂存，工作区已干净、各领先 `origin/<基线>` 1 个提交）。**未推送、未合入 `dev`/`master`**；
+  并提交（显式路径暂存，工作区已干净、各领先 `origin/<基线>` 1–2 个提交）。**未推送、未合入 `dev`/`master`**；
   将来发布时把**这一个分支分别合入两条线**，两条线互不经过对方。5 个他会话仓见下方待办。
+  **第二批（同日）**：`.gitattributes` 的 dist 裁剪补齐 `/plans` 与 `/TODOS.md` —— 此前基准版注释写着「工具/文档不进包」，
+  实测 `plans/`（4 仓 9 文件）与 `TODOS.md`（23 仓）仍会发进消费方 `vendor/`；22 个带该基准文件的基线仓各追加 1 个提交。
+  逐仓用 `git archive HEAD` 回读：归档不再含 `plans/`、`TODOS.md`，且 `src/config/routes/database/lang/scaffold` 未受影响。
+  **注意两条边界**：① `export-ignore` 只在「按 tag 装 dist」时生效，本地 `path`+`symlink` 联调与本机三个 host 的
+  `vendor/charsen/*` 都看不到效果（写错只会在测试服/生产暴露）；② 属性取自**被归档的那棵树**，所以必须进提交/进 tag ——
+  验证工作区改动要用 `git archive --worktree-attributes`。`moo-engine-skeleton` 无 `.gitattributes`、`moo-scaffold` 自己那份
+  是 `*.ai binary`（另一种用途），二者都不在本批内。
 
 判据已固化为 `tools/audit-package-structure.php`（只读闸门，`--fail-on-drift`），规模口径见
 `docs/package-skeleton.md`。**本轮只做非破坏性补齐**；下列事项需先确认设计意图或同步消费方，未动。
@@ -41,6 +48,7 @@
   的工作区里躺着本轮那 3 个文件（`AGENTS.md`/`CLAUDE.md` 已改、`.gitattributes` 未跟踪），但它们当前在**他会话的分支**上，
   不能被本轮 `checkout -b` 带走（会把别人的脏改动一起搬过去）。**等那些会话提交、工作区干净后**，再各仓从最新发布基线
   起 `feat-package-skeleton-alignment` 补提交。已核：这 5 仓的 hunk 全是本轮那份重写，未与他人内容交织，按路径即可干净分离。
+  **补的时候用已更新的基准版**（含 `/plans`、`/TODOS.md` 两条 `export-ignore`），别照抄他们工作区里那份旧的 15 行版。
 
 - [x] **已完成**：补齐 `moo-feedback/AGENTS.md`（该包唯一缺失的项目指令文件）；补齐 5 个包的 `CLAUDE.md`
   （contract / feedback / meeting / richtext / upload，另 24 份改为纯入口）；`pint.json` **8 份**偏离
