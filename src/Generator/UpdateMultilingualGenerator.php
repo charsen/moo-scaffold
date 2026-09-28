@@ -128,6 +128,24 @@ class UpdateMultilingualGenerator extends Generator
     }
 
     /**
+     * 语言文件块内 `=>` 的对齐宽度（按最长 key 补齐）。
+     *
+     * 为什么生成器要自己管对齐：canonical pint 的 binary_operator_spaces =
+     * align_single_space_minimal 要求同一数组块内 `=>` 对齐，而本生成器直接拼字符串、
+     * 不经过 pint ⇒ 不对齐的产出会被下游 `pint --test` 判违规（moo-<name>
+     * 的生成 lang 文件就因此红了 6 个文件）。顺带对齐也让「重生成即合规」成立。
+     */
+    private function langKeyWidth(array $data): int
+    {
+        $width = 0;
+        foreach (array_keys($data) as $key) {
+            $width = max($width, strlen("'" . $this->escapePhpString((string) $key) . "'"));
+        }
+
+        return $width;
+    }
+
+    /**
      * 增量同步并写入 key => translation 结构的 PHP 语言文件
      *
      * $preserve_unknown = true(包管线):$all_keys 之外的旧 key 保留原值不删 —— 包 lang 里有
@@ -155,13 +173,14 @@ class UpdateMultilingualGenerator extends Generator
             }
         }
 
-        $code   = ['<?php'];
+        $code   = ['<?php declare(strict_types=1);'];
         $code[] = '';
         $code[] = 'return [';
+        $width  = $this->langKeyWidth($data);
         foreach ($data as $key => $word) {
             $word = $this->escapeLangValue($word);
             // plan-40 §二 C-11:i18n key 也走 PHP escape,防 `field_name: a',1);system('id');//` 注入数组结构
-            $code[] = $this->getTabs(1) . "'" . $this->escapePhpString($key) . "' => '{$word}',";
+            $code[] = $this->getTabs(1) . str_pad("'" . $this->escapePhpString($key) . "'", $width) . " => '{$word}',";
         }
         $code[] = '];';
         $code[] = '';
@@ -198,11 +217,12 @@ class UpdateMultilingualGenerator extends Generator
             }
         }
 
-        $code = ["'attributes' => ["];
+        $code  = ["'attributes' => ["];
+        $width = $this->langKeyWidth($rebuild_data);
         foreach ($rebuild_data as $key => $val) {
             $val = $this->escapeLangValue($val);
             // plan-40 §二 C-11:i18n attribute key 同样 escape
-            $code[] = $this->getTabs(2) . "'" . $this->escapePhpString($key) . "' => '{$val}',";
+            $code[] = $this->getTabs(2) . str_pad("'" . $this->escapePhpString($key) . "'", $width) . " => '{$val}',";
         }
 
         $code[] = $this->getTabs(1) . '],';

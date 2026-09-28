@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mooeen\Scaffold\Support;
 
 use Illuminate\Filesystem\Filesystem;
+use Mooeen\Scaffold\Exceptions\BaseException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /** 编辑既有计划和发版记录，配置目录是唯一文件边界。 */
@@ -51,20 +52,28 @@ final class LocalMarkdownEditor
     {
         $this->assertWritable();
         $path = $this->path($scope, $slug);
-        abort_unless(is_writable(dirname($path)), 422, '文件所在目录不可写。');
+        if (! is_writable(dirname($path))) {
+            throw new BaseException('文件所在目录不可写。');
+        }
         $this->markdown->assertValid($content);
         $file = @fopen($path, 'r+');
-        abort_if($file === false, 422, '文件不可写。');
+        if ($file === false) {
+            throw new BaseException('文件不可写。');
+        }
 
         try {
-            abort_unless(flock($file, LOCK_EX), 422, '无法锁定文件，请重试。');
+            if (! flock($file, LOCK_EX)) {
+                throw new BaseException('无法锁定文件，请重试。');
+            }
             clearstatcache(true, $path);
             // 其他保存可能已原子替换文件；旧句柄不能覆盖新的文件版本。
             $current = stat($this->path($scope, $slug));
             $opened  = fstat($file);
             abort_if($current['ino'] !== $opened['ino'] || $current['dev'] !== $opened['dev'], 409, '文件已被修改，请重新打开后再编辑。');
             $raw = stream_get_contents($file);
-            abort_if($raw === false, 422, '无法读取文件。');
+            if ($raw === false) {
+                throw new BaseException('无法读取文件。');
+            }
             // 响应丢失后的同内容重试直接确认成功，也避免无修改保存改变 inode / mtime。
             if ($raw === $content) {
                 return hash('sha256', $raw);

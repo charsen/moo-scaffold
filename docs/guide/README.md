@@ -32,3 +32,4 @@ order: 30
 
 - [`../schema_demo.yaml`](../schema_demo.yaml) — schema YAML 完整样例
 - [`../yaml-style.md`](../yaml-style.md) — yaml 风格规范 + `unique` 双语义(必读)
+- [`../package-skeleton.md`](../package-skeleton.md) — 扩展包骨架规范 + `tools/audit-package-structure.php` 只读闸门

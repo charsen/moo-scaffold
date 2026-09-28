@@ -10,17 +10,22 @@
 
 namespace Mooeen\Scaffold\Foundation;
 
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Http\FormRequest as BaseFormRequest;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
+use Mooeen\Scaffold\Exceptions\BaseException;
 use Mooeen\Scaffold\Exceptions\FormLayoutException;
 use Mooeen\Scaffold\Support\FormFrontendRules;
 use Mooeen\Scaffold\Support\FormWidgetTypes;
 
 class FormRequest extends BaseFormRequest
 {
+    /** 有字段控件接收错误时保留 422；无表单动作显式设为 false。 */
+    protected bool $fieldValidation = true;
+
     /**
      * plan-51:Schema::hasColumn 调用走 information_schema,在 Request rule 派发链路
      * 每行 unique 字段触发一次。同表多字段 + 同进程内 idempotent,加 static cache 避免
@@ -29,6 +34,16 @@ class FormRequest extends BaseFormRequest
      * @var array<string,bool>
      */
     private static array $softDeleteColumnCache = [];
+
+    protected function failedValidation(Validator $validator): void
+    {
+        if (! $this->fieldValidation) {
+            throw new BaseException($validator->errors()->first());
+        }
+
+        parent::failedValidation($validator);
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      */

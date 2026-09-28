@@ -3,6 +3,80 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
+- 2026-09-28，**测试套件的结果会被运行 shell 里导出的同名变量改写 —— 断言与「测试环境本身」读的都是环境，不是代码**：
+  给 9 个仓收口测试环境时，本仓 `FrameworkErrorShapeTest` 的 3 条「框架层错误不套信封」断言报红：
+  debug=true 时 Laravel 会给 JSON 错误体补 `exception` / `file` / `line` / `trace`，而该文件钉的是**生产形态**。
+  实测同一份代码、未改任何文件：`APP_DEBUG=true ./vendor/bin/pest` → **3 failed**；`APP_DEBUG=false …` → **4 passed**。
+  （当时本机 shell 里确实有 `APP_DEBUG=true` 与 `APP_ENV=local`。）
+  **⚠ 同一根因的第二个、更隐蔽的形态（2026-09-28 补，我曾误判过一次）**：`phpunit.xml` 的 `<env>` 只在变量
+  **尚未存在于进程环境**时才生效（PHPUnit 文档行为）⇒ shell 里若已导出 `CACHE_STORE=database`，
+  `<env name="CACHE_STORE" value="array"/>` 会被**整条跳过**、shell 值胜出，测试便去查 `cache` 表而红。
+  我当时据此写下「`<env>` 无效」的结论 —— **错**：干净 shell 里它是有效的，是被我的 shell 压制了。
+  A/B 定案（host 侧，同一份代码）：`env -u SESSION_DRIVER -u CACHE_STORE -u DB_CONNECTION … pest` → **103 passed**；
+  保留 shell 变量 → **1 failed**（`no such table: sessions`）；**给 `<env>` 加 `force="true"` 也压不住**（实测）。
+  **解法**：把测试前提写在**测试引导的代码里**（`config([...])` / Testbench 的 `defineEnvironment()`），
+  不要只写在 `phpunit.xml`；`config()` 与 shell 环境无关，是这三种形态里唯一稳的。
+  **通则**：与本文件「包默认值取 `env('SCAFFOLD_AUTHOR','')`」那条同族 —— **测试断言与测试环境都不能依赖进程环境**；
+  看到「换台机器 / 换个 shell 就红」先查 `env()` / `config()` 的取值来源，别先去改断言或改产品码。
+  **批量跑套件做判断前，先 `printenv | grep -E 'CACHE_STORE|SESSION_DRIVER|DB_CONNECTION|APP_'`** ——
+  否则会把环境假象记成仓库缺陷，并顺手写出一个看似有理的错误结论。
+
+- 2026-09-28，**macOS 自带 bash 3.2 里 `$var` 紧邻中文字符会被吞 —— 中文字节被当成变量名的一部分，静默得到空串 + 乱码**：
+  跨 5 个仓批量提交时，`echo "脏项 $before → $after（应只减 3）"` 打成 `脏项 3 → ��应只减 3）`，
+  同一批的 `echo "### $d  （分支 $b）"` 把分支名打成了 `��`。**两次都不报错、不退出**，只是那一段输出没了 ——
+  若那行恰是唯一证据（如「脏项 3 → 0」），就会把「根本没验证」当成「验证通过」。
+  **解法**：变量一律写 `${var}`，或后面留空格 / 用 `printf '%s'`；看到输出里出现孤立 `�` 就是中招了。
+  **通则**：与本文件上面那条 `git ls-files` 引号渲染同族 —— **shell 的文本层会静默改写你以为拿到的东西**，
+  所以「屏幕上打印出来的东西」不能直接当证据，**尤其是计数**。
+
+- 2026-09-28，**`git ls-files` 的输出不能按分隔符直接切分目录名 —— 非 ASCII 路径会被加引号转义，切出来的「目录名」自带 `"`**：
+  给 host 骨架做 dist 裁剪时，我用 `git ls-files | awk -F/ '{print $1}'` 汇总顶层目录，得到一条 `"docs`，
+  据此判定「仓里有个叫 `"docs` 的事故目录」并写进了给用户的报告 —— **是假的，已撤回**。
+  真相：`core.quotePath`（默认 true）把含非 ASCII 字节的路径输出成 `"docs/01-\345\256\211\350\243\205-laravel.md"`
+  这种**带引号 + 八进制**的渲染形态，开头的 `"` 被 `awk -F/` 当成路径首字符 ⇒「目录名」自然带引号；
+  同一份输出里不含非 ASCII 的路径（`docs/README.md`）**没有引号**，所以还会把同一个 `docs/` 拆成两个「目录」。
+  判据（三选一，实测都可用）：`git ls-tree -d --name-only HEAD`、`git -c core.quotePath=false ls-files`、
+  或直接 `find . -name '"*' -not -path './.git/*'`（实测命中 **0**）。
+  **通则**：凡「按分隔符解析 VCS / CLI 工具输出」得出的结构结论，先问一句「这串字符是**文件名本身**，还是它的**渲染形态**」——
+  与本文件「大小写不敏感 glob 判存在性」「屏幕最后一行的数字当成总数」同族：**都是把工具的输出格式当成了数据的形状**。
+  这类误判的共同点是**结论看起来很有故事**（「有个事故目录」），所以特别容易被直接写进报告而不是先去复核。
+
+- 2026-09-28，**跨 29 个仓做「骨架规范对齐」：判据固化下来了，但四条坑比结论更值钱**：
+  **做了什么**：新增只读闸门 `tools/audit-package-structure.php`（canonical = `moo-system` + `moo-<name>` **现况**，
+  自动区分扩展包 / host / 非包），把「包该有哪些文件、怎么判偏离」从口头约定变成可重跑判据；
+  规模口径写进 `docs/package-skeleton.md`（已挂到 `docs/guide/README.md` 的其它参考）。
+  审计 29 个目标后补齐：`moo-feedback` 缺的 `AGENTS.md`、5 个包缺的 `CLAUDE.md`、28 份 `pint.json` 归一、28 份 `.gitattributes`。
+  **坑 ①：改了共享 lint 配置后，不跟「提交态」做 A/B 就无法归因。** 28 份 `pint.json` 有 4 类偏差
+  （1 份缺 `phpdoc_separation`、3 份多 `ordered_traits`、4 份只有缩进不同）。一次性对齐后跑 `pint --test`，
+  4 个包报红 —— **单看这一刻的红，分不清「我引入的」还是「本来就红的」**。
+  解法：逐个 `git show HEAD:pint.json` 还原成提交态再跑一次，得到 改前/改后 对照表 ⇒ 真相是
+  `moo-upload` **由 PASS 变 FAIL（我引入的）**，另 3 个包 **改前就红、逐项相同（不是我的）**。
+  **通则：动的是「被 N 个包共享的配置」时，必须拿提交态配置做 A/B，否则任何红都会被误记到本次改动头上**
+  （反过来也一样：会漏掉自己真引入的那一个）。**另一个方向性的判据**：**去掉**一条规则只会放宽、
+  不可能让原本绿的变红；**新增**规则才会 —— 所以「多出 ordered_traits」那 3 个包天然无风险。
+  **坑 ②：`pint.json` 的规则与 scaffold 的 stub 是一对隐性契约，改一侧要核另一侧。**
+  上面那个真回归的成因：canonical 的 `phpdoc_separation.groups` 最后一组是
+  `["package_name","module_name","controller_name"]` ⇒ 这三个 tag 之间**不允许**空行；
+  而 `stubs/controller-admin.stub:25-27` 正是**相邻 emit** 的（核过 `moo-<name>` / `moo-<name>` 现码同样无空行），
+  只有 `moo-upload` 的文件是更早生成的旧形态、带空行 ⇒ 归一后必然被 pint 摘掉空行。
+  **所以这不是「代码不合规范」而是「文件落后于 stub」**，格式化是对的、不会每次重生成又churn。
+  **通则：凡是「代码风格配置」约束到 **生成物** 的形态（docblock 分组、空行、缩进），它就是 stub 的隐式依赖 ——
+  改 lint 规则前先 grep stubs，否则会误判成用户在裸写不合规范的代码。**
+  **坑 ③：「CI 骨架存在」不等于「CI 能跑」—— 与本文件 2026-09-21 那条「守卫存在 ≠ 守卫在跑」是同一个误区的第二次。**
+  原本打算给缺 CI 的 20 个包补 `quality.yml`，动手前核了一下 manifest：
+  **13 个包的 `repositories` 声明了 sibling `path`（`../moo-upload` 之类）**，而 GitHub Actions 只 checkout 本仓
+  ⇒ 那些 `../moo-*` 不存在 ⇒ `composer install` 解析不到私包（它们也不在 Packagist）；
+  已有 `quality.yml` 的 6 个包**同样带着 path 依赖**，且 workflow 里**没有 ssh-agent 步骤**，而另一类包改用
+  `git@gitee.com:...` 的 vcs 源 ⇒ **那 6 份多半本来就是红的**。⇒ 补 CI 的前置是「脱离同级目录能 `composer install`」，
+  正是本仓 `TODOS.md` 里早已登记的那条（`moo-<name>` 已改成 vcs 形态并在干净克隆上实测通过）。
+  **通则可复用**：新增 CI 前先问「**这份 workflow 在只有本仓的干净 checkout 里跑得起来吗**」——
+  本地能跑依赖的是**工作区的同级目录**，那是 CI 上不存在的前提。
+  **坑 ④：判「某文件存在吗」不要用大小写不敏感的 glob。** `ls -d moo-*/notes.md` 在这台机器上**会匹配到
+  `NOTES.md` 并按我给的写法回显成小写**，于是同一批 `moo-*` 被读成「每包都有 `notes.md`」；
+  两个独立子代理也给出了互相矛盾的 AGENTS.md 存在性结论。**可靠判据是逐项列举目录内容**
+  （`read_directory` 之类），不是 `[ -f ]` / glob 的命中与否。全仓真相：**只有大写 `NOTES.md`，无 `notes.md`**。
+  **顺带**：`moo-feedback` 是**唯一**缺 `AGENTS.md` 的包 —— 「28 个里 27 个都有」这种统计**不能替代逐包核对**。
+
 - 2026-09-21，**「屏幕最后一行的数字」不等于「总数」—— 汇总器只报文件数时，最后一个文件的计数会被当成总计**：
   `npm run test:js` 原先只打印「✅ N 个守卫文件全绿」，各文件自己的「（M passed）」原样转发到 stdout。
   按文件名排序最后一个恒是 `scaffold-api.test.js`（62）⇒ **两轮笔记都把这个 62 记成了总数**。

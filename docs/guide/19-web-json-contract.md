@@ -40,7 +40,7 @@ order: 190
 
 1. **`ApiProxyController`（`POST /scaffold/api/proxy`）** —— body 是**上游 API 的原样透传**，套信封会破坏代理语义。它的契约是：HTTP **恒 200**，真实状态码放在 body 的 `_proxy_status`、响应头放在 `_proxy_headers`。
 2. **框架层响应** —— 由 Laravel 而非 scaffold 控制器产出，形态是 `{message}`（校验失败是 `{message, errors:{字段:[…]}}`）：
-   - `abort()` / `abort_if()` / `abort_unless()` 抛出的 HttpException（计划 / 发版日志编辑的 403 / 404 / 409 / 422 走这条）；
+   - `abort()` / `abort_if()` / `abort_unless()` 抛出的 HttpException（计划 / 发版日志编辑的 403 / 404 / 409 走这条；正文控件校验为 422，隐藏路径等业务拒绝由 BaseException 返回 522）；
    - 表单校验失败（`FormRequest` 的校验袋）；
    - 限流 429（`throttle:*`）。
 
@@ -100,6 +100,16 @@ order: 190
 **HTTP 状态沿用异常自身的 `code`**（默认 `522`，`FormLayoutException` 覆写为 `402`）—— 这是本类既有的对外契约，信封迁移没有改它，下游可能按这个码做判断。
 
 从类名派生而不是逐个声明，是为了让**下游新增子类自动获得唯一码**，没有「漏登记导致静默降级」的口子。
+
+### 4.4 下游业务表单与按钮动作
+
+有对应表单控件接收错误时，使用 `ValidationException::withMessages(['实际字段' => '错误原因'])`，HTTP 422 保留 Laravel 的 `errors` 袋。没有对应表单的业务拒绝直接使用 `BaseException`（默认 HTTP 522，正文 `error.msg`）；没有独立复用语义时不新增异常子类。
+
+`Foundation\FormRequest` 默认保留 422。删除、恢复、移动等无表单动作的专用 Request 显式声明 `protected bool $fieldValidation = false;`，其校验失败转为统一 522；认证/授权、资源不存在和技术错误不经过这项转换。生成器仅对 Admin 的 Destroy、DestroyBatch、Restore Request 默认生成该选项，既有 Request 不自动覆盖。
+
+混合 Request 只把真实控件的错误放进 422 袋；仅隐藏 ID、revision、request key 等上下文失败时使用 BaseException 522。嵌套编辑器应映射到实际父控件，如 `agendas.*` → `agendas`，不能返回前端没有绑定的内部键。上传引用、富文本等共享机制抛出的 ValidationException 在消费边界重键到实际字段；无表单动作转换为 BaseException，技术 Throwable 不转换。
+
+真实表单、搜索控件及专用交互协议需按消费者确认，不能只按状态码批量替换；例如流程补选责任人的 422 仍承载下一步表单输入，真实修订冲突保留既有 409。
 
 ## 5. 升级到 2.2.0+ 要做的事
 

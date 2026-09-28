@@ -103,9 +103,12 @@ it('rejects missing files traversal hidden files and symlink targets without cre
 })->with('record sections');
 
 it('validates inputs and requires authentication for every editor endpoint', function ($route) {
-    foreach ([[], ['slug' => $this->slug, 'content' => ['bad'], 'version' => str_repeat('a', 64)], ['slug' => $this->slug, 'content' => 'x', 'version' => 'bad']] as $data) {
+    foreach ([[], ['slug' => $this->slug, 'content' => ['bad'], 'version' => str_repeat('a', 64)]] as $data) {
         $this->postJson('/scaffold/' . $route . '/save', $data)->assertUnprocessable();
     }
+    // 只错隐藏上下文（version）⇒ 没有表单控件接收该错误，按契约统一 522（见 PreviewRequest 与 docs/guide/19 §4.4）
+    $this->postJson('/scaffold/' . $route . '/save', ['slug' => $this->slug, 'content' => 'x', 'version' => 'bad'])
+        ->assertStatus(522)->assertJsonPath('ok', false);
     $this->post('/scaffold/' . $route . '/save', ['slug' => $this->slug, 'content' => 'form'])->assertStatus(415);
     $this->withMiddleware(ScaffoldAuthenticate::class);
     config(['scaffold.auth.enabled' => true]);
@@ -268,4 +271,13 @@ it('releases the file lock after a writer failure so a retry can succeed', funct
     }
     expect(app(LocalMarkdownEditor::class)->save('plans', $this->slug, '# Updated', hash('sha256', $this->raw)))
         ->toBe(hash('sha256', '# Updated'));
+});
+
+it('shows hidden context failures and keeps content errors on the editor field', function () {
+    $this->postJson('/scaffold/plans/save', ['slug' => $this->slug, 'content' => '# Unchanged'])
+        ->assertStatus(522)->assertJsonPath('ok', false);
+    $this->postJson('/scaffold/plans/save', ['content' => ['bad']])
+        ->assertUnprocessable()->assertJsonValidationErrors('content')
+        ->assertJsonMissingValidationErrors(['slug', 'version']);
+    expect(file_get_contents($this->directory . '/' . $this->slug))->toBe($this->raw);
 });

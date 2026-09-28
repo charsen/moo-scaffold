@@ -1,1 +1,29 @@
+# 本文件两个用途：
+#   1) 标记 Illustrator 源文件为二进制（不做文本 diff / 行尾转换）；
+#   2) 让 composer dist（消费方 vendor/）只装运行必需文件 —— 开发与流程产物不进包。
 *.ai binary
+
+# 运行必需保留：src/ stubs/ public/ config/ docs/ tools/ composer.json README.md LICENSE CHANGELOG.md
+# 内部协作文档不进包：NOTES.md / TODOS.md / plans/ / TUNING-PLAN.md / release-records/
+# AGENTS.md 暂不裁剪（与扩展包基准版口径一致）。
+# ⚠ docs/ 与 tools/ 是**有意保留**的例外，别当遗漏：
+#   - docs/ 是 host 文档中心的「包文档源」（src/Support/DocsRepository.php:50 直接读 $pkg base_path 下的 docs/），
+#     裁掉等于删掉每个 host 文档中心里的 moo-scaffold 文档；
+#   - docs/package-skeleton.md 又指向 tools/audit-package-structure.php，裁了 tools/ 该链接即失效。
+/.env.e2e.example     export-ignore
+/.github              export-ignore
+/.gitattributes       export-ignore
+/.gitignore           export-ignore
+/.vscode              export-ignore
+/CLAUDE.md            export-ignore
+/CONTRIBUTING.md      export-ignore
+/NOTES.md             export-ignore
+/TODOS.md             export-ignore
+/TUNING-PLAN.md       export-ignore
+/package.json         export-ignore
+/phpunit.xml          export-ignore
+/pint.json            export-ignore
+/plans                export-ignore
+/playwright.config.ts export-ignore
+/release-records      export-ignore
+/tests                export-ignore

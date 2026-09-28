@@ -1,19 +1,19 @@
 # AGENTS.md
 
-本文件适用于整个 `moo-scaffold` 仓库。规则冲突时依次服从系统/用户指令、当前代理规则、用户批准的任务方案、`NOTES.md`、`docs/` 和历史 plan。文档必须由当前代码、stubs、测试及消费方 host 行为校验。
+本文件适用于整个 `moo-scaffold` 仓库，**只写本包特有约束**。对话授权、提交 / 推送 / 打 tag / 发布、敏感信息与最小披露、
+验证门禁、E2E 与浏览器验证、Composer 三份 manifest、跨仓公共契约等通用规则随全局 `~/.agents/AGENTS.md`，本文件不重复。
+冲突时按「系统 / 用户当前指令 > 离目标最近的 `AGENTS.md` > 全局」判断；版本、命令与接口以当前代码、manifest 和测试核实。
 
-## 开工顺序与记忆
+## 开工顺序
 
-1. 先读 `NOTES.md`，再读 `README.md`、`docs/overview.md` 和任务对应的 `docs/guide/*`。
+1. 按任务读 `README.md`、`docs/overview.md` 和对应的 `docs/guide/*`。
 2. schema/codegen 任务再读 `docs/yaml-style.md`、相关 `Command`、`Generator`、`stubs` 与测试；Cloud 契约同时核对当前 `moo-monitor-laravel`。
-3. 改文件前完整阅读目标文件和直接调用链。机械性、零语义且范围明确的小修可直接实施；非琐碎或涉及生成覆盖、宿主数据、公共契约、发布的改动先列计划并取得用户批准，范围、覆盖行为或宿主数据风险变化时重新确认。
-
-- `NOTES.md` 是已验证、可复用且不适合写成稳定规则的长期记忆。新增内容一条一项、放在合适分组，避免进度日志、猜测和固定测试数量。
-- 本仓公开；notes、文档、测试和注释不得出现内部项目名、内部域名、真实账号或密钥。旧结论被证伪时修订原条目。
+3. 改文件前完整阅读目标文件和直接调用链。
 
 ## 项目定位
 
 - 本仓是 schema 驱动的 Laravel 代码生成器和开发辅助后台，不是独立 Laravel 应用，自身没有业务表或根 `artisan`。
+- 本仓是公开仓库；文档、注释、测试与生成物一律按公开内容对待。
 - 两大支柱是 `src/Command` + `src/Generator` 的 `moo:*` codegen，以及 `/scaffold/*` 的数据库设计器、API 调试器、ACL、配置和文档中心。
 - YAML 是结构设计真相源；`stubs/` 与 `src/Foundation/` 是生成代码规范。修改模板等同修改所有后续 host/扩展包的编码约定，必须核查下游形态。
 - Web 写能力只用于开发环境；生产环境一律只读。CLI 的 local gate 和 Web 的 `EnforceScaffoldWritable` 不得被新入口绕开。
@@ -58,4 +58,3 @@
 - PHP 改动先跑目标 Pest，再运行 `vendor/bin/pint --dirty --test` 与 `composer test`。需要格式化时再运行写入式 Pint 并复核 diff。
 - `/scaffold` UI 改动运行 `npm run test:e2e:safe`，不得用会污染宿主 scaffold 数据的裸 `test:e2e`；同时说明使用的 host、浏览器和未覆盖环境。
 - schema/codegen 变更需用 fixture 和真实 path-repository host 验证生成落点、重复运行、force 边界及 diff；涉及扩展包时检查包仓而非只看 host。
-- 不主动 commit、push、bump、CHANGELOG、tag 或发布。用户要求提交前展示完整 diff 和验证结果并获明确确认；日常提交可进 `master`，版本与 tag 仍是独立发版动作。

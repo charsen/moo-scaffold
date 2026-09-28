@@ -39,11 +39,11 @@ it('host 可 bind 覆盖默认实现', function () {
         {
             return 999;
         }
+
         public function isPlatformRoot(int|string|null $operatorId): bool
         {
             return false;
         }
-
     });
 
     expect(app(OperatorResolver::class)->id())->toBe(999);
@@ -56,11 +56,11 @@ it('host 预先绑定实现时默认绑定不覆盖', function () {
         {
             return 888;
         }
+
         public function isPlatformRoot(int|string|null $operatorId): bool
         {
             return false;
         }
-
     };
 
     app()->instance(OperatorResolver::class, $hostResolver);
@@ -92,11 +92,11 @@ it('共享 HasOperator 真实事件：无身份保留 null', function () {
         {
             return null;
         }
+
         public function isPlatformRoot(int|string|null $operatorId): bool
         {
             return false;
         }
-
     });
 
     $nullableModel = new class extends Model

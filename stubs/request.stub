@@ -16,6 +16,7 @@ class {{request_name}} extends FormRequest
 {
     use {{trait_name}};
 
+{{validation_mode}}
     /**
      * Get the validation rules that apply to the request.
      */
