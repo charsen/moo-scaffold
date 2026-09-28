@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- FormRequest 默认保持字段级 422；无表单动作显式设置 protected bool $fieldValidation = false 后以 BaseException 返回 522。Admin 删除/恢复 Request 与资源动作模板同步生成该约定，已有手写 Request 需显式对齐。
+
 
 ### Added
 

@@ -142,6 +142,13 @@ it('moo:controller:Controller/Request/Trait 落包、包 use 包内自持 Handle
     expect(is_file($this->pkgRoot . '/src/Http/Requests/PkgxItem/PkgxItemRequestTrait.php'))->toBeTrue();
     expect(is_file($this->pkgRoot . '/src/Http/Requests/PkgxItem/StoreRequest.php'))->toBeTrue();
 
+    $requests = $this->pkgRoot . '/src/Http/Requests/PkgxItem/';
+    expect(file_get_contents($requests . 'DestroyBatchRequest.php'))->toContain('protected bool $fieldValidation = false;');
+    expect(file_get_contents($requests . 'StoreRequest.php'))->not->toContain('fieldValidation = false');
+    expect(file_get_contents($requests . 'UpdateRequest.php'))->not->toContain('fieldValidation = false');
+    expect(file_get_contents($this->pkgRoot . '/src/Http/Controllers/Admin/Traits/HandlesResourceActions.php'))
+        ->toContain('throw new BaseException(')->not->toContain('ValidationException::withMessages');
+
     // controller trait 落包 Controllers/Admin/Traits
     expect(is_file($this->pkgRoot . '/src/Http/Controllers/Admin/Traits/PkgxItemTrait.php'))->toBeTrue();
 

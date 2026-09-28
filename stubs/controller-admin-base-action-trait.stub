@@ -3,7 +3,7 @@
 namespace {{namespace}};
 
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Validation\ValidationException;
+use Mooeen\Scaffold\Exceptions\BaseException;
 use {{base_resources}};
 
 /**
@@ -28,7 +28,7 @@ trait BaseActionTrait
     /**
      * 批量删除
      *
-     * @throws ValidationException
+     * @throws BaseException
      */
     private function destroyBatchAction($request): BaseResource
     {
@@ -44,7 +44,7 @@ trait BaseActionTrait
         });
 
         if (count($result) < 1) {
-            throw ValidationException::withMessages(['ids' => ['No batch operation results.']]);
+            throw new BaseException('没有可操作的数据，请刷新后重试');
         }
 
         return BaseResource::make($result);
@@ -74,7 +74,7 @@ trait BaseActionTrait
     /**
      * 恢复
      *
-     * @throws ValidationException
+     * @throws BaseException
      */
     private function restoreAction($request): BaseResource
     {
@@ -93,7 +93,7 @@ trait BaseActionTrait
         });
 
         if (count($result) < 1) {
-            throw ValidationException::withMessages(['ids' => ['No batch operation results.']]);
+            throw new BaseException('没有可操作的数据，请刷新后重试');
         }
 
         return BaseResource::make($result);

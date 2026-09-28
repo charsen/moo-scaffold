@@ -4,6 +4,40 @@ declare(strict_types=1);
 
 use Mooeen\Scaffold\Foundation\FormRequest;
 
+class FieldErrorFixtureRequest extends FormRequest
+{
+    public function rules(): array
+    {
+        return ['name' => ['required', 'string']];
+    }
+}
+
+class ActionErrorFixtureRequest extends FieldErrorFixtureRequest
+{
+    protected bool $fieldValidation = false;
+}
+
+class DeniedActionFixtureRequest extends ActionErrorFixtureRequest
+{
+    public function authorize(): bool
+    {
+        return false;
+    }
+}
+
+it('表单校验保留字段422，无表单动作校验返回522，合法输入正常通过', function () {
+    Route::post('/_validation/form', fn (FieldErrorFixtureRequest $request) => $request->validated());
+    Route::post('/_validation/action', fn (ActionErrorFixtureRequest $request) => $request->validated());
+    Route::post('/_validation/denied', fn (DeniedActionFixtureRequest $request) => $request->validated());
+
+    $this->postJson('/_validation/form', [])->assertUnprocessable()->assertJsonValidationErrors('name');
+    $response = $this->postJson('/_validation/action', [])->assertStatus(522)->assertJsonPath('ok', false);
+    expect($response->json('error.msg'))->not->toBeEmpty();
+    expect($response->json())->not->toHaveKeys(['errors', 'message']);
+    $this->postJson('/_validation/action', ['name' => '合法输入'])->assertOk()->assertJsonPath('name', '合法输入');
+    $this->postJson('/_validation/denied', [])->assertForbidden();
+});
+
 it('keeps aggregate array rules separate from wildcard item rules', function () {
     $request = new class extends FormRequest
     {

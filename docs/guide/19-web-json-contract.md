@@ -101,6 +101,14 @@ order: 190
 
 从类名派生而不是逐个声明，是为了让**下游新增子类自动获得唯一码**，没有「漏登记导致静默降级」的口子。
 
+### 4.4 下游业务表单与按钮动作
+
+有对应表单控件接收错误时，使用 `ValidationException::withMessages(['实际字段' => '错误原因'])`，HTTP 422 保留 Laravel 的 `errors` 袋。没有对应表单的业务拒绝直接使用 `BaseException`（默认 HTTP 522，正文 `error.msg`）；没有独立复用语义时不新增异常子类。
+
+`Foundation\FormRequest` 默认保留 422。删除、恢复、移动等无表单动作的专用 Request 显式声明 `protected bool $fieldValidation = false;`，其校验失败转为统一 522；认证/授权、资源不存在和技术错误不经过这项转换。生成器仅对 Admin 的 Destroy、DestroyBatch、Restore Request 默认生成该选项，既有 Request 不自动覆盖。
+
+真实表单、搜索控件及专用交互协议需按消费者确认，不能只按状态码批量替换；例如流程补选责任人的 422 仍承载下一步表单输入，真实修订冲突保留既有 409。
+
 ## 5. 升级到 2.2.0+ 要做的事
 
 1. **重新发布前端资源** —— `php artisan vendor:publish --provider="Mooeen\Scaffold\ScaffoldProvider" --tag=public --force`。否则宿主 `public/vendor/scaffold/` 里还是旧的页面脚本，拿不到 `api.js`。详见 [01-install.md](01-install.md)。

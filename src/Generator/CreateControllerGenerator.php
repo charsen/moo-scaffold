@@ -414,11 +414,14 @@ class CreateControllerGenerator extends Generator
                 'use_base_request' => FormRequest::class,
                 'use_custom_rules' => implode(PHP_EOL, array_filter([$use_numeric_array, $use_mobile])),
                 // 'use_enums'        => implode(PHP_EOL, $use_enums_code),
-                'request_name' => $request_name,
-                'trait_name'   => $trait_name,
-                'rules'        => implode(PHP_EOL, $codes),
-                'options'      => implode(PHP_EOL, $options),
-                'form_layout'  => in_array($one, ['Store', 'Update']) ? $this->getFormLayoutMethod($rules) : '',
+                'request_name'    => $request_name,
+                'trait_name'      => $trait_name,
+                'rules'           => implode(PHP_EOL, $codes),
+                'options'         => implode(PHP_EOL, $options),
+                'form_layout'     => in_array($one, ['Store', 'Update']) ? $this->getFormLayoutMethod($rules) : '',
+                'validation_mode' => $app_folder === 'admin' && in_array($one, ['Destroy', 'Restore', 'DestroyBatch'])
+                    ? $this->getTabs(1) . 'protected bool $fieldValidation = false;' . PHP_EOL
+                    : '',
             ];
 
             $content = $this->buildStub($meta, $this->getStub('request'));
