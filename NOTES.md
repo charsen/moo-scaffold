@@ -3,15 +3,23 @@
 > 长期记忆：踩过的坑、确认过的做法，一条一行，新的放上面。
 > 本仓开源：不写内部项目名、内部域名、密钥。
 
-- 2026-09-28，**测试套件的结果会被运行 shell 里导出的 `APP_DEBUG` / `APP_ENV` 改写 —— 断言读的是环境，不是代码**：
+- 2026-09-28，**测试套件的结果会被运行 shell 里导出的同名变量改写 —— 断言与「测试环境本身」读的都是环境，不是代码**：
   给 9 个仓收口测试环境时，本仓 `FrameworkErrorShapeTest` 的 3 条「框架层错误不套信封」断言报红：
   debug=true 时 Laravel 会给 JSON 错误体补 `exception` / `file` / `line` / `trace`，而该文件钉的是**生产形态**。
   实测同一份代码、未改任何文件：`APP_DEBUG=true ./vendor/bin/pest` → **3 failed**；`APP_DEBUG=false …` → **4 passed**。
   （当时本机 shell 里确实有 `APP_DEBUG=true` 与 `APP_ENV=local`。）
-  **解法**：把「这条契约依赖的环境前提」在测试里**显式设死**（`config(['app.debug' => false])`），而不依赖运行环境。
-  **通则**：与本文件「包默认值取 `env('SCAFFOLD_AUTHOR','')`」那条同族 —— **测试断言不能依赖进程环境**；
+  **⚠ 同一根因的第二个、更隐蔽的形态（2026-09-28 补，我曾误判过一次）**：`phpunit.xml` 的 `<env>` 只在变量
+  **尚未存在于进程环境**时才生效（PHPUnit 文档行为）⇒ shell 里若已导出 `CACHE_STORE=database`，
+  `<env name="CACHE_STORE" value="array"/>` 会被**整条跳过**、shell 值胜出，测试便去查 `cache` 表而红。
+  我当时据此写下「`<env>` 无效」的结论 —— **错**：干净 shell 里它是有效的，是被我的 shell 压制了。
+  A/B 定案（host 侧，同一份代码）：`env -u SESSION_DRIVER -u CACHE_STORE -u DB_CONNECTION … pest` → **103 passed**；
+  保留 shell 变量 → **1 failed**（`no such table: sessions`）；**给 `<env>` 加 `force="true"` 也压不住**（实测）。
+  **解法**：把测试前提写在**测试引导的代码里**（`config([...])` / Testbench 的 `defineEnvironment()`），
+  不要只写在 `phpunit.xml`；`config()` 与 shell 环境无关，是这三种形态里唯一稳的。
+  **通则**：与本文件「包默认值取 `env('SCAFFOLD_AUTHOR','')`」那条同族 —— **测试断言与测试环境都不能依赖进程环境**；
   看到「换台机器 / 换个 shell 就红」先查 `env()` / `config()` 的取值来源，别先去改断言或改产品码。
-  另注意：批量跑套件做判断时，**跑之前先 `printenv` 一眼**，否则会把环境假象记成仓库缺陷。
+  **批量跑套件做判断前，先 `printenv | grep -E 'CACHE_STORE|SESSION_DRIVER|DB_CONNECTION|APP_'`** ——
+  否则会把环境假象记成仓库缺陷，并顺手写出一个看似有理的错误结论。
 
 - 2026-09-28，**macOS 自带 bash 3.2 里 `$var` 紧邻中文字符会被吞 —— 中文字节被当成变量名的一部分，静默得到空串 + 乱码**：
   跨 5 个仓批量提交时，`echo "脏项 $before → $after（应只减 3）"` 打成 `脏项 3 → ��应只减 3）`，

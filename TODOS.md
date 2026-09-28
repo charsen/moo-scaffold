@@ -98,13 +98,20 @@
   （`SQLSTATE[HY000]: no such table: cache`），而缓存驱动走 database ⇒ **即使解决了 path 依赖，
   `composer ci` 的 test 步照样红**。实测 `moo-<name>`（本次完全未改动）同样中招，属既有环境缺口；
   跑测试时 `CACHE_STORE=array` 可一次性绕过。
-  **⚠ 修法结论（2026-09-28，别再走弯路）**：**`phpunit.xml` 里写 `<env name="CACHE_STORE" value="array"/>` 是无效的** ——
-  PHPUnit 非 `force` 的 `<env>` 只写 `$_ENV/$_SERVER`，这里的 Laravel 不采纳它。实测同一次代码：
-  只靠该 `<env>` = 28 failed（仍在查 `cache` 表），改用 shell `CACHE_STORE=array` = 39 passed。
-  **有效修法是在 `tests/TestCase.php` 的 `defineEnvironment()` 里 `$app['config']->set('cache.default', 'array')`**
-  （cms / product / banner 已按此修，见下方「消费包测试夹具」条）。
-  另：`moo-<name>/phpunit.xml` 里**已经有**那行失效的 `<env name="CACHE_STORE">`，它 11 failed 里有 25 行 `no such table: cache`
-  ⇒ **那是个假先例，别照抄**。
+  **⚠ 修法结论（2026-09-28，含一次自我纠正）**：**先纠正我上一版写在这里的错误结论** —— 我原写「`phpunit.xml` 里
+  `<env name="CACHE_STORE">` 无效」，那是**误判**。真因是**运行 shell 里已导出了同名变量**
+  （本机实测导出过 `CACHE_STORE=database` / `SESSION_DRIVER=database` / `DB_CONNECTION=sqlite` / `APP_DEBUG=true` / `APP_ENV=local`）：
+  **PHPUnit 非 `force` 的 `<env>` 在变量「已存在于进程环境」时会被整条跳过**（这是 PHPUnit 的文档行为），
+  于是 shell 值胜出、`phpunit.xml` 的值看不见 —— 干净 shell 里那行本来是**有效**的。
+  交叉证据（engine-skeleton 的 A/B，同一份代码）：`env -u SESSION_DRIVER -u CACHE_STORE … pest` → **103 passed**；
+  保留 shell 变量 → **1 failed**（`no such table: sessions`），**且给 `<env>` 加 `force="true"` 也压不住**。
+  **可靠修法 = 在测试引导里用配置锁死**：扩展包用 `tests/TestCase.php` 的 `defineEnvironment()`
+  设 `$app['config']->set('cache.default', 'array')`（与 shell 无关、也不受 `force` 语义影响）；
+  host（`moo-engine-skeleton`）在测试基类里同理。本轮 9 个包按此修，**修法本身仍然正确**。
+  另：`moo-<name>/phpunit.xml` 那行 `<env name="CACHE_STORE">` **不是假先例**（同属被 shell 压制的受害者）；
+  本轮以 TestCase 配置替代它属**加固**（功能等价、更稳），不是「修掉一行错配置」。
+  **通则**：跑套件做判断前先 `printenv | grep -E 'CACHE_STORE|SESSION_DRIVER|DB_CONNECTION|APP_'`；
+  「换台机器/换个 shell 就红」先怀疑环境变量，别急着改断言或改产品码。
 
 - [ ] **既有 pint 违规（改前就红，非本次引入）**：`moo-<name>` 35 处 / `moo-<name>` 2 处 /
   `moo-<name>` 1 处；**本仓自身 2 处**（`tests/Feature/Concerns/HasOperatorContextTest.php`、
