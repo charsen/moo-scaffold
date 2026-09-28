@@ -217,7 +217,8 @@
   另 `moo-engine-skeleton` 的 `ExampleTest` 在本机 shell 导出 `SESSION_DRIVER=database` 时会红
   （同代码清掉该变量即 103 passed），**不是仓库缺陷**，已在 `engine/phpunit.xml` 写明排查方式。
 
-- [ ] **LAYOUT 待议（改动即破坏 namespace，需同步消费方与 codegen 重生成）**：  7 包把 model trait 放在 `src/Models/Concerns/`（`moo-<name>` 2 / `moo-<name>` 2 / `moo-<name>` 2 /
+- [ ] **LAYOUT 待议（改动即破坏 namespace，需同步消费方与 codegen 重生成）**：
+  7 包把 model trait 放在 `src/Models/Concerns/`（`moo-<name>` 2 / `moo-<name>` 2 / `moo-<name>` 2 /
   `moo-<name>` 2 / `moo-feedback` 1 / `moo-<name>` 2 / `moo-<name>` 2），规范位置是 `src/Models/Traits/`
   （codegen 硬编码 emit `use {ns}Traits\...`）；`moo-<name>/src/Concerns/HasRichTextFields.php` 同族；
   `moo-<name>/src/Models/Concerns/` 是空残留（可直接删）；
