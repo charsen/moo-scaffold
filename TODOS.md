@@ -384,7 +384,15 @@
     `moo-<name>` 的两个分支（`fix-shared-sequence` 与 `fix-process-terminate-acl`）都已合入它的两条线。
   - `moo-<name>` **没有远端**（`remote -v` 为空）⇒ 只能在本地把 `feat-sequence` 快进合入它的 `dev`/`main`（已做，`6636fa4`）；
     **推送/发版需他们会话先建远端**。
-  - **生态外 10 个分支未动（等用户确认范围）**：`内部官网项目`/`某个内部 Host 项目`/`某个内部业务项目`/`某内部语言项目（后端）`
-    各 1 笔 `fix-business-exceptions`、`某个内部 Host` 的 `fix-category-business-status`(5) 与 `V2-260515`、
-    `某内部语言项目（前端）` 的 `feat-flutter`(77)、`某个内部 Host-next-admin` 的 `antdv-next`/`feat-packages`(59)/`fix-lzw`。
-    这些属其它项目的在途分支（含长期分支），是否有意合入其发布线需用户判断。
+  - **生态外「异常出口」那一组已合（2026-09-28 用户选择）**：`内部官网项目` / `某个内部 Host 项目` / `某个内部业务项目` /
+    `某内部语言项目（后端）` 的 `fix-business-exceptions` 与 `某个内部 Host` 的 `fix-category-business-status`，
+    均合入各自 `dev` 与 `main`/`master` 并推送（回读 `is-ancestor` + 远端一致全 ✓）。
+    **验证（只跑本分支改到的测试）**：xing-ke 2 passed · 某个内部 Host 项目 41 passed · 某内部语言项目（后端） 7 passed ·
+    某个内部业务项目 29 passed（⚠ 首跑 19 failed 全是**本机 shell 导出 `CACHE_STORE=database` 等**造成的假红，
+    清掉变量即 29 passed —— 同一陷阱今天第三次；命令里一律 `env -u CACHE_STORE -u SESSION_DRIVER -u DB_CONNECTION -u APP_DEBUG -u APP_ENV -u QUEUE_CONNECTION`）·
+    `某个内部 Host` 已修 4 处 `OperatorResolver::isPlatformRoot()` 夹具缺失（`cf340bf4`），但该仓测试**未能验证完**：
+    剩余失败是环境类（测试库缺 `system_personnel_position` 表、`moo_process_instances` 缺 `instance_code` 列，
+    而迁移在兄弟仓与 vendor 两侧都在）⇒ **该仓的绿灯结论待补**。
+  - **仍未合的（长期/迁移分支，用户选择不动）**：`某内部语言项目（前端）` 的 `feat-flutter`(77)、
+    `某个内部 Host-next-admin` 的 `antdv-next`(7)/`feat-packages`(59)/`fix-lzw`(3)、`某个内部 Host` 的 `V2-260515`(1)。
+    这些进发布线属产品级决定，需要时再单独确认。
