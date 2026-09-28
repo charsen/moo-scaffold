@@ -269,3 +269,12 @@ it('releases the file lock after a writer failure so a retry can succeed', funct
     expect(app(LocalMarkdownEditor::class)->save('plans', $this->slug, '# Updated', hash('sha256', $this->raw)))
         ->toBe(hash('sha256', '# Updated'));
 });
+
+it('shows hidden context failures and keeps content errors on the editor field', function () {
+    $this->postJson('/scaffold/plans/save', ['slug' => $this->slug, 'content' => '# Unchanged'])
+        ->assertStatus(522)->assertJsonPath('ok', false);
+    $this->postJson('/scaffold/plans/save', ['content' => ['bad']])
+        ->assertUnprocessable()->assertJsonValidationErrors('content')
+        ->assertJsonMissingValidationErrors(['slug', 'version']);
+    expect(file_get_contents($this->directory . '/' . $this->slug))->toBe($this->raw);
+});
