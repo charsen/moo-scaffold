@@ -26,7 +26,8 @@
  *                   发进消费方 `vendor/`（只在该路径**本仓确实存在**时才要求，逐仓额外条目不算偏离）。
  *   LAYOUT       布局偏离红线（trait 放错位置、Requests 出现模块段）—— 改动即破坏 namespace，只报不判
  *   NAME         config stem / 命名空间 / provider 类名偏离命名约定 —— 判断题，只报不判
- *   OPTIONAL     CI 骨架与 `.gitattributes` **是否存在** —— 收益取决于分发方式（dist 归档 / GitHub 镜像），只报不判
+ *   OPTIONAL     GitHub Actions（**仅开源仓**需要）与 `.gitattributes` 裁剪清单 —— 只报不判：
+ *                私有包没有 GitHub 仓、且 Gitee 依赖走 clone ⇒ `export-ignore` 当前不生效
  *   INFO         观察项（空骨架、host 发布状态等），无需动作
  *
  * 「MISS」的豁免集中在 ALLOWANCES：纯契约包、内核包、采集包、codegen 工具本身的残缺骨架是**设计如此**，
@@ -214,7 +215,7 @@ function allowances(): array
 function exportIgnoreRequirements(): array
 {
     return ['.claude', '.editorconfig', '.github', '.gitattributes', '.gitignore', '.phpunit.cache', '.vscode',
-        'CLAUDE.md', 'NOTES.md', 'TODOS.md', 'composer.dev.json', 'docs', 'phpunit.xml', 'pint.json', 'plans', 'tests'];
+        'CLAUDE.md', 'NOTES.md', 'TODOS.md', 'composer.ci.json', 'docs', 'phpunit.xml', 'pint.json', 'plans', 'tests'];
 }
 
 /**
@@ -499,14 +500,20 @@ function auditPackage(string $dir, string $workspace, ?array $canonicalRules): a
         $drift['CONFIG'][] = $finding;
     }
 
-    // CONFIG：dist 裁剪清单（缺 export-ignore ⇒ 产物泄漏进消费方 vendor/）
+    // OPTIONAL：dist 裁剪清单 —— **只报告、不判失败**。仓库私有、无 GitHub 镜像，而 Composer 对 Gitee
+    // 没有 dist driver ⇒ 依赖一律 `git clone`（实测 installed.json: dist=False source=True），
+    // `export-ignore` 实际不生效（只有从 Packagist 装 dist 的公开包才受益）。留着无害且「将来开源/切 dist 即生效」，
+    // 但不该把它当硬门禁去守一个当前无效的机制。
     foreach (gitattributesFindings($dir, $package) as $finding) {
-        $drift['CONFIG'][] = $finding;
+        $drift['OPTIONAL'][] = $finding;
     }
 
     // OPTIONAL：分发方式相关的骨架，收益取决于是否走 dist / 是否启用 GitHub 镜像
-    if (glob($dir . '/.github/workflows/*.yml') === []) {
-        $drift['OPTIONAL'][] = '缺 .github/workflows/（范本 moo-<name>/.github/workflows/quality.yml；仅在启用 GitHub 镜像时有效）';
+    // 只有**开源仓**需要 GitHub Actions：私有包没有 GitHub 仓，workflow 永远不会跑
+    // （2026-09-28 用户确认：私有包无镜像；开源仅 moo-feedback / moo-scaffold，且走 Gitee+GitHub **双源**，
+    // 不用 mirror-from-gitee 那类定时镜像 workflow）。
+    if (in_array($package, ['moo-feedback', 'moo-scaffold'], true) && glob($dir . '/.github/workflows/*.yml') === []) {
+        $drift['OPTIONAL'][] = '缺 .github/workflows/（仅开源仓需要；范本 moo-scaffold/.github/workflows/quality.yml）';
     }
     if (! is_file($dir . '/.gitattributes')) {
         $drift['OPTIONAL'][] = '缺 .gitattributes（composer dist 裁剪；仅在按 dist 分发时有效，形状需先定）';

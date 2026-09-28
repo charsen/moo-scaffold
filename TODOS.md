@@ -79,6 +79,28 @@
   审计结果：本轮 **29 目标 0 MISS / 0 STYLE-DRIFT**
   （当前工作区第 30 个目标 `moo-<name>` 已整仓剔除，见上方接手复核）。
 
+- [x] **按用户确认的生态事实收口 CI 与 dist 裁剪（2026-09-28）**：用户确认 —— **私有包没有 GitHub 镜像**，
+  开源的只有 `moo-feedback` / `moo-scaffold`（其余包曾定开源、**后来撤销**）；开源仓走 **Gitee + GitHub 双源直推**，
+  **不用** workflow 镜像。据此：
+  ① **清掉不会跑的 workflow**：5 个私有仓的 `quality.yml`（banner / certificate / cms / page / product）、
+     私有 host 的 `tests.yml`（system）、被双源取代的 `moo-feedback/mirror-from-gitee.yml`；
+     判据改为**只对两个开源仓**要求 `.github/workflows/`，并修了两个开源仓 workflow 的可跑性
+     （`audit --locked` → `audit`：包仓 lock 不入库、加 `--locked` 必失败；feedback 补 `COMPOSER=composer.ci.json`
+     与 Gitee 部署密钥步骤，密钥名 `GITEE_DEPLOY_KEY`）——⚠ **平台侧启用 Actions / 配 secret 仍需用户操作**。
+     未动（待确认）：`moo-engine-skeleton` 的 `mirror-from-gitee.yml` + `tests.yml`（host 骨架，其注释本就写明
+     「镜像到 GitHub 后自动启用」）、以及**不在本轮范围**的 `moo-monitor-vue` / `moo-git-fleet` / `moo-chrome-dev-tool`。
+  ② **`.gitattributes` 裁剪降级为只报告**：实测 Composer 对 Gitee **没有 dist driver** ⇒ 私有依赖一律 `git clone`
+     （`vendor/composer/installed.json`：`dist=False source=True`、有 `.git`），**`export-ignore` 实际不生效** ——
+     我前几轮「补 `/plans`、`/TODOS.md` 进裁剪清单」对**私有消费者没有效果**（只有从 Packagist 装 dist 的公开包受益）。
+     文件保留（无害，将来开源/切 dist 即生效），判据从 `CONFIG` 降为 `OPTIONAL`（只报不判）。
+  ③ **双清单默认方向反转**（CI 出局后本地 DX 优先）：`composer.json` = `path` + `symlink` + **传递闭包**（本地默认，
+     行为与此前一致）；`composer.ci.json` = **纯 vcs**（干净克隆 / 未来 CI）。13 个包已改，
+     `.gitattributes` 的忽略项由 `composer.dev.json` 换成 `composer.ci.json`。
+     **验证**：本地默认解析 rc=0（抽样 3/3）、干净目录用 `composer.ci.json` rc=0（抽样 2/2）、闸门 30 目标 `0/0/0`；
+     `OPTIONAL` 从 22 降到 **1**（不再对 25 个私有包催一个永远不跑的 workflow）。
+     ⚠ 上一轮「`composer.json`=vcs」的取值**已作废**，但同一轮修好的两件事**保留**：`versions` 约束式 → 具体版本、
+     repositories 覆盖传递闭包（它们修的是**本地也装不上**的真实缺陷，与 CI 无关）。
+
 - [x] **CI 前置的一半：13 个包改双清单（2026-09-28）** —— 但**先纠正一个前提**：按「vcs 兜底 + 保留 path」开工后实测
   **做不到**：`path` 条目是**急切校验**的，目录不存在时 Composer 直接 `PathRepository ... does not exist`，
   **vcs 兜底根本轮不到**。这条同时推翻交接里那句「`moo-<name>` 已改 vcs 形态并在干净克隆实测通过」——

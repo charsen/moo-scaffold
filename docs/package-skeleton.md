@@ -36,46 +36,61 @@ php tools/audit-package-structure.php --workspace=<同级目录> --fail-on-drift
 | --- | --- | --- |
 | `MISS` | 必需文件 / 目录缺失（豁免清单命中则不计） | 是 |
 | `STYLE-DRIFT` | `pint.json` 规则集与 canonical 不一致；`CLAUDE.md` 不是纯入口（未指向 `AGENTS.md` 或超过 8 行） | 是 |
-| `CONFIG` | 机器可判、且会**实际坏事**的配置口径：① path 仓库 `versions` 写成约束式（无 lock 的 fresh install 被 Composer 拒绝 ⇒ CI/新克隆装不上）；② `.gitattributes` 缺基准 `export-ignore` 条目（产物随 dist 进消费方 `vendor/`） | 是 |
+| `CONFIG` | 机器可判、且会**实际坏事**的配置口径：path 仓库 `versions` 写成约束式（无 lock 的 fresh install 被 Composer 拒绝 ⇒ 干净克隆装不上） | 是 |
 | `LAYOUT` | 布局红线偏离（trait 放错位置、Requests 出现模块段） | 否，只报告 |
 | `NAME` | config stem / 命名空间 / provider 类名偏离命名约定 | 否，只报告 |
-| `OPTIONAL` | CI 骨架与 `.gitattributes` **是否存在** | 否，只报告 |
+| `OPTIONAL` | GitHub Actions（**仅开源仓**需要）与 `.gitattributes` 裁剪清单 | 否，只报告 |
 | `INFO` | 观察项（空骨架、host 发布状态等） | 否 |
 
-**为什么这三级判失败**：`MISS` / `STYLE-DRIFT` / `CONFIG` 都是「机器能判、且不修就真会坏事」——
-前两者是骨架与规则集本身，`CONFIG` 的两条分别是 **fresh clone/CI 装不上** 与 **产物泄漏进消费方**（都实测踩过）。
+**为什么 `MISS` / `STYLE-DRIFT` / `CONFIG` 判失败**：它们都是「机器能判、且不修就真会坏事」——
+前两者是骨架与规则集本身，`CONFIG` 目前只有一条（**干净克隆装不上**，实测踩过）。
 而 `LAYOUT` / `NAME` 的改动会破坏 namespace 或跨 host 契约（消费方要同步升级），
-`OPTIONAL` 的收益取决于分发方式（是否走 composer dist、GitHub 镜像是否启用）。这三类都需先确认设计意图。
+`OPTIONAL` 的两项**当前收益接近零**（见下）。这三类都需先确认设计意图。
 
-**`CONFIG` 的两条判据边界**（都在脚本里，改判据要同步本节）：
+**`CONFIG` 判据边界**（在脚本里，改判据要同步本节）：
 
 - **path 仓库 `versions` 只比语法**：值必须是具体版本（`2.2.8`），出现 `^ ~ * > < = @ |` 或空格即报。
   `repositories` 的 list / dict 两种形态都支持（生态里两种都有，脚本都吃）。
-- **`.gitattributes` 只比「必需条目是否齐」**：不比整份文件、**只在该路径于本仓确实存在时才要求**
-  （`moo-scaffold` 没有 `.claude`/`.editorconfig`/`.phpunit.cache`，就不要求它去 ignore）。
-  逐仓的**额外**条目是刻意的（`moo-<name>` +`/tools`、`moo-system` +`/HANDOFF.md`、`moo-<name>` +`/.codegen`），不算偏离；
-  「有意随包分发」的例外走脚本 `ALLOWANCES` 的 `gitattributes:<path>` 键（如 `moo-scaffold` 的 `docs/`——
-  它是 host 文档中心的包文档源）。host（`moo-engine-skeleton`）有自己的清单，不套本判据。
 
-## 清单双轨（包仓的本地 / CI 分流）
+**`OPTIONAL` 为什么只报不判**（2026-09-28 用户确认的生态事实 + 实测）：
 
-包仓只有一份 `composer.json`，而「本地要 `path`+`symlink`、CI 要能脱离同级目录装」是**互斥**的 ——
+- **私有包没有 GitHub 镜像**，开源只有 `moo-feedback` 与 `moo-scaffold`（其余包曾定开源、后来撤销）。
+  ⇒ 私有仓的 `.github/workflows/` **永远不会跑**（写了也没用），所以脚本只对那两个开源仓要求它；
+  开源仓走 **Gitee + GitHub 双源**（直接推两边），**不用** `mirror-from-gitee.yml` 那类定时镜像 workflow。
+- **`.gitattributes` 的 `export-ignore` 对私有包不生效**：Composer 对 Gitee **没有 dist driver**，
+  依赖一律 `git clone`（实测 `vendor/composer/installed.json`：私有包 `dist=False source=True`、
+  有 `.git`；只有 Packagist 上的公开包是 `dist=True`）。所以「补 `/plans`、`/TODOS.md` 到裁剪清单」
+  只对**从 Packagist 装 dist 的公开包**有意义。文件保留无害（将来开源 / 切 dist 即生效），
+  但判据降级为只报告，免得守一个当前无效的机制。
+- `.gitattributes` 的检查口径本身仍然有效：只比「必需条目是否齐」、**只在该路径本仓确实存在时才要求**
+  （`moo-scaffold` 没有 `.claude`/`.editorconfig`/`.phpunit.cache` 就不要求）；逐仓的**额外**条目是刻意的
+  （`moo-<name>` +`/tools`、`moo-system` +`/HANDOFF.md`、`moo-<name>` +`/.codegen`），不算偏离；
+  「有意随包分发」的例外走脚本 `ALLOWANCES` 的 `gitattributes:<path>` 键（如 `moo-scaffold` 的 `docs/`）。
+  host（`moo-engine-skeleton`）有自己的清单，不套本判据。
+
+## 清单双轨（包仓的本地 / 干净克隆分流）
+
+包仓只有一份 `composer.json`，而「本地要 `path`+`symlink`、干净克隆要能脱离同级目录装」是**互斥**的 ——
 `path` 条目是**急切校验**的：目录不存在时 Composer 直接报
 `The url supplied for the path (../moo-xxx) repository does not exist`，**vcs 兜底根本轮不到**
 （2026-09-28 实测；这也是「vcs 兜底 + 保留 path」不可实现的原因）。因此用**双清单**：
 
 | 文件 | 用途 | `repositories` |
 | --- | --- | --- |
-| `composer.json` | CI / 新克隆 / 发布 | **纯 vcs** |
-| `composer.dev.json` | 本地跨包联调 | `path` + `symlink`（沿用原形态） |
+| `composer.json` | **本地默认**（跨包联调、日常测试） | `path` + `symlink` |
+| `composer.ci.json` | 干净克隆 / CI / 发布 | **纯 vcs** |
 
-- 本地跑：`COMPOSER=composer.dev.json composer update`。两份清单**共用 `composer.lock`**，切换后要重跑一次
+- 干净目录跑：`COMPOSER=composer.ci.json composer update`。两份清单**共用 `composer.lock`**，切换后要重跑一次
   （lock 不入库，CI 每次自行解析，故 CI 侧不受影响）。
 - `composer.dev.json` 必须进 `.gitattributes` 的 `export-ignore`（`CONFIG` 判据会查，见上）。
-- **公开包不必列 vcs**：`charsen/moo-scaffold`、`charsen/moo-monitor-laravel` 在 Packagist 上，
-  走 Packagist 即可 —— 免得 CI 为公开依赖多背一个 SSH 凭据。其余私包一律 `git@gitee.com:charsen/<name>.git`。
-- 提醒：切换清单后本地若直接 `composer install`（默认清单）会因 lock 与清单不符而报错 —— 这是设计如此，
-  用 `COMPOSER=composer.dev.json` 或重跑 `composer update`。
+- **vcs 清单里公开包也要列**：`charsen/moo-scaffold` / `charsen/moo-monitor-laravel` 虽在 Packagist 上，
+  但 **scaffold 的镜像只到 2.2.1**（Gitee 已有 2.2.8）⇒ 依赖 `^2.2.7/^2.2.8` 的包靠 Packagist 必失败
+  （2026-09-28 实测：4 个包的干净目录失败全是这一条）。SSH 本来就要（私包全 SSH），不多背包袱。
+  其余私包一律 `git@gitee.com:charsen/<name>.git`。
+- **`repositories` 必须覆盖「传递私包闭包」**：Composer 只用**根包**的 repositories ⇒ 依赖的依赖
+  （如 `moo-<name> → moo-<name>`）也要由本包声明，否则干净目录解析不到（`process-application` 原先就如此）。
+- 提醒：切换清单后若 lock 与清单不符，`composer install` 会报错 —— 重跑一次 `composer update` 即可
+  （lock 不入库，所以只在本地发生）。
 
 ## 必需清单
 
