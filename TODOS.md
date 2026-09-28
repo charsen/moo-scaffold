@@ -396,3 +396,24 @@
   - **仍未合的（长期/迁移分支，用户选择不动）**：`某内部语言项目（前端）` 的 `feat-flutter`(77)、
     `某个内部 Host-next-admin` 的 `antdv-next`(7)/`feat-packages`(59)/`fix-lzw`(3)、`某个内部 Host` 的 `V2-260515`(1)。
     这些进发布线属产品级决定，需要时再单独确认。
+    ⚠ **口径更正**：这 5 个名字**不是本地分支**（`git rev-parse` 全部 unknown）—— 它们是**远端-only** 分支
+    （别人已推的 WIP）。我上一轮把它们与本地分支混列过，按用户「本地分支」的口径本就不在范围内。
+
+- [ ] **发版清单与准备（按实际改动推导，2026-09-28）**：
+  - **本地分支已 100% 进两条线**：全仓 `refs/heads/*` 均为 `origin/dev` 与 `origin/<main|master>` 的祖先；
+    本地两条线也已与远端**逐仓一致（异常 0）**。做法：先把功能分支合入远端两条线（`merge-tree`+`commit-tree` 直推 refs，
+    不切工作区），再把本地线快进对齐；本地线有独有提交且内容不同时用 merge commit 保留（`moo-<name>` /
+    `moo-chrome-dev-tool` / `moo-monitor-vue` 的「文档导航」3 组共 38 个文件已由此**发布**进 dev 与发布线）。
+  - **需发版的包（`CHANGELOG[Unreleased]` 非空，共 23 个）**：attachment / banner / category / certificate / cms /
+    collect / comment / enterprise-information / feedback / like / media / mini-app / page / process /
+    process-application / product / radar / richtext / scaffold / **sequence** / system / trail / upload。
+    其中 **15 个包已补「清单双轨」条目**（banner / certificate / cms / enterprise-information / media / mini-app /
+    page / process / process-application / product / radar / richtext / system / upload / feedback）；
+    `moo-scaffold` 另补了「判据与规范收口」条目。**tag 仍由用户打**（用户明确保留）。
+  - ⚠ **`moo-scaffold` 必须发新版本（建议 2.2.9）**：`$fieldValidation`（`e044f16`）**不在任何 tag** 里
+    （最新 tag 2.2.8 = 9-23），而消费者约束是 `^2.2.1`×20 / `^2.2.6` / `^2.2.7` / `^2.2.8`×3 ⇒ 不打新 tag 装不到新契约。
+  - ⚠ **`moo-<name>` 的 12 条功能红**（终止/撤回/转派/root 强制终止未完成）现已在它的 `dev` 与 `main` 上 ⇒ **打 tag 前确认**。
+  - ⚠ **`moo-<name>` 没有远端**：本地 `dev`/`main` 已含 `feat-sequence`，但 CHANGELOG 里 4 条 Unreleased 无法发布
+    ⇒ 需他们会话先建 Gitee 仓（`git@gitee.com:charsen/moo-<name>.git` 当前 404）。
+  - ✅ 上一轮记录的两处清单缺口已补：`moo-upload` 原无 `repositories`、`moo-feedback` 缺 scaffold 条目，
+    现均为双轨（`composer.json` 本地 path / `composer.ci.json` 纯 vcs）。
