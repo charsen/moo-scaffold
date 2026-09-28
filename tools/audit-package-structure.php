@@ -509,9 +509,10 @@ function auditPackage(string $dir, string $workspace, ?array $canonicalRules): a
     }
 
     // OPTIONAL：分发方式相关的骨架，收益取决于是否走 dist / 是否启用 GitHub 镜像
-    // 只有**开源仓**需要 GitHub Actions：私有包没有 GitHub 仓，workflow 永远不会跑
-    // （2026-09-28 用户确认：私有包无镜像；开源仅 moo-feedback / moo-scaffold，且走 Gitee+GitHub **双源**，
-    // 不用 mirror-from-gitee 那类定时镜像 workflow）。
+    // 只有**开源包**需要 GitHub Actions：私有包没有 GitHub 仓，workflow 永远不会跑。
+    // 开源集合（2026-09-28 用户确认 + 实测）：包 = moo-feedback / moo-scaffold；
+    // 非包目标另有 moo-engine-skeleton（host，走 auditHost 不套本条）/ moo-chrome-dev-tool / moo-git-fleet /
+    // moo-monitor-vue。开源仓一律走 Gitee + GitHub **双源直推**，5 份 mirror-from-gitee 定时镜像 workflow 已删。
     if (in_array($package, ['moo-feedback', 'moo-scaffold'], true) && glob($dir . '/.github/workflows/*.yml') === []) {
         $drift['OPTIONAL'][] = '缺 .github/workflows/（仅开源仓需要；范本 moo-scaffold/.github/workflows/quality.yml）';
     }

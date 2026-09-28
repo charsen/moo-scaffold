@@ -54,9 +54,13 @@ php tools/audit-package-structure.php --workspace=<同级目录> --fail-on-drift
 
 **`OPTIONAL` 为什么只报不判**（2026-09-28 用户确认的生态事实 + 实测）：
 
-- **私有包没有 GitHub 镜像**，开源只有 `moo-feedback` 与 `moo-scaffold`（其余包曾定开源、后来撤销）。
-  ⇒ 私有仓的 `.github/workflows/` **永远不会跑**（写了也没用），所以脚本只对那两个开源仓要求它；
-  开源仓走 **Gitee + GitHub 双源**（直接推两边），**不用** `mirror-from-gitee.yml` 那类定时镜像 workflow。
+- **开源集合**（2026-09-28 用户确认 + 实测 GitHub 侧匿名可见）：**包**只有 `moo-feedback` / `moo-scaffold`；
+  非包目标还有 `moo-engine-skeleton`（host 骨架）、`moo-chrome-dev-tool`、`moo-git-fleet`、`moo-monitor-vue`。
+  其余包**私有、没有 GitHub 镜像**（曾定开源、后来撤销）。⇒ 私有仓的 `.github/workflows/` **永远不会跑**
+  （写了也没用），所以脚本只对那两个开源**包**要求它（host 走 `auditHost` 路径，不套本条）。
+- **开源仓走 Gitee + GitHub 双源直推**，不再用定时镜像：原先 5 份 `mirror-from-gitee.yml`
+  （cron 每 6 小时 ——`GITEE_TOKEN` clone 一份 bare、`MIRROR_GITHUB_TOKEN` `push --mirror`）**已全部删除**；
+  双源少两个长期 token 的暴露面，也没有最长 6 小时的同步滞后。
 - **`.gitattributes` 的 `export-ignore` 对私有包不生效**：Composer 对 Gitee **没有 dist driver**，
   依赖一律 `git clone`（实测 `vendor/composer/installed.json`：私有包 `dist=False source=True`、
   有 `.git`；只有 Packagist 上的公开包是 `dist=True`）。所以「补 `/plans`、`/TODOS.md` 到裁剪清单」
