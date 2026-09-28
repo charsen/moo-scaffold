@@ -57,6 +57,26 @@ php tools/audit-package-structure.php --workspace=<同级目录> --fail-on-drift
   「有意随包分发」的例外走脚本 `ALLOWANCES` 的 `gitattributes:<path>` 键（如 `moo-scaffold` 的 `docs/`——
   它是 host 文档中心的包文档源）。host（`moo-engine-skeleton`）有自己的清单，不套本判据。
 
+## 清单双轨（包仓的本地 / CI 分流）
+
+包仓只有一份 `composer.json`，而「本地要 `path`+`symlink`、CI 要能脱离同级目录装」是**互斥**的 ——
+`path` 条目是**急切校验**的：目录不存在时 Composer 直接报
+`The url supplied for the path (../moo-xxx) repository does not exist`，**vcs 兜底根本轮不到**
+（2026-09-28 实测；这也是「vcs 兜底 + 保留 path」不可实现的原因）。因此用**双清单**：
+
+| 文件 | 用途 | `repositories` |
+| --- | --- | --- |
+| `composer.json` | CI / 新克隆 / 发布 | **纯 vcs** |
+| `composer.dev.json` | 本地跨包联调 | `path` + `symlink`（沿用原形态） |
+
+- 本地跑：`COMPOSER=composer.dev.json composer update`。两份清单**共用 `composer.lock`**，切换后要重跑一次
+  （lock 不入库，CI 每次自行解析，故 CI 侧不受影响）。
+- `composer.dev.json` 必须进 `.gitattributes` 的 `export-ignore`（`CONFIG` 判据会查，见上）。
+- **公开包不必列 vcs**：`charsen/moo-scaffold`、`charsen/moo-monitor-laravel` 在 Packagist 上，
+  走 Packagist 即可 —— 免得 CI 为公开依赖多背一个 SSH 凭据。其余私包一律 `git@gitee.com:charsen/<name>.git`。
+- 提醒：切换清单后本地若直接 `composer install`（默认清单）会因 lock 与清单不符而报错 —— 这是设计如此，
+  用 `COMPOSER=composer.dev.json` 或重跑 `composer update`。
+
 ## 必需清单
 
 ```

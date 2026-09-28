@@ -214,7 +214,7 @@ function allowances(): array
 function exportIgnoreRequirements(): array
 {
     return ['.claude', '.editorconfig', '.github', '.gitattributes', '.gitignore', '.phpunit.cache', '.vscode',
-        'CLAUDE.md', 'NOTES.md', 'TODOS.md', 'docs', 'phpunit.xml', 'pint.json', 'plans', 'tests'];
+        'CLAUDE.md', 'NOTES.md', 'TODOS.md', 'composer.dev.json', 'docs', 'phpunit.xml', 'pint.json', 'plans', 'tests'];
 }
 
 /**

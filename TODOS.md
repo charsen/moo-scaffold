@@ -79,6 +79,25 @@
   审计结果：本轮 **29 目标 0 MISS / 0 STYLE-DRIFT**
   （当前工作区第 30 个目标 `moo-<name>` 已整仓剔除，见上方接手复核）。
 
+- [x] **CI 前置的一半：13 个包改双清单（2026-09-28）** —— 但**先纠正一个前提**：按「vcs 兜底 + 保留 path」开工后实测
+  **做不到**：`path` 条目是**急切校验**的，目录不存在时 Composer 直接 `PathRepository ... does not exist`，
+  **vcs 兜底根本轮不到**。这条同时推翻交接里那句「`moo-<name>` 已改 vcs 形态并在干净克隆实测通过」——
+  它现在仍有 path 条目，干净目录照样死。⇒ 只能是**双清单**（已写进 `docs/package-skeleton.md`）：
+  - `composer.json` = **纯 vcs**（CI / 新克隆 / 发布）；`composer.dev.json` = `path` + `symlink`（本地 `COMPOSER=composer.dev.json composer update`）。
+    两份**共用 `composer.lock`**（实测 dev 清单不产生自己的 lock）⇒ 切换后要重跑一次 `composer update`。
+  - **repositories 必须覆盖「传递私包闭包」**：Composer 只用**根包**的 repositories ⇒ `moo-<name> → moo-<name>`
+    这类传递依赖也必须由本包声明（`process-application` 原先就因此装不上）。
+  - **公开包也走 vcs**：`moo-scaffold` / `moo-monitor-laravel` 虽在 Packagist，但 **scaffold 的镜像只到 2.2.1**（Gitee 已有 2.2.8）
+    ⇒ `^2.2.7/^2.2.8` 的依赖靠 Packagist 必失败（4 个包的干净目录失败全是这一条）。SSH 本来就要（私包全 SSH），不多背包袱。
+  - `.gitattributes` 补 `/composer.dev.json`，并已加进脚本 `exportIgnoreRequirements()`（判据 `CONFIG` 会查）。
+  13 个包已各自提交（含 `AGENTS.md` 的双清单说明）；**验证**：本地 `COMPOSER=composer.dev.json` **13/13 rc=0**；
+  干净目录（无同级目录）`composer update --dry-run` **10/13 rc=0**。
+  ⚠ **剩余 3 个（mini-app / process / process-application）被 `moo-<name>` 阻塞**：该包**没有远端、从未推送**
+  ⇒ vcs 克隆 404；条目已声明，**sequence 推到 Gitee 并打 `0.1.0` tag 后即可解析**（与那两个包自己的 TODOS 记录一致）。
+  ⚠ **我的探针两次误报，值得记**：第一版按文本找 `Problem 1` 判定成败，把 mini-app 的 **git 404** 当成了通过 ——
+  **判「验证通过」必须看退出码**，别只看输出里有没有某个关键字（与本文件里「把工具输出当成数据的形状」同族）。
+  ⇒ **CI 仍缺的一步**：13 包的 vcs 全是 SSH，所以在 workflow 里注入 **Gitee 部署密钥**（这步未做，且需要你的凭据策略）。
+
 - [ ] **CI 骨架（阻塞，20 个包缺 `.github/workflows/`）**。前置不是「加 workflow」，而是
   **「脱离同级目录能 `composer install`」**：13 个包的 `repositories` 声明 sibling `path`（`../moo-*`），
   GitHub Actions 只 checkout 本仓 ⇒ 私包解析不到（也不在 Packagist）；已有 `quality.yml` 的 6 个包同样带 path 依赖、
