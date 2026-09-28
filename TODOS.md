@@ -328,11 +328,24 @@
     `moo-monitor-laravel` 7 / `moo-<name>` 4 / `moo-<name>` 4 / `moo-scaffold` 7 / `moo-system` 6）⇒ 需一次真合并。
   - ⚠ **分支 tip 混着另一会话的 20 笔在途提交**（19 个仓）：`fix：统一业务拒绝与表单字段异常出口` ×18 +
     `moo-scaffold` 的 `e044f16 fix：区分表单字段校验与无表单操作异常`、`c38e210 fix：对齐编辑预览的字段与上下文异常`。
-  - ⚠ **当前 10 个仓是红的**（全量套件实测，已用「清 shell 变量」A/B 排除环境因素）：
-    `moo-scaffold` 4 failed / `moo-<name>` 5 / `moo-<name>` 3 / `moo-<name>` 2 / `moo-feedback` 2 / `moo-upload` 2 /
-    `moo-<name>` 1 / `moo-<name>` 1 / `moo-<name>` 1 / `moo-system` 1；另 12 个绿；
-    `moo-engine-skeleton`（pest 在 `engine/`）与 `moo-<name>`（phpunit）不在 pest 口径内。
-    **这 10 个红灯是他们会话的在途状态**（我这几轮修完时都验证过绿）⇒ 合并会把红灯发布到两条基线，故按用户决定**等其收绿**。
+  - ✅ **已收绿（2026-09-28 复查，并修正了诊断）**：那 10 个红灯**多数不是断言落后，而是本地环境过期** ——
+    `vendor/charsen/moo-scaffold` 是 7 月的实体拷贝（2.1.x：`grep fieldValidation`=0、`BaseException::render()` 无 `ok` 键），
+    而 `$fieldValidation`（scaffold `e044f16`）**不在任何 tag**（`git tag --contains e044f16` 为空，最新 tag 2.2.8 = 9-23）
+    ⇒ **凡不是 sibling 软链的机器都拿不到新契约**。真·断言落后只有 4 处：`moo-scaffold` 4（含他们自己引入的属性位置违规）
+    + `moo-<name>` / `moo-<name>` / `moo-system` 各 1（他们那笔重构改了行为、漏改了同仓一个测试文件），均已修并提交。
+    ⚠ **近失记录**：我最初的诊断是「断言落后」；若照此执行，会对 **11 处幻影红**改断言（等于删掉 `ok` / 状态码断言）。
+    是子代理按「先定性再动手」的约束拒绝了改断言、并报回真正根因，才没有造成掩盖。**教训：红灯先判「环境 vs 代码」**。
+  - 处理：把仍是实体拷贝的 `vendor/charsen/{moo-scaffold,moo-contract}` 按本工作区既有约定换成 sibling 软链
+    （11 个仓早就这么做；`vendor/` 与 lock 均 gitignored、零 tracked 改动；旧目录备份在 `/tmp/stale-vendor-backup/`）
+    ⇒ **24 仓全量套件全绿**：attachment 106 · banner 40 · camera 13 · cms 30 · collect 34 · comment 28 ·
+    enterprise-information 81 · feedback 70 · flow 25 · like 37 · media 21 · monitor 222 · page 49 · product 30 ·
+    radar 284 · richtext 38 · scaffold 1343(+3 skipped) · schedule 36 · system 379 · trail 65 · upload 62。
+    另：换到 sibling 源码后 `moo-<name>` / `moo-<name>` / `moo-<name>` 的 `OperatorResolver` 夹具缺 `isPlatformRoot()`
+    （新契约方法）导致类加载即 fatal —— 已按既有修法补齐（3 笔测试侧提交）。
+  - **发布还缺一步硬前置**：**scaffold 没有含新契约的 tag**（消费者约束 `^2.2.1`×20 / `^2.2.6` / `^2.2.7` / `^2.2.8`×3，
+    打 **2.2.9** 可全部满足）；干净 `composer install` 现在只能解析到 2.2.8（无 `$fieldValidation`）⇒ 必须先发 scaffold 版本。
+    另 `moo-upload` 无 `repositories`、`moo-feedback` 只有 contract 的 vcs ⇒ 本地/干净安装解析不到 scaffold（只靠 Packagist 旧版），
+    属清单契约变更，**未动、等授权**。
   - 他会话分支（category / certificate / mini-app / process / process-application）**不推、不碰**（用户决定）。
   **绿灯后的执行顺序**（逐仓；先 `git fetch origin` 复核基线）：
   1) 两条线都从**同一个任务分支**来 —— `git push origin <分支>:dev`，再 `git push origin <分支>:<main|master>`；
