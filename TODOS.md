@@ -94,6 +94,11 @@
   ⇒ 真正的卡点是**两件事**：4 包补 vcs 兜底 ＋ **凭据方案（SSH deploy key vs HTTPS token）需用户定**。
   ⚠ 另有一条踩坑：`repositories` 有 **list 与 dict 两种形态**（15 list / 12 dict），写批量脚本必须两种都吃 ——
   第一版侦察只吃 list，把 dict 形态那一列打成了空白，被我读成「无 repositories」而得出错误结论。
+  **⚠ 第三个独立根因（2026-09-28 实测）**：包测试套件跑在**内存 SQLite** 上时缺 `cache` 表
+  （`SQLSTATE[HY000]: no such table: cache`），而缓存驱动走 database ⇒ **即使解决了 path 依赖，
+  `composer ci` 的 test 步照样红**。实测 `moo-<name>`（本次完全未改动）同样中招，属既有环境缺口；
+  跑测试时 `CACHE_STORE=array` 可一次性绕过。修法（phpunit.xml 设 `CACHE_STORE=array` 或测试引导建 cache 表）
+  需单独定，**未做**。
 
 - [ ] **既有 pint 违规（改前就红，非本次引入）**：`moo-<name>` 35 处 / `moo-<name>` 2 处 /
   `moo-<name>` 1 处；**本仓自身 2 处**（`tests/Feature/Concerns/HasOperatorContextTest.php`、
@@ -104,6 +109,18 @@
   **全在手写文件**，`pint --fix` + 定向测试即可验证；而 enterprise-information 的 35 处**含生成物**
   （`database/migrations/2026_09_23_*` 的 `class_definition` / `no_trailing_whitespace_in_comment` / `braces_position`）
   ⇒ 按「不手改生成物」的规则，需先定**重新生成还是接受现状**，不能跟着一起 `--fix`。
+  **进展（2026-09-28）**：cms（`c8649ab`）/ product（`1e3d7c1`）/ scaffold（`324f54d`）三仓已修，
+  `pint --test` 全绿（61 / 55 / 359 files），`php -l` 与定向测试通过；**enterprise-information 仍待你定**。
+  另核过 `stubs/controller-admin.stub` 的 use 块**本身无空行** ⇒ 那两个 Controller 是文件落后而非 stub 违规，
+  修完不会因重生成而 churn（这是 NOTES 坑②那条纪律的应用）。
+
+- [ ] **消费包测试夹具落后于 scaffold 契约（新发现，2026-09-28）**：`moo-<name>` / `moo-<name>` / `moo-<name>` 的
+  `tests/Pest.php` 里匿名 `OperatorResolver` 实现**缺 `isPlatformRoot()`**（scaffold 的 operator-identity-contract
+  新增的方法）⇒ 走到用该 helper 的测试就 `Pest\Exceptions\FatalException`；另 cms / banner 的测试上下文里
+  `Mooeen\Contract\PersonnelNameResolver` 无绑定、`not instantiable`。属「改契约必须扫四层引用」的
+  **第四层（测试夹具）漏网**——契约在逐步演进，消费包的 Testbench 夹具没跟上。
+  与上面的 `cache` 缺表共同导致这些包的 `composer ci` 必红。修法：逐包同步 `tests/Pest.php` 的匿名实现与默认绑定；
+  **未做**（本轮只修了 pint，且已用提交态 A/B 证明这些失败与本次改动无关）。
 
 - [ ] **LAYOUT 待议（改动即破坏 namespace，需同步消费方与 codegen 重生成）**：
   7 包把 model trait 放在 `src/Models/Concerns/`（`moo-<name>` 2 / `moo-<name>` 2 / `moo-<name>` 2 /
