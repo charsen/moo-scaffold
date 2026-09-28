@@ -85,11 +85,25 @@
   且 workflow 无 ssh-agent 步骤，另有包用 `git@gitee.com:...` 的 vcs 源 ⇒ **那几份多半本来就是红的**。
   与上面「mini-app 仍是 path sibling」是同一条根因。**收口顺序**：先把受影响包的 manifest 改成 vcs 形态
   （`moo-<name>` 的样板）+ 在 workflow 注入部署密钥，再谈批量补 CI。范本：`moo-<name>/.github/workflows/quality.yml`。
+  **2026-09-28 实测细分（把「13 包」拆成可执行的粒度）**：有 `path` 条目的确 **13 包**，但要按「有没有 vcs 兜底」分两类 ——
+  ✗ **只有 path、干净 checkout 必失败（4 包，硬阻塞）**：`moo-<name>`(11 条) / `moo-<name>`(4) /
+  `moo-<name>`(3) / `moo-<name>`(2)；⚠ **vcs+path 混用（9 包，本地方便 + CI 有兜底）**：banner / certificate / cms /
+  mini-app / process / process-application / product / radar / system。
+  另 **10 包是纯 SSH vcs**（attachment / camera-recognition / category / collect / comment / feedback / flow /
+  like / schedule / trail）⇒ CI 要 deploy key；只有 `moo-<name>` 走 HTTPS。
+  ⇒ 真正的卡点是**两件事**：4 包补 vcs 兜底 ＋ **凭据方案（SSH deploy key vs HTTPS token）需用户定**。
+  ⚠ 另有一条踩坑：`repositories` 有 **list 与 dict 两种形态**（15 list / 12 dict），写批量脚本必须两种都吃 ——
+  第一版侦察只吃 list，把 dict 形态那一列打成了空白，被我读成「无 repositories」而得出错误结论。
 
 - [ ] **既有 pint 违规（改前就红，非本次引入）**：`moo-<name>` 35 处 / `moo-<name>` 2 处 /
   `moo-<name>` 1 处；**本仓自身 2 处**（`tests/Feature/Concerns/HasOperatorContextTest.php`、
   `tests/Feature/Concerns/OperatorResolverTest.php`，`class_attributes_separation`）。
   已用「提交态配置 A/B」与「文件未被本次修改」双重证实与本次 `pint.json` 归一无关，属独立过堂。
+  **2026-09-28 实测：四仓性质不同，别当一件事做** —— cms（2 处：`ArticleController` 的 `no_extra_blank_lines` +
+  `tests/Feature/FormOptionsTest.php`）、product（1 处：`ProductController` 同类）、scaffold（2 处：上述两个测试文件）
+  **全在手写文件**，`pint --fix` + 定向测试即可验证；而 enterprise-information 的 35 处**含生成物**
+  （`database/migrations/2026_09_23_*` 的 `class_definition` / `no_trailing_whitespace_in_comment` / `braces_position`）
+  ⇒ 按「不手改生成物」的规则，需先定**重新生成还是接受现状**，不能跟着一起 `--fix`。
 
 - [ ] **LAYOUT 待议（改动即破坏 namespace，需同步消费方与 codegen 重生成）**：
   7 包把 model trait 放在 `src/Models/Concerns/`（`moo-<name>` 2 / `moo-<name>` 2 / `moo-<name>` 2 /
