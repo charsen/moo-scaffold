@@ -34,6 +34,12 @@ abstract class TestCase extends Orchestra
         // 给一个固定测试 key(AES-256-CBC 需 32 byte),让加密相关测试可跑。
         $app['config']->set('app.key', 'base64:' . base64_encode(str_repeat('k', 32)));
 
+        // 测试期 cache / session 固定 array：testbench 的内存 sqlite 里没有 cache / sessions 表,
+        // 而雪花 sequence resolver 与 /scaffold/* 的 HTTP 用例分别会去查它们(缺表即整仓红)。
+        // 注:写在 phpunit.xml 的 <env name="CACHE_STORE"> / SESSION_DRIVER 不生效(实测仍去查表),必须设在这里。
+        $app['config']->set('cache.default', 'array');
+        $app['config']->set('session.driver', 'array');
+
         // 默认:需 schema 的测试各自 FixtureSchema::activate() 切到 bundled fixture
         // (tests/Feature/Designer/fixtures),套件零 env 即可全绿,无需全局配置。
         // 可选:显式设 PEST_HOST_SCAFFOLD_PATH 指向真实下游 engine scaffold 目录,针对真实 schema 跑回归。

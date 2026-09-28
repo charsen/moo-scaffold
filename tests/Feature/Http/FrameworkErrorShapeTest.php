@@ -32,6 +32,9 @@ beforeEach(function () {
     file_put_contents($this->directory . '/' . $this->slug, $this->raw);
 
     config(['scaffold.plans.path' => $this->directory, 'scaffold.config_ui.readonly' => false]);
+    // 本文件钉的是**生产形态**的框架层信封：debug=true 时 Laravel 会额外补 exception/file/line/trace,
+    // 而运行环境里可能已导出 APP_DEBUG=true ⇒ 必须显式关掉,否则这条契约会随 shell 环境变红。
+    config(['app.debug' => false]);
     app()->instance('env', 'local');
     // 只绕开登录与 CSRF（与 LocalMarkdownEditingTest 同口径）；写保护中间件保持真实，
     // 否则 abort 会发生在中间件层、测不到下面这些业务 abort。
