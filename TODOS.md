@@ -49,12 +49,20 @@
 判据已固化为 `tools/audit-package-structure.php`（只读闸门，`--fail-on-drift`），规模口径见
 `docs/package-skeleton.md`。**本轮只做非破坏性补齐**；下列事项需先确认设计意图或同步消费方，未动。
 
-- [ ] **5 个他会话仓的骨架文件待补**：`moo-<name>`、`moo-<name>`（同处 `fix-category-business-status`）、
-  `moo-<name>`（`fix-business-code-prefixes`）、`moo-<name>`、`moo-<name>`（同处 `fix-shared-sequence`）
-  的工作区里躺着本轮那 3 个文件（`AGENTS.md`/`CLAUDE.md` 已改、`.gitattributes` 未跟踪），但它们当前在**他会话的分支**上，
-  不能被本轮 `checkout -b` 带走（会把别人的脏改动一起搬过去）。**等那些会话提交、工作区干净后**，再各仓从最新发布基线
-  起 `feat-package-skeleton-alignment` 补提交。已核：这 5 仓的 hunk 全是本轮那份重写，未与他人内容交织，按路径即可干净分离。
-  **补的时候用已更新的基准版**（含 `/plans`、`/TODOS.md` 两条 `export-ignore`），别照抄他们工作区里那份旧的 15 行版。
+- [x] **3 个他会话仓已提交（挂在他的任务分支上，经用户显式许可）**：`moo-<name>`、`moo-<name>`
+  （同处 `fix-category-business-status`）、`moo-<name>`（`fix-business-code-prefixes`）各一笔独立提交
+  （`edeb59d` / `aea496a` / `8c866d0`，message 统一 `chore：对齐扩展包骨架规范`）。
+  **为什么不再等**：那 3 个文件此前是**无保护的未暂存改动**，而对应会话正在逐笔提交，下一次 `git add -A` /
+  `commit -a` 就会把它们卷进一笔业务提交（不可追溯、无法单独回滚）。提交时逐仓断言「暂存区恰好只有这 3 个路径」，
+  未带走他们的业务改动（`moo-<name>` 脏项 25 → 22，其余文件原样保留）。
+  ⚠ **这 3 笔提交混在他会话分支上**：会随他们的分支进 `dev`/发布线，而他们的发版记录不会提到它；
+  他们若 `rebase`/`reset` 该分支，提交可能丢（改动机械，可重放）。
+
+- [ ] **`moo-<name>`、`moo-<name>`（同处 `fix-shared-sequence`）待补**：这两仓的分支**目前 0 个提交**
+  （HEAD 就是 origin 基线），现在提交会成为该分支的**首个提交**、与分支名语义不符，且最容易被 `reset` 掉 ——
+  按用户决定**等它们第一笔业务提交落地后再补**。补的时候用**已更新的基准版**
+  （含 `/plans`、`/TODOS.md` 两条 `export-ignore`），别照抄工作区里那份旧的 15 行版。
+  已核：这两仓的 hunk 全是本轮那份重写，未与他人内容交织，按路径即可干净分离。
 
 - [x] **已完成**：补齐 `moo-feedback/AGENTS.md`（该包唯一缺失的项目指令文件）；补齐 5 个包的 `CLAUDE.md`
   （contract / feedback / meeting / richtext / upload，另 24 份改为纯入口）；`pint.json` **8 份**偏离
