@@ -346,13 +346,24 @@
     打 **2.2.9** 可全部满足）；干净 `composer install` 现在只能解析到 2.2.8（无 `$fieldValidation`）⇒ 必须先发 scaffold 版本。
     另 `moo-upload` 无 `repositories`、`moo-feedback` 只有 contract 的 vcs ⇒ 本地/干净安装解析不到 scaffold（只靠 Packagist 旧版），
     属清单契约变更，**未动、等授权**。
+  - 清单缺口已补（2026-09-28 用户授权）：`moo-upload` 原来**完全没有 `repositories`**、`moo-feedback` 只有 contract 的 vcs
+    ⇒ 两仓都改成双轨（`composer.json` = path+symlink 闭包 / `composer.ci.json` = 纯 vcs），并补 `.gitattributes` 与 AGENTS.md；
+    `moo-feedback` 的 workflow 随之加回 `COMPOSER: composer.ci.json`（默认清单已是本地优先）。两仓本地与干净目录解析均 rc=0 ✓
   - 他会话分支（category / certificate / mini-app / process / process-application）**不推、不碰**（用户决定）。
-  **绿灯后的执行顺序**（逐仓；先 `git fetch origin` 复核基线）：
-  1) 两条线都从**同一个任务分支**来 —— `git push origin <分支>:dev`，再 `git push origin <分支>:<main|master>`；
-     ⛔ **不走 `dev → 发布线`**。9 个非快进仓需在工作区（须干净）`git checkout dev && git merge <分支>` 后再推。
-     公开仓（`moo-feedback` / `moo-scaffold` / `moo-engine-skeleton`）两条线都要推 **origin 与 github 两边**（双源）。
-  2) **tag / CHANGELOG / 版本号未做** —— 各包本轮改动是 docs / 测试 / manifest，是否都发版、发什么版本由用户定。
-  3) 推送后逐仓回读：`git rev-list --count origin/<线>..<线>` 应为 0，并与 github 侧对账（`git ls-remote`）。
+  - ✅ **两条线已合入并推送（2026-09-28，用户选择「只合两条线、tag 自己打」）**：
+    **24 个仓**（含 `moo-contract`）的 `feat-package-skeleton-alignment` 分别合入 `dev` 与 `main`/`master`：
+    15 个仓两条线都是**快进**；9 个仓的 `dev` 非快进（banner / cms / engine-skeleton / feedback / monitor-laravel /
+    product / radar / scaffold / system）用 **merge commit 合入**（`git merge-tree --write-tree` + `commit-tree` +
+    `push <sha>:refs/heads/dev`，**全程不切工作区**，避免动到并行会话的 HEAD）；无冲突。
+    公开仓（feedback / scaffold / engine-skeleton）两条线**同时推了 Gitee 与 GitHub**（双源）。
+    **回读**：`merge-base --is-ancestor <分支> origin/<线>` 对 24 仓 × 2 线全 ✓，且远端 SHA 与本地 fetch 到的 ref 一致（异常 0）；
+    9 个 merge 仓的**双方改动文件零交集**（无同文件语义冲突）。
+    ⚠ **判据教训**：合并场景下 `git rev-list --count <分支>..origin/dev` **本就不为 0**（dev 上有 merge commit 与 dev 独有提交），
+    该计数只适用于快进场景；「是否已合入」必须用 `merge-base --is-ancestor`。
+    ⚠ **`moo-<name>` / `moo-<name>` 的远端默认分支就是 `dev`**（`origin/HEAD → dev`），按默认分支推导发布线会漏推 `main`，
+    已单独补推。
+  2) ✅ **已推**；**tag / CHANGELOG / 版本号仍由用户决定**（用户选择自己打 tag）。发布前的硬前置见上：scaffold 需要 2.2.9 才能让消费者拿到 `$fieldValidation`。
+  3) 回读见上（本项已执行）。
   ⚠ **安全提醒**：`/Volumes/dev/git_tokens` 的内容因我的脱敏正则不匹配其格式（`## name` 头 + 下一行裸值），
   **两个 token 的明文已进入本次会话 transcript/日志** ⇒ **请轮换 Gitee token 与 GitHub PAT**。
   后续引用一律走 shell 变量 + 一次性 askpass（不写进 remote URL、不回显）。
