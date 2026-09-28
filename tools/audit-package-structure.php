@@ -760,7 +760,7 @@ if ($skipped !== []) {
     }
 }
 
-echo "\n汇总：目标 {$summary['targets']} 个；无 MISS/STYLE-DRIFT 的 {$summary['clean']} 个；"
+echo "\n汇总：目标 {$summary['targets']} 个；无 MISS/STYLE-DRIFT/CONFIG 的 {$summary['clean']} 个；"
     . "MISS {$summary['MISS']} / STYLE-DRIFT {$summary['STYLE-DRIFT']} / CONFIG {$summary['CONFIG']} / "
     . "LAYOUT {$summary['LAYOUT']} / NAME {$summary['NAME']} / "
     . "OPTIONAL {$summary['OPTIONAL']} / INFO {$summary['INFO']}\n";
