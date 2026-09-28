@@ -13,15 +13,20 @@
  *                                         [--json] [--fail-on-drift]
  *
  * 只读：不写文件、不连数据库、不发网络请求。
- * 退出码：0 = 正常（含仅报告），1 = 传了 --fail-on-drift 且存在**未豁免**的 MISS / STYLE-DRIFT，
+ * 退出码：0 = 正常（含仅报告），1 = 传了 --fail-on-drift 且存在**未豁免**的 MISS / STYLE-DRIFT / CONFIG，
  *         2 = 参数或环境错误。
  *
- * 严重级（只有 MISS 与 STYLE-DRIFT 会让 --fail-on-drift 失败）：
+ * 严重级（MISS / STYLE-DRIFT / CONFIG 会让 --fail-on-drift 失败）：
  *   MISS         必需文件 / 目录缺失（豁免清单命中则不计）
- *   STYLE-DRIFT  pint.json 规则集与 canonical 不一致
+ *   STYLE-DRIFT  pint.json 规则集与 canonical 不一致；CLAUDE.md 不是纯入口
+ *   CONFIG       机器可判、且会**实际坏事**的配置口径 ——
+ *                ① path 仓库的 `versions` 写成约束式：无 composer.lock 的全新安装会被 Composer 直接拒绝
+ *                   （`Invalid version string "^2.2.1"`）⇒ fresh clone / CI 装不上；
+ *                ② `.gitattributes` 缺基准 `export-ignore` 条目：开发 / 文档 / 流程产物会随 dist
+ *                   发进消费方 `vendor/`（只在该路径**本仓确实存在**时才要求，逐仓额外条目不算偏离）。
  *   LAYOUT       布局偏离红线（trait 放错位置、Requests 出现模块段）—— 改动即破坏 namespace，只报不判
  *   NAME         config stem / 命名空间 / provider 类名偏离命名约定 —— 判断题，只报不判
- *   OPTIONAL     CI 骨架与 .gitattributes —— 收益取决于分发方式（dist 归档 / GitHub 镜像是否启用），只报不判
+ *   OPTIONAL     CI 骨架与 `.gitattributes` **是否存在** —— 收益取决于分发方式（dist 归档 / GitHub 镜像），只报不判
  *   INFO         观察项（空骨架、host 发布状态等），无需动作
  *
  * 「MISS」的豁免集中在 ALLOWANCES：纯契约包、内核包、采集包、codegen 工具本身的残缺骨架是**设计如此**，
@@ -38,10 +43,10 @@ const EXIT_DRIFT = 1;
 const EXIT_USAGE = 2;
 
 /** 严重级排序（报告用） */
-const SEVERITY_ORDER = ['MISS' => 0, 'STYLE-DRIFT' => 1, 'LAYOUT' => 2, 'NAME' => 3, 'OPTIONAL' => 4, 'INFO' => 5];
+const SEVERITY_ORDER = ['MISS' => 0, 'STYLE-DRIFT' => 1, 'CONFIG' => 2, 'LAYOUT' => 3, 'NAME' => 4, 'OPTIONAL' => 5, 'INFO' => 6];
 
 /** 会让 --fail-on-drift 失败的严重级 */
-const FAILING_SEVERITY = ['MISS', 'STYLE-DRIFT'];
+const FAILING_SEVERITY = ['MISS', 'STYLE-DRIFT', 'CONFIG'];
 
 /** 不参与扫描的目录名 */
 const SKIP_DIRS = ['vendor', '.git', 'node_modules'];
@@ -160,7 +165,7 @@ function allowances(): array
         'moo-contract'           => $pureContract,
         'moo-<name>'               => $kernel,
         'moo-monitor-laravel'    => $infra,
-        'moo-scaffold'           => $tooling,
+        'moo-scaffold'           => $tooling + ['gitattributes:docs' => 'docs/ 是 host 文档中心的包文档源（src/Support/DocsRepository.php 直接读包 basePath 下的 docs/），有意随包分发'],
         'moo-<name>' => [
             'database/migrations' => '已初始化未落地：空骨架，尚无真实表设计',
             'src/Models/Filters'  => '已初始化未落地：空骨架，尚无业务表',
@@ -184,6 +189,90 @@ function allowances(): array
             'src/Http/Resources' => '轻控制器包：直接返回数组/DTO',
         ],
     ];
+}
+
+/**
+ * canonical 的 dist 裁剪清单（`.gitattributes` 的 `export-ignore` 条目）。
+ *
+ * **只在该路径于本仓确实存在时才要求**：例如 moo-scaffold 没有 .claude / .editorconfig / .phpunit.cache，
+ * 要求它去 export-ignore 不存在的路径没有意义。逐仓的**额外**条目（moo-<name> 的 /tools、
+ * moo-system 的 /HANDOFF.md、moo-<name> 的 /.codegen）是刻意的，不算偏离、也不比对整份文件。
+ * 有意的「保留」例外走 ALLOWANCES（键形如 `gitattributes:docs`）。
+ */
+function exportIgnoreRequirements(): array
+{
+    return ['.claude', '.editorconfig', '.github', '.gitattributes', '.gitignore', '.phpunit.cache', '.vscode',
+        'CLAUDE.md', 'NOTES.md', 'TODOS.md', 'docs', 'phpunit.xml', 'pint.json', 'plans', 'tests'];
+}
+
+/**
+ * `.gitattributes` 的 dist 裁剪是否达标 —— 缺一条 `export-ignore`，对应的开发/文档/流程产物
+ * 就会随 composer dist 发进消费方 `vendor/`（2026-09-28 实测：`plans/` 与 `TODOS.md` 就这样漏过）。
+ * 缺整个文件仍由 OPTIONAL 报（不重复计）；host 有自己的清单，不走本函数。
+ */
+function gitattributesFindings(string $dir, string $package): array
+{
+    $file = $dir . '/.gitattributes';
+    if (! is_file($file)) {
+        return [];
+    }
+
+    $content = (string) file_get_contents($file);
+    $allow   = allowances()[$package] ?? [];
+    $missing = [];
+
+    foreach (exportIgnoreRequirements() as $path) {
+        if (! file_exists($dir . '/' . $path)) {
+            continue;   // 本仓没有这个路径
+        }
+        if (isset($allow['gitattributes:' . $path])) {
+            continue;   // 有意随包分发，豁免里写了理由
+        }
+        if (preg_match('/^\/' . preg_quote($path, '/') . '\s+export-ignore$/m', $content) !== 1) {
+            $missing[] = $path;
+        }
+    }
+
+    if ($missing === []) {
+        return [];
+    }
+
+    return ['缺 export-ignore：' . implode(', ', $missing)
+        . '（会随 dist 发进消费方 vendor/；基准清单见 docs/package-skeleton.md）'];
+}
+
+/**
+ * path 仓库的 `versions` 必须是**具体版本**，不能写约束式。
+ *
+ * 为什么是硬错误：Composer 会把约束式当成版本串去解析，直接抛 `Invalid version string "^2.2.1"`
+ * ⇒ **没有 composer.lock 的全新安装（fresh clone / CI）装不上**。本仓有本地 lock 时会被掩盖，
+ * 所以只能靠判据抓（2026-09-28：7 个包同时中招，其中一个因此完全装不上依赖）。
+ * 兼容 `repositories` 的 list 与 dict 两种形态（生态里两种都有）。
+ */
+function repositoryVersionFindings(array $composer): array
+{
+    $raw   = $composer['repositories'] ?? [];
+    $items = is_array($raw) && array_is_list($raw) === false ? array_values($raw) : $raw;
+    $found = [];
+
+    foreach ((array) $items as $repo) {
+        if (! is_array($repo)) {
+            continue;
+        }
+        foreach ((array) ($repo['options']['versions'] ?? []) as $name => $version) {
+            if (preg_match('/[\^~*><=@| ]/', (string) $version) === 1) {
+                $found[] = sprintf(
+                    'repositories["%s"].options.versions["%s"] = "%s" 是约束式，必须写具体版本（如 "2.2.8"）；'
+                    . '否则无 composer.lock 的 fresh install 会被 Composer 拒绝（Invalid version string）',
+                    (string) ($repo['type'] ?? '?'),
+                    (string) $name,
+                    (string) $version,
+                );
+            }
+        }
+    }
+
+    return $found;
 }
 
 /**
@@ -283,7 +372,7 @@ function auditPackage(string $dir, string $workspace, ?array $canonicalRules): a
     $package = basename($dir);
     $allow   = allowances()[$package] ?? [];
 
-    $drift  = ['MISS' => [], 'STYLE-DRIFT' => [], 'LAYOUT' => [], 'NAME' => [], 'OPTIONAL' => [], 'INFO' => []];
+    $drift  = ['MISS' => [], 'STYLE-DRIFT' => [], 'CONFIG' => [], 'LAYOUT' => [], 'NAME' => [], 'OPTIONAL' => [], 'INFO' => []];
     $waived = [];
 
     $composer = json_decode((string) @file_get_contents($dir . '/composer.json'), true) ?: [];
@@ -393,6 +482,16 @@ function auditPackage(string $dir, string $workspace, ?array $canonicalRules): a
         }
     }
 
+    // CONFIG：path 仓库的 versions 必须是具体版本（约束式 ⇒ fresh install 装不上）
+    foreach (repositoryVersionFindings($composer) as $finding) {
+        $drift['CONFIG'][] = $finding;
+    }
+
+    // CONFIG：dist 裁剪清单（缺 export-ignore ⇒ 产物泄漏进消费方 vendor/）
+    foreach (gitattributesFindings($dir, $package) as $finding) {
+        $drift['CONFIG'][] = $finding;
+    }
+
     // OPTIONAL：分发方式相关的骨架，收益取决于是否走 dist / 是否启用 GitHub 镜像
     if (glob($dir . '/.github/workflows/*.yml') === []) {
         $drift['OPTIONAL'][] = '缺 .github/workflows/（范本 moo-<name>/.github/workflows/quality.yml；仅在启用 GitHub 镜像时有效）';
@@ -425,7 +524,7 @@ function auditPackage(string $dir, string $workspace, ?array $canonicalRules): a
 function auditHost(string $dir): array
 {
     $engine = $dir . '/engine';
-    $drift  = ['MISS' => [], 'STYLE-DRIFT' => [], 'LAYOUT' => [], 'NAME' => [], 'OPTIONAL' => [], 'INFO' => []];
+    $drift  = ['MISS' => [], 'STYLE-DRIFT' => [], 'CONFIG' => [], 'LAYOUT' => [], 'NAME' => [], 'OPTIONAL' => [], 'INFO' => []];
 
     $profiles  = ['composer.json', 'composer.test.json', 'composer.production.json'];
     $manifests = [];
@@ -595,7 +694,7 @@ foreach (glob($workspace . '/moo-*', GLOB_ONLYDIR) ?: [] as $dir) {
 usort($targets, static fn (array $a, array $b): int => strcmp($a['package'], $b['package']));
 
 // 汇总
-$summary = ['targets' => count($targets), 'clean' => 0, 'MISS' => 0, 'STYLE-DRIFT' => 0, 'LAYOUT' => 0, 'NAME' => 0, 'OPTIONAL' => 0, 'INFO' => 0];
+$summary = ['targets' => count($targets), 'clean' => 0, 'MISS' => 0, 'STYLE-DRIFT' => 0, 'CONFIG' => 0, 'LAYOUT' => 0, 'NAME' => 0, 'OPTIONAL' => 0, 'INFO' => 0];
 $failing = 0;
 
 foreach ($targets as $target) {
@@ -662,14 +761,14 @@ if ($skipped !== []) {
 }
 
 echo "\n汇总：目标 {$summary['targets']} 个；无 MISS/STYLE-DRIFT 的 {$summary['clean']} 个；"
-    . "MISS {$summary['MISS']} / STYLE-DRIFT {$summary['STYLE-DRIFT']} / "
+    . "MISS {$summary['MISS']} / STYLE-DRIFT {$summary['STYLE-DRIFT']} / CONFIG {$summary['CONFIG']} / "
     . "LAYOUT {$summary['LAYOUT']} / NAME {$summary['NAME']} / "
     . "OPTIONAL {$summary['OPTIONAL']} / INFO {$summary['INFO']}\n";
-echo '只有 MISS 与 STYLE-DRIFT 会判失败；LAYOUT / NAME / OPTIONAL / INFO 只报告'
+echo 'MISS / STYLE-DRIFT / CONFIG 会判失败；LAYOUT / NAME / OPTIONAL / INFO 只报告'
     . "（改动即破坏 namespace 或跨 host 契约，需先确认设计意图）。\n";
 
 if (isset($options['fail-on-drift']) && $failing > 0) {
-    fwrite(STDERR, "\n{$failing} 个目标存在未豁免的 MISS 或 STYLE-DRIFT。\n");
+    fwrite(STDERR, "\n{$failing} 个目标存在未豁免的 MISS / STYLE-DRIFT / CONFIG。\n");
     exit(EXIT_DRIFT);
 }
 

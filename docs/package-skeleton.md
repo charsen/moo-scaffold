@@ -36,13 +36,26 @@ php tools/audit-package-structure.php --workspace=<同级目录> --fail-on-drift
 | --- | --- | --- |
 | `MISS` | 必需文件 / 目录缺失（豁免清单命中则不计） | 是 |
 | `STYLE-DRIFT` | `pint.json` 规则集与 canonical 不一致；`CLAUDE.md` 不是纯入口（未指向 `AGENTS.md` 或超过 8 行） | 是 |
+| `CONFIG` | 机器可判、且会**实际坏事**的配置口径：① path 仓库 `versions` 写成约束式（无 lock 的 fresh install 被 Composer 拒绝 ⇒ CI/新克隆装不上）；② `.gitattributes` 缺基准 `export-ignore` 条目（产物随 dist 进消费方 `vendor/`） | 是 |
 | `LAYOUT` | 布局红线偏离（trait 放错位置、Requests 出现模块段） | 否，只报告 |
 | `NAME` | config stem / 命名空间 / provider 类名偏离命名约定 | 否，只报告 |
-| `OPTIONAL` | CI 骨架与 `.gitattributes` | 否，只报告 |
+| `OPTIONAL` | CI 骨架与 `.gitattributes` **是否存在** | 否，只报告 |
 | `INFO` | 观察项（空骨架、host 发布状态等） | 否 |
 
-**为什么只有前两级判失败**：`LAYOUT` / `NAME` 的改动会破坏 namespace 或跨 host 契约（消费方要同步升级），
-`OPTIONAL` 的收益取决于分发方式（是否走 composer dist、GitHub 镜像是否启用）。三者都需先确认设计意图。
+**为什么这三级判失败**：`MISS` / `STYLE-DRIFT` / `CONFIG` 都是「机器能判、且不修就真会坏事」——
+前两者是骨架与规则集本身，`CONFIG` 的两条分别是 **fresh clone/CI 装不上** 与 **产物泄漏进消费方**（都实测踩过）。
+而 `LAYOUT` / `NAME` 的改动会破坏 namespace 或跨 host 契约（消费方要同步升级），
+`OPTIONAL` 的收益取决于分发方式（是否走 composer dist、GitHub 镜像是否启用）。这三类都需先确认设计意图。
+
+**`CONFIG` 的两条判据边界**（都在脚本里，改判据要同步本节）：
+
+- **path 仓库 `versions` 只比语法**：值必须是具体版本（`2.2.8`），出现 `^ ~ * > < = @ |` 或空格即报。
+  `repositories` 的 list / dict 两种形态都支持（生态里两种都有，脚本都吃）。
+- **`.gitattributes` 只比「必需条目是否齐」**：不比整份文件、**只在该路径于本仓确实存在时才要求**
+  （`moo-scaffold` 没有 `.claude`/`.editorconfig`/`.phpunit.cache`，就不要求它去 ignore）。
+  逐仓的**额外**条目是刻意的（`moo-<name>` +`/tools`、`moo-system` +`/HANDOFF.md`、`moo-<name>` +`/.codegen`），不算偏离；
+  「有意随包分发」的例外走脚本 `ALLOWANCES` 的 `gitattributes:<path>` 键（如 `moo-scaffold` 的 `docs/`——
+  它是 host 文档中心的包文档源）。host（`moo-engine-skeleton`）有自己的清单，不套本判据。
 
 ## 必需清单
 
@@ -100,6 +113,9 @@ src/Http/{Controllers/Admin,Requests,Resources}/
 ## 维护
 
 - 改 canonical 判据（新增必需项、调整豁免）→ 同步改脚本 `requirements()` / `allowances()` 与本文件。
+- **`CONFIG` 两条判据**：改基准 dist 裁剪清单 → 同步脚本 `exportIgnoreRequirements()` 与本文件；
+  新增「有意随包分发」的例外 → 写进 `allowances()` 的 `gitattributes:<path>` 键并写明理由。
+  改完**必做咬合力验证**：故意去掉一条 `export-ignore` / 把某个 `versions` 改回约束式 → 确认报 `CONFIG` 且退出码 1 → 精确还原。
 - 基准包（`moo-system` / `moo-<name>`）自身形状变化时，脚本的 `CANONICAL_PACKAGES` 与上面的说明要一起复核。
 - **开发中的仓整仓剔除**走脚本的 `DEFERRED_TARGETS`（值里写理由 + **移除条件**）：它只决定「扫哪些仓」，
   不改变任何必需项判据；理由会随报告「跳过」段与 `--json.skipped` 打印，**不允许静默跳过、也不允许借它压掉真实偏离**；

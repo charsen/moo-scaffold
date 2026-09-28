@@ -144,6 +144,16 @@
   ③ `CodegenOriginTest` 里两条硬编码「单空格 `=>`」的断言改为容忍空白的正则（语义不变）。
   验证：**1341 passed / 3 skipped、pint PASS（359 files）**。⇒ 以后「重生成即合规」，不必再手动补格式化。
 
+- [x] **把这两类缺陷补进闸门（2026-09-28）**：它们此前都是「闸门看不见、只能人肉扫出来」的，现已成机器判据 ——
+  新增严重级 **`CONFIG`**（**会判失败**，两项判据）：
+  ① **path 仓库的 `versions` 必须是具体版本**（约束式 ⇒ 无 `composer.lock` 的 fresh install 被 Composer 拒绝）；
+  ② **`.gitattributes` 必须含基准 `export-ignore` 条目**（**只在该路径本仓确实存在时才要求**；逐仓额外条目
+  不算偏离；`moo-scaffold` 的 `docs/` 走 `ALLOWANCES` 的 `gitattributes:docs` 例外；host 不套本判据）。
+  实现要点：`repositories` 的 **list / dict 两种形态都要吃**（我正是在这上面误判过一次，脚本里注释留了痕）。
+  **咬合力验证**：删掉 `moo-<name>` 的 `/plans` 条目 → 报 `CONFIG` + `exit=1`；把 `moo-<name>` 的 versions
+  改回 `"^2.2.1"` → 报 `CONFIG` + `exit=1`；两次都**精确还原**（`git status` 零差异、`exit` 回 0）。
+  规范同步在 `docs/package-skeleton.md`（严重级表 + `CONFIG` 边界 + 维护条款里的咬合力要求）。
+
 - [x] **host 骨架的两处失败（2026-09-28，`moo-engine-skeleton`）**：
   ① **真缺陷**：`engine/config/actions.php` 的 whitelist 在 2026-09-22 那次 `moo:auth` 整文件重写后丢了
   **8 个个人中心 key**（docs/09 坑 #25 的现场，`FoodAclTest` 正是它的守护）⇒ 按该文档规定的
