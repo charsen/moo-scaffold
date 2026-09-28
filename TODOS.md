@@ -135,11 +135,44 @@
   正解是**改测试**：绑定先行 ＋ 钉住「无内置兜底」（`expect(app()->bound(...))->toBeFalse()` +
   `toThrow(BindingResolutionException::class)`），照抄 moo-<name> 的写法。**别再试图在产品码里加兜底。**
 
-- [ ] **同类问题在其余包仍存在（未修，需先定范围）**：实测整仓套件红、且与上述根因同族 ——
-  `moo-system` 155 failed / `moo-feedback` 31 / `moo-upload` 26 / `moo-<name>` 11
-  （richtext 还带着那行**失效的** `<env CACHE_STORE>`）。收口三步已明确：① `tests/TestCase.php` 设
-  `cache.default=array`；② 逐包给匿名 `OperatorResolver` 补 `isPlatformRoot()`；③ 按上条口径改掉落后的
-  「回退裸 ID」断言（不加产品码兜底）。跨包且量大，**等确认后再动**。
+- [x] **同类问题（2026-09-28 已修 `moo-system` / `moo-feedback` / `moo-upload` / `moo-<name>`）**：
+  四包各一笔修复提交 —— system `8a935f9`、feedback `fa74a61`、upload `3ccafa1`、richtext `79ca8f8`。
+  **结果：四包从「整仓红」变全绿，且没有任何残余失败签名**：
+  `moo-system` 155 failed/224 passed → **379 passed (1720 assertions)**；`moo-feedback` 31 → **70 passed**；
+  `moo-upload` 26 → **59 passed**；`moo-<name>` 11 → **37 passed**；四包 `pint --test` 全部 PASS。
+  **根因单一**：这些失败**全部**来自「内存 sqlite 缺 cache 表」，不是各自独立的缺陷 —— 换个修法（如在产品码加兜底）
+  会既修不好又改错方向。另 `moo-upload` 多一处**非法实现**：`tests/Support/TestOperatorResolver` 只实现 `id()`，
+  身份契约新增 `isPlatformRoot()` 后该类**加载即 fatal**（此前被 cache 失败掩盖）—— 已补。
+  修法固化（三步，缺一不可）：① `tests/TestCase.php` 的 `defineEnvironment()` 设 `cache.default=array`；
+  ② 夹具补 `isPlatformRoot()`；③ 落后断言改成「绑定先行 + 钉住无兜底」。
+  另删除 `moo-<name>/phpunit.xml` 里那行**失效的** `<env name="CACHE_STORE">`（留着一行看似处理过、实则无效的配置
+  比没有更坏）。
+  **第二批（同日，9 个仓：`attachment` / `page` / `radar` / `collect` / `comment` / `like` /
+  `enterprise-information` / `trail` / 本仓 `moo-scaffold`）**：先把 32 个有 pest 的仓全扫一遍，再逐个收口 ——
+  `db67399` / `a33ff36` / `04e2426`＋`40457d8` / `1f66412` / `4903b2d` / `f2c697a` / `489fa76` / `5b1ecdd` / `2bce8d2`。
+  **结果：九仓套件全绿**（attachment 106 / page 48 / radar 284 / collect 34 / comment 28 / like 37 /
+  enterprise-information 80 / trail 65 / scaffold 1341＋3 skipped），pint 除 enterprise-information 外全 PASS。
+  新暴露的三类根因（都属「测试环境 / 夹具落后」，**都不是产品缺陷，修法一律在测试侧**）：
+  ① **本仓自己缺 session 与 cache**：`no such table: sessions`（348 行）＋ cache —— `/scaffold/*` 的 HTTP 用例与雪花
+     resolver 分别要这两张表；修法与各包一致（`defineEnvironment` 里把 `session.driver` / `cache.default` 设为 array）。
+  ② **契约/元数据演进后 mock 与断言未跟进**：radar 匿名 `OperatorResolver` 缺 `isPlatformRoot()`；
+     enterprise-information 的 `OrgDirectory` mock 缺 `onJobPersonnelPostings()`；同一包的列类型断言仍写 `slot`
+     而元数据（`65252df`）已改为 `options`（该包另一测试也断言 `options`）。
+  ③ **跨包替身表**：radar 的待认领群自动升 ACTIVE 会按 `chat_liable_id` 校验「在职人员」（`staff_status = ON_JOB`），
+     内存库没有 `system_personnels` / `system_personnel_position` ⇒ 按同仓 `AdminHttpTest` / `PersonnelBindingTest`
+     既有先例建最小替身，并在用例里造一个在职责任人。
+  ⚠ **环境因素**：运行 shell 若导出 `APP_DEBUG=true` / `APP_ENV=local`，「生产形态」类断言会变色（debug=true 时
+  Laravel 给 JSON 错误体补 `exception`/`file`/`line`/`trace`）—— 已在 `FrameworkErrorShapeTest` 显式钉住 `app.debug=false`，
+  详见 `NOTES.md` 同日条。
+
+- [ ] **仍红的，按理由分三类（未动）**：
+  ① **属他会话分支（不碰，需其会话自己收口）**：`moo-<name>`（`fix-category-business-status`）24 failed、
+  `moo-<name>`（`fix-business-code-prefixes`）8 failed（`is not instantiable`）、
+  `moo-<name>`（`fix-shared-sequence`）11 failed、`moo-<name>`（同分支）25 failed
+  （`no such table: cache_locks`）。**修法与上面三步完全相同**，只是工作区与分支属他会话 —— 等他们落地后照做即可。
+  ② **无依赖未评估**：`moo-<name>` / `moo-<name>` / `moo-engine-skeleton` 等无 `vendor/bin/pest`，本轮未跑。
+  ③ **`moo-<name>` 的 35 处 pint**：含生成物（`database/migrations/2026_09_23_*`），
+  按「不手改生成物」需先定**重新生成还是接受现状**。
 
 - [ ] **LAYOUT 待议（改动即破坏 namespace，需同步消费方与 codegen 重生成）**：
   7 包把 model trait 放在 `src/Models/Concerns/`（`moo-<name>` 2 / `moo-<name>` 2 / `moo-<name>` 2 /
