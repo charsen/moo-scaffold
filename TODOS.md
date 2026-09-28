@@ -37,8 +37,14 @@
   逐仓用 `git archive HEAD` 回读：归档不再含 `plans/`、`TODOS.md`，且 `src/config/routes/database/lang/scaffold` 未受影响。
   **注意两条边界**：① `export-ignore` 只在「按 tag 装 dist」时生效，本地 `path`+`symlink` 联调与本机三个 host 的
   `vendor/charsen/*` 都看不到效果（写错只会在测试服/生产暴露）；② 属性取自**被归档的那棵树**，所以必须进提交/进 tag ——
-  验证工作区改动要用 `git archive --worktree-attributes`。`moo-engine-skeleton` 无 `.gitattributes`、`moo-scaffold` 自己那份
-  是 `*.ai binary`（另一种用途），二者都不在本批内。
+  验证工作区改动要用 `git archive --worktree-attributes`。
+  **第三批（同日）**：`moo-scaffold` 与 `moo-engine-skeleton` 也各起一份（同一分支上追加提交）——
+  前者原文件只有 `*.ai binary`（另一种用途），今回归档实测 **610 → 422** 个文件；后者原本没有 `.gitattributes`，新增后 **232 → 223**。
+  **两处刻意例外，别当遗漏**：① `moo-scaffold` 的 `docs/` 与 `tools/` 保留 —— `docs/` 是 host 文档中心的包文档源
+  （`src/Support/DocsRepository.php:50` 读 `$pkg` base_path 下的 `docs/`），裁掉等于删掉每个 host 文档中心里的本包文档，
+  而 `docs/package-skeleton.md` 又指向 `tools/audit-package-structure.php`；② `moo-engine-skeleton` 保留
+  `NOTES.md`/`TODOS.md` —— host 骨架要给新项目**继承**协作文档，与扩展包裁剪口径相反（已在两份文件的注释里写明理由）。
+  `moo-engine-skeleton` 是 `type=project`，`git clone` 安装时该文件完全不生效，只影响 `create-project` / 归档下载。
 
 判据已固化为 `tools/audit-package-structure.php`（只读闸门，`--fail-on-drift`），规模口径见
 `docs/package-skeleton.md`。**本轮只做非破坏性补齐**；下列事项需先确认设计意图或同步消费方，未动。
