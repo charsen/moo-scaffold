@@ -296,25 +296,20 @@
   另 `moo-engine-skeleton` 的 `ExampleTest` 在本机 shell 导出 `SESSION_DRIVER=database` 时会红
   （同代码清掉该变量即 103 passed），**不是仓库缺陷**，已在 `engine/phpunit.xml` 写明排查方式。
 
-- [ ] **LAYOUT / NAME / 中间件接线 收口 → 方案已出**：`plans/layout-name-middleware-wiring.md`
-  （逐包清单 + 执行步骤 + 验收 + 顺序与风险）。三条要点：
-  - **LAYOUT 11** = 7 包 13 个 model trait 在 `src/Models/Concerns/`（规范是 `src/Models/Traits/`）
-    + richtext `src/Concerns/HasRichTextFields.php` + 3 处 Requests 模块段（mini-app `Business/` 19 个、radar `Export|WeWork/`）。
-    ⚠ **判据更正**：先前记的「codegen 硬编码 emit `use {ns}Traits\…`」**对 model trait 不成立** —— 那是
-    **controller** trait（`src/Generator/CreateControllerGenerator.php:138-142`）；实测 scaffold 的 `src/` 与 `stubs/`
-    里没有任何 `Models/Traits|Concerns` 硬编码 ⇒ model trait 的目录只是**规范条文**，不牵动生成器。
-    真正的成本在**跨仓消费方**（实测：meeting/某个内部 Host 用 `HasAttachments`；certificate/cms/media/product 用
-    `HasPublicCategoryScopes`；enterprise-information 用 `Collectable`/`Likeable`/`Commentable`；某个内部 Host 用
-    `HasTrails`；certificate/cms/meeting/mini-app 用 `HasRichTextFields`）⇒ 需「定义包先发、消费包后发」的窗口。
-    `moo-<name>/src/Models/Concerns/` 是**空目录**（0 条目）⇒ 可直接删。
-  - **NAME 9** = monitor 4 + richtext 3 + scaffold 2：psr-4 尾斜杠 2 条可直接做；config stem（`moo-monitor` /
-    scaffold 的 `config`）建议**保持现状并写成规范例外**（前者疑似与 `moo-monitor-vue` 刻意共享产品 stem，
-    后者是全生态宿主既有契约）；命名空间 / provider 改名属破坏性，排最后且需迁移窗口。
-  - **中间件接线（安全项）**：实测 host 只注册 `moo-system`/`moo-upload`/`moo-feedback` **三组**，
-    而 13 包默认已是 `moo-<name>` ⇒ **其中 12 个组在 host 根本不存在**（只有 upload 有组）；
-    另 10 包默认仍是 `admin`（借用宽松组）；`moo-system`/`moo-feedback` 更是「host 有组、包默认写 `admin`」的反向不一致；
-    `moo-<name>` 的 env 缺 `MOO_` 前缀。收口 = host 扩组（**不要手打清单**，发版那次已漏过 `moo-system`）
-    + 10 包改默认 + radar env 兼容 + **逐包真实路由三态验证（匿名 401 / 无 ACL 403 / 授权成功）**。
+- [ ] **LAYOUT / NAME / 中间件接线 三类待议项（收口方案在私有仓，不在此公开仓）**：审计汇总 `LAYOUT 11 / NAME 9`，
+  三者都只报不判（改动会破坏 namespace、跨 host 契约或安全边界，需先确认设计意图）。
+  **逐包清单、执行步骤、验收与顺序见私有 plan 库**（含内部包名与 Host 名，故不放公开仓）。公开层面只留三条通用结论：
+  - **LAYOUT 11** = model trait 目录与规范不一致（`Models/Concerns/` vs 规范 `Models/Traits/`，涉 7 包 13 个 trait）
+    + 1 处 `src/Concerns/` 里的 model trait + 3 处 Requests 按模块段而非 `<Controller>/` 分组。
+    ⚠ **判据更正**：先前记的「codegen 硬编码 emit `use {ns}Traits\…`」**只适用于 controller trait**
+    （`src/Generator/CreateControllerGenerator.php:138-142`）；实测本仓 `src/` 与 `stubs/` 里**没有**任何
+    `Models/Traits|Concerns` 的硬编码 ⇒ model trait 的目录只是**规范条文**，不牵动生成器。
+    迁移成本在**跨仓消费方**（多个消费包的 model 直接 `use` 这些 trait）⇒ 需「定义包先发、消费包后发」的窗口。
+  - **NAME 9**：psr-4 尾斜杠 2 条可直接做；config stem 2 条建议按「刻意共享的产品 stem / 宿主既有契约」写成规范例外；
+    命名空间与 provider 改名属破坏性变更，需迁移窗口（公开仓的 `ScaffoldProvider`/`config` 就是其一）。
+  - **中间件接线（安全项）**：host 注册的 `moo-<name>` 后台组与实际使用这些组的包**不齐** —— 同时存在
+    「包默认的组在 host 不存在」与「包仍借用宽松 `admin` 组」两种缺口，另有 1 处 env 名缺 `MOO_` 前缀。
+    收口 = host 扩组（**不要手打清单**）+ 包默认值改齐 + env 兼容 + **逐包真实路由三态验证（匿名 401 / 无 ACL 403 / 授权成功）**。
 
 - [ ] **`moo-<name>` 测试形态**：走 `tools/bootstrap.php` + `tests/bootstrap.php` 驱动，无 `TestCase.php` / `Pest.php`，
   另有 `.codegen/` 与 `tools/{bootstrap,generate,metadata}.php`。需确认是否有意为之，再决定是否收敛到家族统一样式。
