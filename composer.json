@@ -46,7 +46,7 @@
   },
   "autoload": {
     "psr-4": {
-      "Mooeen\\Scaffold\\": "src"
+      "Mooeen\\Scaffold\\": "src/"
     }
   },
   "autoload-dev": {
@@ -70,7 +70,7 @@
     },
     "laravel": {
       "providers": [
-        "Mooeen\\Scaffold\\ScaffoldProvider"
+        "Mooeen\\Scaffold\\MooeenScaffoldServiceProvider"
       ]
     }
   }

@@ -6,7 +6,7 @@ namespace Mooeen\Scaffold\Concerns;
  * 雪花算法生成 bigint 主键（string 类型避免 JS 精度丢失）。
  *
  * plan 38：moo 系扩展包三件套之一，上移 scaffold 共享（原各包自持复制，单例名各包各异）。
- * 取用 scaffold 注册的**共享单例** `scaffold.snowflake`（ScaffoldProvider::register）——所有包共一实例，
+ * 取用 scaffold 注册的**共享单例** `scaffold.snowflake`（MooeenScaffoldServiceProvider::register）——所有包共一实例，
  * 反正同源 `SNOW_FLAKE_*` env（同 data_center/worker/start_time），id 空间一致、唯一性靠序列号，本就该一套。
  * 此处只取用，不每次 creating 重建实例 / 重读 config。
  *

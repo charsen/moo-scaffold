@@ -18,14 +18,14 @@ use Mooeen\Scaffold\Command\ScaffoldMergeYamlCommand;
  *
  * 不测每个 stub 输出 byte-by-byte(投入产出比低,stub 改一行 spec 全要跟着改);
  * 只验:
- *   1. 所有 moo:* 命令注册存在(ScaffoldProvider 正确暴露)
+ *   1. 所有 moo:* 命令注册存在(MooeenScaffoldServiceProvider 正确暴露)
  *   2. config('scaffold.only_in_local') 在非 local env 拦截生成器命令(SECURITY POLICY)
  *   3. moo:fresh 在 local 上 dry-run 不挂(命令解析 + boot 正常)
  *
  * codegen 真输出比对靠 hand-tested(开发者跑 moo:fresh + moo:model 看 stub 渲染结果)。
  */
 it('all Command classes have a moo:* artisan signature property', function () {
-    // ScaffoldProvider 用 runningInConsole 守 commands() 注册;Pest HTTP-test 不算 console mode,
+    // MooeenScaffoldServiceProvider 用 runningInConsole 守 commands() 注册;Pest HTTP-test 不算 console mode,
     // Artisan::all() 在测试时不列 moo:*。改测 class 存在 + 反射 $name property 值
     // (Provider 在 console 模式 boot 时会注册这些 class,跟 commands() list 1:1)
     $classes = [
@@ -51,8 +51,8 @@ it('all Command classes have a moo:* artisan signature property', function () {
     }
 });
 
-it('ScaffoldProvider exposes commands() registration block in console mode', function () {
-    $src = file_get_contents(__DIR__ . '/../../../src/ScaffoldProvider.php');
+it('MooeenScaffoldServiceProvider exposes commands() registration block in console mode', function () {
+    $src = file_get_contents(__DIR__ . '/../../../src/MooeenScaffoldServiceProvider.php');
     expect($src)->toContain('$this->commands(');
     expect($src)->toContain('FreshStorageCommand::class');
     expect($src)->toContain('runningInConsole');

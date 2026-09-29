@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Mooeen\Scaffold\Tests;
 
 use Mooeen\Monitor\MonitorProvider;
-use Mooeen\Scaffold\ScaffoldProvider;
+use Mooeen\Scaffold\MooeenScaffoldServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 
 /**
@@ -25,7 +25,7 @@ abstract class TestCase extends Orchestra
     {
         // MonitorProvider:监控链路来自 moo-monitor-laravel(宿主里由 composer
         // auto-discovery 注册;testbench 需显式列出),scaffold 的 cloud 页/首页面板依赖它。
-        return [MonitorProvider::class, ScaffoldProvider::class];
+        return [MonitorProvider::class, MooeenScaffoldServiceProvider::class];
     }
 
     protected function defineEnvironment($app): void

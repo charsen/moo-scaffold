@@ -15,7 +15,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Mooeen\Scaffold\Concerns\HasOperator;
 use Mooeen\Scaffold\Contracts\OperatorResolver;
-use Mooeen\Scaffold\ScaffoldProvider;
+use Mooeen\Scaffold\MooeenScaffoldServiceProvider;
 use Mooeen\Scaffold\Support\GuardOperatorResolver;
 
 it('默认绑定 GuardOperatorResolver；未登录 id() 返回 null', function () {
@@ -64,7 +64,7 @@ it('host 预先绑定实现时默认绑定不覆盖', function () {
     };
 
     app()->instance(OperatorResolver::class, $hostResolver);
-    (new ScaffoldProvider(app()))->register();
+    (new MooeenScaffoldServiceProvider(app()))->register();
 
     expect(app(OperatorResolver::class))->toBe($hostResolver);
 });

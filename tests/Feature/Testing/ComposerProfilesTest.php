@@ -25,7 +25,7 @@ function mooComposerFixtureProfiles(): array
         [
             'name'         => 'charsen/moo-scaffold',
             'repo-key'     => 'scaffold',
-            'provider-rel' => 'src/ScaffoldProvider.php',
+            'provider-rel' => 'src/MooeenScaffoldServiceProvider.php',
             'publish-tag'  => 'public',
         ],
         [

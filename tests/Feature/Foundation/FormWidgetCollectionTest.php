@@ -13,7 +13,7 @@ use Illuminate\Support\Collection;
 use Mooeen\Scaffold\Foundation\FormWidgetCollection;
 
 beforeEach(function () {
-    // scaffold 测试环境只挂 ScaffoldProvider，本就没有 host 的那几个宏 —— 前置条件先钉死
+    // scaffold 测试环境只挂 MooeenScaffoldServiceProvider，本就没有 host 的那几个宏 —— 前置条件先钉死
     expect(Collection::hasMacro('putMore'))->toBeFalse()
         ->and(Collection::hasMacro('forgetMore'))->toBeFalse();
 });

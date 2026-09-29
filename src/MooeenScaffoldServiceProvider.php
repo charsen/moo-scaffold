@@ -35,7 +35,7 @@ use Mooeen\Scaffold\Command\SnapshotInitCommand;
 use Mooeen\Scaffold\Command\UpdateAuthorizationCommand;
 use Mooeen\Scaffold\Command\UpdateMultilingualCommand;
 
-class ScaffoldProvider extends ServiceProvider
+class MooeenScaffoldServiceProvider extends ServiceProvider
 {
     /**
      * Bootstrap the application services.
