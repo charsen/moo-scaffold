@@ -34,7 +34,7 @@ function composerDocsHostFixture(bool $withManifests = true): string
     mkdir($engine, 0777, true);
 
     $private = [
-        ['name' => 'charsen/moo-scaffold', 'repo-key' => 'scaffold', 'provider-rel' => 'src/ScaffoldProvider.php', 'publish-tag' => 'public'],
+        ['name' => 'charsen/moo-scaffold', 'repo-key' => 'scaffold', 'provider-rel' => 'src/MooeenScaffoldServiceProvider.php', 'publish-tag' => 'public'],
         ['name' => 'charsen/moo-system', 'repo-key' => 'system', 'provider-rel' => 'src/MooeenSystemServiceProvider.php', 'publish-tag' => null],
     ];
 
@@ -88,7 +88,7 @@ it('moo:composer:docs table 输出 8 列私包清单表与 Packagist 公开包�
 
     $this->artisan('moo:composer:docs', ['--root' => $root, '--format' => 'table'])
         ->expectsOutputToContain('| name | repo-key | provider-rel | publish-tag | 本地约束 | 测试约束 | 生产约束 | 仓库 URL |')
-        ->expectsOutputToContain('| charsen/moo-scaffold | scaffold | src/ScaffoldProvider.php | public | ^2.1@dev | dev-dev | ^2.1.17 | ⚠ 冲突：test=git@gitee.com:charsen/moo-scaffold.git / prod=git@gitee.com:charsen/moo-scaffold-mirror.git |')
+        ->expectsOutputToContain('| charsen/moo-scaffold | scaffold | src/MooeenScaffoldServiceProvider.php | public | ^2.1@dev | dev-dev | ^2.1.17 | ⚠ 冲突：test=git@gitee.com:charsen/moo-scaffold.git / prod=git@gitee.com:charsen/moo-scaffold-mirror.git |')
         ->expectsOutputToContain('### 走 Packagist 的公开包')
         ->expectsOutputToContain('| charsen/moo-feedback | ^0.1 | ^0.1 | ^0.1 | 否 |')
         ->assertExitCode(0);
@@ -145,7 +145,7 @@ it('--check 在文档过期时给出人可读差异摘要且非 0 退出', funct
     file_put_contents($doc, "# 过期文档\n\n<!-- BEGIN moo-manifest-table -->\n"
         . "| name | repo-key | provider-rel | publish-tag | 本地约束 | 测试约束 | 生产约束 | 仓库 URL |\n"
         . "| --- | --- | --- | --- | --- | --- | --- | --- |\n"
-        . "| charsen/moo-scaffold | scaffold | src/ScaffoldProvider.php | public | ^2.1@dev | dev-dev | ^2.1.16 | git@gitee.com:charsen/moo-scaffold.git |\n"
+        . "| charsen/moo-scaffold | scaffold | src/MooeenScaffoldServiceProvider.php | public | ^2.1@dev | dev-dev | ^2.1.16 | git@gitee.com:charsen/moo-scaffold.git |\n"
         . "| charsen/moo-legacy | legacy | src/LegacyProvider.php | — | ^0.1@dev | dev-dev | ^0.1.0 | — |\n"
         . "<!-- END moo-manifest-table -->\n");
 
@@ -189,7 +189,7 @@ it('--bare --format=table 只出表格本体（公开包表体保留、无 ### �
 
     $this->artisan('moo:composer:docs', ['--root' => $root, '--bare' => true])
         ->expectsOutputToContain('| name | repo-key | provider-rel | publish-tag | 本地约束 | 测试约束 | 生产约束 | 仓库 URL |')
-        ->expectsOutputToContain('| charsen/moo-scaffold | scaffold | src/ScaffoldProvider.php | public | ^2.1@dev | dev-dev | ^2.1.17 | ⚠ 冲突：test=git@gitee.com:charsen/moo-scaffold.git / prod=git@gitee.com:charsen/moo-scaffold-mirror.git |')
+        ->expectsOutputToContain('| charsen/moo-scaffold | scaffold | src/MooeenScaffoldServiceProvider.php | public | ^2.1@dev | dev-dev | ^2.1.17 | ⚠ 冲突：test=git@gitee.com:charsen/moo-scaffold.git / prod=git@gitee.com:charsen/moo-scaffold-mirror.git |')
         // 公开包小表：标题不输出，但表体（表头 + 数据行）仍在
         ->expectsOutputToContain('| name | 本地约束 | 测试约束 | 生产约束 | 是否有 repository |')
         ->expectsOutputToContain('| charsen/moo-feedback | ^0.1 | ^0.1 | ^0.1 | 否 |')

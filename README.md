@@ -52,7 +52,7 @@ tables:
 ```bash
 composer require --dev charsen/moo-scaffold:^2.1
 php artisan moo:init "你的名字"
-php artisan vendor:publish --provider="Mooeen\\Scaffold\\ScaffoldProvider" --tag=public --force
+php artisan vendor:publish --provider="Mooeen\\Scaffold\\MooeenScaffoldServiceProvider" --tag=public --force
 php artisan moo:account:add admin --password=xxx --role=admin
 ```
 

@@ -526,7 +526,7 @@ class DesignerController extends Controller
     /**
      * plan-40 §四 C-1:designer save / migrate 后清下游 generator cache(storage/scaffold/*.php)。
      *
-     * **不走 Artisan::call** — ScaffoldProvider 把所有 moo:* 命令限定在 `runningInConsole()`(line 97,
+     * **不走 Artisan::call** — MooeenScaffoldServiceProvider 把所有 moo:* 命令限定在 `runningInConsole()`(line 97,
      * 注释明示"web endpoint 触发 → 攻击面放大"policy)。Web HTTP context 下 Artisan::call('moo:fresh')
      * 会 throw "does not exist",log 噪声大且 cache 实际没刷。
      *

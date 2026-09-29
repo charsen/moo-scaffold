@@ -3,10 +3,10 @@
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Support\Facades\Http;
-use Mooeen\Monitor\Cloud\CloudClient;
-use Mooeen\Monitor\Cloud\CloudSync;
-use Mooeen\Monitor\Recorder\RuntimeErrorRecorder;
-use Mooeen\Monitor\Recorder\SqlSlowRecorder;
+use Mooeen\MonitorLaravel\Cloud\CloudClient;
+use Mooeen\MonitorLaravel\Cloud\CloudSync;
+use Mooeen\MonitorLaravel\Recorder\RuntimeErrorRecorder;
+use Mooeen\MonitorLaravel\Recorder\SqlSlowRecorder;
 use Mooeen\Scaffold\Http\Controllers\ScaffoldController;
 use Mooeen\Scaffold\Http\Middleware\EnforceScaffoldWritable;
 use Mooeen\Scaffold\Http\Middleware\ScaffoldAuthenticate;

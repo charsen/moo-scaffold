@@ -24,7 +24,7 @@ class RouteController extends Controller
     // YAML 解析 / 反射」的重复开销 —— 量级见 $controllerFileCache 当年的记录:400 条路由
     // = 800 个反射对象/请求。
     //
-    // 生命周期 = **单次请求**:ScaffoldProvider 零 singleton()/bind(),控制器由容器每请求新建
+    // 生命周期 = **单次请求**:MooeenScaffoldServiceProvider 零 singleton()/bind(),控制器由容器每请求新建
     // (Laravel ControllerDispatcher 逐请求 make),所以不存在跨请求读到陈旧 ACL / API yaml 的
     // 问题,也不需要失效钩子 —— 一次请求内没有人会改这些文件。
     //

@@ -7,10 +7,10 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
-use Mooeen\Monitor\Cloud\CloudSync;
-use Mooeen\Monitor\MonitorProvider;
-use Mooeen\Monitor\Recorder\RuntimeErrorRecorder;
-use Mooeen\Monitor\Recorder\SqlSlowRecorder;
+use Mooeen\MonitorLaravel\Cloud\CloudSync;
+use Mooeen\MonitorLaravel\MooeenMonitorLaravelServiceProvider;
+use Mooeen\MonitorLaravel\Recorder\RuntimeErrorRecorder;
+use Mooeen\MonitorLaravel\Recorder\SqlSlowRecorder;
 use Mooeen\Scaffold\Foundation\FormRequest;
 use Mooeen\Scaffold\Http\Requests\ContextRequest;
 use Mooeen\Scaffold\Support\ReadonlyMode;
@@ -228,11 +228,11 @@ class CloudController extends Controller
     private function monitorVersion(): string
     {
         try {
-            if (method_exists(MonitorProvider::class, 'version')) {
-                return MonitorProvider::version();
+            if (method_exists(MooeenMonitorLaravelServiceProvider::class, 'version')) {
+                return MooeenMonitorLaravelServiceProvider::version();
             }
-            if (defined(MonitorProvider::class . '::VERSION')) {
-                return (string) constant(MonitorProvider::class . '::VERSION');
+            if (defined(MooeenMonitorLaravelServiceProvider::class . '::VERSION')) {
+                return (string) constant(MooeenMonitorLaravelServiceProvider::class . '::VERSION');
             }
         } catch (Throwable) {
             // fallback below
@@ -244,11 +244,11 @@ class CloudController extends Controller
     private function monitorFallbackVersion(): ?string
     {
         try {
-            if (defined(MonitorProvider::class . '::VERSION')) {
-                return (string) constant(MonitorProvider::class . '::VERSION');
+            if (defined(MooeenMonitorLaravelServiceProvider::class . '::VERSION')) {
+                return (string) constant(MooeenMonitorLaravelServiceProvider::class . '::VERSION');
             }
-            if (method_exists(MonitorProvider::class, 'version')) {
-                return MonitorProvider::version();
+            if (method_exists(MooeenMonitorLaravelServiceProvider::class, 'version')) {
+                return MooeenMonitorLaravelServiceProvider::version();
             }
         } catch (Throwable) {
             return null;
@@ -429,7 +429,7 @@ class CloudController extends Controller
         // 心跳:与 CloudPushCommand 同语义 —— 真实跑过推送管道就打一拍,云端「推送中断」
         // 哨兵据此判活。原先只有调度命令打,scheduler 没跑、全靠手动推送的 host(本地 dev
         // 常态)天天在推却被云端误报"推送中断"(2026-06-10 修)。best-effort,不影响结果。
-        (new \Mooeen\Monitor\Cloud\CloudClient($cfg))->heartbeat();
+        (new \Mooeen\MonitorLaravel\Cloud\CloudClient($cfg))->heartbeat();
 
         // 逐条 partial 也会改变云端数据；但全跳过 / 无变化时无需制造一次额外 summary 回源。
         if ($confirmed > 0 || $rejected > 0 || $recycled > 0) {

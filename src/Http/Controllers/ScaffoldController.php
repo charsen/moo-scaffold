@@ -5,7 +5,7 @@ namespace Mooeen\Scaffold\Http\Controllers;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
-use Mooeen\Monitor\Cloud\CloudClient;
+use Mooeen\MonitorLaravel\Cloud\CloudClient;
 use Mooeen\Scaffold\Designer\SchemaLoader;
 use Mooeen\Scaffold\Http\Requests\ContextRequest;
 use Mooeen\Scaffold\Http\Requests\Scaffold\CspReportRequest;
@@ -344,8 +344,8 @@ class ScaffoldController extends Controller
                         'step'    => '02',
                         'title'   => '发布配置与静态资源',
                         'desc'    => '首次接入或资源更新后执行；先发布 config，再发布 public 静态资源。',
-                        'command' => 'php artisan vendor:publish --provider="Mooeen\\Scaffold\\ScaffoldProvider" --tag={config|public} [--force]',
-                        'example' => 'php artisan vendor:publish --provider="Mooeen\\Scaffold\\ScaffoldProvider" --tag=public --force',
+                        'command' => 'php artisan vendor:publish --provider="Mooeen\\Scaffold\\MooeenScaffoldServiceProvider" --tag={config|public} [--force]',
+                        'example' => 'php artisan vendor:publish --provider="Mooeen\\Scaffold\\MooeenScaffoldServiceProvider" --tag=public --force',
                     ],
                     [
                         'step'    => '03',

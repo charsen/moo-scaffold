@@ -46,8 +46,8 @@ php artisan moo:init "你的名字"
 ## 3. 发布配置 + 静态资源
 
 ```bash
-php artisan vendor:publish --provider="Mooeen\\Scaffold\\ScaffoldProvider" --tag=config
-php artisan vendor:publish --provider="Mooeen\\Scaffold\\ScaffoldProvider" --tag=public --force
+php artisan vendor:publish --provider="Mooeen\\Scaffold\\MooeenScaffoldServiceProvider" --tag=config
+php artisan vendor:publish --provider="Mooeen\\Scaffold\\MooeenScaffoldServiceProvider" --tag=public --force
 ```
 
 得到 `config/scaffold.php`(改前缀 / hosts / 各开关)+ `public/vendor/scaffold/*`(浏览器加载这份)。
