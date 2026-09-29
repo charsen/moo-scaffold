@@ -173,13 +173,13 @@
   **通则**：跑套件做判断前先 `printenv | grep -E 'CACHE_STORE|SESSION_DRIVER|DB_CONNECTION|APP_'`；
   「换台机器/换个 shell 就红」先怀疑环境变量，别急着改断言或改产品码。
 
-- [x] **既有 pint 违规（改前就红，非本次引入）**：`moo-<name>` 35 处 / `moo-<name>` 2 处 /
+- [x] **既有 pint 违规（改前就红，非本次引入）**：`moo-<name>` 35 个文件 / `moo-<name>` 2 处 /
   `moo-<name>` 1 处；**本仓自身 2 处**（`tests/Feature/Concerns/HasOperatorContextTest.php`、
   `tests/Feature/Concerns/OperatorResolverTest.php`，`class_attributes_separation`）。
   已用「提交态配置 A/B」与「文件未被本次修改」双重证实与本次 `pint.json` 归一无关，属独立过堂。
   **2026-09-28 实测：四仓性质不同，别当一件事做** —— cms（2 处：`ArticleController` 的 `no_extra_blank_lines` +
   `tests/Feature/FormOptionsTest.php`）、product（1 处：`ProductController` 同类）、scaffold（2 处：上述两个测试文件）
-  **全在手写文件**，`pint --fix` + 定向测试即可验证；而 enterprise-information 的 35 处**含生成物**
+  **全在手写文件**，`pint --fix` + 定向测试即可验证；而 enterprise-information 的 35 个文件**含生成物**
   （`database/migrations/2026_09_23_*` 的 `class_definition` / `no_trailing_whitespace_in_comment` / `braces_position`）
   ⇒ 按「不手改生成物」的规则，需先定**重新生成还是接受现状**，不能跟着一起 `--fix`。
   **进展（2026-09-28）**：cms（`c8649ab`）/ product（`1e3d7c1`）/ scaffold（`324f54d`）三仓已修，
@@ -191,7 +191,8 @@
   `pint:check` 步失败，**未修，待你定**（另 1 处 `AdminPresentationTest.php` 的 import 顺序已在本次顺带归位）。
   **收口（2026-09-28 第三批）**：**全部修完，四仓 `pint --test` 全绿** —— banner `37fb18f`（1 处）、
   radar `40457d8`（2 处，同上「文件落后于 stub」型）、enterprise-information `f663a5c`＋`3d6d0cd`
-  （**31 处 / 35 文件：src + tests + lang**，pint PASS 165 files、套件 80 passed；6 个 `lang/**` 是生成物，
+  （**pint 报 35 个文件**：`f663a5c` 归一 31 个（src 25 + lang 6），`3d6d0cd` 另 4 个生成的迁移；
+  pint PASS 165 files、套件 80 passed；6 个 `lang/**` 是生成物，
   已逐文件核对「`require` 出的数组与格式化前完全相等」）。enterprise 的根因**不在仓库而在生成器**，
   同批在 scaffold 侧修掉（见下条），所以这次不是「手改生成物」而是「先修生成器再归一产出」。
 
@@ -282,7 +283,7 @@
   `media` 无依赖 → 装依赖时暴露出**新缺陷**（见下）→ 修后依赖装上、**19 passed** + pint PASS；
   `engine-skeleton` 的 pest 在 `engine/vendor/bin/pest`（上一轮路径找错）→ 2 failed 中：
   `FoodAclTest` 是**真缺陷**（`moo:auth` 冲掉了 whitelist 的 8 个 key，见下），`ExampleTest` 是**我 shell 环境串味**（下条）。
-  **③ `enterprise-information` 的 pint（31 处 / 35 文件）**：已修 —— 见下方 pint 条与「生成器产出即合规」条。
+  **③ `enterprise-information` 的 pint（35 个文件：31 + 4）**：已修 —— 见下方 pint 条与「生成器产出即合规」条。
   **④ 新发现的 manifest 缺陷（7 包）**：`composer.json` 的 path 仓库 `versions` 写成了**约束式** `"charsen/moo-scaffold": "^2.2.1"`；
   无 `composer.lock` 的全新安装（fresh clone / CI）会被 Composer 拒绝（`Invalid version string "^2.2.1"`）——
   `media` 因此根本装不上依赖。已按既有正确写法（`enterprise-information` / `mini-app` 用的 `2.2.8`）修 7 包：
