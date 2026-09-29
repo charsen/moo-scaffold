@@ -42,6 +42,9 @@ class MooeenScaffoldServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        // Log Viewer 的具体路由必须先于 Scaffold 的 prefix fallback。
+        $this->loadRoutesFrom(__DIR__ . '/Http/routes.php');
+
         if ($this->app->runningInConsole()) {
             $this->publishes([__DIR__ . '/../config/config.php' => config_path('scaffold.php')], 'config');
 
@@ -58,6 +61,16 @@ class MooeenScaffoldServiceProvider extends ServiceProvider
     public function register()
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/config.php', 'scaffold');
+
+        // register() 阶段确保依赖 Provider 先注册；booting 在任何 Provider boot
+        // 前接管路由配置，兼容 auto-discovery 顺序及 config/route cache。
+        $this->app->register(\Opcodes\LogViewer\LogViewerServiceProvider::class);
+        $this->app->booting(fn () => $this->app->make(\Mooeen\Scaffold\Support\LogViewerIntegration::class)->configure());
+        $this->app->booted(fn () => $this->app->make(\Mooeen\Scaffold\Support\LogViewerIntegration::class)->configureMiddlewarePriority());
+        $this->app->resolving('log-viewer', function ($viewer) {
+            $viewer->setViewLayout('scaffold::logs');
+            $viewer->auth(fn ($request) => app(\Mooeen\Scaffold\Auth\ScaffoldAuth::class)->authenticateRequest($request) !== null);
+        });
 
         // plan 38：三件套上移——共享雪花单例 scaffold.snowflake（原各包各自 registerSnowflake，单例名各异）。
         // 所有 moo 系包的 Concerns\UsingSnowFlakePrimaryKey 取用本单例；同源 SNOW_FLAKE_* env，id 空间一致。
@@ -163,9 +176,6 @@ class MooeenScaffoldServiceProvider extends ServiceProvider
                 AuditFormerTypesCommand::class,
             ]);
         }
-
-        // 加载 路由
-        $this->loadRoutesFrom(__DIR__ . '/Http/routes.php');
 
         // 注册扩展包 视图
         $this->loadViewsFrom(__DIR__ . '/Http/Views', 'scaffold');

@@ -25,6 +25,10 @@ $defaultMenu = [
     ['route' => 'cloud.index',   'label' => 'S-Cloud',   'icon' => 'cloud', 'matches' => ['cloud.*']],
 ];
 
+if (\Mooeen\Scaffold\Support\LogViewerIntegration::enabled() && \Illuminate\Support\Facades\Route::has('log-viewer.index')) {
+    $defaultMenu[] = ['route' => 'log-viewer.index', 'label' => '应用日志', 'icon' => 'file', 'matches' => ['log-viewer.*']];
+}
+
 $menuItems = $menu ?? $defaultMenu;
 $userName = $user ?? ($scaffold_auth_user ?? 'Scaffold');
 $isHome = request()->routeIs('scaffold.home');
