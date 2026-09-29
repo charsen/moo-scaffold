@@ -4,7 +4,7 @@
  * audit-package-structure —— 只读审计 moo 生态扩展包的**仓库骨架规范**。
  *
  * 目的：回答「哪些包的骨架偏离了 moo 系通行形态」，把「结构规范」从口头约定变成可重跑的闸门。
- * 基准（canonical）是 moo-system 与 moo-<name> 的**当前代码**，不是任何历史文档或 skill 文本；
+ * 基准（canonical）是既有基线包的**当前代码**，不是任何历史文档或 skill 文本；
  * 二者冲突时以代码为准。
  *
  * 用法（默认扫本仓同级目录）：
@@ -58,13 +58,38 @@ const SKIP_DIRS = ['vendor', '.git', 'node_modules'];
  * 理由与**移除条件**写在值里，报告尾部的「跳过」段与 --json 的 skipped 段原样打印，绝不静默消失。
  * 显式 `--package=<name>` 仍照常审计该仓（用于单独看它的当前状态，不影响默认闸门）。
  *
- * **当前为空**：`moo-<name>` 于 2026-09-28 首次 commit 落地（`356898a`）后，按它自己那条移除条件
- * 纳入审计 —— 它不再是「开发中」，而是一个缺豁免的基建包：已补 `allowances()['moo-<name>']` 与 `CLAUDE.md`。
+ * **当前为空**：此前那个「开发中」的仓首次 commit 落地后，按它自己的移除条件纳入审计
+ * （补 `allowances()` 条目与 `CLAUDE.md`）—— 它的豁免条目现由下面的私有覆盖文件提供。
  */
 const DEFERRED_TARGETS = [];
 
-/** canonical 范本包（pint.json 基准取自第一个存在的） */
-const CANONICAL_PACKAGES = ['moo-system', 'moo-<name>'];
+/**
+ * 生态专属数据（canonical 基准包 + 各包豁免）从**不入库**的同目录 `audit-package-structure.private.json` 读取：
+ *   {"canonical": ["pkg-a", "pkg-b"], "allowances": {"<package>": {"<path>": "<reason>"}}}
+ * 公开仓只保留**公开包**与通用理由模板；未开源包的条目放该文件（`.gitignore` 与 `.gitattributes` 均排除）。
+ * 文件缺失时按公开默认运行 —— 私有包会多报 MISS，这是预期（公开克隆本来也拿不到它们的仓）。
+ */
+function privateOverrides(): array
+{
+    static $cache = null;
+
+    if ($cache !== null) {
+        return $cache;
+    }
+
+    $path  = __DIR__ . '/audit-package-structure.private.json';
+    $cache = is_file($path) ? (json_decode((string) file_get_contents($path), true) ?: []) : [];
+
+    return $cache;
+}
+
+/** canonical 范本包（pint.json 基准取自第一个存在的）；可由私有覆盖文件覆盖 */
+function canonicalPackages(): array
+{
+    $canonical = privateOverrides()['canonical'] ?? [];
+
+    return $canonical !== [] ? $canonical : ['moo-scaffold'];
+}
 
 /**
  * 必需项。key = check id，value = [相对路径, 种类 file|dir, 判定说明]。
@@ -163,53 +188,30 @@ function allowances(): array
         'src/Http/Resources'         => 'codegen 工具本身：无资源层',
     ];
 
-    return [
+    $base = [
         'moo-contract'        => $pureContract,
-        'moo-<name>'            => $kernel,
         'moo-monitor-laravel' => $infra,
-        'moo-<name>'        => [
-            'routes/admin.php'           => '取号内核：无后台管理面（调用方是各业务包的 Service/Command）',
-            'config/moo-<stem>.php'      => '取号内核：无可发布配置（作用域与编号格式由消费者负责）',
-            'lang/zh-CN'                 => '取号内核：无词条',
-            'lang/en'                    => '取号内核：无词条',
-            'src/Models/Traits'          => '取号内核：无 Eloquent 层',
-            'src/Models/Filters'         => '取号内核：无 Eloquent 层',
-            'src/Http/Controllers/Admin' => '取号内核：无后台控制器',
-            'src/Http/Requests'          => '取号内核：无请求验证层',
-            'src/Http/Resources'         => '取号内核：无资源层',
-        ],
-        'moo-scaffold'           => $tooling + ['gitattributes:docs' => 'docs/ 是 host 文档中心的包文档源（src/Support/DocsRepository.php 直接读包 basePath 下的 docs/），有意随包分发'],
-        'moo-<name>' => [
-            'database/migrations' => '已初始化未落地：空骨架，尚无真实表设计',
-            'src/Models/Filters'  => '已初始化未落地：空骨架，尚无业务表',
-        ],
-        'moo-<name>' => [
-            'tests/TestCase.php' => '测试走 tools/bootstrap.php 驱动的形态（无 TestCase/Pest）',
-            'tests/Pest.php'     => '测试走 tools/bootstrap.php 驱动的形态（无 TestCase/Pest）',
-        ],
-        'moo-<name>' => [
+        'moo-scaffold'        => $tooling + ['gitattributes:docs' => 'docs/ 是 host 文档中心的包文档源（src/Support/DocsRepository.php 直接读包 basePath 下的 docs/），有意随包分发'],
+        'moo-upload'          => [
             'src/Models/Filters' => '轻控制器包：无列表筛选需求',
-            'src/Http/Resources' => '轻控制器包：直接返回数组/DTO',
-        ],
-        'moo-upload' => [
-            'src/Models/Filters' => '轻控制器包：无列表筛选需求',
-            'src/Http/Resources' => '轻控制器包：直接返回数组/DTO',
-        ],
-        'moo-<name>' => [
-            'src/Http/Resources' => '轻控制器包：直接返回数组/DTO',
-        ],
-        'moo-<name>' => [
             'src/Http/Resources' => '轻控制器包：直接返回数组/DTO',
         ],
     ];
+
+    // 未开源包的豁免条目来自私有覆盖文件（键即包名，值同本函数结构）
+    foreach (privateOverrides()['allowances'] ?? [] as $package => $paths) {
+        $base[$package] = $paths;
+    }
+
+    return $base;
 }
 
 /**
  * canonical 的 dist 裁剪清单（`.gitattributes` 的 `export-ignore` 条目）。
  *
  * **只在该路径于本仓确实存在时才要求**：例如 moo-scaffold 没有 .claude / .editorconfig / .phpunit.cache，
- * 要求它去 export-ignore 不存在的路径没有意义。逐仓的**额外**条目（moo-<name> 的 /tools、
- * moo-system 的 /HANDOFF.md、moo-<name> 的 /.codegen）是刻意的，不算偏离、也不比对整份文件。
+ * 要求它去 export-ignore 不存在的路径没有意义。逐仓的**额外**条目（某些包的 /tools、
+ * 如 /HANDOFF.md、/.codegen）是刻意的，不算偏离、也不比对整份文件。
  * 有意的「保留」例外走 ALLOWANCES（键形如 `gitattributes:docs`）。
  */
 function exportIgnoreRequirements(): array
@@ -350,7 +352,7 @@ function layoutCheck(string $packageDir, string $package): array
  */
 function canonicalPintRules(string $workspace): ?array
 {
-    foreach (CANONICAL_PACKAGES as $name) {
+    foreach (canonicalPackages() as $name) {
         $path = $workspace . '/' . $name . '/pint.json';
         if (is_file($path)) {
             $json = json_decode((string) file_get_contents($path), true);
@@ -395,7 +397,7 @@ function auditPackage(string $dir, string $workspace, ?array $canonicalRules): a
     $prefix   = (string) (array_key_first($psr4) ?? '');
     $psr4Path = $prefix !== '' ? (string) $psr4[$prefix] : '';
 
-    $stem = $package;   // moo-<name> → config/moo-<name>.php
+    $stem = $package;   // <package> → config/<package>.php
 
     foreach (requirements() as $id => [$rel, $kind]) {
         $exists = match ($kind) {
@@ -739,7 +741,7 @@ foreach ($targets as $target) {
 if (isset($options['json'])) {
     echo json_encode([
         'workspace' => $workspace,
-        'canonical' => CANONICAL_PACKAGES,
+        'canonical' => canonicalPackages(),
         'summary'   => $summary,
         'targets'   => $targets,
         'skipped'   => array_map(static fn (array $s): array => ['dir' => $s[0], 'reason' => $s[1]], $skipped),
@@ -749,7 +751,7 @@ if (isset($options['json'])) {
 }
 
 echo "工作区: {$workspace}\n";
-echo 'canonical 基准: ' . implode(' + ', CANONICAL_PACKAGES) . "\n";
+echo 'canonical 基准: ' . implode(' + ', canonicalPackages()) . "\n";
 echo '扫描目标: ' . count($targets) . ' 个（跳过 ' . count($skipped) . " 个：非扩展包 / DEFERRED_TARGETS）\n\n";
 
 foreach ($targets as $target) {

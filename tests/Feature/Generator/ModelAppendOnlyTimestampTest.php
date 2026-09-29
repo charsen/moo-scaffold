@@ -8,7 +8,7 @@ use Symfony\Component\Console\Output\NullOutput;
 /**
  * append-only 表（表内只有 created_at、没有 updated_at）的模型时间戳口径（2026-09-12）。
  *
- * 缺陷现场：`moo-<name>` 的 `RecordRevision::create()` 抛
+ * 缺陷现场：某个未开源包的 `RecordRevision::create()` 抛
  *   SQLSTATE[HY000]: table moo_mini_app_record_revisions has no column named updated_at
  * 因为 Eloquent 默认 insert 时同时写 created_at / updated_at，而这类表没有 updated_at。
  * 生成器改为：表内无 `updated_at` 时显式 `public const UPDATED_AT = null;`

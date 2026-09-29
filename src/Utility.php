@@ -138,7 +138,7 @@ class Utility
      *
      * $target 为 null / 'host' → host 隐含默认:沿用现有 host 路径与命名空间(字节不变)。
      * 否则从 PackageRegistry(自动发现,无 config 注册表)取包根 + psr-4 命名空间,
-     * 各类路径按全 repo 统一目录约定固化(moo-system / moo-<name> 实证形态)。
+     * 各类路径按全 repo 统一目录约定固化（既有包实证形态）。
      */
     public function targetContext(?string $target = null): TargetContext
     {
@@ -175,7 +175,7 @@ class Utility
         return new TargetContext(
             target: $target,
             basePath: $base,
-            // 目录约定全 repo 统一(moo-system / moo-<name> 实证):包不合约定改包,不改工具
+            // 目录约定全 repo 统一（既有包实证）:包不合约定改包,不改工具
             paths: [
                 'model'      => $base . 'src/Models/',
                 'resource'   => $base . 'src/Http/Resources/',

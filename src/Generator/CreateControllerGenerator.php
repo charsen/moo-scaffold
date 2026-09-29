@@ -855,7 +855,7 @@ class CreateControllerGenerator extends Generator
      * 既没有 onlyTrashed() 也选不到列 —— 换表达式等于换端点语义。而路由宏
      * (AppServiceProvider::iResource) 按「控制器是否有该 public 方法」决定是否注册
      * `/trashed`、`/forever/{id}`、`/restore`，所以「不生成」= 端点不存在 = 404，
-     * 与包内既有手写范例一致（见 moo-<name> ProcessInstanceController 注释：
+     * 与包内既有手写范例一致（见同类包的控制器注释：
      * 「trashed / restore / forceDestroy 更是必删：本表无 deleted_at」）。
      *
      * 判定走 Generator::hasSoftDeletes —— 与 CreateModelGenerator 注入 SoftDeletes trait 同源。

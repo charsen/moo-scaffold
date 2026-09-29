@@ -68,7 +68,7 @@ class CreateModelGenerator extends Generator
                 continue;
             }
 
-            // 包 schema 平铺(src/Models/X.php,与 moo-system/moo-<name> 实证形态一致);host 按 module folder 分层
+            // 包 schema 平铺(src/Models/X.php,与既有包实证形态一致);host 按 module folder 分层
             $model_path    = $this->originCtx !== null ? rtrim($this->model_path, '/') : $this->model_path . $attr['module']['folder'];
             $model_file    = $model_path . "/{$class}.php";
             $relative_file = $this->relDisplay($model_file, $this->originCtx);
@@ -571,7 +571,7 @@ class CreateModelGenerator extends Generator
      *
      * Eloquent 默认在 insert / update 时同时写 `created_at` 与 `updated_at`；表里没有 `updated_at`
      * 会直接抛 `... has no column named updated_at`，而这类表（留痕、审计、日志、交接）恰恰是最需要
-     * 写得进的地方 —— moo-<name> 的 `moo_mini_app_record_revisions` 就是被这条卡住的。
+     * 写得进的地方 —— 某个未开源包的 record_revisions 表 就是被这条卡住的。
      *
      * 只关 `UPDATED_AT`、**不关 timestamps**：这些表的 `created_at` 语义往往是「发生于」，仍要自动写。
      * 返回值留空时占位符替换为空串，因此对已有模型完全不产生格式变化。
