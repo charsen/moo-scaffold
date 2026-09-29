@@ -84,7 +84,7 @@ php tools/audit-package-structure.php --workspace=<同级目录> --fail-on-drift
 | `composer.json` | **本地默认**（跨包联调、日常测试） | `path` + `symlink` |
 | `composer.ci.json` | 干净克隆 / CI / 发布 | **纯 vcs** |
 
-- 干净目录跑：`COMPOSER=composer.ci.json composer update`。两份清单**共用 `composer.lock`**，切换后要重跑一次
+- 干净目录跑：`COMPOSER=composer.ci.json composer update`。两份清单**各有自己的 lock**（lock 名跟随清单名：`composer.json` → `composer.lock`、`composer.ci.json` → `composer.ci.lock`），切换后要各自解析一次
   （lock 不入库，CI 每次自行解析，故 CI 侧不受影响）。
 - `composer.dev.json` 必须进 `.gitattributes` 的 `export-ignore`（`CONFIG` 判据会查，见上）。
 - **vcs 清单里公开包也要列**：`charsen/moo-scaffold` / `charsen/moo-monitor-laravel` 虽在 Packagist 上，
