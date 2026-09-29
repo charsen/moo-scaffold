@@ -48,6 +48,12 @@ order: 130
 - **限流**:`/scaffold/login`(POST)挂 `throttle:5,1`(5 次/分/IP),第 6 次返 429。
 - **时序对齐**:`ScaffoldAuth::attempt` 不论账号是否存在都跑一次 bcrypt(用固定 hash 占位),让"账号不存在"和"密码错"耗时一致,消除时间侧信道。
 
+### 应用日志
+
+`/scaffold/logs` 和 `/scaffold/logs/api/*` 使用同一套 Scaffold 认证，所有环境均要求登录。页面匿名请求跳登录，API 匿名请求返回 401；签名下载也受登录保护。关闭 Scaffold 认证不会公开日志入口。
+
+日志删除在所有环境禁用；生产或强制只读时，日志 API 的显式写请求被拒绝。页面和 API 保留 Log Viewer 原生协议，日志 layout 为内联资源添加 CSP nonce。完整配置和旧入口迁移见 [20-application-logs.md](20-application-logs.md)。
+
 ## CSRF
 
 - `VerifyCsrfToken` 加在登录后所有路由组上,POST 表单必须带 `@csrf`,AJAX 带 `X-CSRF-TOKEN` header(`<meta name="csrf-token">`)。

@@ -87,7 +87,7 @@ moo-scaffold 在同一个 Service Provider 下做两件相对独立的事，构�
 
 **核心契约**：用户只改 YAML；`moo:fresh` 把 YAML 解析成缓存；**所有其它生成器读缓存，不读 YAML**。手改 YAML 后不跑 `moo:fresh` = 生成器看到旧数据（数据库设计器保存时会自动同步跑一次 `moo:fresh` 刷缓存，best-effort，失败仅警告）。
 
-支柱二的 Web 层对外只有**一套 JSON 契约**：统一信封 `{ok:true,data}` / `{ok:false,error:{code,msg,detail}}`，加两类刻意不套信封的永久例外（代理透传 / 框架层 `{message}`）；前端由 `public/javascript/api.js` 的 `ScaffoldApi` 统一解包。形态、机器码清单与升级注意事项见 **[19 · Web JSON 契约](guide/19-web-json-contract.md)**。
+支柱二的自有 Web JSON 端点使用统一信封 `{ok:true,data}` / `{ok:false,error:{code,msg,detail}}`，代理透传、框架层 `{message}` 和 Log Viewer 原生 API 保留各自协议；自有前端由 `public/javascript/api.js` 的 `ScaffoldApi` 统一解包。形态、机器码清单与升级注意事项见 **[19 · Web JSON 契约](guide/19-web-json-contract.md)**。
 
 生成产物分两类：
 - **每次重写**（不要写业务逻辑）：`*Trait.php`、Enum 文件。
@@ -283,6 +283,14 @@ YAML 驱动的一条生成流水线。**生成类命令 dev-only**（非 local �
 | 自动纳管软链扩展包 | 软链安装(composer path repo)且带 `scaffold/database/` 的扩展包(如 moo-system / moo-<name>)被 `PackageRegistry` 自动发现；设计器 / 数据库文档 / 字典 / 文档中心的列表按**出身分块**呈现(📦 标识) |
 | 生成落包仓 | 对包 schema 跑 `moo:free admin <X>`，Model / Controller / Request / Resource / Migration / 路由 / 词条全部落**包自己的目录**，host 零改动；ACL / api 文档 / host i18n 等聚合物仍落 host |
 | 写权硬线 | 软链包(realpath 逃出 vendor)= 可写；vcs 拷贝包 = 只读(设计器 / codegen / docs 全链硬拒)。详见 [guide/18-package-schema](guide/18-package-schema.md) |
+
+---
+
+### 模块十二：应用日志（Web · `/scaffold/logs`）
+
+Scaffold 顶栏的「应用日志」使用 `opcodesio/log-viewer` 原生界面读取当前 Host 的日志文件，提供搜索、过滤和堆栈展示，并可返回 Scaffold。页面、API 和签名下载复用 Scaffold 开发账号；所有环境强制登录，旧 `/mooeen-log-viewer` 入口返回 404。
+
+日志删除始终禁用，生产或强制只读时拒绝显式写请求。Host 保留日志范围和展示配置，Scaffold 统一接管路由及认证；S-Cloud 的采集、汇聚和处置职责保持原有边界。详见 [20 · 应用日志](guide/20-application-logs.md)。
 
 ---
 

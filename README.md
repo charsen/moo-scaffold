@@ -41,7 +41,7 @@ tables:
 
 应用端由 `config/scaffold.php` 的 `controller` 注册表定义，默认提供 Admin、Mobi、Web；host 还可注册 RPA、Screen 等自定义端。`api` 专指接口文档/调试能力，不再兼作移动端目录名。
 
-**2. 开发后台 `/scaffold`** —— 数据库设计器(可视化改 schema)、接口调试器(类 Postman,按路由自动识别参数)、ACL 查看、配置可视化编辑、开发文档中心(Markdown + Mermaid 流程图 + 接口 / 表深链)。**只在开发环境可写,生产一律只读。**
+**2. 开发后台 `/scaffold`** —— 数据库设计器(可视化改 schema)、接口调试器(类 Postman,按路由自动识别参数)、ACL 查看、配置可视化编辑、开发文档中心(Markdown + Mermaid 流程图 + 接口 / 表深链)、应用日志(Log Viewer，复用 Scaffold 登录)。**只在开发环境可写,生产一律只读。**
 
 **3. 运行时监控** —— 异常 / 慢 SQL 自动捕获、缓冲、推送到云端统一看(由 [moo-monitor-laravel](https://github.com/charsen/moo-monitor-laravel) 提供,AI 可经 MCP 读取辅助修复)。
 
@@ -67,6 +67,7 @@ php artisan moo:account:add admin --password=xxx --role=admin
 | 命令速查(忘了 flag) | [CLI 速查](docs/guide/03-cli-reference.md) |
 | 全部模块手册 | [docs/guide/](docs/guide/README.md) |
 | 安全模型(dev 写 / prod 只读) | [安全模型](docs/guide/12-security.md) |
+| 在 Scaffold 查看应用日志 | [应用日志](docs/guide/20-application-logs.md) |
 | 自己写 JS / 脚本消费 `/scaffold` 接口 | [Web JSON 契约(统一信封)](docs/guide/19-web-json-contract.md) |
 | 设计取舍 / 模块总览 | [项目总览](docs/overview.md) |
 | 给包做贡献 / 跑测试 | [贡献指南](CONTRIBUTING.md) |

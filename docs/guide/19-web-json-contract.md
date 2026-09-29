@@ -36,7 +36,7 @@ order: 190
 - **`data` 键在成功时永远存在**（缺省是 `[]`，不是缺键）；但值可能是 `null` / `0` / `false`，判空要判**键**而不是判真值。
 - **`code` 是机器码，`msg` 是文案。** 分支一律用 `code`，展示一律用 `msg`；不要拿 `msg` 做字符串匹配。
 
-## 2. 两类永久例外(不套信封)
+## 2. 不套信封的例外
 
 1. **`ApiProxyController`（`POST /scaffold/api/proxy`）** —— body 是**上游 API 的原样透传**，套信封会破坏代理语义。它的契约是：HTTP **恒 200**，真实状态码放在 body 的 `_proxy_status`、响应头放在 `_proxy_headers`。
 2. **框架层响应** —— 由 Laravel 而非 scaffold 控制器产出，形态是 `{message}`（校验失败是 `{message, errors:{字段:[…]}}`）：
@@ -46,9 +46,11 @@ order: 190
 
    这是**刻意的**：给框架层套信封等于接管 exception handler，收益为零、风险全在框架升级上。
 
+3. **Log Viewer 原生 API（`/scaffold/logs/api/*`）** —— 由第三方查看器消费，成功载荷和拒绝响应保留它的原生协议。Scaffold 负责登录、删除禁用和只读边界，不给第三方 API 套 `{ok,data}` 信封。匿名 API 请求为 401，参见 [应用日志](20-application-logs.md)。
+
 ## 3. 前端解包层 `window.ScaffoldApi`
 
-`public/javascript/api.js`（随 `vendor:publish --tag=public` 发布到宿主 `public/vendor/scaffold/javascript/`），**同时吃**上面三种形态。包内页面脚本一律经它读写，不要再自己拼 `{status, responseJSON}`。
+`public/javascript/api.js`（随 `vendor:publish --tag=public` 发布到宿主 `public/vendor/scaffold/javascript/`），**同时吃**信封、代理透传和框架层三种形态。Scaffold 自有页面脚本一律经它读写，不要再自己拼 `{status, responseJSON}`；Log Viewer 使用其自带客户端。
 
 | 方法 | 用途 |
 |---|---|
