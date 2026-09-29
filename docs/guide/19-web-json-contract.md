@@ -105,6 +105,11 @@ order: 190
 
 有对应表单控件接收错误时，使用 `ValidationException::withMessages(['实际字段' => '错误原因'])`，HTTP 422 保留 Laravel 的 `errors` 袋。没有对应表单的业务拒绝直接使用 `BaseException`（默认 HTTP 522，正文 `error.msg`）；没有独立复用语义时不新增异常子类。
 
+**边界补充（2026-09-29 实测踩到）**：无表单动作的 `fieldValidation = false` 只覆盖「**业务规则**」的失败；
+**路由参数与字段的格式校验**（如待办 ID / 附件 ID 必须是数字）仍应返回 422 校验袋 —— 这类输入的错来自客户端，
+不是业务拒绝。若某个 Request 的 `rules()` **只**校验路由参数本身，就不要加该 flag（业务拒绝由控制器显式抛
+`BaseException` 返回 522），否则「非 `$id` 路由参数也必须验证」在 HTTP 层会变成不可见。
+
 `Foundation\FormRequest` 默认保留 422。删除、恢复、移动等无表单动作的专用 Request 显式声明 `protected bool $fieldValidation = false;`，其校验失败转为统一 522；认证/授权、资源不存在和技术错误不经过这项转换。生成器仅对 Admin 的 Destroy、DestroyBatch、Restore Request 默认生成该选项，既有 Request 不自动覆盖。
 
 混合 Request 只把真实控件的错误放进 422 袋；仅隐藏 ID、revision、request key 等上下文失败时使用 BaseException 522。嵌套编辑器应映射到实际父控件，如 `agendas.*` → `agendas`，不能返回前端没有绑定的内部键。上传引用、富文本等共享机制抛出的 ValidationException 在消费边界重键到实际字段；无表单动作转换为 BaseException，技术 Throwable 不转换。
