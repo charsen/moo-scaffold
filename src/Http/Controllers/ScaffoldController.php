@@ -5,7 +5,7 @@ namespace Mooeen\Scaffold\Http\Controllers;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
-use Mooeen\Monitor\Cloud\CloudClient;
+use Mooeen\MonitorLaravel\Cloud\CloudClient;
 use Mooeen\Scaffold\Designer\SchemaLoader;
 use Mooeen\Scaffold\Http\Requests\ContextRequest;
 use Mooeen\Scaffold\Http\Requests\Scaffold\CspReportRequest;

@@ -161,3 +161,26 @@ src/Http/{Controllers/Admin,Requests,Resources}/
   显式 `--package=<name>` 仍照常单查该仓。**当前该清单为空** —— `moo-<name>` 于 2026-09-28 首次 commit 落地后，
   按它自己那条移除条件纳入审计（它缺的不是「开发中」而是基建包豁免：已补 `allowances()` 与其 `CLAUDE.md`）。
 - 已知的布局 / 命名待议项（`LAYOUT` / `NAME`）登记在 `../TODOS.md`，**不在本文件承诺**。
+
+## 布局与命名的登记例外（2026-09-29 收口）
+
+`LAYOUT` / `NAME` 是**判断题**（改了会破坏 namespace 或跨 host 契约），所以判据支持「**登记例外**」而不是长期报红。
+当前**偏离已清零**（`LAYOUT 0 / NAME 0`），此前那批按下面的方式收口：
+
+- **model trait 目录**：一律 `src/Models/Traits/`（`namespace ...\Models\Traits`）。这条已按**跨仓迁移**执行：
+  定义包先改（`git mv` + 命名空间），消费方随后跟进 `use`；**发布顺序**必须是「定义包先发、消费包后发」，
+  否则消费包会 `use` 到不存在的类。迁移**不牵动 codegen** —— 本仓 `src/`、`stubs/` 里没有 `Models/Traits|Concerns`
+  的硬编码（被硬编码的是 **controller** trait，见 `CreateControllerGenerator`），所以这条是纯规范条文。
+- **命名空间 / provider 类名**：按包名推导 —— `moo-<stem>` → `Mooeen\<Ucfirst 去连字符的 stem>\`，
+  provider 为 `<Prefix>ServiceProvider`，psr-4 target 带尾斜杠 `src/`。改名是**破坏性变更**：
+  需同步消费方（`use`、`bootstrap/providers.php`、composer `extra.laravel.providers`）与 host 侧
+  `extra.moo-private-packages[].provider-rel`（该字段由 `ComposerProfiles::problems()` 校验，指错会当场报红）。
+- **config stem 例外**（判据键 `name:config-stem`，写在 `allowances()` 里并附理由）：允许「刻意的共享产品 stem」
+  与「全生态宿主的既有契约」两种情况登记豁免（如与姐妹前端包同源的 stem、以及宿主遍布 `config('<stem>.*')` 读取点的 stem）。
+  登记后该仓不再报 `NAME`，理由随报告打印。
+- **Requests 模块段例外**（判据键 `src/Http/Requests/<Segment>`）：默认按 `<Controller>/` 分组；
+  **按业务域组织**（一个目录跨多个控制器、且经确认是刻意的）可登记豁免，键为 `allowances()[<pkg>]` 的目录路径。
+  ⚠ 未开源包的豁免条目放**不入库**的私有覆盖文件，公开仓只保留公开包的条目与机制说明。
+- **`layoutCheck` 的控制器名扫描**同时覆盖 `src/Http/Controllers/{Admin,Web}/*.php` 与**顶层** `src/Http/Controllers/*.php`
+  —— 后者是雷达类平铺布局的既有形态，不收窄判据就会把「按控制器命名」的目录误判为模块段。
+

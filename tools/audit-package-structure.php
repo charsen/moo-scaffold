@@ -190,8 +190,11 @@ function allowances(): array
 
     $base = [
         'moo-contract'        => $pureContract,
-        'moo-monitor-laravel' => $infra,
-        'moo-scaffold'        => $tooling + ['gitattributes:docs' => 'docs/ 是 host 文档中心的包文档源（src/Support/DocsRepository.php 直接读包 basePath 下的 docs/），有意随包分发'],
+        'moo-monitor-laravel' => $infra + ['name:config-stem' => '刻意共享的产品 stem：与姐妹前端包 moo-monitor-vue 同源，改名会连带发布标签与宿主配置'],
+        'moo-scaffold'        => $tooling + [
+            'gitattributes:docs' => 'docs/ 是 host 文档中心的包文档源（src/Support/DocsRepository.php 直接读包 basePath 下的 docs/），有意随包分发',
+            'name:config-stem'   => '全生态宿主的既有契约：config/ 发布标签与 config(\'scaffold.*\') 读取点遍布所有宿主，改名是破坏性变更',
+        ],
         'moo-upload'          => [
             'src/Models/Filters' => '轻控制器包：无列表筛选需求',
             'src/Http/Resources' => '轻控制器包：直接返回数组/DTO',
@@ -294,7 +297,7 @@ function repositoryVersionFindings(array $composer): array
  * LAYOUT 检查：目录名不匹配任何控制器名时视为「模块段」。
  * Requests 规范是 src/Http/Requests/<Controller>/，<Controller> 应能在控制器目录里找到同名类。
  */
-function layoutCheck(string $packageDir, string $package): array
+function layoutCheck(string $packageDir, string $package, array &$waived = []): array
 {
     $findings = [];
 
@@ -325,7 +328,10 @@ function layoutCheck(string $packageDir, string $package): array
     //    Concerns/ 是跨控制器复用的 Request trait（家族既有写法），不是模块段。
     if ($package !== 'moo-scaffold') {
         $controllerNames = [];
-        foreach (glob($packageDir . '/src/Http/Controllers/{Admin,Web}/*.php', GLOB_BRACE) ?: [] as $file) {
+        foreach (array_merge(
+                glob($packageDir . '/src/Http/Controllers/{Admin,Web}/*.php', GLOB_BRACE) ?: [],
+                glob($packageDir . '/src/Http/Controllers/*.php') ?: [],
+            ) as $file) {
             $controllerNames[] = strtolower(str_replace('Controller.php', '', basename($file)));
         }
         foreach (glob($packageDir . '/src/Http/Requests/*', GLOB_ONLYDIR) ?: [] as $dir) {
@@ -334,6 +340,12 @@ function layoutCheck(string $packageDir, string $package): array
                 continue;
             }
             if (! in_array(strtolower($segment), $controllerNames, true)) {
+                $allowKey = 'src/Http/Requests/' . $segment;
+                if (isset(allowances()[$package][$allowKey])) {
+                    $waived[$allowKey] = allowances()[$package][$allowKey];
+
+                    continue;
+                }
                 $count      = count(glob($dir . '/*.php') ?: []);
                 $findings[] = sprintf(
                     'src/Http/Requests/%s/ 是模块段而非 <Controller>/（%d 个 Request，规范按控制器分组）',
@@ -454,11 +466,15 @@ function auditPackage(string $dir, string $workspace, ?array $canonicalRules): a
     if ($configFiles !== []) {
         $configStem = basename($configFiles[0], '.php');
         if ($configStem !== $stem) {
-            $drift['NAME'][] = sprintf(
+            if (isset($allow['name:config-stem'])) {
+                $waived['name:config-stem'] = $allow['name:config-stem'];
+            } else {
+                $drift['NAME'][] = sprintf(
                 'config stem 为 %s（按 moo-<name> 约定应为 %s）—— 判断题：确认是否为刻意的共享产品 stem',
-                $configStem,
-                $stem,
-            );
+                    $configStem,
+                    $stem,
+                );
+            }
         }
     }
 
@@ -523,7 +539,7 @@ function auditPackage(string $dir, string $workspace, ?array $canonicalRules): a
     }
 
     // LAYOUT
-    foreach (layoutCheck($dir, $package) as $finding) {
+    foreach (layoutCheck($dir, $package, $waived) as $finding) {
         $drift['LAYOUT'][] = $finding;
     }
 

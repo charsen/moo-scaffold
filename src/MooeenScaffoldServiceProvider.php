@@ -49,7 +49,7 @@ class MooeenScaffoldServiceProvider extends ServiceProvider
         }
 
         // 运行时异常 / 慢 SQL 采集、云端推送、MCP 由 charsen/moo-monitor-laravel 提供
-        // (composer 依赖自动带入,MonitorProvider 负责事件监听、reportable 钩子与调度)。
+        // (composer 依赖自动带入,MooeenMonitorLaravelServiceProvider 负责事件监听、reportable 钩子与调度)。
     }
 
     /**
