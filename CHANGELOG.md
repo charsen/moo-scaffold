@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [2.2.9] - 2026-09-29
+
+- **破坏性：服务提供者类名对齐骨架约定** —— `ScaffoldProvider` → `MooeenScaffoldServiceProvider`；psr-4 target 补尾斜杠（`src` → `src/`）。package discovery 按新类名注册，**旧类名不再存在**；消费方需同步 `bootstrap/providers.php`、`composer.json` 的 `extra.laravel.providers`，以及 host 侧 `extra.moo-private-packages[].provider-rel`。
+
 - **骨架规范与判据收口（工具/文档，无运行时改动）**：`tools/audit-package-structure.php` 的 `CONFIG` 级只保留
   「path 仓库 `versions` 写成约束式」一条（`versions` 必须具体版本，否则无 lock 的干净安装被 Composer 拒绝）；
   `.gitattributes` 裁剪清单与 GitHub Actions 两项降为 `OPTIONAL`（只报不判）—— 实测 Composer 对 Gitee 无 dist driver、
