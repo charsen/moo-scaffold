@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+## [2.2.10] - 2026-09-29
+
+- 例行维护与依赖对齐。
 ## [2.2.9] - 2026-09-29
 
 - **破坏性：服务提供者类名对齐骨架约定** —— `ScaffoldProvider` → `MooeenScaffoldServiceProvider`；psr-4 target 补尾斜杠（`src` → `src/`）。package discovery 按新类名注册，**旧类名不再存在**；消费方需同步 `bootstrap/providers.php`、`composer.json` 的 `extra.laravel.providers`，以及 host 侧 `extra.moo-private-packages[].provider-rel`。
