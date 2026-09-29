@@ -132,7 +132,7 @@ class UpdateMultilingualGenerator extends Generator
      *
      * 为什么生成器要自己管对齐：canonical pint 的 binary_operator_spaces =
      * align_single_space_minimal 要求同一数组块内 `=>` 对齐，而本生成器直接拼字符串、
-     * 不经过 pint ⇒ 不对齐的产出会被下游 `pint --test` 判违规（moo-<name>
+     * 不经过 pint ⇒ 不对齐的产出会被下游 `pint --test` 判违规（某个未开源包
      * 的生成 lang 文件就因此红了 6 个文件）。顺带对齐也让「重生成即合规」成立。
      */
     private function langKeyWidth(array $data): int

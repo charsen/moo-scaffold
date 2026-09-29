@@ -27,3 +27,4 @@
 /playwright.config.ts export-ignore
 /release-records      export-ignore
 /tests                export-ignore
+/tools/audit-package-structure.private.json export-ignore

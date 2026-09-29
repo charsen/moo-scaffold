@@ -7,7 +7,7 @@ namespace Mooeen\Scaffold\Support;
 /**
  * OperatorId —— 「无效操作人哨兵」标量归一（plan 42 · Phase F）。
  *
- * 三包（moo-<name> / moo-<name> / moo-<name>）此前各写一份「操作人 id 无效即解析失败」的
+ * 三个未开源包此前各写一份「操作人 id 无效即解析失败」的
  * 哨兵判断，口径微漂移（trail 判 null/0/'0'/全零串、attachment/radar 判 null/''/0/'0'）。
  * 本类把三家判断收敛成共享单点：把无效哨兵归一为 null、其余原样透传，各包在此之上保留自己的
  * 额外处置（trail 的 positiveId 正数/范围收紧、attachment/radar 的 AuthenticationException）。
