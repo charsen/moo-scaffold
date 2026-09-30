@@ -338,7 +338,7 @@ Scaffold 顶栏的「应用日志」使用 `opcodesio/log-viewer` 原生界面�
 
 | 层 | 路径 | 角色 |
 |---|---|---|
-| Provider | `src/ScaffoldProvider.php` | 注册命令、路由、视图、单例 |
+| Provider | `src/MooeenScaffoldServiceProvider.php` | 注册命令、路由、视图、单例 |
 | CLI 命令 | `src/Command/` | 全部 `moo:*` artisan 入口 |
 | 生成器 | `src/Generator/` + `src/Adder/` | 命令背后的代码生成实现 |
 | 设计器 | `src/Designer/` | 可视化 schema 编辑 + diff + migration |

@@ -58,6 +58,7 @@ $isHome = request()->routeIs('scaffold.home');
             @endphp
             <a
                 href="{{ route($item['route']) }}"
+                @if($item['route'] === 'log-viewer.index') target="_blank" rel="noopener noreferrer" @endif
                 class="header__menu-item {{ $active ? 'is-active' : '' }}"
                 @if($active) aria-current="page" @endif
             >@if (! empty($item['icon']))<x-scaffold::icon :name="$item['icon']" :size="15" class="header__menu-icon" />@endif{{ $item['label'] }}</a>

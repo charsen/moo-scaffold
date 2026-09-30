@@ -18,6 +18,11 @@ use Opcodes\LogViewer\Http\Middleware\AuthorizeLogViewer;
 /** Scaffold 管入口与访问策略，Log Viewer 管日志读取与展示。 */
 final class LogViewerIntegration
 {
+    public static function script(): string
+    {
+        return file_get_contents(__DIR__ . '/../../public/javascript/pages/log-viewer.js');
+    }
+
     public static function enabled(): bool
     {
         return (bool) config('scaffold.route.enabled', true)

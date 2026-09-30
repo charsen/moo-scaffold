@@ -69,7 +69,9 @@ class MooeenScaffoldServiceProvider extends ServiceProvider
         $this->app->booted(fn () => $this->app->make(\Mooeen\Scaffold\Support\LogViewerIntegration::class)->configureMiddlewarePriority());
         $this->app->resolving('log-viewer', function ($viewer) {
             $viewer->setViewLayout('scaffold::logs');
-            $viewer->auth(fn ($request) => app(\Mooeen\Scaffold\Auth\ScaffoldAuth::class)->authenticateRequest($request) !== null);
+            // 日志中间件已完成本次请求认证；复用服务端属性，不跨请求缓存账号状态。
+            $viewer->auth(fn ($request) => is_string($request->attributes->get('scaffold_auth_user'))
+                && $request->attributes->get('scaffold_auth_user') !== '');
         });
 
         // plan 38：三件套上移——共享雪花单例 scaffold.snowflake（原各包各自 registerSnowflake，单例名各异）。
