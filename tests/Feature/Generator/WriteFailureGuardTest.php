@@ -184,7 +184,13 @@ it('AccountStore::create():写盘失败 → 抛异常（控制器落 flash_error
         config(['scaffold.accounts.yaml_path' => 'accounts.yaml']);
         app()->instance(Filesystem::class, wfg_failing_fs());
 
-        $store = app(AccountStore::class);
+        $store = new class(app('config'), app(Filesystem::class)) extends AccountStore
+        {
+            protected function writeFileAtomically(string $path, string $content, ?int $mode = null): void
+            {
+                throw new RuntimeException('写入失败');
+            }
+        };
 
         expect(fn () => $store->create(['username' => 'wfg', 'password' => 'x', 'role' => 'admin'], 'test'))
             ->toThrow(RuntimeException::class, '写入失败');

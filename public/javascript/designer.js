@@ -70,6 +70,11 @@ document.addEventListener('alpine:init', () => {
         renameHints: {},          // {oldKey: newKey}
         savingState: 'idle',      // idle | saving | saved | error
         _saveTimer: null,
+        _savePromise: null,
+        _saveRevision: 0,
+        _savedRevision: 0,
+        _previewRevision: null,
+        saveWarnings: [],
         migrating: false,
         // v6.2 round 5:saving 状态扩展
         lastSavedAt: 0,           // ms epoch,0 = 从未保存
@@ -265,6 +270,9 @@ document.addEventListener('alpine:init', () => {
         get saveStatusText() {
             // 触读 _nowTick 让 getter 跟 setInterval 走(每 5s 重算 "N 秒前")
             const _ = this._nowTick;
+            if (this.saveWarnings.length && this.savingState !== 'saving' && this.savingState !== 'error') {
+                return '已保存 · 缓存刷新失败';
+            }
             switch (this.savingState) {
                 case 'saving': return '保存中…';
                 case 'saved':  return '已保存';
@@ -712,63 +720,78 @@ document.addEventListener('alpine:init', () => {
         _scheduleSave() {
             if (!this.saveEndpoint) return;
             if (this._saveTimer) clearTimeout(this._saveTimer);
-            this._isDirty = true;     // #3:每次 setter 都标 dirty
+            this._saveRevision += 1;
+            this._isDirty = true;
             this.savingState = 'saving';
-            this._saveTimer = setTimeout(() => this._flushSave(), 500);
+            // 在途请求完成后保存最新修改；不并行发送旧、新两份内容。
+            if (!this._savePromise) this._saveTimer = setTimeout(() => this._flushSave(), 500);
         },
-        // 网络/5xx 错才重试,验证错(422/SUSPECTED_RENAMES)不重试
         _shouldRetrySave(e) {
             if (!e) return false;
-            if (e.status === undefined || e.status === 0) return true;     // 网络断
-            return e.status >= 500;
+            if (e.status === undefined || e.status === 0) return true;
+            return e.status >= 500 && e.status !== 522;
         },
-        // plan 19 v8 C2:统一错误文案,_toast 1.2s dedup 实现去重
         _saveErrorText(e) {
             return (e && (e.message || e.code)) || '未知';
         },
-        async _flushSave(retryCount) {
-            this._saveTimer = null;     // 进入 flush 后 timer 标 null,saveNow 据此区分"等待中 vs 真 in-flight"
-            retryCount = retryCount || 0;
-            try {
-                await this._post(this.saveEndpoint, this._buildSavePayload());
-                this.savingState = 'saved';
-                this.lastSavedAt = Date.now();
-                this.saveErrorMsg = '';
-                this._isDirty = false;     // #3:flush 成功才清 dirty
-                setTimeout(() => { if (this.savingState === 'saved') this.savingState = 'idle'; }, 1500);
-            } catch (e) {
-                // 第一次失败 + 网络错 → 1s 后静默重试,user 看到的 pill 仍是"保存中…"
-                if (retryCount < 1 && this._shouldRetrySave(e)) {
-                    setTimeout(() => this._flushSave(retryCount + 1), 1000);
-                    return;
+        _flushSave() {
+            if (this._saveTimer) clearTimeout(this._saveTimer);
+            this._saveTimer = null;
+            if (this._savePromise) return this._savePromise;
+            if (!this.saveEndpoint) return Promise.resolve(false);
+            this._savePromise = this._drainSaves().finally(() => {
+                this._savePromise = null;
+                if (this._isDirty && this.savingState !== 'error') {
+                    this.savingState = 'saving';
+                    this._saveTimer = setTimeout(() => this._flushSave(), 500);
                 }
-                this.savingState = 'error';
-                this.saveErrorMsg = this._saveErrorText(e);
-                this._toast('保存失败' + (retryCount > 0 ? '（已重试）' : '') + '：' + this.saveErrorMsg, 'danger');
-            }
+            });
+            return this._savePromise;
         },
-        // —— 立即保存(保存按钮触发):取消 debounce、flush 一次、给 toast 反馈 ——
-        // 2026-05-21:enum 翻译辅助 feature,空 key 现在是合法 pending 状态(等 AI 翻译填),
-        // save 端不再 warn。codegen(moo:model)看到 pending key 会拒生成 + 提示 user。
-        async saveNow() {
-            // savingState='saving' 有两层来源:_scheduleSave 设的(timer 等待中) vs _flushSave 真 in-flight。
-            // 只有真 in-flight(timer 已 null)才 noop;timer 还在 → bypass 它立刻 flush
-            if (this.savingState === 'saving' && !this._saveTimer) return;
-            if (!this.saveEndpoint) { this._toast('保存端点未配置', 'warning'); return; }
-            if (this._saveTimer) { clearTimeout(this._saveTimer); this._saveTimer = null; }
+        async _drainSaves() {
             this.savingState = 'saving';
-            try {
-                await this._post(this.saveEndpoint, this._buildSavePayload());
-                this.savingState = 'saved';
-                this.lastSavedAt = Date.now();
-                this.saveErrorMsg = '';
-                this._isDirty = false;     // #3
-                this._toast('已保存', 'success');
-                setTimeout(() => { if (this.savingState === 'saved') this.savingState = 'idle'; }, 1500);
-            } catch (e) {
-                this.savingState = 'error';
-                this.saveErrorMsg = this._saveErrorText(e);
-                this._toast('保存失败：' + this.saveErrorMsg, 'danger');
+            this._isDirty = true;
+            let retried = false;
+            do {
+                const revision = this._saveRevision;
+                try {
+                    const data = await this._post(this.saveEndpoint, this._buildSavePayload());
+                    this._savedRevision = revision;
+                    // 请求期间继续编辑，保留 dirty 并合并成下一次保存。
+                    if (revision !== this._saveRevision) continue;
+                    this.saveWarnings = (data && data.warnings) || [];
+                    this.savingState = 'saved';
+                    this.lastSavedAt = Date.now();
+                    this.saveErrorMsg = '';
+                    this._isDirty = false;
+                    this.saveWarnings.forEach(message => this._toast(message, 'warning'));
+                    setTimeout(() => { if (this.savingState === 'saved') this.savingState = 'idle'; }, 1500);
+                } catch (e) {
+                    if (!retried && this._shouldRetrySave(e)) {
+                        retried = true;
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        continue;
+                    }
+                    this.savingState = 'error';
+                    this._isDirty = true;
+                    this.saveErrorMsg = this._saveErrorText(e);
+                    this._toast('保存失败' + (retried ? '（已重试）' : '') + '：' + this.saveErrorMsg, 'danger');
+                    return false;
+                }
+            } while (this._savedRevision !== this._saveRevision || this._isDirty);
+            return true;
+        },
+        async _ensureSaved() {
+            while (this._saveTimer || this._savePromise || this._isDirty || this.savingState === 'error') {
+                if (!await this._flushSave()) return false;
+            }
+            return true;
+        },
+        // 空 enum key 可保存为待翻译草稿,生成器仍负责拒绝未完成定义。
+        async saveNow() {
+            if (!this.saveEndpoint) { this._toast('保存端点未配置', 'warning'); return; }
+            if (await this._flushSave()) {
+                if (!this.saveWarnings.length) this._toast('已保存', 'success');
             }
         },
         // CSP build 不支持模板里写 $event.target.value 深属性链，统一走 method 解出
@@ -2223,11 +2246,15 @@ document.addEventListener('alpine:init', () => {
         async openPreview(event) {
             const trigger = (event && (event.currentTarget || event.target)) || null;
             // 先 flush 未 save 的改动,再拉 preview
-            if (this._saveTimer) { clearTimeout(this._saveTimer); this._saveTimer = null; await this._flushSave(); }
-            // plan 19 v8 C2:如果 flush 失败 → toast 已弹,不要再走 preview fetch 弹第二条
-            if (this.savingState === 'error') return;
+            if (!await this._ensureSaved()) return;
+            const revision = this._saveRevision;
             try {
                 const data = await this._get(this.previewEndpoint);
+                if (revision !== this._saveRevision) {
+                    this._toast('设计已修改，请重新预览。', 'warning');
+                    return;
+                }
+                this._previewRevision = revision;
                 if (data && data.is_empty) {
                     this._toast('没有变更，无 migration 可生成', 'info');
                     return;
@@ -2455,6 +2482,11 @@ document.addEventListener('alpine:init', () => {
             if (this.migrating) return;
             this.migrating = true;
             try {
+                if (!await this._ensureSaved()) return;
+                if (this._previewRevision !== this._saveRevision) {
+                    this._toast('设计已修改，请重新预览后生成迁移。', 'warning');
+                    return;
+                }
                 const data = await this._post(this.migrateEndpoint, {
                     only_table: this.tableKey,     // 只生成当前表的 migration,不连其它表 drift 一起改
                 });
@@ -2464,6 +2496,7 @@ document.addEventListener('alpine:init', () => {
                 // 只报成功会误导：migration 文件已经落盘，但 baseline 没动 → 下次预览会重报本次变更，
                 // 用户再点一次生成就产出重复 migration。
                 if (data.note) this._toast(data.note, 'warning');
+                (data.warnings || []).forEach(message => this._toast(message, 'warning'));
                 this.closePreview();
                 scaffoldReload(800);
             } catch (e) {

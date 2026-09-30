@@ -1174,7 +1174,6 @@
                 headers = validKey("#request_header"),
                 urlParams = validKey("#request_params"),
                 bodyParams = validKey("#request_body_params"),
-                params = $.extend({}, urlParams, bodyParams),
                 originalText = $me.text(),
                 // 发起请求时的接口标识快照 —— 异步期间用户可能切到别的 tab(_syncSidebarHighlight
                 // 会把 .is-active 移走),而 recordHistory 跑在响应回调里,必须用这份发送时的快照,
@@ -1200,12 +1199,10 @@
                 delete headers.Authorization;
             }
 
-            // GET 的勾选参数由 proxy 拼进 query string —— 「实际地址」展示要带上,否则只显示 path、
-            // 用户既看不到也复制不到真正发出去的完整 URL(2026-06-10 修)。_proxy_url 仍传 path-only
-            // 的 uri,query 由后端 $http->get($url, $params) 追加,不能在这里重复拼(否则双 query)。
+            // 所有方法的 URL 参数都走 query；body 参数单独发送。
             var displayUri = uri;
-            if (method === "GET" && ! $.isEmptyObject(params)) {
-                displayUri = uri + (uri.indexOf("?") >= 0 ? "&" : "?") + $.param(params);
+            if (! $.isEmptyObject(urlParams)) {
+                displayUri = uri + (uri.indexOf("?") >= 0 ? "&" : "?") + $.param(urlParams);
             }
 
             var recordHistory = function (status) {
@@ -1249,7 +1246,8 @@
                     _proxy_url: uri,
                     _proxy_method: method,
                     _proxy_headers: headers,
-                    _proxy_params: params
+                    _proxy_query: urlParams,
+                    _proxy_body: bodyParams
                 },
                 success: function (json) {
                     var realStatus = json._proxy_status || 0;

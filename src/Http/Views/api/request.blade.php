@@ -225,6 +225,7 @@
     };
 </script>
 <script src="/vendor/scaffold/javascript/pages/api-request.js?v={{ @filemtime(public_path('vendor/scaffold/javascript/pages/api-request.js')) ?: time() }}"></script>
+<script src="/vendor/scaffold/javascript/api-debug-history.js?v={{ @filemtime(public_path('vendor/scaffold/javascript/api-debug-history.js')) ?: time() }}"></script>
 <script src="/vendor/scaffold/javascript/pages/api-request-index.js?v={{ @filemtime(public_path('vendor/scaffold/javascript/pages/api-request-index.js')) ?: time() }}"></script>
 @if (!empty($current_controller) && ! empty($current_action))
 <script nonce="{{ $cspNonce ?? "" }}">

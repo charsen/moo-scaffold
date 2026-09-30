@@ -95,9 +95,11 @@ YAML `authorization: true` 的接口,调试器给一个**手动填写**的 `Auth
 - 切 tab:params 走 DOM swap(保留编辑状态),response 走 state-based(内存缓存)
 - 切 app = 新页面 = 新 tabs(跨 app 不保留)
 
+升级后须按安装流程重新发布 Scaffold `public` 资源,使调试页面使用配套的代理参数和历史脱敏脚本。
+
 ## 历史抽屉
 
-- **本地历史抽屉**(api/request 页内右侧)— `localStorage` 存最多 **100** 条,纯本机不进 git,分页每页 10 条。**点行回填** method / host / uri / headers / params 免重输,敏感 header 显示时 mask。
+- **本地历史抽屉**(api/request 页内右侧)— `localStorage` 存最多 **100** 条,纯本机不进 git,分页每页 10 条。**点行回填** method / host / uri / headers / params 免重输,敏感 header、密码/token 参数和 URL 查询参数在存入历史前脱敏,旧记录读取时也脱敏并回写。本机历史的悬浮 URL 不保留密码/token;回填跳过脱敏占位,需重新填写敏感值。
 
 ## 发布历史
 
@@ -121,6 +123,8 @@ YAML `authorization: true` 的接口,调试器给一个**手动填写**的 `Auth
     'timeout' => (int) env('SCAFFOLD_PROXY_TIMEOUT', 30),
 ],
 ```
+
+URL 参数和 body 参数分别转发,POST/PUT/PATCH/DELETE 的 query 不再混入表单 body;同名 query/body 字段可以同时存在。当前 body 仍使用表单编码,本轮不新增 JSON/文件上传发送模式。代理新增 `_proxy_query` / `_proxy_body` 数组输入;旧 `_proxy_params` 继续兼容(GET 转为 query,其余方法转为 body),新旧并存时优先分流字段。
 
 故意不留兜底开关:**TLS 永远校验**(证书错直接报 `cURL error 60`,去修证书);**不 follow redirect**(301/302 原样返回,说明 `hosts` 的 scheme 写错,改 config)。
 

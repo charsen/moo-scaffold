@@ -18,9 +18,9 @@ order: 70
 ## 改 schema → 上 DB(主流程)
 
 1. 进 `/scaffold/db/designer/{schema}`,左 sidebar 选表(或"新建表")。
-2. 字段表里改字段 / 索引 / 枚举 —— **无保存按钮**,改完 500ms debounce 自动 POST `/save`,sub-nav 上 `saveStatus` 更新(失败弹 toast)。
-3. 点"预览"(`/preview`):后端跑 diff + 生成 migration PHP 源码,右栏抽屉显示,**不写盘**。
-4. 点"migrate"(`/migrate`):真写 `database/migrations/{ts}_xxx.php` + 推进 `.snapshots/` baseline。
+2. 字段表里改字段 / 索引 / 枚举,改完 500ms debounce 自动 POST `/save`,也可立即保存。请求串行执行,期间继续编辑会合并为下一次保存;全部完成后才显示“已保存”。
+3. 点"预览"(`/preview`):后端跑 diff + 生成 migration PHP 源码,右栏抽屉显示,**不写盘**。预览等待最新保存完成;预览后又修改设计时须重新预览才能生成迁移。
+4. 点"migrate"(`/migrate`):只为当前表写 `database/migrations/{ts}_xxx.php` + 推进该表 `.snapshots/` baseline。**不执行数据库迁移**,真正更新 DB 仍需手动运行 `php artisan migrate`。
 5. **GUI 不自动 git commit**,你手动 `git add + commit`(模板见 [`14-multi-dev-workflow.md`](14-multi-dev-workflow.md) §五)。
 
 > 字段名前缀 strip / 拼写检查 / 中文→字段名翻译 / 批量加字段都有行内 AI 按钮,走 DeepSeek(配置见下文)。
@@ -33,13 +33,15 @@ order: 70
 | 改名 schema | schema hero ✏ | 文件名 + yaml `module.folder` 一起改,显示名 `module.name` 不变 |
 | 删 schema | schema hero × | **草稿态** — 只删 yaml,**不**删 migration / DB |
 | 创建表 | sidebar"新建表" | 写新 table 段,带默认 id / creator_id / updater_id / deleted_at / 时间戳字段 |
-| 删表 | 表 hero × | 从 yaml 移除该表段,不动 migration / DB |
+| 删表 | 表 hero × | 从 YAML 移除该表段,按当前表差异生成 drop migration;其他表的待处理变更与快照不受影响,DB 暂不改变 |
 
 新建 Schema 时,文件头的 `# SchemaName / @date` 只记录文件元数据。显示名和说明仍分别写在 `module.name`、`module.desc`;说明为空时省略 `module.desc`。这些值统一经 `YamlFormatter` 序列化,即使包含 `:`、`#`、换行或字面量 `null`,也不会被误解析成注释或其它 YAML 类型。
 
+保存设计、通过预览中的 migrate 生成迁移后会刷新生成缓存;刷新失败会提示“文件已保存,但缓存刷新失败”,修复原因后运行 `php artisan moo:fresh` 再继续生成代码。
+
 Designer 能立即读取新 YAML;后续要运行代码生成器时,仍需先执行 `moo:fresh` 刷新 `storage/scaffold` 缓存。
 
-> 删表 / 删 schema 都是**草稿态删**(只动 yaml,不 emit drop migration)。要彻底删 DB 里的表:designer 标删 → 手写 drop migration → migrate → 再删 yaml。
+> 删表后检查返回的 migration 与提示,运行 `php artisan migrate` 才会删除物理表。删 schema 仍只删除 YAML,不生成整库 drop migration,也不删除已有迁移或 DB。
 
 ## 字段索引 dropdown
 

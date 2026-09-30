@@ -15,6 +15,8 @@ class ProxyRequest extends FormRequest
             '_proxy_method'  => ['nullable', 'string', 'in:GET,POST,PUT,PATCH,DELETE,get,post,put,patch,delete'],
             '_proxy_headers' => ['nullable', 'array'],
             '_proxy_params'  => ['nullable', 'array'],
+            '_proxy_query'   => ['nullable', 'array'],
+            '_proxy_body'    => ['nullable', 'array'],
         ];
     }
 }

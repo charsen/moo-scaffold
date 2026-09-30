@@ -24,8 +24,8 @@ use RuntimeException;
  * 刻意不做的事（已知取舍，勿当遗漏）：
  *   - **不 fsync**：与本仓既有实现（含 Laravel `Filesystem::replace`）保持一致，不为每次
  *     保存加 syscall。代价是断电场景仍有丢数据可能，但不会留半份文件。
- *   - **不加 flock**：读-改-写的丢更新窗口（两个 tab 同时提交同一 schema）不是锁能解决的
- *     —— 锁只串行化写入动作，读到的仍是旧版本。要真正解决得靠版本号/CAS，成本远超收益。
+ *   - **不加 flock**：本 helper 只负责写入，不管理读取；仅锁最终写入不能防止旧版本覆盖。
+ *     需要串行读改写或版本校验的调用方自行处理（AccountStore 锁完整操作）。
  *   - **不做 symlink 策略**：目标若是符号链接，`rename` 会把链接本身替换成普通文件
  *     （而 `file_put_contents` 会写穿）。调用方负责先用 `realpath` 解析路径
  *     （SchemaLoader / SnapshotStore 均已如此；LocalMarkdownEditor 另有显式拒绝）。
@@ -37,13 +37,14 @@ trait AtomicFileWrite
     /**
      * 原子写 `$content` 到 `$path`。
      *
+     * 显式 mode 用于私密文件；省略时保持现有文件权限与原有创建策略。
      * 临时文件用随机后缀（`.tmp.{hex}`），不会命中本仓的目录扫描 glob
      * （`*.yaml` / `*_table.php` / `*.php`），因此不会被当成真文件读走。
      *
      * @throws RuntimeException 目录不可写 / 临时文件写入失败 / rename 失败时；
      *                          三种情况都不会改动 `$path`，也不会留下 tmp 文件。
      */
-    protected function writeFileAtomically(string $path, string $content): void
+    protected function writeFileAtomically(string $path, string $content, ?int $mode = null): void
     {
         $dir = dirname($path);
         if (! is_dir($dir) || ! is_writable($dir)) {
@@ -51,6 +52,12 @@ trait AtomicFileWrite
         }
 
         $tmp = $path . '.tmp.' . bin2hex(random_bytes(6));
+        // 私密文件在写入内容前限制权限，首次创建也不出现可读的临时内容。
+        if ($mode !== null && (! @touch($tmp) || ! @chmod($tmp, $mode))) {
+            @unlink($tmp);
+
+            throw new RuntimeException("临时文件权限设置失败：{$tmp}");
+        }
         if (@file_put_contents($tmp, $content) === false) {
             @unlink($tmp);
 
@@ -59,10 +66,10 @@ trait AtomicFileWrite
 
         // 保留原文件权限位（含 setuid/setgid/sticky，用 07777 而非 0777 —— SGID 共享目录
         // 下的文件可能合法带这些位）。文件不存在时（首次创建）走 umask 默认，与原来一致。
-        if (is_file($path)) {
-            $mode = @fileperms($path);
-            if ($mode !== false) {
-                @chmod($tmp, $mode & 07777);
+        if ($mode === null && is_file($path)) {
+            $existingMode = @fileperms($path);
+            if ($existingMode !== false) {
+                @chmod($tmp, $existingMode & 07777);
             }
         }
 

@@ -33,6 +33,9 @@ class ApiProxyController extends Controller
         $method         = strtoupper((string) ($validated['_proxy_method'] ?? 'GET'));
         $headers        = $validated['_proxy_headers'] ?? [];
         $params         = $validated['_proxy_params']  ?? [];
+        $separateParams = array_key_exists('_proxy_query', $validated) || array_key_exists('_proxy_body', $validated);
+        $query          = $separateParams ? ($validated['_proxy_query'] ?? []) : ($method === 'GET' ? $params : []);
+        $requestBody    = $separateParams ? ($validated['_proxy_body'] ?? []) : ($method === 'GET' ? [] : $params);
         $allowedMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
         if (empty($url)) {
@@ -57,11 +60,16 @@ class ApiProxyController extends Controller
 
         try {
             $http = $this->buildProxyClient(is_array($headers) ? $headers : []);
+            // 保留 URI 已有 query；同名 query 与 body 字段分别发送，不互相覆盖。
+            $url = explode('#', $url, 2)[0];
+            if ($query !== []) {
+                $url .= (str_contains($url, '?') ? '&' : '?') . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+            }
 
             if ($method === 'GET') {
-                $response = $http->get($url, $params);
+                $response = $http->get($url);
             } else {
-                $response = $http->asForm()->{strtolower($method)}($url, $params);
+                $response = $http->asForm()->{strtolower($method)}($url, $requestBody);
             }
 
             // 故意不 follow redirect:server 把 http 跳到 https 这种通常说明 host config 写错了,
