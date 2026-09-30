@@ -114,6 +114,7 @@ class ScaffoldAuth
         }
     }
 
+    /** @return array{username: string, last_active: int, is_admin: bool}|null */
     public function authenticateRequest(Request $request): ?array
     {
         if (! $this->isEnabled()) {
@@ -138,7 +139,8 @@ class ScaffoldAuth
             return null;
         }
 
-        if (! isset($this->getAccounts()[$username])) {
+        $account = $this->getAccounts()[$username] ?? null;
+        if ($account === null) {
             return null;
         }
 
@@ -153,6 +155,8 @@ class ScaffoldAuth
         return [
             'username'    => $username,
             'last_active' => $lastActive,
+            // 只返回角色判定，不把密码等账号字段带入认证结果或 Cookie。
+            'is_admin' => ($account['role'] ?? '') === AccountStore::ROLE_ADMIN,
         ];
     }
 

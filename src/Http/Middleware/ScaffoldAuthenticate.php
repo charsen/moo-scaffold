@@ -43,7 +43,8 @@ class ScaffoldAuthenticate
         $request->attributes->set('scaffold_auth_user', $user['username']);
         view()->share('scaffold_auth_user', $user['username']);
         // 人员管理入口 / 权限可见性:把当前用户是否 admin 共享给所有视图
-        $isAdmin = $this->accounts->isAdmin($user['username']);
+        // 复用本次认证读取的角色；兼容宿主覆盖认证方法时的原有返回结构。
+        $isAdmin = $user['is_admin'] ?? $this->accounts->isAdmin($user['username']);
         $request->attributes->set('scaffold_is_admin', $isAdmin);
         view()->share('scaffold_is_admin', $isAdmin);
 

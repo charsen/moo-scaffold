@@ -4,6 +4,8 @@
 
 ## 应用日志接入
 
+- [x] 修复二次复盘发现的 Bash 计数提前退出及认证角色重复读取，验证停用和角色变更在下一请求生效。见 [接入计划](plans/log-viewer-integration.md)。
+
 - [x] 完成复盘修复及性能优化：单请求鉴权、增量菜单扫描、JS/PHP 契约测试分流、Sass 与静态守卫、Provider 文档修正；保留已确认的无表单 522 规则。见 [接入计划](plans/log-viewer-integration.md)。
 
 - [x] 完成已批准的体验优化：登录失效后返回当前日志页面、只读标识及索引清理菜单隐藏、修正资源过期误提示。见 [接入计划](plans/log-viewer-integration.md)。

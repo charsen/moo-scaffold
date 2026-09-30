@@ -45,11 +45,11 @@ matches=$(printf '%s\n' "$matches" | LOG_CSS_ALLOWED="$allowed_log_css" awk -v f
 if [[ -n "$matches" ]]; then
     echo "❌ 发现 <style> 块："
     echo "$matches" | sed 's/^/    /'
-    ((FAIL_COUNT++))
+    FAIL_COUNT=$((FAIL_COUNT + 1))
     FAIL=1
 else
     echo "✅ <style> = 0"
-    ((PASS_COUNT++))
+    PASS_COUNT=$((PASS_COUNT + 1))
 fi
 
 # -------------------------------------------------------------------
@@ -61,11 +61,11 @@ count=$(grep -rEn "#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?\\b" "$VIEWS" --include="*.bl
 if [[ "$count" -gt 5 ]]; then
     echo "❌ 发现 $count 处（阈值 5）"
     grep -rEn "#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?\\b" "$VIEWS" --include="*.blade.php" 2>/dev/null | sed 's/^/    /'
-    ((FAIL_COUNT++))
+    FAIL_COUNT=$((FAIL_COUNT + 1))
     FAIL=1
 else
     echo "✅ 硬编码 hex 数 = $count"
-    ((PASS_COUNT++))
+    PASS_COUNT=$((PASS_COUNT + 1))
 fi
 
 # -------------------------------------------------------------------
@@ -77,11 +77,11 @@ matches=$(grep -rEn "padding:\\s*[0-9]+px" "$VIEWS" --include="*.blade.php" 2>/d
 if [[ -n "$matches" ]]; then
     echo "❌ 发现："
     echo "$matches" | sed 's/^/    /'
-    ((FAIL_COUNT++))
+    FAIL_COUNT=$((FAIL_COUNT + 1))
     FAIL=1
 else
     echo "✅ padding: Npx = 0"
-    ((PASS_COUNT++))
+    PASS_COUNT=$((PASS_COUNT + 1))
 fi
 
 # -------------------------------------------------------------------
@@ -107,10 +107,10 @@ if [[ -n "$big_scripts" ]]; then
     echo "$big_scripts" | sed 's/^/    /'
     # 不算 FAIL：业务上 dictionaries / db/index / route 的滚动 spy 等 ~50 行是合理
     # 严格度按 02 plan §13 也只列了"业务视图 <style>=0"硬要求，<script> 是建议
-    ((PASS_COUNT++))
+    PASS_COUNT=$((PASS_COUNT + 1))
 else
     echo "✅ 没有 >30 行内联 <script>"
-    ((PASS_COUNT++))
+    PASS_COUNT=$((PASS_COUNT + 1))
 fi
 
 
@@ -138,11 +138,11 @@ if [[ -d "$SRC/Http" ]]; then
         echo "❌ Web 层发现 Artisan::call('moo:...'):"
         echo "$matches" | sed 's/^/    /'
         echo "    → 生成 / 破坏类命令一律走终端,详见 ScaffoldProvider 顶部 SECURITY POLICY 注释"
-        ((FAIL_COUNT++))
+        FAIL_COUNT=$((FAIL_COUNT + 1))
         FAIL=1
     else
         echo "✅ Web 层无 moo:* Artisan 调用"
-        ((PASS_COUNT++))
+        PASS_COUNT=$((PASS_COUNT + 1))
     fi
 fi
 
