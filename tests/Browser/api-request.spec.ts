@@ -88,6 +88,41 @@ async function switchToTabByIndex(page: Page, idx: number): Promise<void> {
 }
 
 test.describe('接口调试器 tab 编排回归', () => {
+    test('发送保留原始 URL 和认证头，新增与旧调试历史都脱敏', async ({ page }) => {
+        const app = await openApiDebugger(page);
+        const eps = await discoverTwoEndpoints(page);
+        expect(eps.length).toBeGreaterThan(0);
+        await openTab(page, eps[0]);
+        const key = 'scaffold.apiHistory.' + (app || 'default');
+        await page.evaluate(k => localStorage.removeItem(k), key);
+        await page.locator('#uri').fill('/e2e-history?password=E2eUrlSecret&name=public');
+        await page.getByRole('button', { name: '+ 新增 Header', exact: true }).click();
+        const header = page.locator('#request_header tr').last();
+        await header.locator('.key').fill('Authorization');
+        await header.locator('.value').fill('Bearer E2eHeaderSecret');
+        let sent = '';
+        await page.route('**/api/proxy', async route => {
+            sent = route.request().postData() || '';
+            await route.fulfill({ status: 200, json: { _proxy_status: 200, _proxy_headers: {}, data: {} } });
+        });
+        await page.locator('#send').click();
+        await expect.poll(() => sent).not.toBe('');
+        const payload = new URLSearchParams(sent);
+        expect(payload.get('_proxy_url')).toContain('password=E2eUrlSecret');
+        expect(payload.get('_proxy_headers[Authorization]')).toBe('Bearer E2eHeaderSecret');
+        await expect.poll(() => page.evaluate(k => localStorage.getItem(k), key)).not.toBeNull();
+        const saved = await page.evaluate(k => localStorage.getItem(k)!, key);
+        expect(saved).not.toContain('E2eUrlSecret');
+        expect(saved).not.toContain('E2eHeaderSecret');
+        expect(saved).toContain('name=public');
+        await page.evaluate(k => localStorage.setItem(k, JSON.stringify([{
+            method: 'GET', uri: '/old?token=E2eOldSecret', full_url: '/old?token=E2eOldSecret',
+            headers: { Authorization: 'E2eOldHeader' }, url_params: { password: 'E2eOldPassword' },
+        }])), key);
+        await page.locator('#recent_records_trigger').click();
+        await expect.poll(() => page.evaluate(k => localStorage.getItem(k), key)).not.toContain('E2eOld');
+    });
+
     test('BUG 1:发送中切 tab,最近记录记的是发送时的接口(不是切过去那个)', async ({ page }) => {
         const app = await openApiDebugger(page);
         const eps = await discoverTwoEndpoints(page);
