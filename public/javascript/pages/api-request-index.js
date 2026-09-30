@@ -573,11 +573,7 @@
         var HISTORY_KEY_PREFIX = 'scaffold.apiHistory.';
         var HISTORY_LIMIT = 100;
         var PAGE_SIZE = 10;
-        var MASK_HEADERS = ['authorization', 'cookie', 'x-csrf-token'];
-        var MASK_VALUE = '***';   // 脱敏占位:入库时替换敏感 header,回填时据此跳过(不覆盖真实 token)
-        // 敏感参数键:密码 / token 类不该明文落 localStorage 历史(header 早已脱敏,参数此前漏了 →
-        // 登录密码明文跨会话留存,2026-06-10 补)。回填时 skipMasked 跳过 *** 占位,用户重填。
-        var MASK_PARAM_KEYS = /^(password|passwd|pwd|old_password|new_password|token|secret|api_?key|access_token|refresh_token|authorization)$/i;
+        var MASK_VALUE = '***';   // 回填时跳过脱敏占位，保留用户重新填写的值
         var currentHistoryPage = 1;
 
         function historyKey() {
@@ -586,7 +582,14 @@
 
         function readHistory() {
             try {
-                return JSON.parse(localStorage.getItem(historyKey()) || '[]');
+                var raw = localStorage.getItem(historyKey()) || '[]';
+                var parsed = JSON.parse(raw);
+                if (!Array.isArray(parsed)) return [];
+                var list = parsed.filter(function (entry) { return entry && typeof entry === 'object'; })
+                    .map(window.ScaffoldDebugHistory.sanitizeEntry);
+                // 旧版完整 URL 可能含密码/token；读取时脱敏并回写本机历史。
+                if (JSON.stringify(list) !== raw) writeHistory(list);
+                return list;
             } catch (e) {
                 return [];
             }
@@ -606,34 +609,7 @@
             try { localStorage.removeItem(historyKey()); } catch (e) {}
         }
 
-        function maskHeaders(headers) {
-            if (!headers) return headers;
-            var out = {};
-            for (var k in headers) {
-                if (!Object.prototype.hasOwnProperty.call(headers, k)) continue;
-                out[k] = MASK_HEADERS.indexOf(String(k).toLowerCase()) !== -1 ? MASK_VALUE : headers[k];
-            }
-            return out;
-        }
-
-        // 递归脱敏参数:键名命中 MASK_PARAM_KEYS → ***;嵌套对象 / 数组继续往下走。
-        function maskParams(obj) {
-            if (!obj || typeof obj !== 'object') return obj;
-            var out = Array.isArray(obj) ? [] : {};
-            for (var k in obj) {
-                if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
-                if (MASK_PARAM_KEYS.test(String(k))) {
-                    out[k] = MASK_VALUE;
-                } else if (obj[k] && typeof obj[k] === 'object') {
-                    out[k] = maskParams(obj[k]);
-                } else {
-                    out[k] = obj[k];
-                }
-            }
-            return out;
-        }
-
-        // 同接口(method + f/c/a)+ 同状态 视为同一条:用它去重 + 计数,避免连续调试刷屏
+        // 同接口(method + f/c/a)与同状态去重并计数,避免连续调试刷屏。
         function historyDedupeKey(e) {
             return [
                 String(e.method || '').toUpperCase(),
@@ -645,9 +621,7 @@
         window.recordApiHistoryEntry = function (entry) {
             if (!entry) return;
             entry.timestamp = Date.now();
-            entry.headers = maskHeaders(entry.headers);
-            entry.url_params = maskParams(entry.url_params);
-            entry.body_params = maskParams(entry.body_params);
+            entry = window.ScaffoldDebugHistory.sanitizeEntry(entry);
             var list = readHistory();
             // 命中已有同接口同状态记录 → 累加次数、移除旧位置,再把最新一次(参数/耗时/时间已刷新)置顶
             var key = historyDedupeKey(entry), dupIdx = -1;

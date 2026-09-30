@@ -2,6 +2,12 @@
 
 本文件集中记录当前尚未完成且可执行的项目待办。复杂方案应链接到正式 plan；完成后及时勾选或清理。
 
+## 设计器、账号与调试器可靠性
+
+- [x] 完成已批准的六项修复与定向验证,见 [执行记录](plans/scaffold-workflow-reliability.md)。本轮不调整改密注销、写接口默认 ID 或 422/522 规则。
+- [x] 完成用户授权的真实 Host E2E 和 `2.2.12` 发版准备，验证范围与首轮失败/补跑结果见 [执行记录](plans/scaffold-workflow-reliability.md)。
+- [x] 收口 `2.2.12` 发布改动与验证记录，用户已授权小版本 Git 交付，见 [执行记录](plans/scaffold-workflow-reliability.md)。
+
 ## 应用日志接入
 
 - [x] 完成 `2.2.11` 发版准备：说明、依赖解析、归档资源与双远程引用核对已完成，用户已授权正式发版；升级 Host 时须重新发布 Scaffold public 资源。见 [接入计划](plans/log-viewer-integration.md)。

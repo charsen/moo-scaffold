@@ -303,3 +303,41 @@ it('文档列表:deprecated action 不进计数但仍展示(与 getAppStats 口�
         app(\Illuminate\Filesystem\Filesystem::class)->deleteDirectory(base_path($rel));
     }
 });
+
+it('代理分别发送 query 与 body，同名字段互不覆盖且保留 URL 已有 query', function (string $method) {
+    config(['scaffold.hosts' => ['本地' => 'http://localhost']]);
+    Http::fake(['localhost/*' => Http::response(['ok' => true], 200)]);
+    $this->postJson('/scaffold/api/proxy', [
+        '_proxy_url'    => 'http://localhost/api/item?fixed=1',
+        '_proxy_method' => $method,
+        '_proxy_query'  => ['name' => 'query value', 'filters' => ['state' => 'open']],
+        '_proxy_body'   => ['name' => 'body value', 'ids' => [1, 2]],
+    ])->assertOk()->assertJsonPath('_proxy_status', 200);
+    Http::assertSent(function ($request) use ($method) {
+        parse_str(parse_url($request->url(), PHP_URL_QUERY), $query);
+        expect($request->method())->toBe($method);
+        expect($query)->toBe(['fixed' => '1', 'name' => 'query value', 'filters' => ['state' => 'open']]);
+        parse_str($request->body(), $body);
+        expect($body)->toBe(['name' => 'body value', 'ids' => ['1', '2']]);
+
+        return true;
+    });
+})->with(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+it('GET 的 query 不混入 body，旧版代理参数仍可用于 GET 和 POST', function () {
+    config(['scaffold.hosts' => ['本地' => 'http://localhost']]);
+    Http::fake(['localhost/*' => Http::response(['ok' => true], 200)]);
+    $this->postJson('/scaffold/api/proxy', [
+        '_proxy_url'   => 'http://localhost/api/new', '_proxy_method' => 'GET',
+        '_proxy_query' => ['name' => 'query'], '_proxy_body' => ['name' => 'body'],
+    ])->assertJsonPath('_proxy_status', 200);
+    $this->postJson('/scaffold/api/proxy', [
+        '_proxy_url' => 'http://localhost/api/legacy-get', '_proxy_method' => 'GET', '_proxy_params' => ['name' => 'old'],
+    ])->assertJsonPath('_proxy_status', 200);
+    $this->postJson('/scaffold/api/proxy', [
+        '_proxy_url' => 'http://localhost/api/legacy-post', '_proxy_method' => 'POST', '_proxy_params' => ['name' => 'old'],
+    ])->assertJsonPath('_proxy_status', 200);
+    Http::assertSent(fn ($r) => $r->url() === 'http://localhost/api/new?name=query' && $r->body() === '');
+    Http::assertSent(fn ($r) => $r->url() === 'http://localhost/api/legacy-get?name=old');
+    Http::assertSent(fn ($r) => $r->url() === 'http://localhost/api/legacy-post' && $r->body() === 'name=old');
+});

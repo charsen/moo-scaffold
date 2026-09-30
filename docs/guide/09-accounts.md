@@ -88,6 +88,8 @@ php artisan moo:account:add charsen --password=xxx --role=admin
 | "账号或密码错误"但确信没错 | 该账号 `enabled: false`?角色不对? |
 | 登录后立刻跳回登录页 | cookie `scaffold_auth` 没存上,reverse proxy 漏 cookie? |
 | 改 `SCAFFOLD_AUTH_TTL_MINUTES` 后旧 session 失效 | 正常,重登即可 |
-| YAML 损坏导致 500 | `git log -- scaffold/accounts.yaml` checkout 上一个好版本 |
+| YAML 损坏导致无法登录 / 写入被拒 | 修复原文件或从 `git log -- scaffold/accounts.yaml` 恢复正确内容;CLI 新增账号也不会覆盖损坏文件 |
 
 > 老明文密码:**下次登录成功时**自动 bcrypt 化,零干预。误删账号从 `git log -- scaffold/accounts.yaml` 找删除前 commit,把对应行 checkout 回来。
+
+账号写入会串行执行完整的读取、校验和保存,防止并发新增或停用破坏账号集与末位管理员守卫。文件通过原子替换写入并保持 `0600`;运行锁位于 `storage/scaffold/locks/`,不进入账号 YAML 或 Git 同步。读取损坏文件仍按无可用账号拒绝登录,写入则拒绝并保留原内容。

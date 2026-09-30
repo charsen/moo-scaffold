@@ -126,14 +126,14 @@ test.describe('Navigation', () => {
         await page.goto('/scaffold/db/designer');
         await page.getByRole('link', { name: new RegExp(`^${SCHEMA} `), exact: false }).first().click();
         await expect(page).toHaveURL(new RegExp(`/designer/${SCHEMA}`));
-        await expect(page.getByRole('textbox', { name: '表 key' })).toBeVisible();
+        await expect(page.locator('#designer-table-key')).toBeVisible();
     });
 
     test('sidebar 切表 URL 加 ?table=X + 表 key 同步', async ({ page }) => {
         await page.goto(`/scaffold/db/designer/${SCHEMA}`);
         await tableSidebarLink(page, SIDEBAR_TABLE).click();
         await expect(page).toHaveURL(new RegExp(`table=${SIDEBAR_TABLE}`));
-        await expect(page.getByRole('textbox', { name: '表 key' })).toHaveValue(SIDEBAR_TABLE);
+        await expect(page.locator('#designer-table-key')).toHaveValue(SIDEBAR_TABLE);
     });
 });
 
@@ -515,7 +515,7 @@ test.describe('Create table (real write)', () => {
         // sidebar 应出现新表 link(按 data-table-key 定位:可访问名带序号前缀,前缀正则失配)
         await expect(tableSidebarLink(page, TEMP_KEY)).toBeVisible();
         // 表 key input 同步
-        await expect(page.getByRole('textbox', { name: '表 key' })).toHaveValue(TEMP_KEY);
+        await expect(page.locator('#designer-table-key')).toHaveValue(TEMP_KEY);
 
         // 测后清理:走 Alpine designer._post(带 csrfToken)调 DELETE 端点删表 yaml 节点
         // (净 0,避免历史 e2e_temp_videos_* 累积)
@@ -1019,7 +1019,7 @@ test.describe('CSP', () => {
             }
         });
         await page.goto(`/scaffold/db/designer/${SCHEMA}?table=${TABLE}`);
-        await expect(page.getByRole('textbox', { name: '表 key' })).toBeVisible();
+        await expect(page.locator('#designer-table-key')).toBeVisible();
         await page.waitForTimeout(500);
         expect(warnings, `unexpected Alpine/CSP warnings:\n${warnings.join('\n')}`).toEqual([]);
     });

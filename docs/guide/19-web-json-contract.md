@@ -38,7 +38,7 @@ order: 190
 
 ## 2. 不套信封的例外
 
-1. **`ApiProxyController`（`POST /scaffold/api/proxy`）** —— body 是**上游 API 的原样透传**，套信封会破坏代理语义。它的契约是：HTTP **恒 200**，真实状态码放在 body 的 `_proxy_status`、响应头放在 `_proxy_headers`。
+1. **`ApiProxyController`（`POST /scaffold/api/proxy`）** —— body 是**上游 API 的原样透传**，套信封会破坏代理语义。它的契约是：HTTP **恒 200**，真实状态码放在 body 的 `_proxy_status`、响应头放在 `_proxy_headers`。 请求参数使用 `_proxy_query` 与 `_proxy_body` 分别传递;旧 `_proxy_params` 仍兼容,不改变上游响应协议。
 2. **框架层响应** —— 由 Laravel 而非 scaffold 控制器产出，形态是 `{message}`（校验失败是 `{message, errors:{字段:[…]}}`）：
    - `abort()` / `abort_if()` / `abort_unless()` 抛出的 HttpException（计划 / 发版日志编辑的 403 / 404 / 409 走这条；正文控件校验为 422，隐藏路径等业务拒绝由 BaseException 返回 522）；
    - 表单校验失败（`FormRequest` 的校验袋）；

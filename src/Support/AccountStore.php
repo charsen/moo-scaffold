@@ -7,6 +7,7 @@ namespace Mooeen\Scaffold\Support;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Log;
+use Mooeen\Scaffold\Support\Concerns\AtomicFileWrite;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
 
@@ -22,6 +23,8 @@ use Symfony\Component\Yaml\Yaml;
  */
 class AccountStore
 {
+    use AtomicFileWrite;
+
     public const ROLE_ADMIN = 'admin';
 
     public const ROLE_MEMBER = 'member';
@@ -55,6 +58,11 @@ class AccountStore
      */
     public function load(): array
     {
+        return $this->readDocument(false);
+    }
+
+    private function readDocument(bool $strict): array
+    {
         if (! $this->exists()) {
             return ['meta' => [], 'accounts' => []];
         }
@@ -64,15 +72,13 @@ class AccountStore
         // 2026-09-11：accounts.yaml 入 git、随仓多机同步，冲突标记(<<<<<<<) / 手改坏形是现实事件。
         // 裸 parse 抛异常会 500 掉整条鉴权链路（ScaffoldAuthenticate 每次请求都 load），
         // 而修复入口 /scaffold/accounts 本身也在鉴权之后 → 面板彻底锁死，只能上磁盘改文件。
-        // 解析失败统一降级为空集，口径同 AiSettingStore::load()。
-        //
-        // ⚠️ 已知边界（本次刻意未处理，见 NOTES.md）：降级为空集后，任何一次写操作
-        // （create / update / toggle / delete 内部都走 load → persist）都会以「空账号集」
-        // 重写整个文件，即覆盖掉原内容。本文件入 git，回滚靠 git；若需要挡住这个覆盖面，
-        // 应在写入口加「损坏即拒写 / 先隔离坏文件」的守卫。
+        // 鉴权读取降级为空集；写入读取严格校验，不能用空集覆盖损坏的原文件。
         try {
             $parsed = Yaml::parse($raw);
         } catch (\Throwable $e) {
+            if ($strict) {
+                throw new RuntimeException('账号文件损坏，请先修复原文件后重试。', 0, $e);
+            }
             Log::warning('scaffold.accounts.parse_failed', [
                 'path'  => $this->path(),
                 'error' => $e->getMessage(),
@@ -84,15 +90,30 @@ class AccountStore
         // YAML 合法但根节点不是映射（例如整文件就是一句标量）时同样按降级处理，
         // 否则 `$data['accounts']` 会在字符串上取下标。
         $data = is_array($parsed) ? $parsed : [];
+        if ($strict && (! is_array($parsed) || ! isset($data['accounts']) || ! is_array($data['accounts'])
+                                            || (isset($data['meta']) && ! is_array($data['meta'])))) {
+            throw new RuntimeException('账号文件结构不合法，请先修复原文件后重试。');
+        }
 
         $accounts = [];
         foreach ((array) ($data['accounts'] ?? []) as $row) {
             if (! is_array($row)) {
+                if ($strict) {
+                    throw new RuntimeException('账号文件含不合法记录，请先修复原文件后重试。');
+                }
+
                 continue;
             }
             $row = $this->normalize($row);
             if ($row === null) {
+                if ($strict) {
+                    throw new RuntimeException('账号文件含不合法记录，请先修复原文件后重试。');
+                }
+
                 continue;
+            }
+            if ($strict && isset($accounts[$row['username']])) {
+                throw new RuntimeException('账号文件含重复用户名，请先修复原文件后重试。');
             }
             $accounts[$row['username']] = $row;
         }
@@ -135,49 +156,48 @@ class AccountStore
      */
     public function create(array $payload, string $by): array
     {
-        $this->assertWritable();
+        return $this->mutate(function (array $loaded) use ($payload, $by): array {
+            $username = trim((string) ($payload['username'] ?? ''));
+            if ($username === '') {
+                throw new RuntimeException('username 不能为空');
+            }
 
-        $username = trim((string) ($payload['username'] ?? ''));
-        if ($username === '') {
-            throw new RuntimeException('username 不能为空');
-        }
+            if (isset($loaded['accounts'][$username])) {
+                throw new RuntimeException("账号 [{$username}] 已存在");
+            }
 
-        $loaded = $this->load();
-        if (isset($loaded['accounts'][$username])) {
-            throw new RuntimeException("账号 [{$username}] 已存在");
-        }
+            $now    = $this->now();
+            $rawPwd = (string) ($payload['password'] ?? '');
+            if ($rawPwd === '') {
+                // 与上面 username 的非空校验对称。空密码落库只会得到**空 hash**，而空 hash 在
+                // ScaffoldAuth::attempt() 里恒不可登录（那里已挡，且等时返回）⇒「创建成功」是假的：
+                // 命令 / 表单都报成功，用户却永远登不进去、也查不出原因。本方法是唯一入口，
+                // CLI（moo:account:add）与 Web UI（AccountController::store）两侧都经此。
+                // ⚠ update() 的空密码是**有意**的「表示不改」，勿一并堵（见 update() 内注释）。
+                throw new RuntimeException('password 不能为空');
+            }
+            $hashedPwd = $this->isPasswordHashed($rawPwd) ? $rawPwd : password_hash($rawPwd, PASSWORD_BCRYPT);
 
-        $now    = $this->now();
-        $rawPwd = (string) ($payload['password'] ?? '');
-        if ($rawPwd === '') {
-            // 与上面 username 的非空校验对称。空密码落库只会得到**空 hash**，而空 hash 在
-            // ScaffoldAuth::attempt() 里恒不可登录（那里已挡，且等时返回）⇒「创建成功」是假的：
-            // 命令 / 表单都报成功，用户却永远登不进去、也查不出原因。本方法是唯一入口，
-            // CLI（moo:account:add）与 Web UI（AccountController::store）两侧都经此。
-            // ⚠ update() 的空密码是**有意**的「表示不改」，勿一并堵（见 update() 内注释）。
-            throw new RuntimeException('password 不能为空');
-        }
-        $hashedPwd = $this->isPasswordHashed($rawPwd) ? $rawPwd : password_hash($rawPwd, PASSWORD_BCRYPT);
+            $row = $this->normalize([
+                'username'      => $username,
+                'password'      => $hashedPwd,
+                'phone'         => (string) ($payload['phone'] ?? ''),
+                'role'          => $this->validateRole($payload['role'] ?? self::ROLE_ADMIN),
+                'enabled'       => array_key_exists('enabled', $payload) ? (bool) $payload['enabled'] : true,
+                'can_design_db' => (bool) ($payload['can_design_db'] ?? false),
+                'created_at'    => $now,
+                'updated_at'    => $now,
+            ]);
 
-        $row = $this->normalize([
-            'username'      => $username,
-            'password'      => $hashedPwd,
-            'phone'         => (string) ($payload['phone'] ?? ''),
-            'role'          => $this->validateRole($payload['role'] ?? self::ROLE_ADMIN),
-            'enabled'       => array_key_exists('enabled', $payload) ? (bool) $payload['enabled'] : true,
-            'can_design_db' => (bool) ($payload['can_design_db'] ?? false),
-            'created_at'    => $now,
-            'updated_at'    => $now,
-        ]);
+            if ($row === null) {
+                throw new RuntimeException('账号字段不合法');
+            }
 
-        if ($row === null) {
-            throw new RuntimeException('账号字段不合法');
-        }
+            $loaded['accounts'][$username] = $row;
+            $this->persist($loaded, $by, 'create:' . $username);
 
-        $loaded['accounts'][$username] = $row;
-        $this->persist($loaded, $by, 'create:' . $username);
-
-        return $row;
+            return $row;
+        });
     }
 
     /**
@@ -185,59 +205,59 @@ class AccountStore
      */
     public function update(string $username, array $payload, string $by): array
     {
-        $this->assertWritable();
-        $username = trim($username);
+        return $this->mutate(function (array $loaded) use ($username, $payload, $by): array {
+            $username = trim($username);
 
-        $loaded   = $this->load();
-        $existing = $loaded['accounts'][$username] ?? null;
-        if ($existing === null) {
-            throw new RuntimeException("账号 [{$username}] 不存在");
-        }
-
-        $next = $existing;
-        // password 空字符串表示"不改"（保留旧 hash），非空则 hash 化（如果还没 hash）
-        if (array_key_exists('password', $payload)) {
-            $newPwd = (string) $payload['password'];
-            if ($newPwd !== '') {
-                $next['password'] = $this->isPasswordHashed($newPwd)
-                    ? $newPwd
-                    : password_hash($newPwd, PASSWORD_BCRYPT);
+            $existing = $loaded['accounts'][$username] ?? null;
+            if ($existing === null) {
+                throw new RuntimeException("账号 [{$username}] 不存在");
             }
-        }
-        if (array_key_exists('phone', $payload)) {
-            $next['phone'] = (string) $payload['phone'];
-        }
-        if (array_key_exists('role', $payload)) {
-            $next['role'] = $this->validateRole($payload['role']);
-        }
-        if (array_key_exists('enabled', $payload)) {
-            $next['enabled'] = (bool) $payload['enabled'];
-        }
-        if (array_key_exists('can_design_db', $payload)) {
-            $next['can_design_db'] = (bool) $payload['can_design_db'];
-        }
-        $next['updated_at'] = $this->now();
 
-        // 末位 admin 守护:把最后一个启用 admin 降级(改 role)或停用(enabled=false),会让系统
-        // 零 admin、账号管理彻底锁死,只能改磁盘救回。delete() 早有此守护,update() 之前漏了
-        // (2026-06-09 修)。
-        $wasEnabledAdmin   = ($existing['role'] ?? '') === self::ROLE_ADMIN && ($existing['enabled'] ?? true) !== false;
-        $stillEnabledAdmin = ($next['role'] ?? '')     === self::ROLE_ADMIN && ($next['enabled'] ?? true)     !== false;
-        if ($wasEnabledAdmin && ! $stillEnabledAdmin) {
-            $otherAdmins = array_filter(
-                $loaded['accounts'],
-                fn ($a, $u) => $u !== $username && ($a['role'] ?? '') === self::ROLE_ADMIN && ($a['enabled'] ?? true) !== false,
-                ARRAY_FILTER_USE_BOTH,
-            );
-            if ($otherAdmins === []) {
-                throw new RuntimeException("不能降级 / 停用最后一个启用状态的 admin [{$username}]");
+            $next = $existing;
+            // password 空字符串表示"不改"（保留旧 hash），非空则 hash 化（如果还没 hash）
+            if (array_key_exists('password', $payload)) {
+                $newPwd = (string) $payload['password'];
+                if ($newPwd !== '') {
+                    $next['password'] = $this->isPasswordHashed($newPwd)
+                        ? $newPwd
+                        : password_hash($newPwd, PASSWORD_BCRYPT);
+                }
             }
-        }
+            if (array_key_exists('phone', $payload)) {
+                $next['phone'] = (string) $payload['phone'];
+            }
+            if (array_key_exists('role', $payload)) {
+                $next['role'] = $this->validateRole($payload['role']);
+            }
+            if (array_key_exists('enabled', $payload)) {
+                $next['enabled'] = (bool) $payload['enabled'];
+            }
+            if (array_key_exists('can_design_db', $payload)) {
+                $next['can_design_db'] = (bool) $payload['can_design_db'];
+            }
+            $next['updated_at'] = $this->now();
 
-        $loaded['accounts'][$username] = $next;
-        $this->persist($loaded, $by, 'update:' . $username);
+            // 末位 admin 守护:把最后一个启用 admin 降级(改 role)或停用(enabled=false),会让系统
+            // 零 admin、账号管理彻底锁死,只能改磁盘救回。delete() 早有此守护,update() 之前漏了
+            // (2026-06-09 修)。
+            $wasEnabledAdmin   = ($existing['role'] ?? '') === self::ROLE_ADMIN && ($existing['enabled'] ?? true) !== false;
+            $stillEnabledAdmin = ($next['role'] ?? '')     === self::ROLE_ADMIN && ($next['enabled'] ?? true)     !== false;
+            if ($wasEnabledAdmin && ! $stillEnabledAdmin) {
+                $otherAdmins = array_filter(
+                    $loaded['accounts'],
+                    fn ($a, $u) => $u !== $username && ($a['role'] ?? '') === self::ROLE_ADMIN && ($a['enabled'] ?? true) !== false,
+                    ARRAY_FILTER_USE_BOTH,
+                );
+                if ($otherAdmins === []) {
+                    throw new RuntimeException("不能降级 / 停用最后一个启用状态的 admin [{$username}]");
+                }
+            }
 
-        return $next;
+            $loaded['accounts'][$username] = $next;
+            $this->persist($loaded, $by, 'update:' . $username);
+
+            return $next;
+        });
     }
 
     /**
@@ -275,31 +295,31 @@ class AccountStore
      */
     public function delete(string $username, string $by): bool
     {
-        $this->assertWritable();
-        $username = trim($username);
+        return $this->mutate(function (array $loaded) use ($username, $by): bool {
+            $username = trim($username);
 
-        $loaded = $this->load();
-        $target = $loaded['accounts'][$username] ?? null;
-        if ($target === null) {
-            return false;
-        }
-
-        // 兜底：last admin guard
-        if (($target['role'] ?? '') === self::ROLE_ADMIN) {
-            $remainingAdmins = array_filter(
-                $loaded['accounts'],
-                fn ($a, $u) => $u !== $username && ($a['role'] ?? '') === self::ROLE_ADMIN && ($a['enabled'] ?? true) !== false,
-                ARRAY_FILTER_USE_BOTH
-            );
-            if ($remainingAdmins === []) {
-                throw new RuntimeException("不能删除最后一个启用状态的 admin [{$username}]");
+            $target = $loaded['accounts'][$username] ?? null;
+            if ($target === null) {
+                return false;
             }
-        }
 
-        unset($loaded['accounts'][$username]);
-        $this->persist($loaded, $by, 'delete:' . $username);
+            // 兜底：last admin guard
+            if (($target['role'] ?? '') === self::ROLE_ADMIN) {
+                $remainingAdmins = array_filter(
+                    $loaded['accounts'],
+                    fn ($a, $u) => $u !== $username && ($a['role'] ?? '') === self::ROLE_ADMIN && ($a['enabled'] ?? true) !== false,
+                    ARRAY_FILTER_USE_BOTH
+                );
+                if ($remainingAdmins === []) {
+                    throw new RuntimeException("不能删除最后一个启用状态的 admin [{$username}]");
+                }
+            }
 
-        return true;
+            unset($loaded['accounts'][$username]);
+            $this->persist($loaded, $by, 'delete:' . $username);
+
+            return true;
+        });
     }
 
     // resetToken / importFromConfig / backups / restore / 文件级备份：精简版 UI 不需要，
@@ -319,6 +339,32 @@ class AccountStore
     }
 
     // -------------------------------------------------------------------------
+
+    /** 锁覆盖读取、末位管理员校验和原子写入；锁文件不随账号文件的 rename 更换 inode。 */
+    private function mutate(callable $callback): mixed
+    {
+        $this->assertWritable();
+        $path = $this->path();
+        $this->ensureDir(dirname($path));
+        $identity = realpath($path) ?: realpath(dirname($path)) . '/' . basename($path);
+        $lockPath = storage_path('scaffold/locks/accounts-' . hash('sha256', $identity) . '.lock');
+        $this->ensureDir(dirname($lockPath));
+        $lock = @fopen($lockPath, 'c');
+        if ($lock === false) {
+            throw new RuntimeException('无法打开账号写入锁，请重试。');
+        }
+        @chmod($lockPath, 0600);
+        try {
+            if (! flock($lock, LOCK_EX)) {
+                throw new RuntimeException('无法锁定账号文件，请重试。');
+            }
+
+            return $callback($this->readDocument(true));
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
 
     private function persist(array $loaded, string $by, string $action, string $source = 'scaffold-ui'): void
     {
@@ -344,7 +390,7 @@ class AccountStore
      * 以及 ConfigManager 经 EnvFileEditor / PhpFileEditor 的写法）；AccountController
      * 已 `catch (\Throwable $e)` 把 message 落进 `flash_error` 红条并抑制成功绿条。
      *
-     * @throws RuntimeException 写入失败（`Filesystem::put()` 返回 false）时，文件保持原内容
+     * @throws RuntimeException 原子写入失败时，文件保持原内容
      */
     private function writeYaml(array $meta, array $accounts): void
     {
@@ -360,10 +406,7 @@ class AccountStore
                 'accounts' => $accounts,
             ], 4, 4, Yaml::DUMP_OBJECT_AS_MAP | Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
 
-        if ($this->fs->put($path, $body) === false) {   // put() 是 int|false，只能与 false 严格比
-            throw new RuntimeException("写入失败，账号文件未变更：{$path}");
-        }
-        @chmod($path, 0600);
+        $this->writeFileAtomically(realpath($path) ?: $path, $body, 0600);
     }
 
     /**
@@ -414,8 +457,9 @@ class AccountStore
 
     private function ensureDir(string $dir): void
     {
-        if (! $this->fs->isDirectory($dir)) {
-            $this->fs->makeDirectory($dir, 0755, true);
+        if (! $this->fs->isDirectory($dir) && ! $this->fs->makeDirectory($dir, 0755, true, true)
+                                           && ! $this->fs->isDirectory($dir)) {
+            throw new RuntimeException("目录创建失败：{$dir}");
         }
     }
 

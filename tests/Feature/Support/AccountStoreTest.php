@@ -12,7 +12,9 @@ use Mooeen\Scaffold\Support\AccountWriteForbiddenException;
 beforeEach(function () {
     $this->sandbox = sys_get_temp_dir() . '/scaffold_acct_' . uniqid();
     @mkdir($this->sandbox, 0755, true);
-    $this->origBase = base_path();
+    $this->origBase    = base_path();
+    $this->origStorage = storage_path();
+    app()->useStoragePath($this->sandbox . '/storage');
     app()->setBasePath($this->sandbox);
     config(['scaffold.accounts.yaml_path' => 'accounts.yaml']);   // → sandbox/accounts.yaml
     $this->store = app(AccountStore::class);
@@ -20,8 +22,8 @@ beforeEach(function () {
 
 afterEach(function () {
     app()->setBasePath($this->origBase);
-    @unlink($this->sandbox . '/accounts.yaml');
-    @rmdir($this->sandbox);
+    app()->useStoragePath($this->origStorage);
+    (new \Illuminate\Filesystem\Filesystem)->deleteDirectory($this->sandbox);
 });
 
 it('create() 把明文密码 hash 成 bcrypt', function () {
@@ -176,3 +178,112 @@ it('文件不存在与文件损坏两种"没账号"状态返回同一形状(调�
 
     expect($broken)->toBe($missing);
 });
+
+it('所有账号写入口拒绝损坏文件并逐字保留原内容', function (string $raw) {
+    file_put_contents($this->store->path(), $raw);
+    foreach ([
+        fn () => $this->store->create(['username' => 'new', 'password' => 'x'], 'test'),
+        fn () => $this->store->update('old', ['phone' => '123'], 'test'),
+        fn () => $this->store->toggleEnabled('old', false, 'test'),
+        fn () => $this->store->delete('old', 'test'),
+    ] as $write) {
+        expect($write)->toThrow(RuntimeException::class, '请先修复原文件后重试');
+        expect(file_get_contents($this->store->path()))->toBe($raw);
+    }
+})->with([
+    'parse error'      => "accounts:\n\tbroken: yes\n",
+    'scalar'           => "broken\n",
+    'missing accounts' => "meta: {}\n",
+    'invalid row'      => "accounts: [broken]\n",
+    'invalid username' => "accounts: [{username: '../broken'}]\n",
+    'duplicates'       => "accounts: [{username: old}, {username: old}]\n",
+]);
+
+it('账号原子写入保留完整内容，首次创建和更新均为 0600', function () {
+    $this->store->create(['username' => 'admin', 'password' => 'x'], 'test');
+    $path = $this->store->path();
+    clearstatcache(true, $path);
+    $before = stat($path);
+    expect($before['mode'] & 0777)->toBe(0600);
+    $this->store->update('admin', ['phone' => '123'], 'test');
+    clearstatcache(true, $path);
+    expect(stat($path)['ino'])->not->toBe($before['ino']);
+    expect(fileperms($path) & 0777)->toBe(0600);
+    expect($this->store->find('admin')['phone'])->toBe('123');
+    expect(glob($path . '.tmp.*'))->toBe([]);
+});
+
+it('两个进程同时新增账号不会丢失更新', function () {
+    $children = [];
+    foreach (['first', 'second'] as $username) {
+        $pid = pcntl_fork();
+        if ($pid === -1) {
+            throw new RuntimeException('cannot fork');
+        }
+        if ($pid === 0) {
+            // 同时起跑；bcrypt 保证读改写窗口重叠，验证整个操作而非只锁最终写入。
+            $deadline = microtime(true) + 5;
+            while (! file_exists($this->sandbox . '/start') && microtime(true) < $deadline) {
+                usleep(1000);
+            }
+            try {
+                $this->store->create(['username' => $username, 'password' => 'x'], 'test');
+                exit(0);
+            } catch (Throwable) {
+                exit(1);
+            }
+        }
+        $children[] = $pid;
+    }
+    touch($this->sandbox . '/start');
+    foreach ($children as $pid) {
+        pcntl_waitpid($pid, $status);
+        expect(pcntl_wifexited($status) && pcntl_wexitstatus($status) === 0)->toBeTrue();
+    }
+    expect(array_keys($this->store->load()['accounts']))->toEqualCanonicalizing(['first', 'second']);
+})->skip(! function_exists('pcntl_fork'), 'requires pcntl');
+
+it('两个进程同时停用管理员时只有一个成功，始终保留一个启用管理员', function () {
+    foreach (['first', 'second'] as $username) {
+        $this->store->create(['username' => $username, 'password' => 'x'], 'test');
+    }
+    $store = new class(app('config'), new \Illuminate\Filesystem\Filesystem) extends AccountStore
+    {
+        protected function writeFileAtomically(string $path, string $content, ?int $mode = null): void
+        {
+            usleep(50000);
+            parent::writeFileAtomically($path, $content, $mode);
+        }
+    };
+    $children = [];
+    foreach (['first', 'second'] as $username) {
+        $pid = pcntl_fork();
+        if ($pid === -1) {
+            throw new RuntimeException('cannot fork');
+        }
+        if ($pid === 0) {
+            $deadline = microtime(true) + 5;
+            while (! file_exists($this->sandbox . '/start') && microtime(true) < $deadline) {
+                usleep(1000);
+            }
+            try {
+                $store->toggleEnabled($username, false, 'test');
+                exit(0);
+            } catch (RuntimeException $e) {
+                exit(str_contains($e->getMessage(), '最后一个') ? 2 : 9);
+            } catch (Throwable) {
+                exit(9);
+            }
+        }
+        $children[] = $pid;
+    }
+    touch($this->sandbox . '/start');
+    $codes = [];
+    foreach ($children as $pid) {
+        pcntl_waitpid($pid, $status);
+        expect(pcntl_wifexited($status))->toBeTrue();
+        $codes[] = pcntl_wexitstatus($status);
+    }
+    expect($codes)->toEqualCanonicalizing([0, 2]);
+    expect($store->listEnabled())->toHaveCount(1);
+})->skip(! function_exists('pcntl_fork'), 'requires pcntl');

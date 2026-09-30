@@ -1,6 +1,6 @@
 # Scaffold e2e（Playwright）
 
-两个 spec —— `designer.spec.ts`（数据库设计器全流程）、`api-request.spec.ts`（接口调试器 tab 编排回归）。
+覆盖设计器、API 调试器、文档/计划/发版日志、账号与日志入口，以及主题和 Cloud 确认弹窗。
 **不自带 web server**，跑在一个真实宿主 Laravel 的 `/scaffold` 上。
 
 ## 前提
@@ -21,7 +21,7 @@ php /path/to/host/artisan serve --host=127.0.0.1 --port=8088
 
   ```bash
   npm run build:css   # 仅在改了 SCSS 时
-  php /path/to/host/artisan vendor:publish --tag=public --force
+  php /path/to/host/artisan vendor:publish --provider='Mooeen\Scaffold\MooeenScaffoldServiceProvider' --tag=public --force
   ```
 
 - ⚠️ **坑：宿主走 vhost 域名（如 `http://my-host.test`）时，Chromium 会直接拦掉并报 `net::ERR_BLOCKED_BY_CLIENT`**
@@ -78,13 +78,14 @@ file_put_contents("<本仓>/tests/Browser/.auth/admin.json", json_encode($state,
 ## 3. 跑
 
 ```bash
-# 全跑
-E2E_BASE_URL=http://127.0.0.1:8088 npm run test:e2e
+# 全跑（先确认宿主 scaffold/database 工作区干净；safe 会还原该目录）
+E2E_BASE_URL=http://127.0.0.1:8088 \
+E2E_HOST_SCAFFOLD_DB_PATH=/path/to/host/engine/scaffold/database npm run test:e2e:safe
 
 # 只跑接口调试器回归（BUG1 发送中切tab记错历史 / BUG2 切tab完成态不刷新）
 #   —— 需所选 app 至少 2 个接口,admin 合适
 E2E_BASE_URL=http://127.0.0.1:8088 E2E_API_APP=admin \
-  npx playwright test tests/Browser/api-request.spec.ts
+  npm run test:e2e:safe -- tests/Browser/api-request.spec.ts
 
 # 跑完自动还原宿主：回滚已跟踪文件 + 删掉本次**新增**的未跟踪产物
 #   （新建 schema yaml / .snapshots/*.yaml / database/migrations/*.php 都是未跟踪文件，
@@ -112,6 +113,7 @@ npm run test:e2e:ui
 | `E2E_FIELD_DECIMAL_KEY` / `_PRECISION` / `_SIZE` | 「字段表渲染」的字段与期望值 | `media_duration` / `6` / `10` |
 | `E2E_FIELD_FORMAT` | 期望的 format 值；**留空 = 跳过该列断言** | `float:1000000` |
 | `E2E_HOST_SCAFFOLD_DB_PATH` | 宿主 `scaffold/database/` 目录,供 `test:e2e:safe` 跑完还原 + 真写类 test 清理 | 无(相关 test 自动 skip) |
+| `E2E_ISOLATED_ACCOUNTS` | 仅在服务已配置独立账号文件时设为 `1`，启用账号新增/停用/删除回归 | 不启用 |
 
 带完整注释与换宿主实例的模板见 [`.env.e2e.example`](../../.env.e2e.example)。
 
@@ -140,16 +142,24 @@ npm run test:e2e:ui
 
 ## ⚠ 跑完必须核对宿主
 
-`Create table` / `Delete table` 两条用例的**清理步骤**会调 `DELETE .../tables/<key>`，
-而后端 `deleteTable` 会**对整个 schema 做 diff 并生成 migration**（设计如此：删表要出 migration）。
-所以它们会在宿主 `database/migrations/` 留下文件 —— 对应宿主 yaml 与 baseline 的既有差异，
-**不是本次改动造成的**，但必须清：
+`Create table` / `Delete table` 用例的**清理步骤**会调 `DELETE .../tables/<key>`。
+后端仅为被删除的目标表生成 migration、推进该表 snapshot，保留其他表待处理变更。
+用例会在宿主 `database/migrations/` 生成文件，必须清理；测试不执行数据库迁移：
 
 - 用 `npm run test:e2e:safe` → 当次新增的会被清掉（见 `safe-run.sh`）；
 - 直连 `npm run test:e2e` → **不会清**。这类残留下次被 safe 跑当成「宿主原有未跟踪文件」而保留，
   于是**永久累积**（本仓实测见过 3 个 `..._drop_platform_attachments_table.php` 之类）。
 
 跑完一律 `git -C <宿主仓> status --short --untracked-files=all` 核对到干净为止。
+设计器保存会刷新 ignored 的 Scaffold 缓存，safe 的 Git 清理不会还原它；结束后按 Host 的缓存刷新流程重建，并核对 `_fields.yaml` diff，避免遗留测试 schema 的缓存。
+
+## 操作可靠性回归
+
+`workflow-reliability.spec.ts` 使用独占 schema/snapshot 验证串行保存、预览过期、单表迁移范围、缓存警告和 522 不重试；每例只清理自己的 YAML 与 migration。API 历史用例拦截调试代理，验证原请求仍发送原值，而新增和旧历史都脱敏。
+
+账号用例必须使用独立服务：通过 `SCAFFOLD_ACCOUNTS_YAML` 指向 Host 根下独立的相对路径，准备仅供 E2E 的管理员并通过登录表单录制状态，再设置 `E2E_ISOLATED_ACCOUNTS=1`。测试新增 member、编辑、停用、确认旧会话立即拒绝、删除该 member，并验证日志菜单 `_blank`。该标志只启用测试，不会替服务隔离账号文件。
+
+建议临时服务用 `LARAVEL_STORAGE_PATH` 隔离缓存、Session 和日志，并关闭 Monitor 运行时采集与 Cloud 定时同步。保留真实限流；密集写入触发 429 时等窗口恢复，只补跑失败用例。Cloud 测试仅打开确认弹窗后取消，不执行清理或外部同步；AI 实调须单独启用。
 
 ## 计划与发版日志编辑验收
 

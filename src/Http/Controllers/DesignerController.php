@@ -224,11 +224,11 @@ class DesignerController extends Controller
 
         // plan-40 §四 C-1:save 后清 storage/scaffold cache,避免下游 generator(moo:model / moo:i18n)
         // 读 stale cache。同步走 artisan moo:fresh 一次,失败只 warn(scaffold 单 dev 工具,best effort)。
-        $this->refreshSchemaCache($schema);
+        $warnings = $this->refreshSchemaCache($schema);
 
         return $this->ok([
             'saved_at' => now()->format('Y-m-d H:i:s'),
-            'warnings' => [],
+            'warnings' => $warnings,
         ]);
     }
 
@@ -512,9 +512,10 @@ class DesignerController extends Controller
         }
 
         // plan-40 §四 C-1:migrate 后同样刷 cache(yaml 已经被 saveModule 改过 + 现在补 migration)
-        $this->refreshSchemaCache($schema);
+        $warnings = $this->refreshSchemaCache($schema);
 
         return $this->ok([
+            'warnings'      => $warnings,
             'files_written' => $result['files_written'],
             // 2026-09-11:baseline 没按请求推进（源 yaml 解析失败 / 快照写失败）或快照被从零重建时，
             // migration 文件**已经落盘**，但下次 preview 会重报本次变更 —— 前端按既有 `data.note`
@@ -533,19 +534,21 @@ class DesignerController extends Controller
      * 改成直接 inline FreshStorageGenerator(scaffold 自家 command 都已经这么干 — 见
      * CreateApi/CreateView/UpdateMultilingualCommand),走 NullOutput 静音。
      */
-    private function refreshSchemaCache(string $schema): void
+    private function refreshSchemaCache(string $schema): array
     {
         try {
-            $gen = new FreshStorageGenerator(
-                new NullOutput,                                  // 吸收所有 console output
-                app(Filesystem::class),
-                app(Utility::class),
-            );
-            $gen->start(clean: false, silence: true);
+            $gen = app()->makeWith(FreshStorageGenerator::class, ['command' => new NullOutput]);
+            if (! $gen->start(clean: false, silence: true)) {
+                throw new \RuntimeException('Schema 缓存刷新未完成');
+            }
+
+            return [];
         } catch (Throwable $e) {
             Log::warning(
                 "designer save/migrate cache refresh failed for {$schema}: {$e->getMessage()}",
             );
+
+            return ['文件已保存，但 Schema 缓存刷新失败。请修复原因后运行 php artisan moo:fresh，再继续生成代码。'];
         }
     }
 
@@ -734,7 +737,13 @@ class DesignerController extends Controller
         $migrationNote  = '';
         $baseline       = [];
         try {
-            $migDiff = $this->diff->diff($schema);
+            $migDiff                      = $this->diff->diff($schema);
+            $migDiff['tables']            = isset($migDiff['tables'][$table]) ? [$table => $migDiff['tables'][$table]] : [];
+            $migDiff['suspected_renames'] = array_values(array_filter(
+                $migDiff['suspected_renames'] ?? [],
+                static fn ($candidate) => ($candidate['table'] ?? '') === $table,
+            ));
+            $migDiff['is_empty'] = empty($migDiff['tables']);
             if (empty($migDiff['suspected_renames'])) {
                 $result         = $this->writer->write($migDiff);
                 $migrationFiles = $result['files_written'] ?? [];
