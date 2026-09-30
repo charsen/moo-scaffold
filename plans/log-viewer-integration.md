@@ -77,3 +77,13 @@ Log Viewer 自定义 layout 适配 CSP nonce、「返回 Scaffold」、登录失
 CSS 构建、PHP dirty Pint、JS 语法、UI 静态守卫、资源存在性和 CSS 体积预算通过。静态守卫另以临时布局验证：准确的上游 CSS nonce 表达式允许，新增普通内联 style 拒绝。未运行 E2E、全量测试或 Admin 双 smoke，未提交、合并、发版或部署。Host 升级时须重新发布 Scaffold public 资源；Laravel 10/11 和浏览器视觉尚未验证。
 
 跨仓旧 Provider 短名审计返回 1（CODE 1 / DOC 36）：唯一 CODE 是任务外仓自持旧版包中的类定义，未作为本包消费方迁移，也未修改该仓；其余文档命中未扩大处理范围。本仓 README/docs 的旧 Provider 守卫通过，跨仓审计不宣称全绿。
+
+## 2026-09-30 二次复盘修复
+
+- [x] 静态守卫的通过/失败计数改为普通算术赋值，避免 `set -e` 在新版 Bash 下因首次后置自增返回非零而提前退出；新增正常与违规夹具，要求完整汇总全部检查。
+- [x] `ScaffoldAuth::authenticateRequest()` 在原有 username/last_active 之外仅增加管理角色布尔值，中间件复用该判定，避免第二次读取账号 YAML。Cookie 格式不变，宿主覆盖认证方法并返回原结构时仍沿用既有角色判断。
+- [x] 核查包内、宿主、实现/绑定、测试/文档引用；当前工作区未发现宿主覆盖认证返回结构，另补旧结构兼容回归。账号角色与停用不跨请求缓存，422/522、Request 生成器和模板未改动。
+
+定向认证与日志集成 26 项 / 176 assertions 通过；静态守卫夹具 2 项 / 4 assertions 在 Bash 3.2 和 5.2.37 均通过。临时编译的 Bash 5.2.37 实际复现旧脚本首条通过后退出 1，修复后本仓检查完整通过，违规夹具完整汇总且退出 1。
+
+真实 path-repository Host 的隔离 HttpKernel 检查 9 条通过，覆盖每请求一次账号读取、角色降级和停用后的 401；使用临时账号、日志、缓存与内存数据库，未修改 Host 代码或既有数据。Bash 5.2 验证在 macOS 执行，未运行 Ubuntu runner、E2E 或全量测试。用户已授权本轮修复提交并分别本地合入 dev/master；不含推送、tag 或部署。

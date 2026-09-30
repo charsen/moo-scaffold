@@ -44,6 +44,7 @@ order: 130
 ## 登录链路
 
 - **cookie 模型**:cookie 名 `scaffold_auth`,值 = AES-256 加密 + HMAC 签名的 JSON(含 `username` / `last_active` / `signature`)。`ScaffoldAuthenticate` 每请求解 cookie → 验签 → 反序列化;失败清 cookie 并 302 到 `/scaffold/login`(AJAX 返 `401 + X-Scaffold-Login` header),成功把 username 注入 `request->attributes['scaffold_auth_user']` 并滚动续签。
+- **角色与停用**:角色展示复用本次认证读取的账号信息；每次请求重新读取账号状态，角色变更和停用在下一请求生效。管理角色不写入 Cookie，不跨请求缓存。
 - **TTL**:`SCAFFOLD_AUTH_TTL_MINUTES`(默认 24h)。改 TTL 让旧签名失效是预期行为。
 - **限流**:`/scaffold/login`(POST)挂 `throttle:5,1`(5 次/分/IP),第 6 次返 429。
 - **时序对齐**:`ScaffoldAuth::attempt` 不论账号是否存在都跑一次 bcrypt(用固定 hash 占位),让"账号不存在"和"密码错"耗时一致,消除时间侧信道。

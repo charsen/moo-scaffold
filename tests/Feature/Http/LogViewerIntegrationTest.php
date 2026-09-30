@@ -66,6 +66,8 @@ final class LogViewerIntegrationTest extends TestCase
         $path = $this->sandbox . '/accounts.yaml';
         $app->instance(AccountStore::class, new class($app['config'], new Filesystem, $path) extends AccountStore
         {
+            public int $loads = 0;
+
             public function __construct($config, $files, private string $fixturePath)
             {
                 parent::__construct($config, $files);
@@ -74,6 +76,13 @@ final class LogViewerIntegrationTest extends TestCase
             public function path(): string
             {
                 return $this->fixturePath;
+            }
+
+            public function load(): array
+            {
+                $this->loads++;
+
+                return parent::load();
             }
         });
         self::assertSame($path, $app->make(AccountStore::class)->path());
@@ -190,11 +199,36 @@ final class LogViewerIntegrationTest extends TestCase
         $auth->shouldReceive('authenticateRequest')->twice()->passthru();
         app()->instance(ScaffoldAuth::class, $auth);
 
+        $accounts = app(AccountStore::class);
+        $loads    = $accounts->loads;
         $this->getJson('/scaffold/logs/api/files')->assertOk();
         $auth->shouldHaveReceived('authenticateRequest')->once();
+        self::assertSame(1, $accounts->loads - $loads);
+        self::assertFalse(view()->shared('scaffold_is_admin'));
         app(AccountStore::class)->update('reader', ['enabled' => false], 'test');
+        $loads = $accounts->loads;
         $this->get('/scaffold/logs/api/files')->assertUnauthorized()->assertHeader('X-Scaffold-Auth', 'required');
         $auth->shouldHaveReceived('authenticateRequest')->twice();
+        self::assertSame(1, $accounts->loads - $loads);
+    }
+
+    public function test_role_changes_are_reloaded_on_the_next_request_without_a_second_account_read(): void
+    {
+        $accounts = app(AccountStore::class);
+        $accounts->create(['username' => 'keeper', 'password' => 'test-password', 'role' => 'admin'], 'test');
+        $accounts->update('reader', ['role' => 'admin'], 'test');
+        $this->loginReader();
+
+        $loads = $accounts->loads;
+        $this->getJson('/scaffold/logs/api/files')->assertOk();
+        self::assertTrue(view()->shared('scaffold_is_admin'));
+        self::assertSame(1, $accounts->loads - $loads);
+
+        $accounts->update('reader', ['role' => 'member'], 'test');
+        $loads = $accounts->loads;
+        $this->getJson('/scaffold/logs/api/files')->assertOk();
+        self::assertFalse(view()->shared('scaffold_is_admin'));
+        self::assertSame(1, $accounts->loads - $loads);
     }
 
     public function test_readonly_menu_labels_match_installed_upstream_components(): void

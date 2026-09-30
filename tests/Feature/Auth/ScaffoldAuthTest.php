@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Mooeen\Scaffold\Auth\ScaffoldAuth;
+use Mooeen\Scaffold\Http\Middleware\ScaffoldAuthenticate;
 use Mooeen\Scaffold\Support\AccountStore;
 
 /**
@@ -41,6 +42,21 @@ it('makeCookie → authenticateRequest round-trip 返回 username', function () 
     expect($result)->not->toBeNull();
     expect($result['username'])->toBe('alice');
     expect($result['last_active'])->toBeInt()->toBeGreaterThan(0);
+    expect($result['is_admin'])->toBeTrue();
+    expect(array_keys($result))->toBe(['username', 'last_active', 'is_admin']);
+});
+
+it('宿主认证覆盖仍可返回原结构并沿用账号角色判断', function () {
+    $auth = Mockery::mock(ScaffoldAuth::class)->makePartial();
+    $auth->shouldReceive('authenticateRequest')->once()->andReturn(['username' => 'alice', 'last_active' => time()]);
+    $middleware = new ScaffoldAuthenticate($auth, app(AccountStore::class));
+    $request    = Request::create('/scaffold');
+
+    $response = $middleware->handle($request, fn (Request $request) => response()->json([
+        'is_admin' => $request->attributes->get('scaffold_is_admin'),
+    ]));
+
+    expect($response->getData(true))->toBe(['is_admin' => true]);
 });
 
 it('无 cookie → null', function () {
