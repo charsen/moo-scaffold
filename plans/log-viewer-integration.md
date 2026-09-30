@@ -87,3 +87,18 @@ CSS 构建、PHP dirty Pint、JS 语法、UI 静态守卫、资源存在性和 C
 定向认证与日志集成 26 项 / 176 assertions 通过；静态守卫夹具 2 项 / 4 assertions 在 Bash 3.2 和 5.2.37 均通过。临时编译的 Bash 5.2.37 实际复现旧脚本首条通过后退出 1，修复后本仓检查完整通过，违规夹具完整汇总且退出 1。
 
 真实 path-repository Host 的隔离 HttpKernel 检查 9 条通过，覆盖每请求一次账号读取、角色降级和停用后的 401；使用临时账号、日志、缓存与内存数据库，未修改 Host 代码或既有数据。Bash 5.2 验证在 macOS 执行，未运行 Ubuntu runner、E2E 或全量测试。用户已授权本轮修复提交并分别本地合入 dev/master；不含推送、tag 或部署。
+
+## 2.2.11 发版准备（2026-09-30）
+
+准备阶段仅整理发版说明并核对范围、依赖和远端引用；随后用户明确要求「commit，后发版」，授权本次正式发布。沿用 `feat-scaffold-log-viewer`。
+
+- 发布基线为 `2.2.10`（实际指向 `71634d8`），当前 master/task 为 `21d0559`，dev 为 `84c09ff`。两条线均包含本次修复，dev 独有内容不进入 master。
+- 待发范围为 `7ebe11d`、`c523cd4`、`21d0559`：Monitor 依赖下限、日志新窗口与体验/性能优化、CI 守卫、回归测试和文档；没有数据库变更，422/522 及 Request 生成规则保持原样。
+- Gitee/GitHub 的 master、dev、`2.2.10` tag 一致；两端均不存在 `2.2.11` / `v2.2.11`。本地 master 领先两端 3 个提交，dev 领先 6 个提交（包含合并记录）。
+- Monitor `v0.1.19` 已在 Gitee/GitHub 发布，两端 annotated/peeled tag 一致；该 tag 包含新命名空间和 `MooeenMonitorLaravelServiceProvider`，满足 `^0.1.19` 下限。
+- 当前代码归档包含日志 JS/Sass/CSS、Request 模板、公开文档和静态守卫，不包含 Composer lock、测试及内部计划。
+- 本机未跟踪 lock 的内容已过期，直接 `composer validate --strict` 因此返回 2；未改 lock 或本地依赖。在无 lock 的临时目录，清单严格校验与关闭 scripts/plugins 的依赖解析 dry-run 均返回 0，解析器未报告安全公告问题。该检查证明约束可解析，不替代干净安装及运行测试。
+
+沿用此前已通过的定向测试、Bash 3.2/5.2 与 Host 隔离 HTTP 验证，不因准备发版重复执行或扩大为全量/E2E。尚未覆盖 Ubuntu runner、Laravel 10/11 和浏览器视觉。
+
+正式发版时，先提交这些说明并将同一任务分支分别合入 dev/master，显式检出 master 核对 HEAD 后打 `2.2.11` annotated tag；分别推送 Gitee 与 GitHub，并回读分支及 peeled tag。服务器部署另行执行；Host 升级后按安装手册重新发布 Scaffold public 资源。
