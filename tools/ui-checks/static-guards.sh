@@ -32,6 +32,16 @@ echo "==============================="
 echo ""
 echo "## 1. <style> 块（业务视图禁止）"
 matches=$(grep -rn "<style" "$VIEWS" --include="*.blade.php" 2>/dev/null | grep -v "/components/" | grep -v "{{--.*<style>.*--}}" || true)
+# 日志布局仅允许这一条第三方 CSS nonce 适配表达式，自有样式仍走 Sass。
+allowed_log_css=$(cat <<'BLADE'
+    {!! preg_replace('/^<style>/', '<style nonce="' . e($cspNonce) . '">', (string) \Opcodes\LogViewer\Facades\LogViewer::css(), 1) !!}
+BLADE
+)
+matches=$(printf '%s\n' "$matches" | LOG_CSS_ALLOWED="$allowed_log_css" awk -v file="$VIEWS/logs.blade.php" '
+    { line = $0; sub(/^[^:]+:[0-9]+:/, "", line) }
+    index($0, file ":") == 1 && line == ENVIRON["LOG_CSS_ALLOWED"] { next }
+    NF { print }
+')
 if [[ -n "$matches" ]]; then
     echo "❌ 发现 <style> 块："
     echo "$matches" | sed 's/^/    /'

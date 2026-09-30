@@ -12,6 +12,7 @@ FAIL_COUNT=0
 
 ASSETS=(
     "css/index.css"
+    "css/log-viewer.css"
     "javascript/alpine-csp.min.js"
     "javascript/alpine-init.js"
     "javascript/clipboard.min.js"

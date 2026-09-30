@@ -17,7 +17,7 @@ class ScaffoldAuthenticate
         protected AccountStore $accounts,
     ) {}
 
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next, bool $forceJson = false)
     {
         if (! $this->auth->isEnabled()) {
             return $next($request);
@@ -30,7 +30,7 @@ class ScaffoldAuthenticate
                 : $request->getRequestUri();
             $loginUrl = $this->auth->loginUrl($request, $redirectTarget);
 
-            if ($request->ajax() || $request->expectsJson()) {
+            if ($forceJson || $request->ajax() || $request->expectsJson()) {
                 return response('Unauthorized', 401, [
                     'X-Scaffold-Auth'  => 'required',
                     'X-Scaffold-Login' => $loginUrl,

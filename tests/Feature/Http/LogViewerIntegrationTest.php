@@ -146,6 +146,71 @@ final class LogViewerIntegrationTest extends TestCase
         $this->get('/scaffold/logs/api/files')->assertUnauthorized();
     }
 
+    public function test_page_bridge_uses_current_prefix_and_runtime_readonly_state(): void
+    {
+        $this->settings = ['scaffold.route.prefix' => 'tools'];
+        $this->refreshApplication();
+        $this->loginReader();
+        foreach (['testing' => false, 'production' => true] as $environment => $readonly) {
+            $this->app['env'] = $environment;
+            $response         = $this->get('/tools/logs')->assertOk();
+            preg_match('/window\.ScaffoldLogViewer = (.*?);/s', $response->getContent(), $matches);
+            self::assertSame([
+                'apiPath' => '/tools/logs/api', 'loginPath' => '/tools/login', 'readonly' => $readonly,
+            ], json_decode($matches[1], true, flags: JSON_THROW_ON_ERROR));
+            self::assertSame($readonly, str_contains($response->getContent(), 'id="scaffold-log-viewer-readonly"'));
+            $response->assertSee('id="scaffold-log-viewer-auth"', false)->assertSee('登录已失效，请重新登录');
+            self::assertStringContainsString(\Mooeen\Scaffold\Support\LogViewerIntegration::script(), $response->getContent());
+        }
+        $this->app['env'] = 'testing';
+        config(['scaffold.config_ui.readonly' => true]);
+        $this->get('/tools/logs')->assertOk()->assertSee('id="scaffold-log-viewer-readonly"', false);
+    }
+
+    public function test_inline_assets_ignore_stale_published_manifest(): void
+    {
+        $this->app->usePublicPath($this->sandbox . '/public');
+        $directory = public_path(trim(config('log-viewer.assets_path'), '/'));
+        mkdir($directory, 0755, true);
+        file_put_contents($directory . '/mix-manifest.json', '{"/app.js":"/app.js?id=old"}');
+        self::assertTrue(\Opcodes\LogViewer\Facades\LogViewer::assetsArePublished());
+        self::assertFalse(\Opcodes\LogViewer\Facades\LogViewer::assetsAreCurrent());
+        $this->loginReader();
+        $response = $this->get('/scaffold/logs')->assertOk();
+        preg_match('/window\.LogViewer = (.*?);/s', $response->getContent(), $matches);
+        $bootstrap = json_decode($matches[1], true, flags: JSON_THROW_ON_ERROR);
+        self::assertFalse($bootstrap['assets_outdated']);
+        self::assertSame('scaffold/logs', $bootstrap['path']);
+    }
+
+    public function test_authentication_runs_once_per_request_and_disabled_accounts_are_rechecked(): void
+    {
+        $this->loginReader();
+        $auth = \Mockery::mock(ScaffoldAuth::class)->makePartial();
+        $auth->shouldReceive('authenticateRequest')->twice()->passthru();
+        app()->instance(ScaffoldAuth::class, $auth);
+
+        $this->getJson('/scaffold/logs/api/files')->assertOk();
+        $auth->shouldHaveReceived('authenticateRequest')->once();
+        app(AccountStore::class)->update('reader', ['enabled' => false], 'test');
+        $this->get('/scaffold/logs/api/files')->assertUnauthorized()->assertHeader('X-Scaffold-Auth', 'required');
+        $auth->shouldHaveReceived('authenticateRequest')->twice();
+    }
+
+    public function test_readonly_menu_labels_match_installed_upstream_components(): void
+    {
+        $base   = LogViewerServiceProvider::basePath('/resources/js/components/');
+        $script = \Mooeen\Scaffold\Support\LogViewerIntegration::script();
+        foreach ([
+            'FileListItem.vue'         => 'Clear index',
+            'FileList.vue'             => 'Clear indices',
+            'SiteSettingsDropdown.vue' => 'Clear indices for all files',
+        ] as $file => $label) {
+            self::assertStringContainsString('>' . $label . '</span>', file_get_contents($base . $file));
+            self::assertStringContainsString("'" . $label . "'", $script);
+        }
+    }
+
     public function test_all_native_deletion_endpoints_reject_and_preserve_file(): void
     {
         $this->loginReader();
@@ -179,8 +244,9 @@ final class LogViewerIntegrationTest extends TestCase
 
     public function test_existing_scaffold_login_cookie_also_authenticates_log_viewer(): void
     {
-        $login = $this->post('/scaffold/login', ['username' => 'reader', 'password' => 'test-password', 'redirect' => '/scaffold/logs'])
-            ->assertRedirect('/scaffold/logs');
+        $returnTo = '/scaffold/logs?file=fixture&query=error#details';
+        $login    = $this->post('/scaffold/login', ['username' => 'reader', 'password' => 'test-password', 'redirect' => $returnTo])
+            ->assertRedirect($returnTo);
         $cookie = $login->getCookie(app(ScaffoldAuth::class)->getCookieName());
         self::assertNotNull($cookie);
         $this->withCookie($cookie->getName(), $cookie->getValue())->withCredentials();

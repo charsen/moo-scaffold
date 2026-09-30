@@ -107,10 +107,7 @@ order: 190
 
 有对应表单控件接收错误时，使用 `ValidationException::withMessages(['实际字段' => '错误原因'])`，HTTP 422 保留 Laravel 的 `errors` 袋。没有对应表单的业务拒绝直接使用 `BaseException`（默认 HTTP 522，正文 `error.msg`）；没有独立复用语义时不新增异常子类。
 
-**边界补充（2026-09-29 实测踩到）**：无表单动作的 `fieldValidation = false` 只覆盖「**业务规则**」的失败；
-**路由参数与字段的格式校验**（如待办 ID / 附件 ID 必须是数字）仍应返回 422 校验袋 —— 这类输入的错来自客户端，
-不是业务拒绝。若某个 Request 的 `rules()` **只**校验路由参数本身，就不要加该 flag（业务拒绝由控制器显式抛
-`BaseException` 返回 522），否则「非 `$id` 路由参数也必须验证」在 HTTP 层会变成不可见。
+**错误出口按交互场景判定**：有表单且有实际控件接收错误时，返回 `422 + errors.<实际字段>`；没有表单的动作返回 `522 + error.msg`，由前端展示异常提醒。不能仅因规则是必填、数字或 ID 格式校验，就把无表单动作改回字段 422。
 
 `Foundation\FormRequest` 默认保留 422。删除、恢复、移动等无表单动作的专用 Request 显式声明 `protected bool $fieldValidation = false;`，其校验失败转为统一 522；认证/授权、资源不存在和技术错误不经过这项转换。生成器仅对 Admin 的 Destroy、DestroyBatch、Restore Request 默认生成该选项，既有 Request 不自动覆盖。
 
@@ -120,7 +117,7 @@ order: 190
 
 ## 5. 升级到 2.2.0+ 要做的事
 
-1. **重新发布前端资源** —— `php artisan vendor:publish --provider="Mooeen\Scaffold\ScaffoldProvider" --tag=public --force`。否则宿主 `public/vendor/scaffold/` 里还是旧的页面脚本，拿不到 `api.js`。详见 [01-install.md](01-install.md)。
+1. **重新发布前端资源** —— `php artisan vendor:publish --provider="Mooeen\Scaffold\MooeenScaffoldServiceProvider" --tag=public --force`。否则宿主 `public/vendor/scaffold/` 里还是旧的页面脚本，拿不到 `api.js`。详见 [01-install.md](01-install.md)。
 2. **改你自己消费 `/scaffold` JSON 的代码** —— 按 §1 的信封取载荷，错误分支改用 `error.code`。
 3. **改已外迁成员的调用点** —— 如 `Utility::getStoragePath()` → `Support\Paths::storage()`、`Utility::getModels()` → `Support\StorageRegistry::models()`。完整清单见 [CHANGELOG](../../CHANGELOG.md) 的 `2.2.0` 与 `2.2.1` 两节。
 

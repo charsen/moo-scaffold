@@ -149,6 +149,23 @@ it('moo:controller:Controller/Request/Trait 落包、包 use 包内自持 Handle
     expect(file_get_contents($this->pkgRoot . '/src/Http/Controllers/Admin/Traits/HandlesResourceActions.php'))
         ->toContain('throw new BaseException(')->not->toContain('ValidationException::withMessages');
 
+    // 无表单批量动作：缺失/非法 ids 返回 522，交给前端异常提醒。
+    Route::post('/_generated/batch', fn (\Acme\PkgGen\Http\Requests\PkgxItem\DestroyBatchRequest $request) => $request->validated());
+    $this->postJson('/_generated/batch', [])->assertStatus(522)->assertJsonPath('ok', false);
+    $response = $this->postJson('/_generated/batch', ['ids' => ['bad-id']])->assertStatus(522);
+    expect($response->json('error.msg'))->not->toBeEmpty();
+    expect($response->json())->not->toHaveKeys(['errors', 'message']);
+    $this->postJson('/_generated/batch', ['ids' => ['123']])->assertOk()->assertJsonPath('ids.0', '123');
+
+    // 重复运行仍保护手写 Request，force 才恢复当前生成基线。
+    $batchFile = $requests . 'DestroyBatchRequest.php';
+    $original  = file_get_contents($batchFile);
+    file_put_contents($batchFile, $original . "\n// custom request marker\n");
+    (new CreateControllerGenerator(new NullOutput, $fs, app(Utility::class)))->start('PkgGen');
+    expect(file_get_contents($batchFile))->toContain('// custom request marker');
+    (new CreateControllerGenerator(new NullOutput, $fs, app(Utility::class)))->start('PkgGen', force: true);
+    expect(file_get_contents($batchFile))->not->toContain('// custom request marker')->toContain('protected bool $fieldValidation = false;');
+
     // controller trait 落包 Controllers/Admin/Traits
     expect(is_file($this->pkgRoot . '/src/Http/Controllers/Admin/Traits/PkgxItemTrait.php'))->toBeTrue();
 

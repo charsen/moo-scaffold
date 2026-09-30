@@ -1,0 +1,18 @@
+// 独立的日志桥接样式，避免引入 Scaffold 布局对上游界面的全局覆盖。
+#scaffold-log-viewer-auth[hidden] { display: none; }
+#scaffold-log-viewer-auth {
+    position: fixed; inset: 0; z-index: 100;
+    display: grid; place-items: center;
+    background: #111827; color: #f9fafb;
+    > div { padding: 2rem; text-align: center; }
+}
+#scaffold-log-viewer-login {
+    display: inline-block; margin-top: 1rem; padding: .75rem 1.25rem;
+    border-radius: .375rem; background: #2563eb; color: white;
+}
+#scaffold-log-viewer-readonly {
+    position: fixed; bottom: .75rem; right: 1rem; z-index: 40;
+    padding: .25rem .75rem; border-radius: 1rem;
+    background: #374151; color: white; font-size: .75rem;
+    pointer-events: none;
+}

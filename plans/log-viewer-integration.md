@@ -21,7 +21,7 @@ Scaffold 直接依赖 Log Viewer `^3.24`，并在其 Provider 注册路由前统
 
 日志入口沿用 `scaffold.route.middleware` 的 cookie 处理边界，补齐既有受保护路由的 session、queued cookie 和 CSRF 链。当前默认外层为 `web`；Host 显式使用空中间件组时，不能额外引入一次 `EncryptCookies` 解密。
 
-Log Viewer 自定义 layout 只适配 CSP nonce 和「返回 Scaffold」，保留上游界面及 API 协议。应用日志 API 是 Scaffold JSON 信封的第三方协议例外。
+Log Viewer 自定义 layout 适配 CSP nonce、「返回 Scaffold」、登录失效提示和只读菜单展示，保留上游界面及 API 协议。应用日志 API 是 Scaffold JSON 信封的第三方协议例外。
 
 关闭 Log Viewer、Scaffold 路由或 Scaffold 认证时，日志入口不对外开放，导航也隐藏。原有 Scaffold 开放模式不因此改为强制登录。
 
@@ -49,3 +49,31 @@ Log Viewer 自定义 layout 只适配 CSP nonce 和「返回 Scaffold」，保�
 - 本次运行组合为 Log Viewer 3.24.2 / Laravel 12。依赖下限收紧至 3.24，避免 3.21 缺少布局所需的原生资源接口。
 
 未运行 E2E、全量测试或 Admin 双 smoke；未在 Laravel 10/11 上执行测试，未生成 Host 的磁盘配置/路由缓存，编译路由仅在隔离进程内验证。未执行 Git 提交、合并、发布或部署。
+
+## 2026-09-30 已批准体验优化
+
+- [x] 日志 API 的 401 + 专用认证响应头触发重新登录遮罩，回跳使用当前页面地址（包含筛选与锚点），不使用 API 地址。遮罩显示时隔离日志区键盘焦点。
+- [x] 生产或强制只读显示状态标识，隐藏文件、目录、全部索引清理菜单；后端写守卫保持原有规则。
+- [x] 本布局内联安装资源，覆盖上游依据已发布资源计算的过期标志，避免遗留 manifest 误报。
+
+菜单适配集中在页面桥接脚本，按 Log Viewer 3.24 的三个维护标签精确匹配动态菜单；不修改上游 bundle 或使用 Vue 内部实例。定向测试核对安装版本的组件标签，依赖升级时须复核这个适配点。
+
+本轮定向验证：日志集成 12 项（126 assertions）、JavaScript VM 行为 7 项、真实 path-repository Host 页面渲染 8 条检查通过；PHP 风格、JS 语法与 diff 检查通过。系统盘临时空间不足时，将本轮夹具迁到开发盘后完成验证，未清理其他文件。
+
+本轮未运行 E2E、全量测试或 Admin 双 smoke；未执行 Git 提交、合并、发布或部署。日志文件范围、账号角色策略与主题统一不在本轮范围。
+
+
+## 2026-09-30 代码复盘与性能优化
+
+- [x] 日志 API、页面和下载认证复用现有 Scaffold 中间件；上游回调只消费本次请求的认证属性，单次 API 请求认证从三次减为一次，下一请求重新校验账号启用状态。
+- [x] 只读菜单首次扫描后，仅收集新增子树及变更菜单，使用 Set 和微任务合并重复更新；保留 style 与文字变化响应，不重扫日志内容。
+- [x] 上游 Vue 标签契约检查移入 Composer 依赖已安装的 PHP 集成测试，JavaScript 行为测试在无 vendor 的干净目录可独立运行。
+- [x] 自有样式移入独立 Sass 并生成 log-viewer.css；静态守卫只放行日志布局中准确匹配的第三方 nonce 注入表达式，其余内联样式仍拒绝。
+- [x] 修正旧 Provider 文档并补当前公开文档守卫。
+- [x] 按用户确认保留 422/522 交互规则：有表单及实际字段控件的错误为 422；无表单动作统一 522 异常提醒，包括 ids 必填/格式失败。生成器与 Request 模板保持原样，补真实生成 Request 的 522、正常输入、重复生成保护和 force 回归；修正文档中的冲突补充。
+
+定向 PHP 回归 37 项 / 267 assertions 通过；无 vendor 的 JS 行为 7 项通过；真实 path-repository Host 隔离 HTTP 8 条检查通过（登录、API、CSP、桥接资源引用、只读与停用账号）。首次 Host 引导未绑定 request 导致夹具启动失败，补齐引导后上述 8 条实际执行通过，不计失败启动为验收。临时账号、日志、内存库和编译缓存均隔离并清理。
+
+CSS 构建、PHP dirty Pint、JS 语法、UI 静态守卫、资源存在性和 CSS 体积预算通过。静态守卫另以临时布局验证：准确的上游 CSS nonce 表达式允许，新增普通内联 style 拒绝。未运行 E2E、全量测试或 Admin 双 smoke，未提交、合并、发版或部署。Host 升级时须重新发布 Scaffold public 资源；Laravel 10/11 和浏览器视觉尚未验证。
+
+跨仓旧 Provider 短名审计返回 1（CODE 1 / DOC 36）：唯一 CODE 是任务外仓自持旧版包中的类定义，未作为本包消费方迁移，也未修改该仓；其余文档命中未扩大处理范围。本仓 README/docs 的旧 Provider 守卫通过，跨仓审计不宣称全绿。
