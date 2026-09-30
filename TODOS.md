@@ -4,6 +4,8 @@
 
 ## 应用日志接入
 
+- [x] 完成 `2.2.11` 发版准备：说明、依赖解析、归档资源与双远程引用核对已完成，用户已授权正式发版；升级 Host 时须重新发布 Scaffold public 资源。见 [接入计划](plans/log-viewer-integration.md)。
+
 - [x] 修复二次复盘发现的 Bash 计数提前退出及认证角色重复读取，验证停用和角色变更在下一请求生效。见 [接入计划](plans/log-viewer-integration.md)。
 
 - [x] 完成复盘修复及性能优化：单请求鉴权、增量菜单扫描、JS/PHP 契约测试分流、Sass 与静态守卫、Provider 文档修正；保留已确认的无表单 522 规则。见 [接入计划](plans/log-viewer-integration.md)。
