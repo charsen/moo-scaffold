@@ -393,6 +393,9 @@ it('php 产物带生成戳注释头,且 require 回来仍是数组', function ()
             ->toContain(' * @generated_at ')
             ->toContain('请勿手改')
             ->and(require $file)->toBeArray()->toHaveKey('admin');
+
+        // 每层多行数组末项都须有逗号，避免生成后 Host Pint 再改写。
+        expect(preg_match('/[^,\\s\\[]\\R\\s*\\]/', $content))->toBe(0);
     }
 });
 
@@ -414,6 +417,19 @@ it('三类产物 · 同一组 routes 重跑全部不重写,生成戳保持原值
     foreach (authGen_artifacts() as $file) {
         expect(file_get_contents($file))->toBe($before[$file], $file . ' 不该被重写');
     }
+});
+
+it('数组排版不改变转义键、值内箭头及嵌套数据', function () {
+    $data = [
+        "quote' => key" => 'value => untouched',
+        'back\\slash'   => "O'Brien",
+        'nested'        => ['short' => 'a', 'longer-key' => 'b'],
+        'list'          => ['a', 'b'],
+    ];
+    $method = new ReflectionMethod(UpdateAuthorizationGenerator::class, 'exportAlignedArray');
+    $code   = $method->invoke(authGen_make(), $data);
+
+    expect(eval('return ' . $code . ';'))->toBe($data);
 });
 
 it('三类产物 · routes 真变化时全部重写并刷新生成戳', function () {

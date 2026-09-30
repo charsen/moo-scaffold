@@ -306,7 +306,42 @@ class UpdateAuthorizationGenerator extends Generator
             . ' * @generated_at ' . $this->generatedAt . PHP_EOL
             . ' */' . PHP_EOL
             . PHP_EOL
-            . 'return ' . VarExporter::export($data) . ';' . PHP_EOL;
+            . 'return ' . $this->exportAlignedArray($data) . ';' . PHP_EOL;
+    }
+
+    /** 连续同层的字符串键按 Host Pint 约定对齐；导出与转义仍由 VarExporter 负责。 */
+    private function exportAlignedArray(array $data): string
+    {
+        $lines = explode(PHP_EOL, VarExporter::export($data, VarExporter::TRAILING_COMMA_IN_ARRAY));
+        $group = [];
+        $flush = static function () use (&$lines, &$group): void {
+            if ($group === []) {
+                return;
+            }
+            $width = max(array_map(static fn (array $row): int => strlen($row[2]), $group));
+            foreach ($group as $index => $row) {
+                $lines[$index] = $row[1] . str_pad($row[2], $width) . ' =>' . $row[3];
+            }
+            $group = [];
+        };
+        // 只匹配完整单引号键，避免把值中的 => 或转义引号当成分隔符。
+        $pattern = <<<'REGEX'
+/^( +)('(?:[^'\\]|\\.)*') +=>(.*)$/
+REGEX;
+        foreach ($lines as $index => $line) {
+            if (preg_match($pattern, $line, $row) !== 1) {
+                $flush();
+
+                continue;
+            }
+            if ($group !== [] && reset($group)[1] !== $row[1]) {
+                $flush();
+            }
+            $group[$index] = $row;
+        }
+        $flush();
+
+        return implode(PHP_EOL, $lines);
     }
 
     /**
