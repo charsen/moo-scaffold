@@ -77,6 +77,14 @@ file_put_contents("<本仓>/tests/Browser/.auth/admin.json", json_encode($state,
 
 ## 3. 跑
 
+`safe-run.sh` 保留 Bash 调用入口，清理由零依赖的 Node 脚本实现。使用独占 Host，
+`scaffold/database`（含快照）必须干净且无未跟踪文件，已有 migrations 不得有已跟踪改动。
+提供了 `E2E_HOST_SCAFFOLD_DB_PATH` 却路径无效、不在 Git 仓内或现场不满足条件时，直接拒绝启动。
+测试后仅还原这两个目录的已跟踪文件，并删除范围内本次新增的未跟踪文件；保留已有未跟踪 migration
+与范围外文件。Git/清理失败或仍有残留时返回非零，测试失败时仍执行清理。
+路径推导与写入用例一致：migrations 位于 `scaffold/database/../../database/migrations`。
+未配置 Host 路径时仅运行 Playwright，不执行 Host 自动清理。
+
 ```bash
 # 全跑（先确认宿主 scaffold/database 工作区干净；safe 会还原该目录）
 E2E_BASE_URL=http://127.0.0.1:8088 \

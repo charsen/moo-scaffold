@@ -22,6 +22,7 @@
 
 ## 动手前
 
+- 本仓开发测试需要 PHP/Composer、Git、Bash 和 Node.js（CI 使用 Node 22）；E2E 清理脚本的行为夹具由 PHP/JS 两套入口执行，不需要启动浏览器或 Host。
 - **改 SCSS** → commit 前必跑 `npm run build:css`(否则下游拉不到新 CSS)。
 - **改 `stubs/*.stub` 或 `src/Foundation/`** → 这是"编码规范本体",按改规范的严肃度对待,别随手改模板解决单点问题。
 - **跑测试** → 后端 `composer test`(零 env 即全绿,fixture 自带);**改了 `public/javascript/` 下的任何脚本**要跑 `npm run test:js`(纯 node、零依赖、秒级返回,验解包层行为 + 各页面脚本的接线形态);`/scaffold` UI 改动再跑 `npm run test:e2e:safe`(需真实宿主,不得用会污染宿主数据的裸 `test:e2e`)。

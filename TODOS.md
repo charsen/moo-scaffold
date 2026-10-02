@@ -15,7 +15,8 @@
 - [x] 用户授权后的全量验证：PHP 1436 passed（6296 assertions）/ 3 项既有跳过；JS 8 文件 / 191 断言全绿。Pint dirty 与 diff 检查通过。PHP 跳过项分别依赖完整 Host 的 moo:fresh 配置、Demo migration 文件和 order_* 跨 schema migration 夹具。
 
 - [x] 全套 E2E：使用真实 path-repository Host 的独立副本、临时 SQLite/账号/文档和当前发布资源，Chromium headless 经 test:e2e:safe 最终 70 passed / 1 skipped（未发外部 AI 请求）；覆盖 16 个 schema 预览、设计器写入、账号、日志、Markdown、AI 配置与限流隔离。首次侧栏 fixture 名不匹配后调整环境配置；修复弹窗聚焦竞争；快捷保存计时从响应完成改为请求发出，400ms 门槛与成功响应断言保留，补跑 3 次通过。schema/snapshot/migration 后置检查无残留，原 Host 未修改，原浏览器登录态已还原。未跑 Admin 双 smoke、Laravel 10/11 矩阵或真实 Cloud/AI 上游调用。
-- [ ] E2E 清理脚本的现场保护：safe-run 当前 checkout 会丢失跑前已脏的已跟踪 schema，且新增未跟踪文件清理不限于生成目录。补充拒绝脏 schema 和限定清理范围的保护及脚本回归；本轮使用独占 Host 副本避开该风险，勿对正在开发的 Host 直接运行。
+- [x] E2E 清理脚本的现场保护：Bash 仅保留入口，Node 集中处理 Git/NUL 路径、脏 schema 拒绝启动、限定 schema/快照与 migrations 清理，以及失败退出码。保留范围外新增文件和已有未跟踪 migration；HEAD 变化拒绝自动还原。用临时 Git 仓库与模拟 Playwright 验证，未触碰真实 Host。
+- [x] 清理脚本优化验证：新增 40 个实际行为断言；PHP 全量 1436 passed（6286 assertions）/ 3 项既有跳过，JS 全量 9 文件 / 231 断言通过，Pint dirty 和 diff 检查通过。PHP 断言数减少源于替换原源码字符串守卫，原保护目标由行为断言覆盖。更新入口的完整 Chromium E2E 已跑：70 passed / 1 skipped（外部 AI 调用），1.5 分钟；真实 path Host 独立副本覆盖 16 个 schema，生成目录还原且无残留，登录态不变，运行期间新增的范围外标记文件保留。临时服务与副本已清理，未修改原 Host。
 
 ## 设计器、账号与调试器可靠性
 
