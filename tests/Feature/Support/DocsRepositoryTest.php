@@ -300,3 +300,63 @@ it('扩展名大小写不敏感:.MD 也列出', function () {
     file_put_contents($this->sandbox . '/docs/UP.MD', "---\ntitle: 大写\n---\n");
     expect(collect($this->repo->all())->pluck('slug')->all())->toContain('UP');
 });
+
+it('大小写敏感文件系统上列出的文档仍能打开与搜索', function (string $extension) {
+    mkdir($this->sandbox . '/docs', 0755, true);
+    $path = $this->sandbox . '/docs/UP.' . $extension;
+    $body = "---\ntitle: 大写\n---\n可搜索正文\n";
+    file_put_contents($path, $body);
+    // macOS 默认大小写不敏感；显式模拟 Linux 上不存在小写 .md 的路径。
+    $fs = Mockery::mock(Filesystem::class)->makePartial();
+    $fs->shouldReceive('isFile')->andReturnUsing(static fn (string $candidate): bool => $candidate === $path);
+    $fs->shouldReceive('get')->with($path)->andReturn($body);
+    $repo = new DocsRepository($fs, app(\Mooeen\Scaffold\Utility::class));
+
+    expect($repo->all()[0]['slug'])->toBe('UP')
+        ->and($repo->exists('UP'))->toBeTrue()
+        ->and($repo->find('UP')['body'])->toContain('可搜索正文')
+        ->and($repo->search('可搜索正文'))->toHaveCount(1);
+})->with(['MD', 'Md', 'mD']);
+
+it('目录外软链文档不能进入列表、搜索或存在性判断', function () {
+    $this->repo->save('keep', "正常正文\n");
+    file_put_contents($this->sandbox . '/outside.md', "目录外独有内容\n");
+    symlink($this->sandbox . '/outside.md', $this->sandbox . '/docs/escape.md');
+
+    expect(array_column($this->repo->all(), 'slug'))->toBe(['keep']);
+    expect($this->repo->search('独有内容'))->toBe([]);
+    expect($this->repo->exists('escape'))->toBeFalse();
+    expect($this->repo->find('escape'))->toBeNull();
+});
+
+it('缓存列表后软链改指目录外，搜索和排序仍拒绝越界', function () {
+    $this->repo->save('keep', "正常正文\n");
+    $this->repo->all();
+    $outside = $this->sandbox . '/outside.md';
+    file_put_contents($outside, "目录外独有内容\n");
+    unlink($this->sandbox . '/docs/keep.md');
+    symlink($outside, $this->sandbox . '/docs/keep.md');
+
+    expect($this->repo->search('独有内容'))->toBe([]);
+    expect(fn () => $this->repo->reorder(['keep']))->toThrow(InvalidArgumentException::class);
+    expect(file_get_contents($outside))->toBe("目录外独有内容\n");
+});
+
+it('保存越界嵌套路径时，不先在目录外创建子目录', function () {
+    mkdir($this->sandbox . '/docs');
+    mkdir($this->sandbox . '/outside');
+    symlink($this->sandbox . '/outside', $this->sandbox . '/docs/escape');
+
+    expect(fn () => $this->repo->save('escape/new/deep/doc', '越界'))
+        ->toThrow(InvalidArgumentException::class);
+    expect(is_dir($this->sandbox . '/outside/new'))->toBeFalse();
+});
+
+it('排序使用最新文件集合，拒绝扫描后新增文档的过期列表', function () {
+    $this->repo->save('a', "正文A\n");
+    $this->repo->all();
+    file_put_contents($this->sandbox . '/docs/b.md', "正文B\n");
+
+    expect(fn () => $this->repo->reorder(['a']))->toThrow(InvalidArgumentException::class);
+    expect(file_get_contents($this->sandbox . '/docs/a.md'))->toBe("正文A\n");
+});

@@ -9,7 +9,7 @@ order: 130
 
 ## 总览
 
-一条请求进 `/scaffold/*` 穿过这串中间件:`SecurityHeaders`(加 CSP / 防御头)→ 路由级 `throttle`(login / intake 限流)→ `ScaffoldAuthenticate`(校验 `scaffold_auth` cookie)→ Session + ShareErrors → `VerifyCsrfToken` → 写保护三件套 `EnforceScaffoldWritable`(prod / readonly 拒高风险写)· `EnforceAdminOnly`(账号与配置写需 admin)· `EnforceDesignerPermission`(设计器需 `can_design_db`)。并行还有 CLI 防线:`config('scaffold.only_in_local')`。
+一条请求进 `/scaffold/*` 穿过这串中间件:`SecurityHeaders`(加 CSP / 防御头)→ 路由级 `throttle`(按动作限流)→ `ScaffoldAuthenticate`(校验 `scaffold_auth` cookie)→ Session + ShareErrors → `VerifyCsrfToken` → 写保护三件套 `EnforceScaffoldWritable`(prod / readonly 拒高风险写)· `EnforceAdminOnly`(账号与配置写需 admin)· `EnforceDesignerPermission`(设计器需 `can_design_db`)。并行还有 CLI 防线:`config('scaffold.only_in_local')`。
 
 三个 `Enforce*` 拒绝时都产**同一个 403 信封**、各带自己的机器码(`WRITE_LOCKED` / `ADMIN_ONLY` / `DESIGNER_FORBIDDEN`,另有 `EDIT_LOCAL_ONLY`)—— 前端据此分支;表单请求则走 `flash_error` + 303 回退。完整形态与码表见 [19-web-json-contract.md](19-web-json-contract.md)。
 
@@ -46,8 +46,22 @@ order: 130
 - **cookie 模型**:cookie 名 `scaffold_auth`,值 = AES-256 加密 + HMAC 签名的 JSON(含 `username` / `last_active` / `signature`)。`ScaffoldAuthenticate` 每请求解 cookie → 验签 → 反序列化;失败清 cookie 并 302 到 `/scaffold/login`(AJAX 返 `401 + X-Scaffold-Login` header),成功把 username 注入 `request->attributes['scaffold_auth_user']` 并滚动续签。
 - **角色与停用**:角色展示复用本次认证读取的账号信息；每次请求重新读取账号状态，角色变更和停用在下一请求生效。管理角色不写入 Cookie，不跨请求缓存。
 - **TTL**:`SCAFFOLD_AUTH_TTL_MINUTES`(默认 24h)。改 TTL 让旧签名失效是预期行为。
-- **限流**:`/scaffold/login`(POST)挂 `throttle:5,1`(5 次/分/IP),第 6 次返 429。
+- **限流**:`/scaffold/login`(POST)挂 `throttle:5,1,scaffold:login.submit:`(5 次/分/IP),第 6 次返 429。
 - **时序对齐**:`ScaffoldAuth::attempt` 不论账号是否存在都跑一次 bcrypt(用固定 hash 占位),让"账号不存在"和"密码错"耗时一致,消除时间侧信道。
+
+### 限流范围
+
+本地、测试及生产环境均执行路由限流。每个动作通过 `throttle` 第三参数设置独立的 `scaffold:` 计数前缀；Laravel 数字限流默认不区分路由，省略前缀会让预览、搜索或 CSP 上报消耗登录、保存等接口的额度。账号新增、修改、启停、删除仍在一个组内共享额度。
+
+| 动作 | 每分钟额度 |
+|---|---|
+| 登录 | 5 |
+| CSP 上报、AI 翻译、API 代理 | 各 60 |
+| 文档搜索、文档/计划/发版日志预览 | 各 120 |
+| 设计器与 Markdown 保存 | 各 30 |
+| 账号写动作 | 合计 10 |
+
+完整动作及额度以 `src/Http/routes.php` 为准。计数身份沿用 Laravel 默认规则：默认 guard 已认证时按框架用户，否则按域名/IP。Scaffold 使用自己的 cookie 认证，不会自动成为默认 guard 用户，所以同 IP 的同一动作仍可能共用额度。429 保持框架响应及 `Retry-After`、`X-RateLimit-*` 头；页面 GET 刷新通常不计数，但文档编辑页的预览和自动保存会发额外请求。
 
 ### 应用日志
 
@@ -58,7 +72,7 @@ order: 130
 ## CSRF
 
 - `VerifyCsrfToken` 加在登录后所有路由组上,POST 表单必须带 `@csrf`,AJAX 带 `X-CSRF-TOKEN` header(`<meta name="csrf-token">`)。
-- **故意豁免**:`/scaffold/csp-report` 是无状态 webhook,浏览器直接 POST 不带 cookie,只挂 `throttle:60,1`。
+- **故意豁免**:`/scaffold/csp-report` 是无状态 webhook,浏览器直接 POST 不带 cookie,只挂 `throttle:60,1,scaffold:csp.report:`。
 
 > runtime 错误 / 慢 SQL / todo 走云端([`16-cloud-push.md`](16-cloud-push.md)),其 intake 端点在 cloud 一侧凭 project token 鉴权,不属于本包路由面。
 
@@ -79,7 +93,7 @@ report-uri /scaffold/csp-report;
 - **script** 只信 `'self'` + nonce,去掉 `'unsafe-eval'`,Alpine 切 CSP build(`alpine-csp.min.js`),`x-data` 必须预注册在 `alpine-init.js`。
 - **style-src-attr** 留 `'unsafe-inline'`,因 HTML 内联 `style="..."`(列宽 / display 等结构性)大量存在;XSS 经此能改样式但执行不了 JS。
 - **frame-ancestors 'none'** 与 `X-Frame-Options: DENY` 双重防 clickjacking。
-- **违规上报** POST 到 `/scaffold/csp-report`(`throttle:60,1`),记进 Laravel log。
+- **违规上报** POST 到 `/scaffold/csp-report`(`throttle:60,1,scaffold:csp.report:`),记进 Laravel log。
 
 ## 其它防御头
 

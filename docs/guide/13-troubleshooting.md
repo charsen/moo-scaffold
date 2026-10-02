@@ -57,6 +57,7 @@ order: 140
 | 提交 419 | CSRF token 过期 → 刷新;或全局 `VerifyCsrfToken` 漏排除 scaffold 写路由 |
 | AJAX 401 + `X-Scaffold-Auth: required` / `X-Scaffold-Login` | 登录过期 → 前端认这两个 header 跳 login |
 | 登录 5 次后 429 | 路由级 throttle 5/min/IP → 等 1 分钟 |
+| 少量操作就 429 | 先看命中 URI 与 `X-RateLimit-Limit` / `Retry-After`，核对自动预览/保存及同 IP 多人使用；旧版不同接口共用计数，升级后使用独立前缀，Host 缓存了路由时须重新构建路由缓存。范围见 [限流说明](12-security.md#限流范围) |
 
 ## Alpine / 前端
 

@@ -2,6 +2,21 @@
 
 本文件集中记录当前尚未完成且可执行的项目待办。复杂方案应链接到正式 plan；完成后及时勾选或清理。
 
+## 业务代码复盘（2026-10-02）
+
+- [x] 可读性与封装复审：AI 配置解析与归一化分开，文档路径检查集中在类内，账号/配置控制器移除重复 catch 和单次调用的私有转发；保留三个权限守卫及各动作显式编排，不新增通用执行器。150 项定向回归通过（763 assertions），Pint dirty 与 diff 检查通过；另修复空前缀 CSP 上报地址，四种前缀回归及真实 Host 隔离接口检查通过。
+- [x] 限流复盘：复现 CSP 上报挤占登录、Markdown 预览挤占保存额度；27 处声明补独立动作/组前缀，次数与一分钟窗口不变。新增 6 个回归用例；限流、错误回执、认证、Request 契约、Markdown 编辑及日志接入的 73 项定向测试通过（684 assertions），真实 path Host 的 CSP/登录隔离与登录第六次 429 检查通过。已核对自动预览、自动保存及同 IP 同动作共享额度；同事的具体 429 URI 未提供；首轮未执行浏览器或 E2E，后续浏览器验证见下。
+
+- [x] 复核 Schema/快照/迁移生成、账号与鉴权、权限/只读守卫、API 调试代理、配置/文档、Cloud/日志及基础表单/资源契约；修复文档路径与排序缓存、大小写扩展名、空路由前缀守卫、AI 损坏配置、dotenv 转义、手机号异常输入和 CLI 写失败回执，见 [Unreleased](CHANGELOG.md)。
+- [x] 新增失败路径回归，先复现旧代码失败；用真实 path Host 的容器、路由和下游 Personnel Request 做隔离定向检查，所有写入仅落临时夹具，未修改 Host 数据库、配置或业务文件。
+- [x] 首轮定向验证：修复相关 260 passed（970 assertions），账号/API/日志/Cloud 135 passed（719 assertions），生成链路 28 passed（156 assertions）及 1 项既有跳过，下游 Rules 7 passed（23 assertions）；真实 path Host 14 项隔离检查、Pint dirty 与 diff 检查通过。新增 33 个回归用例。首轮未运行 E2E、全量测试、Admin 双 smoke 或 Laravel 10/11 兼容矩阵；既有跳过项是 Testbench 不具备完整 Host 配置的 `moo:fresh` 用例。
+
+- [x] 继续优化：文档与 AI 保存复用现有原子 writer，保留权限、有效软链接和原失败回执，补 11 项回归。设计器弹窗延迟聚焦不再抢走用户输入焦点，JS 确定性回归先红后绿，新建模块浏览器连续 5 次通过。
+- [x] 用户授权后的全量验证：PHP 1436 passed（6296 assertions）/ 3 项既有跳过；JS 8 文件 / 191 断言全绿。Pint dirty 与 diff 检查通过。PHP 跳过项分别依赖完整 Host 的 moo:fresh 配置、Demo migration 文件和 order_* 跨 schema migration 夹具。
+
+- [x] 全套 E2E：使用真实 path-repository Host 的独立副本、临时 SQLite/账号/文档和当前发布资源，Chromium headless 经 test:e2e:safe 最终 70 passed / 1 skipped（未发外部 AI 请求）；覆盖 16 个 schema 预览、设计器写入、账号、日志、Markdown、AI 配置与限流隔离。首次侧栏 fixture 名不匹配后调整环境配置；修复弹窗聚焦竞争；快捷保存计时从响应完成改为请求发出，400ms 门槛与成功响应断言保留，补跑 3 次通过。schema/snapshot/migration 后置检查无残留，原 Host 未修改，原浏览器登录态已还原。未跑 Admin 双 smoke、Laravel 10/11 矩阵或真实 Cloud/AI 上游调用。
+- [ ] E2E 清理脚本的现场保护：safe-run 当前 checkout 会丢失跑前已脏的已跟踪 schema，且新增未跟踪文件清理不限于生成目录。补充拒绝脏 schema 和限定清理范围的保护及脚本回归；本轮使用独占 Host 副本避开该风险，勿对正在开发的 Host 直接运行。
+
 ## 设计器、账号与调试器可靠性
 
 - [x] 完成已批准的六项修复与定向验证,见 [执行记录](plans/scaffold-workflow-reliability.md)。本轮不调整改密注销、写接口默认 ID 或 422/522 规则。

@@ -40,7 +40,7 @@ class SnapshotStore
      * 把当前工作树 yaml 拷一份到 .snapshots/{Schema}.yaml,作为下一次 diff 的 baseline。
      * 全量覆盖。
      *
-     * @throws \RuntimeException 源 yaml 不存在时
+     * @throws \RuntimeException 源 yaml 不存在、解析失败或快照写入失败时
      */
     public function capture(string $schema): void
     {
@@ -62,10 +62,10 @@ class SnapshotStore
         }
 
         $this->ensureSnapshotDir($schema);
-        // 这里刻意**不**检查返回值：capture() 只被 `moo:snapshot:init` 调用，写失败原先只 log；
-        // 把它改成抛属于独立的行为变更（会改 CLI 退出行为），不混进本次「captureTables → write()
-        // 链可见化」的范围。见 NOTES.md 的残留清单。
-        $this->writeSnapshot($this->snapshotPath($schema), YamlFormatter::dump($parsed));
+        // 初始化快照尚未生成 migration；失败必须交给命令的 error/退出码。
+        if (! $this->writeSnapshot($this->snapshotPath($schema), YamlFormatter::dump($parsed))) {
+            throw new \RuntimeException("snapshot 写入失败，原基线未变更：{$schema}");
+        }
     }
 
     /**

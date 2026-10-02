@@ -63,7 +63,8 @@ class EnforceScaffoldWritable
 
         // 计划 / 发版日志仅 local 可编辑；即使 staging 也保持只读。
         $prefix = trim((string) config('scaffold.route.prefix', 'scaffold'), '/');
-        if ($request->is($prefix . '/plans/*', $prefix . '/release-records/*')
+        $prefix = $prefix === '' ? '' : $prefix . '/';
+        if ($request->is($prefix . 'plans/*', $prefix . 'release-records/*')
             && (! app()->environment('local') || ReadonlyMode::configLocked())) {
             return $this->forbidden($request, 'EDIT_LOCAL_ONLY', '仅本地且未开启强制只读时允许编辑。');
         }
@@ -76,8 +77,7 @@ class EnforceScaffoldWritable
         }
 
         // 生产 / 只读:仅锁高风险簇,其它 W 仍放行。按实际配置的路由前缀拼 pattern。
-        $prefix   = trim((string) config('scaffold.route.prefix', 'scaffold'), '/');
-        $patterns = array_map(static fn ($s) => $prefix . '/' . $s, self::LOCKED_SUFFIXES);
+        $patterns = array_map(static fn ($s) => $prefix . $s, self::LOCKED_SUFFIXES);
         if (! $request->is(...$patterns)) {
             return $next($request);
         }

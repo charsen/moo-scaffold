@@ -28,9 +28,10 @@ class EnforceAdminOnly
     public function handle(Request $request, Closure $next)
     {
         $prefix = trim((string) config('scaffold.route.prefix', 'scaffold'), '/');
+        $prefix = $prefix === '' ? '' : $prefix . '/';
 
         // 人员管理(/scaffold/accounts)：「进入」(GET) 与「管理」(写) 都仅 admin。
-        $isAccounts = $request->is($prefix . '/accounts', $prefix . '/accounts/*');
+        $isAccounts = $request->is($prefix . 'accounts', $prefix . 'accounts/*');
 
         // 配置(/scaffold/config/*)：**只有写**仅 admin。
         //
@@ -41,7 +42,7 @@ class EnforceAdminOnly
         //
         // GET 不拦是刻意的：配置页只读、敏感字段已掩码（见 config/index.blade.php 的空白输入），
         // 与 accounts 的「进入即拦」口径不同 —— 后者的列表本身就是人员隐私。
-        $isConfigWrite = $request->is($prefix . '/config', $prefix . '/config/*')
+        $isConfigWrite = $request->is($prefix . 'config', $prefix . 'config/*')
             && ! $request->isMethodSafe();
 
         if (! $isAccounts && ! $isConfigWrite) {

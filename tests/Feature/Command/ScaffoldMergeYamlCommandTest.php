@@ -191,3 +191,40 @@ it('当前目录不在任何 git 仓内 → 退出码 1 且明说（仓根探测
 
     expect($code)->toBe(1)->and($out)->toContain('当前不在 git 仓库内');
 });
+
+it('合并结果写入失败时退出非零并保留原冲突文件', function () {
+    $fx      = mergeYamlFixture();
+    $before  = file_get_contents($fx['abs']);
+    $command = new class(app(Filesystem::class), app(\Mooeen\Scaffold\Utility::class), app(\Mooeen\Scaffold\Designer\GitInspector::class)) extends \Mooeen\Scaffold\Command\ScaffoldMergeYamlCommand
+    {
+        protected function writeFileAtomically(string $path, string $content, ?int $mode = null): void
+        {
+            throw new RuntimeException('fixture write failure');
+        }
+    };
+    $command->setLaravel(app());
+    $output = new \Symfony\Component\Console\Output\BufferedOutput;
+    $prev   = getcwd();
+    chdir($fx['repo']);
+    try {
+        $code = $command->run(new \Symfony\Component\Console\Input\ArrayInput(['path' => $fx['rel']]), $output);
+    } finally {
+        chdir($prev);
+    }
+
+    expect($code)->toBe(1)
+        ->and($output->fetch())->toContain('写入失败')
+        ->and(file_get_contents($fx['abs']))->toBe($before);
+});
+
+it('非 dry-run 合并真正落盘并保留原文件权限', function () {
+    $fx = mergeYamlFixture();
+    chmod($fx['abs'], 0600);
+    [$code, $out] = mergeYamlRun($fx['repo'], ['path' => $fx['rel']]);
+
+    clearstatcache(true, $fx['abs']);
+    expect($code)->toBe(0)
+        ->and($out)->toContain('已合并')
+        ->and(file_get_contents($fx['abs']))->toContain('sync:auto-merge')
+        ->and(fileperms($fx['abs']) & 0777)->toBe(0600);
+});

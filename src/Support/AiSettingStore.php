@@ -6,6 +6,7 @@ namespace Mooeen\Scaffold\Support;
 
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Filesystem\Filesystem;
+use Mooeen\Scaffold\Support\Concerns\AtomicFileWrite;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
 
@@ -23,6 +24,8 @@ use Symfony\Component\Yaml\Yaml;
  */
 class AiSettingStore
 {
+    use AtomicFileWrite;
+
     /**
      * 默认上游（DeepSeek）。api_key 默认空 = 未配置（翻译关闭）。
      *
@@ -68,31 +71,26 @@ class AiSettingStore
      * 合并默认值 + yaml 文件，返回归一后的 base_url / api_key / model / timeout。
      * TranslationService binding 直接吃这个。
      *
-     * @return array{base_url:string, api_key:string, model:string, timeout:int}
+     * @return array{base_url:string, api_key:string, model:string, timeout:int, connect_timeout:int, max_tokens:int, temperature:float}
      */
     public function load(): array
     {
         $data             = self::DEFAULTS;
         $this->yamlBroken = false;
+        $ai               = $this->readAiConfig();
 
-        if ($this->exists()) {
-            // ai.yaml 入 git 随仓多机同步,冲突标记(<<<<<<<)/手改坏形是现实事件。
-            // 裸 parse 抛异常会 500 掉 AI 配置页(修复入口自身)+ designer 翻译 → 死锁,
-            // 只能上磁盘修文件。解析失败回退默认 + 页面黄条提示(2026-06-10 修);
-            // 此时从 UI 保存一次即用合法内容重写、自动修复文件。
-            try {
-                $parsed = Yaml::parse($this->fs->get($this->path())) ?: [];
-            } catch (\Throwable) {
-                $parsed           = [];
+        foreach (self::DEFAULTS as $key => $default) {
+            $value = $ai[$key] ?? null;
+            if ($value === null || $value === '') {
+                continue;
+            }
+            $numeric = is_int($default) || is_float($default);
+            if (! is_scalar($value) || ($numeric && ! is_numeric($value))) {
                 $this->yamlBroken = true;
+
+                continue;
             }
-            // 容错：既支持嵌套 `ai:` 也支持平铺
-            $ai = (array) ($parsed['ai'] ?? $parsed);
-            foreach (array_keys(self::DEFAULTS) as $k) {
-                if (array_key_exists($k, $ai) && $ai[$k] !== null && $ai[$k] !== '') {
-                    $data[$k] = $ai[$k];
-                }
-            }
+            $data[$key] = $value;
         }
 
         return [
@@ -126,7 +124,7 @@ class AiSettingStore
      * （跟 AccountStore 密码"留空不改"同语义 —— 避免 UI 掩码回显把真 key 冲掉）。
      * 要清空 key 请删 scaffold/ai.yaml。
      *
-     * @return array{base_url:string, api_key:string, model:string, timeout:int}
+     * @return array{base_url:string, api_key:string, model:string, timeout:int, connect_timeout:int, max_tokens:int, temperature:float}
      */
     public function save(array $payload): array
     {
@@ -192,6 +190,41 @@ class AiSettingStore
 
     // -------------------------------------------------------------------------
 
+    /** 读取嵌套或平铺配置；损坏时提示并回退，让配置页仍可修复文件。 */
+    private function readAiConfig(): array
+    {
+        if (! $this->exists()) {
+            return [];
+        }
+
+        try {
+            $parsed = Yaml::parse($this->fs->get($this->path())) ?? [];
+        } catch (\Throwable) {
+            $this->yamlBroken = true;
+
+            return [];
+        }
+
+        if (! $this->isMapping($parsed)) {
+            $this->yamlBroken = true;
+
+            return [];
+        }
+        $ai = array_key_exists('ai', $parsed) ? $parsed['ai'] : $parsed;
+        if (! $this->isMapping($ai)) {
+            $this->yamlBroken = true;
+
+            return [];
+        }
+
+        return $ai;
+    }
+
+    private function isMapping(mixed $value): bool
+    {
+        return is_array($value) && ($value === [] || ! array_is_list($value));
+    }
+
     /**
      * 整体重写 YAML（持久化终点）。
      *
@@ -201,7 +234,7 @@ class AiSettingStore
      * 以及 ConfigManager 经 EnvFileEditor / PhpFileEditor 的写法）；ConfigController
      * 已 `catch (\Throwable $e)` 把 message 落进 `flash_error` 红条并抑制成功绿条。
      *
-     * @throws RuntimeException 写入失败（`Filesystem::put()` 返回 false）时，文件保持原内容
+     * @throws RuntimeException 原子写入失败时，文件保持原内容
      */
     private function writeYaml(array $ai): void
     {
@@ -214,8 +247,15 @@ class AiSettingStore
             . "# 删本文件即恢复默认（api_key 清空 = AI 翻译关闭）。\n\n"
             . Yaml::dump(['ai' => $ai], 4, 4, Yaml::DUMP_OBJECT_AS_MAP);
 
-        if ($this->fs->put($path, $body) === false) {   // put() 是 int|false，只能与 false 严格比
-            throw new RuntimeException("写入失败，AI 配置未变更：{$path}");
+        try {
+            $target = realpath($path);
+            // 已有软链接继续写目标；断链拒绝写入，不能把链接替换成普通文件。
+            if (($target === false && is_link($path)) || (is_file($path) && ! is_writable($path))) {
+                throw new RuntimeException('AI 配置目标不存在或不可写。');
+            }
+            $this->writeFileAtomically($target ?: $path, $body);
+        } catch (RuntimeException $e) {
+            throw new RuntimeException("写入失败，AI 配置未变更：{$path}", 0, $e);
         }
     }
 

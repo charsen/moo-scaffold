@@ -11,7 +11,6 @@ use Mooeen\Scaffold\Http\Requests\Config\UpdateRequest;
 use Mooeen\Scaffold\Http\Requests\ContextRequest;
 use Mooeen\Scaffold\Support\AiSettingStore;
 use Mooeen\Scaffold\Support\ConfigManager;
-use Mooeen\Scaffold\Support\ConfigWriteForbiddenException;
 use Mooeen\Scaffold\Support\ReadonlyMode;
 use Mooeen\Scaffold\Utility;
 
@@ -98,7 +97,7 @@ class ConfigController extends Controller
     /**
      * 提交分组字段更新（POST /scaffold/config/{group}）。
      * - env 字段写入 .env，file 字段写入 engine/config/scaffold.php（manager 分发）
-     * - production / readonly 时整体返 403 flash
+     * - production / readonly 时拒绝写入，以 flash_error 回显
      */
     public function update(UpdateRequest $request, string $group): RedirectResponse
     {
@@ -140,8 +139,6 @@ class ConfigController extends Controller
             if (! empty($result['diff'])) {
                 $request->session()->flash('flash_diff', $result['diff']);
             }
-        } catch (ConfigWriteForbiddenException $e) {
-            $request->session()->flash('flash_error', $e->getMessage());
         } catch (\Throwable $e) {
             $request->session()->flash('flash_error', $e->getMessage());
         }
@@ -193,8 +190,6 @@ class ConfigController extends Controller
             $validated = $request->validated();
             $this->aiStore->save($validated);
             $request->session()->flash('flash_message', 'AI 配置已保存（改完即时生效，无需重启）');
-        } catch (ConfigWriteForbiddenException $e) {
-            $request->session()->flash('flash_error', $e->getMessage());
         } catch (\Throwable $e) {
             $request->session()->flash('flash_error', $e->getMessage());
         }

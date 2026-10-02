@@ -900,6 +900,9 @@ test.describe('Cmd+S shortcut', () => {
 
         // 立刻 saveNow:必须 bypass timer < 400ms 出 POST
         const t0 = Date.now();
+        const requestPromise = page.waitForRequest(r =>
+            r.url().includes(`/db/designer/${SCHEMA}/save`) && r.method() === 'POST',
+            { timeout: 2000 });
         const savePromise = page.waitForResponse(r =>
             r.url().includes(`/db/designer/${SCHEMA}/save`) && r.request().method() === 'POST',
             { timeout: 2000 });
@@ -910,8 +913,10 @@ test.describe('Cmd+S shortcut', () => {
             if (!el || !Alpine) throw new Error('designer Alpine 组件未挂载');
             Alpine.$data(el).saveNow();
         });
-        const resp = await savePromise;
+        // 测发出请求的时间，不能把 Host 写盘和响应耗时当成前端 debounce。
+        await requestPromise;
         const elapsed = Date.now() - t0;
+        const resp = await savePromise;
         expect(resp.status()).toBe(200);
         expect(elapsed, `Cmd+S 应 bypass 500ms debounce → < 400ms,实际 ${elapsed}ms`).toBeLessThan(400);
 

@@ -47,7 +47,7 @@ class AccountController extends Controller
             'uri'           => $request->getPathInfo(),
             'accounts'      => $accounts,
             'meta'          => $meta,
-            'readonly'      => $this->isReadonly(),
+            'readonly'      => ReadonlyMode::active(),
             'is_prod'       => ReadonlyMode::productionActive(),
             'me'            => $this->currentUser($request),
             'flash_message' => $request->session()->pull('flash_message'),
@@ -66,8 +66,6 @@ class AccountController extends Controller
             $payload['username'] = trim((string) ($payload['username'] ?? ''));
             $row                 = $this->store->create($payload, $this->currentUser($request));
             $request->session()->flash('flash_message', "新增账号 [{$row['username']}] 成功");
-        } catch (AccountWriteForbiddenException $e) {
-            $request->session()->flash('flash_error', $e->getMessage());
         } catch (\Throwable $e) {
             $request->session()->flash('flash_error', $e->getMessage());
         }
@@ -82,8 +80,6 @@ class AccountController extends Controller
             $payload = $request->validated();
             $this->store->update($username, $payload, $this->currentUser($request));
             $request->session()->flash('flash_message', "更新 [{$username}] 成功");
-        } catch (AccountWriteForbiddenException $e) {
-            $request->session()->flash('flash_error', $e->getMessage());
         } catch (\Throwable $e) {
             $request->session()->flash('flash_error', $e->getMessage());
         }
@@ -106,8 +102,6 @@ class AccountController extends Controller
             }
             $this->store->toggleEnabled($username, ! ($current['enabled'] ?? true), $me);
             $request->session()->flash('flash_message', "已切换 [{$username}] 状态");
-        } catch (AccountWriteForbiddenException $e) {
-            $request->session()->flash('flash_error', $e->getMessage());
         } catch (\Throwable $e) {
             $request->session()->flash('flash_error', $e->getMessage());
         }
@@ -126,8 +120,6 @@ class AccountController extends Controller
             }
             $this->store->delete($username, $me);
             $request->session()->flash('flash_message', "已删除账号 [{$username}]");
-        } catch (AccountWriteForbiddenException $e) {
-            $request->session()->flash('flash_error', $e->getMessage());
         } catch (\Throwable $e) {
             $request->session()->flash('flash_error', $e->getMessage());
         }
@@ -143,11 +135,6 @@ class AccountController extends Controller
         if (ReadonlyMode::configLocked()) {
             throw new AccountWriteForbiddenException('当前为强制只读模式（SCAFFOLD_CONFIG_READONLY）');
         }
-    }
-
-    private function isReadonly(): bool
-    {
-        return ReadonlyMode::active();
     }
 
     private function currentUser(FormRequest $request): string

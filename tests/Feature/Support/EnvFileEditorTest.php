@@ -90,3 +90,24 @@ it('同 key 重复多行 → 全部更新(dotenv 后者生效,只改第一处是
         @unlink($p);
     }
 });
+
+it('特殊字符写入后能被真正的 dotenv 解析器无损读回', function (string $value) {
+    $path = writeTmpEnv("A=old\n");
+    try {
+        (new EnvFileEditor)->setKeysInFile($path, ['A' => $value]);
+        expect(\Dotenv\Dotenv::parse(file_get_contents($path))['A'])->toBe($value);
+    } finally {
+        unlink($path);
+    }
+})->with(['back`tick', 'quote" and slash\\ and #hash', 'literal${UNDEFINED_FIXTURE}']);
+
+it('不支持的换行值在写入前拒绝，整批更新保持原文', function (string $value) {
+    $path = writeTmpEnv("A=old\nB=keep\n");
+    try {
+        expect(fn () => (new EnvFileEditor)->setKeysInFile($path, ['A' => 'next', 'B' => $value]))
+            ->toThrow(RuntimeException::class);
+        expect(file_get_contents($path))->toBe("A=old\nB=keep\n");
+    } finally {
+        unlink($path);
+    }
+})->with(["line1\nline2", "line1\rline2", "line1\r\nline2"]);

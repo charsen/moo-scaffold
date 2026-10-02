@@ -114,6 +114,8 @@ npm run test:e2e:ui
 | `E2E_FIELD_FORMAT` | 期望的 format 值；**留空 = 跳过该列断言** | `float:1000000` |
 | `E2E_HOST_SCAFFOLD_DB_PATH` | 宿主 `scaffold/database/` 目录,供 `test:e2e:safe` 跑完还原 + 真写类 test 清理 | 无(相关 test 自动 skip) |
 | `E2E_ISOLATED_ACCOUNTS` | 仅在服务已配置独立账号文件时设为 `1`，启用账号新增/停用/删除回归 | 不启用 |
+| `E2E_HOST_DOCS_PATH` | Host 当前 `scaffold.docs.path`，供原子保存回归创建与清理独占文档/目录内软链接 | 无(保存用例跳过) |
+| `E2E_HOST_AI_PATH` | Host 当前 `scaffold.ai.yaml_path`，仅在文件不存在时创建并清理 AI 表单保存夹具，不发上游请求 | 无(保存用例跳过) |
 
 带完整注释与换宿主实例的模板见 [`.env.e2e.example`](../../.env.e2e.example)。
 

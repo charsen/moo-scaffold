@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Mooeen\Scaffold\Http\Middleware\EnforceAdminOnly;
 use Mooeen\Scaffold\Http\Middleware\EnforceDesignerPermission;
 use Mooeen\Scaffold\Http\Middleware\EnforceScaffoldWritable;
+use Mooeen\Scaffold\Http\Middleware\SecurityHeaders;
 use Mooeen\Scaffold\Support\AccountStore;
 
 /**
@@ -124,3 +125,36 @@ it('designer 中间件：有 can_design_db 权限时放行写（补此前零覆�
     expect($res->getStatusCode())->toBe(200)
         ->and((string) $res->getContent())->toBe('PASSED_THROUGH');
 });
+
+it('空前缀与多级前缀均保持权限和只读边界', function (string $prefix) {
+    config(['scaffold.route.prefix' => $prefix, 'scaffold.config_ui.readonly' => true]);
+    $uri = static fn (string $suffix): string => '/' . trim(trim($prefix, '/') . '/' . $suffix, '/');
+    foreach ([
+        ['admin', 'accounts', 'ADMIN_ONLY'],
+        ['admin', 'config/hosts', 'ADMIN_ONLY'],
+        ['designer', 'db/designer/Demo/tables', 'DESIGNER_FORBIDDEN'],
+        ['writable', 'db/designer/Demo/tables', 'WRITE_LOCKED'],
+        ['writable', 'docs/save', 'WRITE_LOCKED'],
+        ['writable', 'cloud/push', 'WRITE_LOCKED'],
+        ['writable', 'plans/example/save', 'EDIT_LOCAL_ONLY'],
+        ['writable', 'release-records/example/save', 'EDIT_LOCAL_ONLY'],
+    ] as [$which, $suffix, $code]) {
+        $response = mwEnv_run($which, mwEnv_jsonReq($uri($suffix)));
+        expect($response->getStatusCode())->toBe(403, $which . ':' . $suffix);
+        expect(json_decode($response->getContent(), true)['error']['code'])->toBe($code);
+    }
+    expect(mwEnv_run('writable', mwEnv_jsonReq($uri('docs'), 'GET'))->getStatusCode())->toBe(200);
+    expect(mwEnv_run('writable', mwEnv_jsonReq($uri('api/proxy')))->getStatusCode())->toBe(200);
+})->with(['', '/', 'scaffold', '/tools/internal/']);
+
+it('CSP 上报路径跟随前缀，空前缀不能产生双斜杠外站地址', function (string $prefix, string $expected) {
+    config(['scaffold.route.prefix' => $prefix]);
+    $response = (new SecurityHeaders)->handle(Request::create('/'), fn () => response('fixture'));
+
+    expect($response->headers->get('Content-Security-Policy'))->toContain("report-uri {$expected};");
+})->with([
+    ['', '/csp-report'],
+    ['/', '/csp-report'],
+    ['scaffold', '/scaffold/csp-report'],
+    ['/tools/internal/', '/tools/internal/csp-report'],
+]);
