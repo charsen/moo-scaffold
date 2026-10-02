@@ -99,3 +99,27 @@ it('yaml 文件嵌套在 ai: 键下', function () {
     expect($parsed)->toHaveKey('ai');
     expect($parsed['ai']['api_key'])->toBe('sk-nested');
 });
+
+it('合法 YAML 的损坏结构回退默认值并提示，不让配置修复页崩溃', function (string $raw) {
+    file_put_contents($this->sandbox . '/ai.yaml', $raw);
+
+    $view = $this->store->read();
+    expect($view['yaml_broken'])->toBeTrue();
+    expect($view['api_key_set'])->toBeFalse();
+    expect($view['model'])->toBe('deepseek-chat');
+    expect($view['timeout'])->toBe(10);
+    $this->store->save(['model' => 'repaired']);
+    expect($this->store->read()['yaml_broken'])->toBeFalse();
+    expect($this->store->load()['model'])->toBe('repaired');
+})->with(['scalar' => "broken\n", 'false scalar' => "false\n", 'zero scalar' => "0\n", 'nested scalar' => "ai: broken\n", 'nested null' => "ai: null\n", 'list' => "- broken\n"]);
+
+it('AI 配置字段损坏时只回退该字段，保留可用配置并提示', function () {
+    file_put_contents($this->sandbox . '/ai.yaml', "ai:\n  model: [broken]\n  timeout: {broken: 1}\n  api_key: sk-fixture\n");
+
+    $view = $this->store->read();
+    expect($view['yaml_broken'])->toBeTrue();
+    expect($view['model'])->toBe('deepseek-chat');
+    expect($view['timeout'])->toBe(10);
+    expect($view['api_key_set'])->toBeTrue();
+    expect($view)->not->toHaveKey('api_key');
+});

@@ -108,6 +108,8 @@ php artisan moo:snapshot:init --no-db-check      # 跳过 yaml↔DB 对账
 
 **前置**:当前 yaml 跟 DB 一致(走过 designer / `moo:migration`),否则把未 migrate 的改动吃进 baseline → 后续 diff 漏报。落基线前自动反查活 DB(mysql `information_schema`)对账**列类型 / varchar size / 单列 unique 索引**,不符报 `⚠ drift yaml=… db=…`(只读告警,baseline 仍按当前 yaml 落)。非 mysql / DB 不可达自动跳过对账。详 [04](04-db-docs-designer.md) baseline 段。
 
+快照写入失败时保留原基线，命令输出该 schema 的 `error` 并退出 `1`；已成功处理的其它 schema 不回滚。确认目录可写后再重试。
+
 ### `moo:db:audit [--schema=]`
 
 随手查 yaml ↔ 实际 DB 漂移(跟 `snapshot:init` 内嵌对账同源,独立好记)。
@@ -226,7 +228,7 @@ git 同步冲突的 YAML 自动合并器(多端同步脚本在 rebase 冲突时�
 php artisan moo:scaffold:merge-yaml scaffold/accounts.yaml --dry-run
 ```
 
-详 [11-sync.md](11-sync.md) §4。
+详 [11-sync.md](11-sync.md) §3。实际写回采用原子替换并保留原权限；写入失败退出 `1`，原冲突文件不变，调用脚本不得继续标记冲突已解决。
 
 ## 通用注意事项
 

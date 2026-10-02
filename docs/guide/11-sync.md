@@ -43,3 +43,5 @@ php artisan moo:scaffold:merge-yaml scaffold/accounts.yaml --dry-run  # 只输�
 - **accounts.yaml**:按 username **取并集** + 行级 last-write-wins(双方都有的取 `updated_at` 较新);**无删除墓碑** —— 删掉的账号若另一端还在,合并后会复活(真删干净:跟对方同步到最新后再删一次、push;误删找回走 `git log -- scaffold/accounts.yaml`,详 [`09-accounts.md`](09-accounts.md))。meta 重算(`updated_by=sync:auto-merge`)。
 - **其它 yaml**:整文件按 `meta.updated_at` 比较,取较新一边覆盖。
 - **元数据缺失没法仲裁**:不写回,需人工解决。
+
+实际写回采用同目录临时文件和原子替换，保留原文件权限。写入失败时保留原冲突文件、输出错误并退出 `1`；下游脚本应检查退出码，成功后再标记冲突已解决。

@@ -30,6 +30,9 @@ if (! ($config['enabled'] ?? true)) {
 $prefix     = $config['prefix']     ?? 'scaffold';
 $middleware = $config['middleware'] ?? [];
 
+// 每个限流动作使用独立前缀；Laravel 数字 throttle 默认只按用户/IP 计数，
+// 不区分路由，预览和 CSP 上报会挤占登录、保存等低额度接口。账号写动作仍共用一个额度。
+
 // ============================================================
 // Public webhook endpoints（隔离 group）
 //
@@ -46,7 +49,7 @@ Route::prefix($prefix)->middleware([SecurityHeaders::class])->group(function () 
     //   - throttle:60,1/IP 防 DDoS
     //   - payload ≤ 8KB(在 controller 内 check)
     Route::post('/csp-report', ScaffoldController::class . '@cspReport')
-        ->middleware('throttle:60,1')
+        ->middleware('throttle:60,1,scaffold:csp.report:')
         ->name('scaffold.csp.report');
 });
 
@@ -57,7 +60,7 @@ Route::prefix($prefix)->middleware(array_merge($middleware, [SecurityHeaders::cl
     Route::get('/login', AuthController::class . '@showLogin')->name('scaffold.login');
     // /login POST 加节流：5 次/分钟/IP，防暴力破解
     Route::post('/login', AuthController::class . '@login')
-        ->middleware('throttle:5,1')
+        ->middleware('throttle:5,1,scaffold:login.submit:')
         ->name('scaffold.login.submit');
     // POST-only:GET 登出可被 <img src=.../logout> 跨站强制登出(GET 免 CSRF)。改 POST + @csrf
     // 表单,走 web 组的 VerifyCsrfToken 防 CSRF(2026-06-09 修)。
@@ -107,11 +110,11 @@ Route::prefix($prefix)->middleware(array_merge($middleware, [SecurityHeaders::cl
         // plan-40 §三 R-1 横切补漏:LOCK_EX 已防数据撕裂,加 throttle 防多 tab 排队卡死
         Route::post('/db/designer/{schema}/save', DesignerController::class . '@save')
             ->where('schema', '[A-Z][A-Za-z0-9]*')
-            ->middleware('throttle:30,1')
+            ->middleware('throttle:30,1,scaffold:db.designer.save:')
             ->name('db.designer.save');
         // plan-40 §四 B-1:加 throttle 防 DeepSeek 钱包烧 / 账号封;60 次/分钟
         Route::post('/db/designer/translate', DesignerController::class . '@translate')
-            ->middleware('throttle:60,1')
+            ->middleware('throttle:60,1,scaffold:db.designer.translate:')
             ->name('db.designer.translate');
         Route::get('/db/designer/{schema}/preview', DesignerController::class . '@preview')
             ->where('schema', '[A-Z][A-Za-z0-9]*')
@@ -119,16 +122,16 @@ Route::prefix($prefix)->middleware(array_merge($middleware, [SecurityHeaders::cl
         // plan-40 §三 R-1 横切补漏:文件 IO + baseline snapshot 重,人类操作 10/min 足够
         Route::post('/db/designer/{schema}/migrate', DesignerController::class . '@migrate')
             ->where('schema', '[A-Z][A-Za-z0-9]*')
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:10,1,scaffold:db.designer.migrate:')
             ->name('db.designer.migrate');
         // plan-49 migration 合并:dry-run preview + execute 两段式
         Route::post('/db/designer/{schema}/migrations/compact-preview', DesignerController::class . '@compactMigrationsPreview')
             ->where('schema', '[A-Z][A-Za-z0-9]*')
-            ->middleware('throttle:30,1')
+            ->middleware('throttle:30,1,scaffold:db.designer.migrations.compact_preview:')
             ->name('db.designer.migrations.compact_preview');
         Route::post('/db/designer/{schema}/migrations/compact', DesignerController::class . '@compactMigrationsExecute')
             ->where('schema', '[A-Z][A-Za-z0-9]*')
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:10,1,scaffold:db.designer.migrations.compact_execute:')
             ->name('db.designer.migrations.compact_execute');
         // 2026-05-21:删 migration 文件 entry(C 方案)— migrations 表无 record 才允许删,
         // 不动 snapshot(user 自己决定要不要重生成,需手动改 .snapshots/{Schema}.yaml)。
@@ -137,37 +140,37 @@ Route::prefix($prefix)->middleware(array_merge($middleware, [SecurityHeaders::cl
         Route::delete('/db/designer/{schema}/migrations/{stem}', DesignerController::class . '@deleteMigration')
             ->where('schema', '[A-Z][A-Za-z0-9]*')
             ->where('stem', '[0-9a-zA-Z_]+')
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:10,1,scaffold:db.designer.migration.delete:')
             ->name('db.designer.migration.delete');
         // #4:新建 schema(写 .yaml stub)— plan-40 §三 R-1 横切补漏
         Route::post('/db/designer/schemas', DesignerController::class . '@createSchema')
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:10,1,scaffold:db.designer.create_schema:')
             ->name('db.designer.create_schema');
         // 草稿态 schema 改名 + 删(锁定态拒绝;改了 / 删了 yaml + cache invalidate,downstream 无影响)
         Route::put('/db/designer/schemas/{schema}', DesignerController::class . '@renameSchema')
             ->where('schema', '[A-Z][A-Za-z0-9]*')
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:10,1,scaffold:db.designer.rename_schema:')
             ->name('db.designer.rename_schema');
         // 表 key 改名:仅未生成 migration 时;rename yaml 节点(非合并出重复表)+ cache 重建。
         // controller / acl 不源于表 key,不受影响;锁定表(已生成 migration)后端拒。
         Route::put('/db/designer/{schema}/tables/{table}/rename', DesignerController::class . '@renameTable')
             ->where('schema', '[A-Z][A-Za-z0-9]*')
             ->where('table', '[A-Za-z][A-Za-z0-9_]*')
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:10,1,scaffold:db.designer.rename_table:')
             ->name('db.designer.rename_table');
         Route::delete('/db/designer/schemas/{schema}', DesignerController::class . '@deleteSchema')
             ->where('schema', '[A-Z][A-Za-z0-9]*')
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:10,1,scaffold:db.designer.delete_schema:')
             ->name('db.designer.delete_schema');
         Route::post('/db/designer/{schema}/tables', DesignerController::class . '@createTable')
             ->where('schema', '[A-Z][A-Za-z0-9]*')
-            ->middleware('throttle:30,1')
+            ->middleware('throttle:30,1,scaffold:db.designer.create_table:')
             ->name('db.designer.create_table');
         // v6.2 round 7:删表(只删 yaml 节点)— plan-40 §三 R-1 横切补漏
         Route::delete('/db/designer/{schema}/tables/{table}', DesignerController::class . '@deleteTable')
             ->where('schema', '[A-Z][A-Za-z0-9]*')
             ->where('table', '[A-Za-z][A-Za-z0-9_]*')
-            ->middleware('throttle:30,1')
+            ->middleware('throttle:30,1,scaffold:db.designer.delete_table:')
             ->name('db.designer.delete_table');
         // URL path 不带 .php(nginx 会按 try_files 拦截非存在的 .php 文件),用 ?file= query
         Route::get('/db/designer/{schema}/migration-content', DesignerController::class . '@migrationContent')
@@ -187,7 +190,7 @@ Route::prefix($prefix)->middleware(array_merge($middleware, [SecurityHeaders::cl
         Route::post('/api/cache', ApiController::class . '@cache')->name('api.cache');
         // plan-40 §三 R-1 横切:origin 白名单已防 SSRF,加 throttle 防反射 DDoS 工具滥用
         Route::post('/api/proxy', ApiProxyController::class . '@proxy')
-            ->middleware('throttle:60,1')
+            ->middleware('throttle:60,1,scaffold:api.proxy:')
             ->name('api.proxy');
 
         // 接口路由
@@ -196,17 +199,17 @@ Route::prefix($prefix)->middleware(array_merge($middleware, [SecurityHeaders::cl
         Route::get('/plans', PlansController::class . '@index')->name('plans.index');
         Route::get('/plans/edit', PlansController::class . '@edit')->name('plans.edit');
         Route::post('/plans/save', PlansController::class . '@save')
-            ->middleware('throttle:30,1')->name('plans.save');
+            ->middleware('throttle:30,1,scaffold:plans.save:')->name('plans.save');
         Route::post('/plans/preview', PlansController::class . '@preview')
-            ->middleware('throttle:120,1')->name('plans.preview');
+            ->middleware('throttle:120,1,scaffold:plans.preview:')->name('plans.preview');
 
         // Host 发版记录：沿用 Scaffold 登录保护，本地可编辑既有文件。
         Route::get('/release-records', ReleaseRecordsController::class . '@index')->name('release-records.index');
         Route::get('/release-records/edit', ReleaseRecordsController::class . '@edit')->name('release-records.edit');
         Route::post('/release-records/save', ReleaseRecordsController::class . '@save')
-            ->middleware('throttle:30,1')->name('release-records.save');
+            ->middleware('throttle:30,1,scaffold:release-records.save:')->name('release-records.save');
         Route::post('/release-records/preview', ReleaseRecordsController::class . '@preview')
-            ->middleware('throttle:120,1')->name('release-records.preview');
+            ->middleware('throttle:120,1,scaffold:release-records.preview:')->name('release-records.preview');
 
         // plan-52 文档中心。slug 一律走 ?doc= query（不进路由 path，避开 unicode 路由正则坑;
         // 入口 DocsRepository::isValidSlug + realpath 收敛双层防穿越)。写类(save/preview/delete)
@@ -218,21 +221,21 @@ Route::prefix($prefix)->middleware(array_merge($middleware, [SecurityHeaders::cl
         // 引用 picker 的接口/表 catalog（只读 JSON）
         Route::get('/docs/picker', DocsController::class . '@picker')->name('docs.picker');
         Route::post('/docs/preview', DocsController::class . '@preview')
-            ->middleware('throttle:120,1')
+            ->middleware('throttle:120,1,scaffold:docs.preview:')
             ->name('docs.preview');
         Route::post('/docs/save', DocsController::class . '@save')
-            ->middleware('throttle:30,1')
+            ->middleware('throttle:30,1,scaffold:docs.save:')
             ->name('docs.save');
         Route::post('/docs/delete', DocsController::class . '@delete')
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:10,1,scaffold:docs.delete:')
             ->name('docs.delete');
         // 目录主页拖拽排序落盘(写类,同受 EnforceScaffoldWritable 的 docs/* 锁)
         Route::post('/docs/reorder', DocsController::class . '@reorder')
-            ->middleware('throttle:30,1')
+            ->middleware('throttle:30,1,scaffold:docs.reorder:')
             ->name('docs.reorder');
         // 全文搜索(只读 JSON,生产可用;搜索框防抖逐键触发,限流放宽到 120/min)
         Route::get('/docs/search', DocsController::class . '@search')
-            ->middleware('throttle:120,1')
+            ->middleware('throttle:120,1,scaffold:docs.search:')
             ->name('docs.search');
 
         // Scaffold 配置：主页单页 + 锚点（plan 18）；env 镜像独立页；历史回溯走 git
@@ -256,7 +259,7 @@ Route::prefix($prefix)->middleware(array_merge($middleware, [SecurityHeaders::cl
         // 2026-05-28 全面 audit:`{username}` regex 起首必 alphanumeric,防 `..` / `.` 之类纯 dot 串
         // (原 `[A-Za-z0-9._-]+` 允许 `..` 两个 dot,虽 AccountStore 单 yaml 无 path traversal 但守紧些)
         Route::get('/accounts', AccountController::class . '@index')->name('scaffold.accounts');
-        Route::middleware('throttle:10,1')->group(function () {
+        Route::middleware('throttle:10,1,scaffold:accounts:')->group(function () {
             Route::post('/accounts', AccountController::class . '@store')->name('scaffold.accounts.store');
             Route::post('/accounts/{username}', AccountController::class . '@update')
                 ->where('username', '[A-Za-z0-9][A-Za-z0-9._-]{0,63}')
@@ -293,10 +296,10 @@ Route::prefix($prefix)->middleware(array_merge($middleware, [SecurityHeaders::cl
         //     生产/只读拒绝;discard 额外只允许 local。throttle 防连点重复操作。
         Route::get('/cloud', CloudController::class . '@index')->name('cloud.index');
         Route::post('/cloud/push', CloudController::class . '@push')
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:10,1,scaffold:cloud.push:')
             ->name('cloud.push');
         Route::post('/cloud/discard', CloudController::class . '@discard')
-            ->middleware('throttle:5,1')
+            ->middleware('throttle:5,1,scaffold:cloud.discard:')
             ->name('cloud.discard');
     });
 

@@ -20,6 +20,7 @@ namespace Mooeen\Scaffold\Command;
 
 use Illuminate\Filesystem\Filesystem;
 use Mooeen\Scaffold\Designer\GitInspector;
+use Mooeen\Scaffold\Support\Concerns\AtomicFileWrite;
 use Mooeen\Scaffold\Support\Paths;
 use Mooeen\Scaffold\Utility;
 use Symfony\Component\Process\Process;
@@ -27,6 +28,8 @@ use Symfony\Component\Yaml\Yaml;
 
 class ScaffoldMergeYamlCommand extends Command
 {
+    use AtomicFileWrite;
+
     protected bool $requiresLocalEnvironment = false;
 
     protected $name = 'moo:scaffold:merge-yaml';
@@ -105,8 +108,17 @@ class ScaffoldMergeYamlCommand extends Command
             return self::SUCCESS;
         }
 
-        // plan-40 §三 R-1 横切补漏:跟全仓 LOCK_EX 一致
-        file_put_contents($absolute, $dumped, LOCK_EX);
+        try {
+            $target = realpath($absolute);
+            if ($target === false) {
+                throw new \RuntimeException('无法解析目标文件路径');
+            }
+            $this->writeFileAtomically($target, $dumped);
+        } catch (\RuntimeException $e) {
+            $this->console()->error("写入失败，原冲突文件未变更：{$relative}：{$e->getMessage()}");
+
+            return self::FAILURE;
+        }
         $this->console()->info("已合并：{$relative}");
 
         return self::SUCCESS;

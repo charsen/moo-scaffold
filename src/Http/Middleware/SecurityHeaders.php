@@ -71,7 +71,8 @@ class SecurityHeaders
         $headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
 
         // Content-Security-Policy + 违规上报到 /scaffold/csp-report
-        $reportUri = '/' . trim((string) config('scaffold.route.prefix', 'scaffold'), '/') . '/csp-report';
+        $prefix    = trim((string) config('scaffold.route.prefix', 'scaffold'), '/');
+        $reportUri = '/' . ltrim($prefix . '/csp-report', '/');
         $csp       = "default-src 'self'; "
             . "script-src 'self' 'nonce-{$nonce}'; "
             . "style-src 'self' 'nonce-{$nonce}' 'unsafe-inline'; "

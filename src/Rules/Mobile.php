@@ -26,7 +26,7 @@ class Mobile implements ValidationRule
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        if (! preg_match('/^1[3-9]\d{9}$/', (string) $value)) {
+        if (! is_scalar($value) || ! preg_match('/^1[3-9]\d{9}$/', (string) $value)) {
             $fail('validation.custom.mobile')->translate();
         }
     }

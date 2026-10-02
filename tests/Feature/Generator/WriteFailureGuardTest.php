@@ -52,6 +52,18 @@ function wfg_failing_fs(): Filesystem
     };
 }
 
+/** 文档写入使用原子 writer；仅注入写失败，读取与路径校验仍走真实文件系统。 */
+function wfg_failing_docs(): DocsRepository
+{
+    return new class(new Filesystem, app(Utility::class)) extends DocsRepository
+    {
+        protected function writeFileAtomically(string $path, string $content, ?int $mode = null): void
+        {
+            throw new RuntimeException('写入失败');
+        }
+    };
+}
+
 /**
  * `putOrReport` 的宿主：trait 的隐式依赖（`protected Filesystem $filesystem` + `console()`）
  * 在匿名类里补齐。`getConsoleTarget()` 收窄成 `OutputInterface` 是**窄化**（基类声明是
@@ -204,7 +216,15 @@ it('AiSettingStore::save():写盘失败 → 抛异常（控制器落 flash_error
         config(['scaffold.ai.yaml_path' => 'ai.yaml']);
         app()->instance(Filesystem::class, wfg_failing_fs());
 
-        expect(fn () => app(AiSettingStore::class)->save(['model' => 'gpt-x']))
+        $store = new class(app('config'), app(Filesystem::class)) extends AiSettingStore
+        {
+            protected function writeFileAtomically(string $path, string $content, ?int $mode = null): void
+            {
+                throw new RuntimeException('写入失败');
+            }
+        };
+
+        expect(fn () => $store->save(['model' => 'gpt-x']))
             ->toThrow(RuntimeException::class, '写入失败');
     });
 });
@@ -212,7 +232,7 @@ it('AiSettingStore::save():写盘失败 → 抛异常（控制器落 flash_error
 it('DocsRepository::save():写盘失败 → 抛异常且 message 带 slug（落 422 JSON 给编辑器）', function () {
     wfg_sandbox(function () {
         config(['scaffold.docs.path' => 'docs']);
-        app()->instance(Filesystem::class, wfg_failing_fs());
+        app()->instance(DocsRepository::class, wfg_failing_docs());
 
         expect(fn () => app(DocsRepository::class)->save('随手记', "正文\n"))
             ->toThrow(RuntimeException::class, '随手记');
@@ -228,7 +248,7 @@ it('DocsRepository::reorder():写盘失败 → 抛异常，且该篇 order 行�
         $real->save('a', "正文A\n");
         $real->save('b', "正文B\n");
 
-        app()->instance(Filesystem::class, wfg_failing_fs());
+        app()->instance(DocsRepository::class, wfg_failing_docs());
 
         expect(fn () => app(DocsRepository::class)->reorder(['b', 'a']))
             ->toThrow(RuntimeException::class, '写入失败');

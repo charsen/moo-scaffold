@@ -1146,7 +1146,13 @@ document.addEventListener('alpine:init', () => {
 
         // v6.2 round 3:打开 modal 后聚焦第一个 input(setTimeout 让 x-show transition 完成)
         _focusEl(id) {
-            setTimeout(() => { const el = document.getElementById(id); if (el) el.focus(); }, 60);
+            const activeElement = document.activeElement;
+            setTimeout(() => {
+                // 用户已移到其他输入框时，保留其焦点，避免把后续输入送进首字段。
+                if (document.activeElement !== activeElement) return;
+                const el = document.getElementById(id);
+                if (el) el.focus();
+            }, 60);
         },
 
         // v6.2 round 7:删表

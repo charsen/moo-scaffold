@@ -31,7 +31,8 @@ class EnforceDesignerPermission
 
         // 只管 designer 写;其它路径交给别的 middleware
         $prefix   = trim((string) config('scaffold.route.prefix', 'scaffold'), '/');
-        $patterns = [$prefix . '/db/designer', $prefix . '/db/designer/*'];
+        $prefix   = $prefix === '' ? '' : $prefix . '/';
+        $patterns = [$prefix . 'db/designer', $prefix . 'db/designer/*'];
         if (! $request->is(...$patterns)) {
             return $next($request);
         }

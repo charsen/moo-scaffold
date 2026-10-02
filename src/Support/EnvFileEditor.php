@@ -34,6 +34,11 @@ class EnvFileEditor
         if ($writes === []) {
             return;
         }
+        foreach ($writes as $key => $value) {
+            if (str_contains($value, "\n") || str_contains($value, "\r")) {
+                throw new RuntimeException("env key [{$key}] 的值含换行，拒绝写入不支持的多行值。");
+            }
+        }
         if (! is_file($filePath)) {
             throw new RuntimeException(".env 文件不存在：{$filePath}");
         }
@@ -97,12 +102,11 @@ class EnvFileEditor
         if (preg_match('/^[A-Za-z0-9._\-\/]+$/', $value)) {
             return $value;
         }
-        // 否则用双引号，转义 \" 和 \$ 和 \\ 和反引号
+        // dotenv 双引号只需转义 \"、\$、\\；反引号是普通字符，\` 是非法转义。
         $escaped = strtr($value, [
             '\\' => '\\\\',
             '"'  => '\\"',
             '$'  => '\\$',
-            '`'  => '\\`',
         ]);
 
         return '"' . $escaped . '"';

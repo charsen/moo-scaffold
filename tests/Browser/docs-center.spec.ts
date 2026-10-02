@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+import { closeSync, lstatSync, openSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 /**
  * `/scaffold/docs/edit` + `/scaffold/docs`（文档中心）的实时行为守卫。
@@ -7,14 +10,49 @@ import { test, expect } from '@playwright/test';
  * 漏解包不会抛错，只会让「实时预览整块空白」或「搜索永远显示没有匹配」，PHP 侧一条都测不到。
  * 配套的形态守卫在 `tests/javascript/docs-unwrap.test.js`（扫描源码接线），本文件守**运行时**。
  *
- * 全程**只读**：
+ * 预览与搜索用例**只读**：
  *   - 编辑器用例停在「新建态」（路径框留空）—— docs-editor 的 autosave 会直接 `return`，
  *     不会落盘任何文件；
  *   - 搜索用例只发 GET /docs/search。
  *
- * 宿主处于生产/强制只读（编辑器整页锁定、不绑交互）时自动跳过。
+ * 保存用例需要 E2E_HOST_DOCS_PATH，创建并清理独占夹具。
+ * 宿主处于生产/强制只读（编辑器整页锁定、不绑交互）时自动跳过预览与搜索。
  */
 test.describe('Docs 文档中心', () => {
+    test('通过编辑器原子保存目录内软链接，保留旧读者、目标权限和链接', async ({ page }) => {
+        const directory = process.env.E2E_HOST_DOCS_PATH;
+        test.skip(!directory, '需要 Host 配置的 docs.path 创建隔离夹具');
+        const slug = `e2e-atomic-${randomUUID()}`;
+        const target = join(directory!, `${slug}.md`);
+        const alias = `${slug}-alias`;
+        const link = join(directory!, `${alias}.md`);
+        const old = '# E2E 原文\n';
+        const next = '# E2E 新正文\n\n完整的新内容。\n';
+        writeFileSync(target, old, { flag: 'wx', mode: 0o600 });
+        symlinkSync(`${slug}.md`, link);
+        const reader = openSync(target, 'r');
+
+        try {
+            await page.goto(`/scaffold/docs/edit?doc=${alias}`);
+            await expect(page.locator('#doc_slug')).toHaveValue(alias);
+            await page.locator('#doc_content').fill(next);
+            const saved = page.waitForResponse(r => r.url().endsWith('/docs/save') && r.request().method() === 'POST');
+            await page.locator('#doc_save').click();
+            expect((await saved).status()).toBe(200);
+            await expect(page.locator('#doc_save_status')).toContainText('已保存');
+            expect(readFileSync(target, 'utf8')).toBe(next);
+            expect(readFileSync(reader, 'utf8')).toBe(old);
+            expect(lstatSync(target).mode & 0o7777).toBe(0o600);
+            expect(lstatSync(link).isSymbolicLink()).toBe(true);
+        } finally {
+            page.on('dialog', dialog => dialog.accept());
+            await page.close();
+            closeSync(reader);
+            unlinkSync(link);
+            unlinkSync(target);
+        }
+    });
+
     test('编辑器实时预览：经解包层渲染 markdown（新建态，零写入）', async ({ page }) => {
         const pageErrors: string[] = [];
         page.on('pageerror', (e) => pageErrors.push(String(e)));
@@ -64,5 +102,37 @@ test.describe('Docs 文档中心', () => {
         // 防抖 250ms + 一次往返
         await expect(page.locator('#docs_home_results')).toBeVisible({ timeout: 20000 });
         await expect(page.locator('#docs_home_results .p-docs-home__result')).toHaveCount(apiCount);
+    });
+
+    test('同 IP 的 CSP 上报不挤占登录额度', async ({ browser }) => {
+        const context = await browser.newContext({
+            baseURL: process.env.E2E_BASE_URL,
+            storageState: { cookies: [], origins: [] },
+        });
+        try {
+            const login = await context.newPage();
+            await login.goto('/scaffold/login');
+            const statuses = await login.evaluate(async () => {
+                const reports: number[] = [];
+                for (let i = 0; i < 5; i++) {
+                    const response = await fetch('/scaffold/csp-report', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 'csp-report': {} }),
+                    });
+                    reports.push(response.status);
+                }
+                const token = (document.querySelector('input[name="_token"]') as HTMLInputElement).value;
+                const response = await fetch('/scaffold/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': token },
+                    body: JSON.stringify({ username: [] }),
+                });
+                return { reports, login: response.status };
+            });
+            expect(statuses.reports).toEqual([204, 204, 204, 204, 204]);
+            expect(statuses.login).toBe(422);
+        } finally {
+            await context.close();
+        }
     });
 });

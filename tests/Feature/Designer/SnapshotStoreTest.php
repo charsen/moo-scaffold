@@ -224,3 +224,46 @@ it('captureTables: 正常路径返回 advanced=true / reason=null（前端据此
         'advanced' => true, 'rebuilt_from_scratch' => false, 'reason' => null,
     ]);
 });
+
+function failingSnapshotCapture(Filesystem $files): SnapshotStore
+{
+    return new class($files) extends SnapshotStore
+    {
+        protected function writeFileAtomically(string $path, string $content, ?int $mode = null): void
+        {
+            throw new RuntimeException('fixture: snapshot write failed');
+        }
+    };
+}
+
+it('capture() 写入失败必须抛错，且保持原基线', function () {
+    $before = file_get_contents($this->snapPath);
+
+    expect(fn () => failingSnapshotCapture($this->fs)->capture('Demo'))
+        ->toThrow(RuntimeException::class, 'snapshot');
+    expect(file_get_contents($this->snapPath))->toBe($before);
+});
+
+it('snapshot:init 写入失败返回非零并报告 error，不虚报 created 或 overwritten', function () {
+    config(['scaffold.only_in_local' => false]);
+    app()->instance(SnapshotStore::class, failingSnapshotCapture($this->fs));
+    $before = file_get_contents($this->snapPath);
+
+    $code = \Illuminate\Support\Facades\Artisan::call('moo:snapshot:init', [
+        '--schema' => 'Demo', '--force' => true, '--no-db-check' => true,
+    ]);
+    $output = \Illuminate\Support\Facades\Artisan::output();
+
+    expect($code)->toBe(1);
+    expect($output)->toContain('error')->not->toContain('overwritten');
+    expect(file_get_contents($this->snapPath))->toBe($before);
+});
+
+it('captureTables() 写入失败仍返回状态，不抛异常打断已落盘迁移的回执', function () {
+    $before = file_get_contents($this->snapPath);
+    $result = failingSnapshotCapture($this->fs)->captureTables('Demo', ['demo_users']);
+
+    expect($result['advanced'])->toBeFalse();
+    expect($result['reason'])->toContain('快照写入失败');
+    expect(file_get_contents($this->snapPath))->toBe($before);
+});

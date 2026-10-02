@@ -6,6 +6,7 @@ namespace Mooeen\Scaffold\Support;
 
 use Illuminate\Filesystem\Filesystem;
 use InvalidArgumentException;
+use Mooeen\Scaffold\Support\Concerns\AtomicFileWrite;
 use Mooeen\Scaffold\Utility;
 use RuntimeException;
 
@@ -30,6 +31,8 @@ use RuntimeException;
  */
 class DocsRepository
 {
+    use AtomicFileWrite;
+
     /** slug 段非法字符：控制符 + 文件系统危险字符。中文/空格/字母数字 _ - . 允许。 */
     private const SLUG_FORBIDDEN = '/[\x00-\x1f\x7f<>:"\\\\|?*]/u';
 
@@ -140,7 +143,10 @@ class DocsRepository
             $relPath = str_replace('\\', '/', $file->getRelativePathname());
             $slug    = preg_replace('/\.md$/i', '', $relPath);
             $segs    = explode('/', $slug);
-            if ($this->anySegmentHidden($segs)) {
+            if ($this->anySegmentHidden($segs) || ! $this->isValidSlug($slug)) {
+                continue;
+            }
+            if (! $this->withinBase($file->getPathname(), $origin)) {
                 continue;
             }
 
@@ -241,11 +247,8 @@ class DocsRepository
      */
     public function find(string $slug, ?string $origin = null): ?array
     {
-        if (! $this->isValidSlug($slug)) {
-            return null;
-        }
-        $abs = $this->absPath($slug, $origin);
-        if (! $this->fs->isFile($abs) || ! $this->withinBase($abs, $origin)) {
+        $abs = $this->existingPath($slug, $origin);
+        if ($abs === null) {
             return null;
         }
 
@@ -265,7 +268,7 @@ class DocsRepository
 
     public function exists(string $slug, ?string $origin = null): bool
     {
-        return $this->isValidSlug($slug) && $this->fs->isFile($this->absPath($slug, $origin));
+        return $this->existingPath($slug, $origin) !== null;
     }
 
     /** 某源没有任何文档时返回 null；否则返回排序后第一篇的 slug。 */
@@ -295,9 +298,12 @@ class DocsRepository
         foreach ($this->all($origin) as $doc) {
             $titleHit = mb_stripos($doc['title'], $q) !== false || mb_stripos($doc['slug'], $q) !== false;
 
-            $raw      = (string) $this->fs->get($this->absPath($doc['slug'], $origin));
+            $found = $this->find($doc['slug'], $origin);
+            if ($found === null) {
+                continue;
+            }
             $excerpts = [];
-            foreach (explode("\n", $this->parse($raw)['body']) as $line) {
+            foreach (explode("\n", $found['body']) as $line) {
                 if (mb_stripos($line, $q) === false) {
                     continue;
                 }
@@ -348,7 +354,7 @@ class DocsRepository
      * `catch (\Throwable $e)` 把 message 落成 422 JSON，用户在编辑器里看到红字提示。
      *
      * @throws InvalidArgumentException slug 非法 / 路径越界
-     * @throws RuntimeException         写入失败（`Filesystem::put()` 返回 false）时，文件保持原内容
+     * @throws RuntimeException         原子写入失败时，文件保持原内容
      */
     public function save(string $slug, string $raw, ?string $origin = null): string
     {
@@ -357,7 +363,11 @@ class DocsRepository
             throw new InvalidArgumentException('文档路径非法（不能含 .. / 控制符 / 文件系统保留字符，每段非空且不以点开头）。');
         }
         $abs = $this->absPath($slug, $origin);
-        // realpath 收敛：父目录解析后必须仍在 docs 根内（双层防穿越）
+        // 先检查最近的已存在祖先，不能沿越界软链先创建目录再拒绝。
+        $this->fs->ensureDirectoryExists($this->baseDir($origin));
+        if (! $this->withinBase($abs, $origin)) {
+            throw new InvalidArgumentException('文档路径越界，拒绝写入。');
+        }
         $this->fs->ensureDirectoryExists(dirname($abs));
         if (! $this->withinBase($abs, $origin)) {
             throw new InvalidArgumentException('文档路径越界，拒绝写入。');
@@ -366,8 +376,10 @@ class DocsRepository
         // 统一换行 + 末尾留一个换行
         $raw = str_replace("\r\n", "\n", $raw);
         $raw = rtrim($raw, "\n") . "\n";
-        if ($this->fs->put($abs, $raw) === false) {   // put() 是 int|false，只能与 false 严格比
-            throw new RuntimeException("写入失败，文档未变更：{$slug}");
+        try {
+            $this->writeDocument($abs, $raw);
+        } catch (RuntimeException $e) {
+            throw new RuntimeException("写入失败，文档未变更：{$slug}", 0, $e);
         }
         unset($this->allCache[$origin ?? '']);   // 列表变了,作废该源 memo
 
@@ -390,8 +402,8 @@ class DocsRepository
         if (! $this->isValidSlug($slug)) {
             throw new InvalidArgumentException('文档路径非法。');
         }
-        $abs = $this->absPath($slug, $origin);
-        if (! $this->fs->isFile($abs) || ! $this->withinBase($abs, $origin)) {
+        $abs = $this->existingPath($slug, $origin);
+        if ($abs === null) {
             throw new InvalidArgumentException('文档不存在或路径越界。');
         }
         if ($this->fs->delete($abs) === false) {   // delete() 返回纯 bool，但同样不该被丢弃
@@ -417,6 +429,8 @@ class DocsRepository
     {
         $this->assertWritable($origin);
 
+        // 写入不能使用此前读取的目录快照：同请求内磁盘也可能已有增删。
+        unset($this->allCache[$origin ?? '']);
         $current = [];
         foreach ($this->all($origin) as $doc) {
             $current[$doc['slug']] = $doc['order'];
@@ -429,20 +443,23 @@ class DocsRepository
 
         $changed = 0;
         foreach (array_values($slugs) as $i => $slug) {
+            $abs = $this->existingPath($slug, $origin);
+            if ($abs === null) {
+                throw new InvalidArgumentException('文档不存在或路径越界，请刷新页面后重新排序。');
+            }
             $order = ($i + 1) * 10;
             if ($current[$slug] === $order) {
                 continue;
             }
-            $abs  = $this->absPath($slug, $origin);
             $next = $this->withOrderLine((string) $this->fs->get($abs), $order);
-            // put() 是 int|false，只能与 false 严格比。前几篇可能已落盘，故提示带上已改篇数
-            if ($this->fs->put($abs, $next) === false) {
-                throw new RuntimeException("写入失败：{$slug} 未能编号，已改 {$changed} 篇，请刷新页面后重试。");
+            // 每篇原子写；前几篇可能已落盘，故提示带上已改篇数。
+            try {
+                $this->writeDocument($abs, $next);
+            } catch (RuntimeException $e) {
+                throw new RuntimeException("写入失败：{$slug} 未能编号，已改 {$changed} 篇，请刷新页面后重试。", 0, $e);
             }
             $changed++;
-        }
-        if ($changed > 0) {
-            unset($this->allCache[$origin ?? '']);   // 顺序变了,作废该源 memo
+            unset($this->allCache[$origin ?? '']);   // 部分成功后失败也不能复用旧序号
         }
 
         return $changed;
@@ -547,9 +564,37 @@ class DocsRepository
         return array_values(array_filter(array_map(static fn ($t) => trim((string) $t), $tags), static fn ($t) => $t !== ''));
     }
 
+    /** 保留目录内软链接：替换其已校验目标，而非链接本身。 */
+    private function writeDocument(string $path, string $content): void
+    {
+        if (is_file($path) && ! is_writable($path)) {
+            throw new RuntimeException('文档不可写。');
+        }
+        $this->writeFileAtomically(realpath($path) ?: $path, $content);
+    }
+
+    /** 已有文档的统一入口：合法 slug、文件存在且位于当前源目录内。 */
+    private function existingPath(string $slug, ?string $origin): ?string
+    {
+        if (! $this->isValidSlug($slug)) {
+            return null;
+        }
+        $path = $this->absPath($slug, $origin);
+
+        return $this->fs->isFile($path) && $this->withinBase($path, $origin) ? $path : null;
+    }
+
     private function absPath(string $slug, ?string $origin): string
     {
-        return $this->baseDir($origin) . $slug . '.md';
+        $stem = $this->baseDir($origin) . $slug;
+        foreach (['md', 'MD', 'Md', 'mD'] as $extension) {
+            $path = $stem . '.' . $extension;
+            if ($this->fs->isFile($path)) {
+                return $path;
+            }
+        }
+
+        return $stem . '.md';
     }
 
     /** @param list<string> $segs */
@@ -584,20 +629,24 @@ class DocsRepository
         return true;
     }
 
-    /** realpath 收敛：abs 解析后必须落在该源 docs 根内（文件可不存在，则按其父目录判断）。 */
+    /** realpath 收敛：文件可不存在，按最近的已存在祖先判断；损坏软链拒绝。 */
     private function withinBase(string $abs, ?string $origin): bool
     {
         $realBase = realpath(rtrim($this->baseDir($origin), '/'));
         if ($realBase === false) {
             return false;
         }
-        $target = realpath($abs);
-        if ($target === false) {
-            // 文件尚不存在（新建）：按父目录判断
-            $target = realpath(dirname($abs));
-            if ($target === false) {
+        $ancestor = $abs;
+        while (! file_exists($ancestor) && ! is_link($ancestor)) {
+            $parent = dirname($ancestor);
+            if ($parent === $ancestor) {
                 return false;
             }
+            $ancestor = $parent;
+        }
+        $target = realpath($ancestor);
+        if ($target === false) {
+            return false;
         }
 
         return $target === $realBase || str_starts_with($target, $realBase . DIRECTORY_SEPARATOR);
