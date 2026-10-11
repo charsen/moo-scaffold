@@ -21,9 +21,12 @@ it('两个子集各自无重复，且 detectable() 就是并集', function () {
     expect(FormWidgetTypes::detectable())->toBe($union);
 });
 
-it('已知差异是既成事实：text-amount 只在 FORMER', function () {
+it('已知差异是既成事实：text-amount / input-number 只在 FORMER', function () {
     expect(FormWidgetTypes::FORMER)->toContain('text-amount');
     expect(FormWidgetTypes::DEBUGGER_RENDERABLE)->not->toContain('text-amount');
+
+    expect(FormWidgetTypes::FORMER)->toContain('input-number');
+    expect(FormWidgetTypes::DEBUGGER_RENDERABLE)->not->toContain('input-number');
 });
 
 it('已知差异是既成事实：date / cropper-image 只在 DEBUGGER_RENDERABLE', function () {

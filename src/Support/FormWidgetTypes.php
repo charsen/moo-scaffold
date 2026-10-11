@@ -17,7 +17,7 @@ namespace Mooeen\Scaffold\Support;
  *   type 落到「未知 widget 类型」占位框——不报错、也不让整张表单预览静默消失。
  *
  * 现有差异是既成事实，不是待修漂移：
- * - `text-amount` 只在 `FORMER`：预览暂画不出，显示占位框；要画得先在 `renderControl()` 加分支。
+ * - `text-amount` / `input-number` 只在 `FORMER`：预览暂画不出，显示占位框；要画得先在 `renderControl()` 加分支。
  * - `date` / `cropper-image` 只在 `DEBUGGER_RENDERABLE`：历史 / 误用 type，下游注册表没有；
  *   留在可识别集合里，避免老 host 下发的字段让整张表单预览消失。
  *
@@ -31,7 +31,7 @@ final class FormWidgetTypes
 {
     /** 下游 admin 前端 `components/former/config.ts` 的 elComponents 注册表。 */
     public const FORMER = [
-        'input', 'textarea', 'password', 'color-picker', 'rate', 'rate-picker',
+        'input', 'input-number', 'textarea', 'password', 'color-picker', 'rate', 'rate-picker',
         'month-day-picker', 'date-picker', 'datetime-picker', 'month-picker',
         'editor', 'select', 'cascader', 'checkbox', 'radio',
         'upload-file', 'upload-image', 'text-amount',
