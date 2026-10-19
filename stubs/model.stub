@@ -1,4 +1,4 @@
-<?php declare(strict_types = 1);
+<?php declare(strict_types=1);
 /*
  * @Author: {{author}}
  * @Date: {{date}}
@@ -25,12 +25,14 @@ class {{class}} extends Model
 {{timestamp_columns}}
     /**
      * 表格名称
+     *
      * @var string
      */
     protected $table = '{{table_name}}';
 
     /**
      * 指定字段默认值
+     *
      * @var array
      */
     protected $attributes = [{{attributes}}];
@@ -39,6 +41,7 @@ class {{class}} extends Model
 
     /**
      * 可以被批量赋值的属性
+     *
      * @var array
      */
     protected $fillable = [{{fillable}}];

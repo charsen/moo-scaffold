@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2.2.16] - 2026-10-19
+
+- 生成物产出即合规：19 个 stub 首行统一为 `declare(strict_types=1)`，与宿主 `pint.json` 的 `declare_equal_normalize(space: none)` 对齐，生成后无需再跑格式化。
+- `resource.stub` 的返回类型补空格；`model.stub` 的 `@var` 前补空行；模型 filter 的 `return` 前补空行（`blank_line_before_statement`）。
+- 仅生成模板与生成器调整，无运行时行为变更、无数据库迁移；升级后重新生成代码即可获得合规产物。
+
 ## [2.2.14] - 2026-10-02
 
 - E2E 安全入口拒绝脏 schema、无效路径与已改动 migrations；清理限定生成目录，保留范围外新增文件，以 NUL 分隔处理中文/空格/换行路径，清理失败不再返回成功。
