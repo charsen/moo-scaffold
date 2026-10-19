@@ -345,6 +345,7 @@ class CreateModelGenerator extends Generator
                 $codes[] = $this->getTabs() . "public function {$field_name}(\$int)";
                 $codes[] = $this->getTabs() . '{';
                 $codes[] = $this->getTabs(2) . '$int = is_array($int) ? $int : [$int];';
+                $codes[] = ''; // 空一行（Pint blank_line_before_statement）
                 $codes[] = $this->getTabs(2) . "return \$this->whereIn('{$fn}', \$int);";
                 $codes[] = $this->getTabs() . '}';
             }
@@ -399,6 +400,7 @@ class CreateModelGenerator extends Generator
             $codes[] = $this->getTabs() . "public function {$field_name}(\$int)";
             $codes[] = $this->getTabs() . '{';
             $codes[] = $this->getTabs(2) . '$int = is_array($int) ? $int : [$int];';
+            $codes[] = ''; // 空一行（Pint blank_line_before_statement）
             $codes[] = $this->getTabs(2) . "return \$this->whereIn('{$fn}', \$int);";
             $codes[] = $this->getTabs() . '}';
         }
