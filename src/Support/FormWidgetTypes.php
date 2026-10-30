@@ -33,7 +33,7 @@ final class FormWidgetTypes
     public const FORMER = [
         'input', 'input-number', 'textarea', 'password', 'color-picker', 'rate', 'rate-picker',
         'month-day-picker', 'date-picker', 'datetime-picker', 'month-picker',
-        'editor', 'select', 'cascader', 'checkbox', 'radio',
+        'editor', 'select', 'cascader', 'tree-scope', 'checkbox', 'radio',
         'upload-file', 'upload-image', 'text-amount',
     ];
 

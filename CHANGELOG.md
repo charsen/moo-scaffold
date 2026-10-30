@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Former 控件词表登记通用 `tree-scope` 类型，与共享前端树范围控件接线；调试器识别该类型并沿用未支持预览控件的占位策略，不改变控件推断或生成器。
+
 ## [2.2.16] - 2026-10-19
 
 - 生成物产出即合规：19 个 stub 首行统一为 `declare(strict_types=1)`，与宿主 `pint.json` 的 `declare_equal_normalize(space: none)` 对齐，生成后无需再跑格式化。
