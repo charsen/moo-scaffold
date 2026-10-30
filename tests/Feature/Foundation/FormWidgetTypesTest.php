@@ -36,6 +36,12 @@ it('已知差异是既成事实：date / cropper-image 只在 DEBUGGER_RENDERABL
     expect(FormWidgetTypes::FORMER)->not->toContain('cropper-image');
 });
 
+it('树范围控件可由Former下发并被调试器识别，预览保留占位策略', function () {
+    expect(FormWidgetTypes::FORMER)->toContain('tree-scope')
+        ->and(FormWidgetTypes::detectable())->toContain('tree-scope')
+        ->and(FormWidgetTypes::DEBUGGER_RENDERABLE)->not->toContain('tree-scope');
+});
+
 /* ---------------------------------------------------------------------------
  * 接线锚点
  * ------------------------------------------------------------------------ */
