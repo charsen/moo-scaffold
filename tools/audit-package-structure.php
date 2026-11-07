@@ -190,12 +190,12 @@ function allowances(): array
 
     $base = [
         'moo-contract'        => $pureContract,
-        'moo-monitor-laravel' => $infra + ['name:config-stem' => '刻意共享的产品 stem：与姐妹前端包 moo-monitor-vue 同源，改名会连带发布标签与宿主配置'],
+        'moo-monitor-laravel' => $infra   + ['name:config-stem' => '刻意共享的产品 stem：与姐妹前端包 moo-monitor-vue 同源，改名会连带发布标签与宿主配置'],
         'moo-scaffold'        => $tooling + [
             'gitattributes:docs' => 'docs/ 是 host 文档中心的包文档源（src/Support/DocsRepository.php 直接读包 basePath 下的 docs/），有意随包分发',
             'name:config-stem'   => '全生态宿主的既有契约：config/ 发布标签与 config(\'scaffold.*\') 读取点遍布所有宿主，改名是破坏性变更',
         ],
-        'moo-upload'          => [
+        'moo-upload' => [
             'src/Models/Filters' => '轻控制器包：无列表筛选需求',
             'src/Http/Resources' => '轻控制器包：直接返回数组/DTO',
         ],
@@ -329,9 +329,9 @@ function layoutCheck(string $packageDir, string $package, array &$waived = []): 
     if ($package !== 'moo-scaffold') {
         $controllerNames = [];
         foreach (array_merge(
-                glob($packageDir . '/src/Http/Controllers/{Admin,Web}/*.php', GLOB_BRACE) ?: [],
-                glob($packageDir . '/src/Http/Controllers/*.php') ?: [],
-            ) as $file) {
+            glob($packageDir . '/src/Http/Controllers/{Admin,Web}/*.php', GLOB_BRACE) ?: [],
+            glob($packageDir . '/src/Http/Controllers/*.php') ?: [],
+        ) as $file) {
             $controllerNames[] = strtolower(str_replace('Controller.php', '', basename($file)));
         }
         foreach (glob($packageDir . '/src/Http/Requests/*', GLOB_ONLYDIR) ?: [] as $dir) {
@@ -470,7 +470,7 @@ function auditPackage(string $dir, string $workspace, ?array $canonicalRules): a
                 $waived['name:config-stem'] = $allow['name:config-stem'];
             } else {
                 $drift['NAME'][] = sprintf(
-                'config stem 为 %s（按 moo-<name> 约定应为 %s）—— 判断题：确认是否为刻意的共享产品 stem',
+                    'config stem 为 %s（按 moo-<name> 约定应为 %s）—— 判断题：确认是否为刻意的共享产品 stem',
                     $configStem,
                     $stem,
                 );
