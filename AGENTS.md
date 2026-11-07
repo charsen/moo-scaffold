@@ -4,6 +4,8 @@
 验证门禁、E2E 与浏览器验证、Composer 三份 manifest、跨仓公共契约等通用规则随全局 `~/.agents/AGENTS.md`，本文件不重复。
 冲突时按「系统 / 用户当前指令 > 离目标最近的 `AGENTS.md` > 全局」判断；版本、命令与接口以当前代码、manifest 和测试核实。
 
+> Moo/Laravel 通用规则见 `~/.agents/moo.md`（scaffold/Schema/Request/迁移/扩展包/Composer），开工前先读。
+
 ## 开工顺序
 
 1. 按任务读 `README.md`、`docs/overview.md` 和对应的 `docs/guide/*`。
